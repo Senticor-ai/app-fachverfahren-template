@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.strict.json",
+  "compilerOptions": {
+    "outDir": "dist-server",
+    "rootDir": ".",
+    "noEmit": false
+  },
+  "references": [
+    { "path": "../../packages/public-sector-sdk" },
+    { "path": "../../packages/app-store-postgres" }
+  ],
+  "include": ["server/**/*.ts", "shared/**/*.ts"]
+}

@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.strict.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "references": [
+    { "path": "../../packages/public-sector-sdk" },
+    { "path": "../../packages/public-sector-ui" },
+    { "path": "../../jurisdictions/de" }
+  ],
+  "include": [
+    "../../.storybook/**/*.ts",
+    "../../modules/**/ui/**/*.stories.ts",
+    "../../modules/**/ui/**/*.stories.tsx",
+    "../../packages/public-sector-ui/src/**/*.stories.ts",
+    "../../packages/public-sector-ui/src/**/*.stories.tsx",
+    "src/**/*.stories.ts",
+    "src/**/*.stories.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "shared/**/*.ts"
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "useDefineForClassFields": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "@senticor/platform-contracts": [
+        "packages/platform-contracts/src/index.ts"
+      ],
+      "@senticor/public-sector-sdk": [
+        "packages/public-sector-sdk/src/index.ts"
+      ],
+      "@senticor/public-sector-ui": ["packages/public-sector-ui/src/index.ts"],
+      "@senticor/provider-local": ["packages/provider-local/src/index.ts"],
+      "@senticor/provider-codesphere": [
+        "packages/provider-codesphere/src/index.ts"
+      ],
+      "@senticor/provider-dvc-generic": [
+        "packages/provider-dvc-generic/src/index.ts"
+      ],
+      "@senticor/conformance-kit": ["packages/conformance-kit/src/index.ts"],
+      "@senticor/migration-kit": ["packages/migration-kit/src/index.ts"],
+      "@senticor/app-store-postgres": [
+        "packages/app-store-postgres/src/index.ts"
+      ],
+      "@senticor/jurisdiction-eu": ["jurisdictions/eu/src/index.ts"],
+      "@senticor/jurisdiction-de": ["jurisdictions/de/src/index.ts"]
+    }
+  }
+}

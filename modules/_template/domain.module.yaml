@@ -1,0 +1,35 @@
+id: replace-with-domain-id
+version: 0.1.0
+displayName: Fachverfahren Vorlage
+
+routes:
+  - path: /cases/replace-with-domain-id
+    surface: caseworker
+  - path: /services/replace-with-domain-id
+    surface: citizen
+
+requiredCapabilities:
+  - identity-and-trust
+
+permissions:
+  - permission: replace-with-domain-id.case.read
+    description: Vorgänge lesen
+  - permission: replace-with-domain-id.case.write
+    description: Vorgänge bearbeiten
+
+events:
+  publishes:
+    - eventType: replace-with-domain-id.case-created
+      version: v1
+  consumes: []
+
+dataCategories:
+  - confidential
+
+retentionPolicies:
+  - replace-with-domain-id-case-records
+
+migrations:
+  database: migrations/database/
+  documents: migrations/documents/
+  externalSystems: []

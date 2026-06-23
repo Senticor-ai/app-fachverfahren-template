@@ -1,0 +1,26 @@
+{
+  "extends": "../../tsconfig.strict.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "jsx": "react-jsx",
+    "outDir": "dist-types",
+    "rootDir": "."
+  },
+  "references": [
+    { "path": "../../packages/public-sector-sdk" },
+    { "path": "../../packages/app-store-postgres" },
+    { "path": "../../packages/public-sector-ui" },
+    { "path": "../../jurisdictions/de" }
+  ],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "e2e/**/*.ts",
+    "server/**/*.ts",
+    "shared/**/*.ts",
+    "vite.config.ts"
+  ],
+  "exclude": ["src/**/*.stories.ts", "src/**/*.stories.tsx"]
+}

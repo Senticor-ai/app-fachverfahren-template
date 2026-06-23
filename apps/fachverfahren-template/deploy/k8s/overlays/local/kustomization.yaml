@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: fachverfahren-local
+
+resources:
+  - ../../base
+  - namespace.yaml
+
+configMapGenerator:
+  - name: fachverfahren-public-config
+    behavior: merge
+    literals:
+      - PUBLIC_APP_NAME=Fachverfahren Template Lokal
+      - PUBLIC_AUTHORITY_ID=authority.local
+      - PUBLIC_AUTHORITY_NAME=Lokale Beispielbehörde
+      - PUBLIC_TENANT_ID=tenant.local
+
+images:
+  - name: registry.opencode.de/senticor/fachverfahren-template
+    newName: fachverfahren-template
+    newTag: local

@@ -1,0 +1,25 @@
+{
+  "jurisdiction": "DE",
+  "authorityType": "municipality",
+  "protectionNeeds": {
+    "confidentiality": "high",
+    "integrity": "high",
+    "availability": "normal"
+  },
+  "processing": {
+    "purposes": [],
+    "legalBases": [],
+    "dataCategories": [],
+    "recipients": [],
+    "retentionRules": []
+  },
+  "operations": {
+    "dataResidency": "DE",
+    "rto": "PT4H",
+    "rpo": "PT1H"
+  },
+  "accessibility": {
+    "profile": "BITV-2",
+    "target": "WCAG-2.2-AA"
+  }
+}

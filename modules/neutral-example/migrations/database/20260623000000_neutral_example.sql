@@ -1,0 +1,2 @@
+-- Domain modules own their procedure-specific schema changes.
+-- This neutral example intentionally creates no runtime tables.

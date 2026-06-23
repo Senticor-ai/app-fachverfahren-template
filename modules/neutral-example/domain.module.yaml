@@ -1,0 +1,42 @@
+id: neutral-example
+version: 0.1.0
+displayName: Neutrales Beispielverfahren
+
+routes:
+  - path: /cases/neutral-example
+    surface: caseworker
+  - path: /services/neutral-example
+    surface: citizen
+
+requiredCapabilities:
+  - identity-and-trust
+  - mailbox
+
+permissions:
+  - permission: neutral-example.case.read
+    description: Beispielvorgaenge lesen
+  - permission: neutral-example.case.write
+    description: Beispielvorgaenge bearbeiten
+  - permission: neutral-example.case.decide
+    description: Beispielentscheidung vorbereiten
+
+events:
+  publishes:
+    - eventType: neutral-example.case-created
+      version: v1
+    - eventType: neutral-example.decision-prepared
+      version: v1
+  consumes:
+    - eventType: mailbox.message-received
+      version: v1
+
+dataCategories:
+  - confidential
+
+retentionPolicies:
+  - neutral-example-case-records
+
+migrations:
+  database: migrations/database/
+  documents: migrations/documents/
+  externalSystems: []

@@ -1,0 +1,7 @@
+permissions:
+  - permission: neutral-example.case.read
+    description: Beispielvorgaenge lesen
+  - permission: neutral-example.case.write
+    description: Beispielvorgaenge bearbeiten
+  - permission: neutral-example.case.decide
+    description: Beispielentscheidung vorbereiten

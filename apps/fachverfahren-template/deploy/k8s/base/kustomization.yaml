@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+configMapGenerator:
+  - name: fachverfahren-public-config
+    literals:
+      - PUBLIC_APP_NAME=Fachverfahren Template
+      - PUBLIC_AUTHORITY_ID=authority.local
+      - PUBLIC_AUTHORITY_NAME=Beispielbehörde
+      - PUBLIC_TENANT_ID=tenant.local
+
+resources:
+  - serviceaccount-web.yaml
+  - serviceaccount-worker.yaml
+  - serviceaccount-scheduler.yaml
+  - serviceaccount-migrator.yaml
+  - web-deployment.yaml
+  - worker-deployment.yaml
+  - scheduler-cronjob.yaml
+  - migrator-job.yaml
+  - service.yaml
+  - networkpolicy-default-deny.yaml
+  - networkpolicy-web.yaml
+  - pdb.yaml

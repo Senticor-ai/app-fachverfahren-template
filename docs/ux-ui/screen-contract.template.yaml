@@ -1,0 +1,64 @@
+id: example-screen
+route: /example
+owner: modules/example
+persona: citizen | caseworker | management-audit
+inputs:
+  - runtimeConfig
+  - activeRole
+  - jurisdictionConfig
+outputs:
+  - example.opened
+states:
+  - loading
+  - empty
+  - error
+  - ready
+  - success
+ia:
+  pattern: guided-stepper | master-detail | dashboard-drilldown
+  navigation:
+    - role-gated navigation is visible before screen actions
+  profile:
+    - profile and settings remain reachable from the persistent shell
+  scroll:
+    - screen uses independent content scroll, not body scroll for work panels
+content:
+  language:
+    - German UI text fits the active persona
+  architectureTerms:
+    - no basis-service, port or adapter wording in primary user navigation
+hcai:
+  mode: none | assistive | review-required
+  controls:
+    - AI output is marked, sourced, explainable and overrideable when present
+a11y:
+  landmarks:
+    - main
+  labels:
+    - all controls have visible labels
+  keyboard:
+    - Tab reaches every interactive element
+    - Enter or Space activates focused rows
+  focusOrder:
+    - page heading
+    - primary action
+    - main content
+  zoom:
+    - 400 percent zoom reflows without function loss
+  statusSemantics:
+    - status uses text or icon plus color
+tests:
+  unit:
+    - renders allowed actions for active role
+  integration:
+    - handles upstream outage with recovery path
+  storybook:
+    - default
+    - empty
+    - error
+    - success
+    - keyboard focus
+evidence:
+  - storybook story
+  - test output
+  - accessibility review note

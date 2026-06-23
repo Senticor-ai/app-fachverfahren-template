@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.strict.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "references": [
+    { "path": "../../packages/platform-contracts" },
+    { "path": "../../packages/public-sector-sdk" },
+    { "path": "../eu" }
+  ],
+  "include": ["src/**/*.ts"]
+}
