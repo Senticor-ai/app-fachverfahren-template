@@ -120,6 +120,11 @@ OpenCode-Agenten nutzen den repo-lokalen Skill
 Standalone-Export sind in `docs/reference/opencode-agent-readiness.md`
 beschrieben.
 
+GitLab-/opencode.de-Image-Builds nutzen Kaniko statt Docker-in-Docker, weil die
+Runner als unprivilegierte Kubernetes-Pods laufen. Der Dockerfile-Vertrag,
+Kaniko-Job und die pnpm-Filterreihenfolge sind in
+`docs/reference/ci-image-builds.md` beschrieben.
+
 ## Wichtige Regeln
 
 - Dokumentation ist deutsch; Code, Typen, Variablen und Paketnamen sind Englisch.

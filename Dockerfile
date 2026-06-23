@@ -1,8 +1,10 @@
 # syntax=docker/dockerfile:1.7
 
 FROM registry.opencode.de/open-code/oci/nodejs:24 AS build
+USER root
 WORKDIR /app
 
+ENV CI=true
 ENV PNPM_HOME="/home/nonroot/.local/bin"
 ENV PATH="${PNPM_HOME}:${PATH}"
 
@@ -26,9 +28,9 @@ RUN mkdir -p "${PNPM_HOME}" \
  && pnpm install --frozen-lockfile=false
 
 COPY . .
-RUN pnpm run build:app \
+RUN pnpm run build:packages \
+ && pnpm run build:app \
  && pnpm run build:server \
- && pnpm --filter @senticor/app-store-postgres build \
  && pnpm prune --prod
 
 FROM registry.opencode.de/open-code/oci/nodejs:24

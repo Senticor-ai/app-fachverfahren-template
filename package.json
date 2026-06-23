@@ -20,6 +20,7 @@
     "dev:vite": "VITE_API_MOCKING=disabled VITE_API_PROXY_TARGET=http://127.0.0.1:8080 pnpm --filter @senticor/fachverfahren-template dev",
     "dev:all": "concurrently --kill-others --names pg,server,vite --prefix-colors blue,green,magenta \"pnpm run dev:postgres\" \"pnpm run dev:server\" \"pnpm run dev:vite\"",
     "build": "pnpm -r --if-present build",
+    "build:packages": "pnpm --filter \"./packages/**\" run --if-present build && pnpm --filter \"./jurisdictions/**\" run --if-present build",
     "build:app": "pnpm --filter @senticor/fachverfahren-template build",
     "build:server": "pnpm --filter @senticor/fachverfahren-template build:server",
     "storybook": "pnpm --filter @senticor/fachverfahren-template storybook",
