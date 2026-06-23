@@ -24,6 +24,8 @@ jobs:
         run: pnpm run check:typescript-policy
       - name: Storybook coverage
         run: pnpm run check:storybook
+      - name: CSS token aliases
+        run: pnpm run check:css-tokens
       - name: Typecheck
         run: pnpm run typecheck
       - name: Test

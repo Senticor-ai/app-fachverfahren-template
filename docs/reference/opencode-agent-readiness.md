@@ -32,6 +32,16 @@ fachliche Serverlogik nicht direkt aus `modules/` in den Template-Server
 importieren, sondern gemeinsame DTOs über `shared/` oder Paketverträge führen
 und die Domain-Anbindung explizit registrieren.
 
+Wichtig für CI-Slices: opencode.de-Runner sind unprivilegierte Kubernetes-Pods.
+Es gibt keinen Docker-Socket und kein Docker-in-Docker. Image-Builds nutzen
+Kaniko; Details stehen in `docs/reference/ci-image-builds.md`.
+
+Bei pnpm-Filterbefehlen steht `--filter` vor `run`, zum Beispiel:
+
+```bash
+pnpm --filter "./packages/**" run --if-present build
+```
+
 ## Standalone Export
 
 ```bash

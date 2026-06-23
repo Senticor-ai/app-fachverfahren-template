@@ -26,6 +26,7 @@ pnpm run precommit:check
 - strict ESM Policy
 - TypeScript-only Source Policy
 - Storybook Coverage Gate
+- CSS Token Alias Gate
 - Prettier Format-Check
 - ESLint
 - TypeScript Project References

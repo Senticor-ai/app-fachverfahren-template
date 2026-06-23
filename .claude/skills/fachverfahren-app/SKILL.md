@@ -69,6 +69,14 @@ pnpm run test
   Basisdienste, ports or adapters in primary user navigation.
 - Screen contracts must include persona, IA, content, HCAI, loading, empty,
   error, ready, success and accessibility acceptance criteria.
+- For CI or container work on GitLab/opencode.de, use Kaniko, not
+  Docker-in-Docker. The runners are unprivileged Kubernetes pods without a
+  Docker socket.
+- For workspace package builds, keep pnpm filters before `run`, for example
+  `pnpm --filter "./packages/**" run --if-present build`.
+- Build workspace packages before app and server outputs:
+  `pnpm run build:packages`, then `pnpm run build:app`, then
+  `pnpm run build:server`.
 
 ## Standalone Export Workflow
 

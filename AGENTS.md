@@ -45,6 +45,29 @@ Ports aus `@senticor/platform-contracts` und Profile aus den Provider-Packs.
 - `pnpm run check:typescript-policy` muss für App-, Package-, Jurisdiction- und
   Domain-Modul-Änderungen bestanden werden.
 
+## CI und Container-Builds
+
+OpenCode-/opencode.de-Runner laufen als unprivilegierte Kubernetes-Pods. Es
+gibt keinen Docker-Socket und keine privilegierten Container; `docker:dind` ist
+deshalb kein zulässiger Standard für Image-Builds. GitLab-CI-Beispiele und
+Agenten-Skills verwenden Kaniko mit `.gitlab-ci.yml` als Referenz.
+
+Im Dockerfile gilt:
+
+- Build-Stage mit `USER root`, weil das opencode.de-Node-Image standardmäßig
+  nicht als Root läuft und `pnpm` sonst bei `node_modules` scheitern kann.
+- `ENV CI=true`, damit nichtinteraktive `pnpm`-Schritte wie `pnpm prune --prod`
+  in Kaniko nicht abbrechen.
+- Workspace-Pakete vor App und BFF bauen: `pnpm run build:packages`, danach
+  `pnpm run build:app` und `pnpm run build:server`.
+
+Bei pnpm-Filterbefehlen steht `--filter` vor `run`, damit Flags nicht an das
+unterliegende Script weitergereicht werden:
+
+```bash
+pnpm --filter "./packages/**" run --if-present build
+```
+
 ## Domain-Module
 
 Neue Fachverfahren werden unter `modules/<domain>/` modelliert:
