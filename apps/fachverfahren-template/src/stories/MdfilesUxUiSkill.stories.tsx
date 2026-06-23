@@ -16,7 +16,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Abnahme gegen /Users/wolfgang/Downloads/mdfilesuxuiskill. Storybook ist der erste sichtbare Vertrag; die App übernimmt die generischen Regeln ohne Hundesteuer-Domainlogik.",
+          "Abnahme gegen das repo-lokale UX/UI-Source-Set. Storybook ist der erste sichtbare Vertrag; die App übernimmt die generischen Regeln ohne Domain-Beispiellogik.",
       },
     },
   },
@@ -27,31 +27,31 @@ type Story = StoryObj<typeof meta>;
 
 const sourceRows = [
   {
-    source: "00_README-uebersicht.md",
+    source: "Source-Set-Überblick",
     requirement: "Generisch und konkret trennen",
     evidence:
-      "Hundesteuer-spezifische Regeln bleiben Validierungsbrief oder Domain-Modul. Template-UI, Mockdaten und Storybook nutzen fachneutrale Vorgänge.",
+      "Fachspezifische Regeln bleiben Beispielprompt oder Domain-Modul. Template-UI, Mockdaten und Storybook nutzen fachneutrale Vorgänge.",
   },
   {
-    source: "01_ux-methodik-public-sector-generisch.md",
+    source: "Public-Sector-UX-Methodik",
     requirement: "Problem, Rolle, HCAI, Shell, Tabellen, Formulare, A11y",
     evidence:
       "UX-Methodik/Public Sector, Screen Contracts, Bürgerin- und Sachbearbeitungs-States sowie persistierte Einstellungen.",
   },
   {
-    source: "01_ux-methodik-hundesteuer-demo.md",
-    requirement: "Nur generische Shell-, Tabellen-, Formular- und Token-Regeln",
+    source: "Fachliches Beispiel",
+    requirement: "Nur konkrete Fachannahmen und Akzeptanz",
     evidence:
-      "Einklappbare Sidebar, Posteingang/Ausgang, Vorgänge, Stepper-Kontrakt und Tokens sind übernommen; Satzung, Gebühren und Hundedaten sind ausgeschlossen.",
+      "Beispielprompts bleiben kurz. Shell, Tabellen, Formulare, Accessibility und Tokens kommen aus Skill, Docs, Storybook und Template-Guardrails.",
   },
   {
-    source: "02_fachverfahren-design-manual.md",
+    source: "Fachverfahren Design Manual",
     requirement: "Fachverfahren-App für Bürgerin, Sachbearbeiter:in und Audit",
     evidence:
       "Design Manual/Fachverfahren codifiziert Master-Detail, Breadcrumbs, Zustände, Tastaturpfad und zielgruppengerechte Dichte.",
   },
   {
-    source: "03_coding-agent-ui-und-designsystem.md",
+    source: "Coding-Agent UI und Design-System",
     requirement: "Doc 3 Design-System und Build Console",
     evidence:
       "Doc 3 ist Token-Quelle. Public-sector-ui exportiert GovernanceBar, ContextRail, WorkspacePanel, Run Cards, Findings, GateStatus und WorkingTabs.",
@@ -62,7 +62,7 @@ export const SourceSetAudit: Story = {
   render: () => (
     <main className="sb-page sb-stack">
       <section className="sb-card sb-card--wide">
-        <p className="eyebrow">mdfilesuxuiskill</p>
+        <p className="eyebrow">UX/UI Source Set</p>
         <h1>Generische Abnahme</h1>
         <p>
           Diese Story ist der Storybook-Vertrag für das komplette
@@ -101,14 +101,14 @@ export const SourceSetAudit: Story = {
 
       <section className="sb-card sb-card--wide">
         <p className="eyebrow">Abgrenzung</p>
-        <h2>Hundesteuer-spezifisch ausgeschlossen</h2>
+        <h2>Fachbeispiele ausgeschlossen</h2>
         <div className="sb-state-grid">
           <article className="sb-state">
             <ShieldCheck aria-hidden="true" size={20} />
             <strong>Keine Fachwerte in der Runtime</strong>
             <span>
-              Beträge, Fristen, Satzungsstellen, Tierdaten und
-              Gefährlichkeitslogik gehören in ein Domain-Modul.
+              Beträge, Fristen, Rechtsverweise, Registerdaten und
+              Bewertungslogik gehören in ein Domain-Modul.
             </span>
           </article>
           <article className="sb-state">
@@ -167,7 +167,7 @@ export const BuildConsoleContract: Story = {
               findingId="UX-GATE-003"
               gateImpact="conditional"
               owner="UX-Agent"
-              source="mdfilesuxuiskill Doc 3"
+              source="UX/UI Source Set Doc 3"
             />
           </RunCard>
 

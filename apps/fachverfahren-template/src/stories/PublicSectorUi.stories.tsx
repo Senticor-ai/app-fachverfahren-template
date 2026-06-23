@@ -139,7 +139,7 @@ export const ComponentSet: Story = {
                   findingId="UX-IA-001"
                   gateImpact="conditional"
                   owner="Build-Agent"
-                  source="mdfilesuxuiskill Doc 3"
+                  source="UX/UI Source Set Doc 3"
                 />
               </RunCard>
             </WorkspacePanel>

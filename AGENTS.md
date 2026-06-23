@@ -29,7 +29,7 @@ Ports aus `@senticor/platform-contracts` und Profile aus den Provider-Packs.
 - User-facing Dokumentation und UI-Texte: Deutsch.
 - Code, Typen, Variablen, Package-Namen, Env-Keys: Englisch.
 - Keine Hundesteuer-Inhalte im Template-Runtime-Code. Hundesteuer ist nur ein
-  externes Validierungsszenario unter `docs/validation/`.
+  externes Beispielprompt unter `docs/examples/hundesteuer/`.
 
 ## Runtime- und Toolchain-Vertrag
 
@@ -85,7 +85,7 @@ Implementierungsdetail fuer Primitive.
 
 Der verbindliche UX/UI-Vertrag steht in
 `docs/ux-ui/fachverfahren-ux-contract.md`. Generische Guidance wird dort in
-Repository-Regeln uebersetzt; Hundesteuer bleibt nur Validierungsszenario.
+Repository-Regeln uebersetzt; Hundesteuer bleibt nur ein externes Beispiel.
 Der aktuelle Abgleich zum Fachverfahren Design Manual steht in
 `docs/ux-ui/fachverfahren-design-manual-audit.md`.
 Der aktuelle Abgleich zur generischen UX-Methodik steht in

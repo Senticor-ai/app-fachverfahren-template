@@ -42,6 +42,6 @@ Pruefung:
 pnpm run check:domain-contracts
 ```
 
-Der Template-Runtime-Code bleibt domain-neutral. Validierungsszenarien wie
-Hundesteuer duerfen hier in einem separaten Modul entstehen, aber nicht in die
+Der Template-Runtime-Code bleibt domain-neutral. Fachspezifische Beispiele
+duerfen hier in einem separaten Modul entstehen, aber nicht in die
 Plattformpakete zurueckkopiert werden.

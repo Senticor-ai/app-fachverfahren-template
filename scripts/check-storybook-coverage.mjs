@@ -16,7 +16,7 @@ const requiredFiles = [
   "docs/reference/test-driven-development.md",
   "docs/ux-ui/fachverfahren-ux-contract.md",
   "docs/ux-ui/fachverfahren-design-manual-audit.md",
-  "docs/ux-ui/mdfilesuxuiskill-template-audit.md",
+  "docs/ux-ui/source-set-template-audit.md",
   "docs/ux-ui/ux-methodik-public-sector-audit.md",
 ];
 const storyRoots = [
@@ -115,19 +115,19 @@ for (const term of requiredDesignManualTerms) {
 }
 
 const requiredSourceSetTerms = [
-  "mdfilesuxuiskill",
+  "UX/UI Source Set",
   "Doc 3",
   "Build Console",
   "ContextRail",
   "GovernanceBar",
   "Run Cards",
   "Working Context",
-  "Hundesteuer-spezifisch ausgeschlossen",
+  "Fachbeispiele ausgeschlossen",
 ];
 
 for (const term of requiredSourceSetTerms) {
   if (!storyText.includes(term)) {
-    failures.push(`mdfilesuxuiskill source-set story must include: ${term}`);
+    failures.push(`UX/UI source-set story must include: ${term}`);
   }
 }
 
