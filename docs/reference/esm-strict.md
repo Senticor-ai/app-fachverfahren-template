@@ -15,7 +15,7 @@ Dieses Repository ist strict ESM.
   `.mjs` sind dort nicht erlaubt. Ausnahme: generierte Assets wie
   `apps/fachverfahren-template/public/mockServiceWorker.js`.
 
-Der automatisierte Check laeuft mit:
+Der automatisierte Check läuft mit:
 
 ```bash
 pnpm run check:esm
@@ -25,11 +25,11 @@ pnpm run check:typescript-policy
 ## Import-Regeln
 
 Relative TypeScript-Imports verwenden die `.js`-Endung, weil sie nach dem
-Build als echte ESM-Imports ausgefuehrt werden.
+Build als echte ESM-Imports ausgeführt werden.
 
 ```ts
 import { buildApp } from "./app.js";
 ```
 
-Package-Imports laufen ueber Workspace-Namen wie
+Package-Imports laufen über Workspace-Namen wie
 `@senticor/platform-contracts`.

@@ -1,6 +1,6 @@
 # Backend Fastify Skill
 
-Nutze diese Anleitung fuer Backend-Aenderungen an der Vorlage.
+Nutze diese Anleitung für Backend-Änderungen an der Vorlage.
 
 ## Backend-Vertrag
 
@@ -17,8 +17,8 @@ Nutze diese Anleitung fuer Backend-Aenderungen an der Vorlage.
 ## Umsetzung
 
 - Neue Routen liegen unter `apps/fachverfahren-template/server/routes/`.
-- Fachlogik gehoert in Domain-Module, nicht in Plattformrouten.
+- Fachlogik gehört in Domain-Module, nicht in Plattformrouten.
 - Fehlerantworten geben `requestId` aus, aber keine internen Hostnamen,
   Secrets oder Providerdetails.
-- Migrationslogik laeuft ueber den `migrator`-Workload und
+- Migrationslogik läuft über den `migrator`-Workload und
   `@senticor/app-store-postgres`.

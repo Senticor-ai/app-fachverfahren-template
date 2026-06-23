@@ -1,6 +1,6 @@
 ---
 name: fachverfahren-app
-description: Build or extend Fachverfahren and Buergerportal apps from this template. Use when scaffolding a domain module, adding screen contracts, UI, tests, Storybook stories, permissions, events, migrations, compliance evidence, or exporting a standalone app from the workspace template.
+description: Build or extend Fachverfahren and Bürgerportal apps from this template. Use when scaffolding a domain module, adding screen contracts, UI, tests, Storybook stories, permissions, events, migrations, compliance evidence, or exporting a standalone app from the workspace template.
 ---
 
 # Fachverfahren App

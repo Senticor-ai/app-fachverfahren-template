@@ -1,6 +1,6 @@
 # Testing Skill
 
-Nutze diese Anleitung, wenn ein Agent Aenderungen in diesem Repository
+Nutze diese Anleitung, wenn ein Agent Änderungen in diesem Repository
 verifiziert.
 
 ## Standardreihenfolge
@@ -12,8 +12,8 @@ verifiziert.
 5. `pnpm run test:k8s:render`
 6. `pnpm run evidence:build`
 
-Bei schmalen Aenderungen darf zunaechst ein Pakettest laufen. Vor Abschluss
-einer plattformweiten Aenderung muessen die Standardchecks versucht werden.
+Bei schmalen Änderungen darf zunächst ein Pakettest laufen. Vor Abschluss
+einer plattformweiten Änderung müssen die Standardchecks versucht werden.
 
 ## Evidence
 

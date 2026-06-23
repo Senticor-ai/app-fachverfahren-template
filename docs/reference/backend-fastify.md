@@ -19,12 +19,12 @@ Der SPA-Build bleibt austauschbar, aber der Serververtrag ist Fastify-first.
 - `GET /api/v1/work/posteingang`
 - `GET /api/v1/work/ausgang`
 
-`/internal/metrics` darf nicht oeffentlich geroutet werden. Readiness darf
-kritische Abhaengigkeiten pruefen; Liveness darf das nicht.
+`/internal/metrics` darf nicht öffentlich geroutet werden. Readiness darf
+kritische Abhängigkeiten prüfen; Liveness darf das nicht.
 
 ## OpenAPI
 
-Route-Schemas sind die Quelle fuer OpenAPI. Neue Plattformrouten liegen unter
+Route-Schemas sind die Quelle für OpenAPI. Neue Plattformrouten liegen unter
 `apps/fachverfahren-template/server/routes/`. Domain-spezifische Routen werden
 aus `modules/<domain>/server/` registriert und behalten ihre eigenen
 Permissions, Events und Compliance-Hinweise im Domain-Manifest.

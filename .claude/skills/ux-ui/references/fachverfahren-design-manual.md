@@ -1,15 +1,15 @@
 # Fachverfahren Design Manual Checklist
 
 Use this as the compact checklist for generated Fachverfahren apps,
-Buergerportale and Storybook review surfaces.
+Bürgerportale and Storybook review surfaces.
 
 ## Design Principles
 
 - Progressive disclosure: ask path-deciding questions first and reveal details
   only when needed.
 - Simple language for citizens; precise but concise language for employees.
-- Use proper German umlauts in copy. Do not write `Buergerin`, `Vorgaenge` or
-  `Behoerde` in visible UI text.
+- Use proper German umlauts in copy. Do not write `Bürgerin`, `Vorgänge` or
+  `Behörde` in visible UI text.
 - Data minimization and once-only: do not ask again for known data; mark
   prefilled values as taken over and editable.
 - Persona density: citizen calm and guided, caseworker dense and efficient,

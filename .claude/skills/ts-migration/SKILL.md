@@ -1,6 +1,6 @@
 # TypeScript Strict Skill
 
-Nutze diese Anleitung fuer TypeScript- und ESM-Aenderungen.
+Nutze diese Anleitung für TypeScript- und ESM-Änderungen.
 
 ## Regeln
 

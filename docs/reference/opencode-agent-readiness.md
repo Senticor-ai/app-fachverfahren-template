@@ -1,7 +1,7 @@
 # OpenCode Agent Readiness
 
-Dieses Repository ist als Startpunkt fuer Coding Agents gedacht. Die folgenden
-Artefakte beantworten die naechsten Anforderungen des OpenCode-Teams.
+Dieses Repository ist als Startpunkt für Coding Agents gedacht. Die folgenden
+Artefakte beantworten die nächsten Anforderungen des OpenCode-Teams.
 
 ## Abdeckung
 
@@ -16,14 +16,14 @@ Artefakte beantworten die naechsten Anforderungen des OpenCode-Teams.
 ## Agenten-Workflow
 
 1. `modules/_template/` in ein neues `modules/<domain>/` kopieren.
-2. `domain.module.yaml` ausfuellen.
+2. `domain.module.yaml` ausfüllen.
 3. Screen Contracts unter `contracts/*.screen.yaml` schreiben.
 4. UI-Stories unter `ui/*.stories.tsx` anlegen.
 5. Permissions, Events, Form-Schema, Migrationen, Tests und Compliance-Profil
-   ergaenzen.
-6. `pnpm run check:domain-contracts` ausfuehren.
+   ergänzen.
+6. `pnpm run check:domain-contracts` ausführen.
 7. `pnpm run check:typescript-policy`, `pnpm run check:storybook`,
-   `pnpm run typecheck` und `pnpm run test` ausfuehren.
+   `pnpm run typecheck` und `pnpm run test` ausführen.
 
 ## Standalone Export
 
@@ -31,11 +31,11 @@ Artefakte beantworten die naechsten Anforderungen des OpenCode-Teams.
 pnpm run scaffold:standalone -- /tmp/fachverfahren-app
 ```
 
-Der Export kopiert die duenne App-Vorlage, loest `catalog:`-Versionen aus
+Der Export kopiert die dünne App-Vorlage, löst `catalog:`-Versionen aus
 `pnpm-workspace.yaml` auf und ersetzt `workspace:*` durch die lokalen
-Paketversionen. Das Ergebnis enthaelt einen
+Paketversionen. Das Ergebnis enthält einen
 `standalone-export-report.json`-Nachweis.
 
-Dieser Exportpfad ist fuer SDK- und Paketnutzer gedacht. Die aufgeloesten
-`@senticor/*`-Pakete muessen fuer echte externe Nutzung veroeffentlicht oder in
-der Zielumgebung verfuegbar sein.
+Dieser Exportpfad ist für SDK- und Paketnutzer gedacht. Die aufgelösten
+`@senticor/*`-Pakete müssen für echte externe Nutzung veröffentlicht oder in
+der Zielumgebung verfügbar sein.

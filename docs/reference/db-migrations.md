@@ -1,18 +1,18 @@
 # Datenbankmigrationen
 
 Migrationen laufen als kontrollierter Kubernetes-Job im `migrator`-Workload.
-Sie werden nicht beim Start jeder Web-Replik automatisch ausgefuehrt.
+Sie werden nicht beim Start jeder Web-Replik automatisch ausgeführt.
 
 ## Paket
 
-`packages/app-store-postgres` enthaelt den Basismigrator fuer PostgreSQL:
+`packages/app-store-postgres` enthält den Basismigrator für PostgreSQL:
 
 - timestamped Migrationen
 - Checksum-Drift-Erkennung
 - Advisory Lock
 - Migrationstabelle `app_schema_migrations`
 - Ablehnung bekannter PgBouncer-/Pooler-URLs ohne Direct-URL
-- Plattformtabellen fuer Vorgangsbasis, Audit, RBAC, Benutzereinstellungen und
+- Plattformtabellen für Vorgangsbasis, Audit, RBAC, Benutzereinstellungen und
   Posteingang/Ausgang
 
 ```bash

@@ -1,23 +1,23 @@
 # Compliance Evidence
 
 Die Vorlage ist compliance-ready, nicht automatisch compliant. Die
-verantwortliche Behoerde muss Rechtsgrundlagen, Schutzbedarf, Aufbewahrung,
-Loeschung und organisatorische Kontrollen festlegen und freigeben.
+verantwortliche Behörde muss Rechtsgrundlagen, Schutzbedarf, Aufbewahrung,
+Löschung und organisatorische Kontrollen festlegen und freigeben.
 
 Das Evidence-Bundle soll mindestens enthalten:
 
 - System- und Datenflussdiagramme
 - Threat Model
-- Verzeichnis der Verarbeitungstaetigkeiten als Entwurf
-- DSFA-Vorpruefung
+- Verzeichnis der Verarbeitungstätigkeiten als Entwurf
+- DSFA-Vorprüfung
 - TOM- und Kontrollmatrix
-- Aufbewahrungs- und Loeschkonzept
+- Aufbewahrungs- und Löschkonzept
 - BSI-IT-Grundschutz-Mapping
 - C5-Providerverweise
 - SBOM, Lizenzbericht und Build Provenance
 - Container- und Kubernetes-Policy-Ergebnisse
 - API- und Event-Katalog
-- Barrierefreiheitsbericht und Erklaerungsentwurf
+- Barrierefreiheitsbericht und Erklärungsentwurf
 - Backup- und Restore-Test
 - Migrations- und Rollback-Nachweise
 
