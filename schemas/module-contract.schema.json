@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://senticor.local/schemas/module-contract.schema.json",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "moduleId",
+    "lifecycle",
+    "owner",
+    "riskClass",
+    "consumedCapabilities",
+    "allowedDomainPaths"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "moduleId": { "type": "string" },
+    "consumedCapabilities": { "type": "array", "items": { "type": "string" } },
+    "allowedDomainPaths": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": true
+}

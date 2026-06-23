@@ -48,5 +48,10 @@ Im Kubernetes-Basisprofil liest der Web-Workload `APP_PG_URL` aus
 Die Endpunkte geben ohne Sitzung `401` zurück. Rollen werden serverseitig über
 die RBAC-Registry geprüft: Bürgerinnen und Bürger lesen nur eigene Postfächer,
 Sachbearbeitung liest den behördlichen Posteingang und Ausgang.
+
+Fastify validiert den Request-Body vor dem Route-Handler. Tests, die `401`
+erwarten, müssen deshalb einen schema-gültigen Body senden; ein ungültiger Body
+liefert zuerst `400`.
+
 `pnpm run test:e2e:postgres` validiert diese Endpunkte gegen einen echten
 PostgreSQL-Dienst mit vorher ausgeführten Migrationen.

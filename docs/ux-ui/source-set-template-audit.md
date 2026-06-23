@@ -39,6 +39,6 @@ ausgeschlossen.
 
 ## Skill-Regel
 
-Die Skill-Dateien unter `.claude/skills/ux-ui` sind die kurze Arbeitsanweisung
+Die Skill-Dateien unter `.agents/skills/ux-ui` sind die kurze Arbeitsanweisung
 für spätere Erweiterungen. Jede UI-Erweiterung muss zuerst Storybook oder einen
 Screen Contract aktualisieren und dann die App ändern.

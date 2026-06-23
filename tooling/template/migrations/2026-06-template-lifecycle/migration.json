@@ -1,0 +1,14 @@
+{
+  "id": "2026-06-template-lifecycle",
+  "from": ">=0.0.0",
+  "to": "0.1.0-rc.1",
+  "mode": "review",
+  "touches": [
+    ".gitlab-ci.yml",
+    "Dockerfile",
+    "package.json",
+    "dev/postgres.yaml",
+    ".template/lock.json"
+  ],
+  "checks": ["check:template-invariants", "check:scaffold", "precommit:check"]
+}

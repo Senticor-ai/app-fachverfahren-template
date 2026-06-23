@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "composite": false,
+    "declaration": false,
+    "emitDeclarationOnly": false,
+    "exactOptionalPropertyTypes": false,
+    "noEmit": true,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUncheckedIndexedAccess": false,
+    "rootDir": "../..",
+    "strict": false,
+    "types": ["node", "vitest"]
+  },
+  "include": ["**/*.ts"]
+}

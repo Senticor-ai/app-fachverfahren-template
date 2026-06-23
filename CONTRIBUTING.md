@@ -2,18 +2,18 @@
 
 ## Entwicklungsregeln
 
-- Wiederverwendbare Logik gehoert in `packages/*`.
-- Fachlogik gehoert in `modules/<domain>/`.
-- Providerdetails gehoeren in `packages/provider-*`.
-- Rechtsraumlogik gehoert in `jurisdictions/*`.
-- UI-Vertraege gehoeren in `packages/public-sector-ui`; ShadCN bleibt
+- Wiederverwendbare Logik gehört in `packages/*`.
+- Fachlogik gehört in `modules/<domain>/`.
+- Providerdetails gehören in `packages/provider-*`.
+- Rechtsraumlogik gehört in `jurisdictions/*`.
+- UI-Verträge gehören in `packages/public-sector-ui`; ShadCN bleibt
   Implementierungsdetail.
 - App-, Package-, Jurisdiction- und Domain-Modul-Code ist TypeScript-only.
   Verwende `.ts` oder `.tsx`; keine `.js`, `.jsx`, `.cjs` oder `.mjs` in
   `apps/`, `packages/`, `jurisdictions/` oder `modules/`. Generierte Assets wie
   der MSW Worker sind die einzige Ausnahme.
 
-## Lokale Pruefung
+## Lokale Prüfung
 
 ```bash
 pnpm install
@@ -31,8 +31,8 @@ Husky richtet beim Installieren einen Pre-Commit-Hook ein. Der Hook ruft
 `pnpm run precommit:check` auf. Details und Bypass-Regeln stehen in
 `docs/reference/precommit-hooks.md`.
 
-Mockdaten fuer Plattformfunktionen laufen ueber MSW. Neue fachliche Mockdaten
-gehoeren in Domain-Module; Details stehen in `docs/reference/mock-data-msw.md`.
+Mockdaten für Plattformfunktionen laufen über MSW. Neue fachliche Mockdaten
+gehören in Domain-Module; Details stehen in `docs/reference/mock-data-msw.md`.
 
-Wenn eine Aenderung ein neues Domain-Modul einfuehrt, muss sie das Manifest,
+Wenn eine Änderung ein neues Domain-Modul einführt, muss sie das Manifest,
 Rechte, Events, Datenkategorien, Retention und Compliance-Profil mitliefern.

@@ -115,15 +115,33 @@ pnpm run dev:all
 `dev:all` nutzt `concurrently`, setzt die lokalen Datenbank-URLs für den BFF
 und leitet Vite-API-Aufrufe an `http://127.0.0.1:8080` weiter.
 
-OpenCode-Agenten nutzen den repo-lokalen Skill
-`.claude/skills/fachverfahren-app/SKILL.md`. Die Agent-Readiness und der
+Coding Agents nutzen `agent.discovery.json`, `docs/agents/bootstrap.md` und die
+repo-lokalen Skills unter `.agents/skills`. Tool-spezifische Verzeichnisse wie
+`.claude/skills` sind nur Kompatibilitätsshims. Die Agent-Readiness und der
 Standalone-Export sind in `docs/reference/opencode-agent-readiness.md`
 beschrieben.
+
+Vendor-neutrale Agenten starten mit Package-Script `agent:discover`, wählen
+danach mit `agent:context` den task-spezifischen Kontext und erzeugen neue
+Module aus App-Spezifikationen mit `app:new`.
 
 GitLab-/opencode.de-Image-Builds nutzen Kaniko statt Docker-in-Docker, weil die
 Runner als unprivilegierte Kubernetes-Pods laufen. Der Dockerfile-Vertrag,
 Kaniko-Job und die pnpm-Filterreihenfolge sind in
 `docs/reference/ci-image-builds.md` beschrieben.
+
+Vollständige neue App-Repositories werden über den Template-Lifecycle erzeugt:
+
+```bash
+pnpm run scaffold:domain-app -- --domain beispiel --target /tmp/app-beispiel
+```
+
+Provenienz, Ownership, Updates, Migrationen und Fleet-Befehle stehen in
+`docs/reference/template-lifecycle.md`.
+
+App-Spezifikationen liegen unter `docs/examples/*/app.spec.yaml`. Sie erzeugen
+Domain-Module mit `module.contract.yaml`; Capability-IDs und verbotene
+Reimplementierungen stehen in `platform/capabilities.json`.
 
 ## Wichtige Regeln
 

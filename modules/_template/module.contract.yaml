@@ -1,0 +1,37 @@
+{
+  "$schema": "../../schemas/module-contract.schema.json",
+  "schemaVersion": "1.0.0",
+  "moduleId": "replace-with-domain-id",
+  "lifecycle": "template",
+  "owner": "platform-template",
+  "riskClass": "medium",
+  "publicExports": ["domain.module.yaml", "contracts/*.screen.yaml"],
+  "permittedDependencies":
+    [
+      "@senticor/platform-contracts",
+      "@senticor/public-sector-sdk",
+      "@senticor/public-sector-ui",
+    ],
+  "consumedCapabilities": ["identity-and-trust"],
+  "routes":
+    [
+      { "path": "/cases/replace-with-domain-id", "surface": "caseworker" },
+      { "path": "/services/replace-with-domain-id", "surface": "citizen" },
+    ],
+  "roles": ["citizen", "caseworker"],
+  "permissions":
+    ["replace-with-domain-id.case.read", "replace-with-domain-id.case.write"],
+  "dataClassifications": ["confidential"],
+  "retention": ["replace-with-domain-id-case-records"],
+  "events":
+    { "produces": ["replace-with-domain-id.case-created"], "consumes": [] },
+  "storage":
+    {
+      "migrations": ["modules/_template/migrations/database/"],
+      "ownsTables": [],
+    },
+  "externalSources": [],
+  "requiredTests": ["check:domain-contracts", "check:module-contracts"],
+  "vocabulary": ["Fachverfahren", "Vorgang"],
+  "allowedDomainPaths": ["modules/_template"],
+}

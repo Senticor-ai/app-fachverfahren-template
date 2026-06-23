@@ -27,6 +27,7 @@ pnpm run precommit:check
 - TypeScript-only Source Policy
 - Storybook Coverage Gate
 - CSS Token Alias Gate
+- Template TypeScript Gate
 - Prettier Format-Check
 - ESLint
 - TypeScript Project References

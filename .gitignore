@@ -8,5 +8,6 @@ playwright-report/
 test-results/
 .env
 .env.local
+.agent/
 .DS_Store
 *.tsbuildinfo

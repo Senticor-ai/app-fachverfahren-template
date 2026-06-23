@@ -1,7 +1,7 @@
 # Audit: UX-Methodik Public Sector
 
 Quelle: repo-lokale UX/UI-Skill-Referenz
-`.claude/skills/ux-ui/references/public-sector-ux-methodik.md`
+`.agents/skills/ux-ui/references/public-sector-ux-methodik.md`
 
 Status: RC1-Template, fachneutral. Dieses Dokument bewertet, was im Template
 bereits durch App, Storybook, Skill, Tests oder Dokumentation abgesichert ist.
@@ -18,7 +18,7 @@ Die Methode ist jetzt repo-lokal codifiziert:
 - `scripts/check-storybook-coverage.mjs` erzwingt die Storybook-Abdeckung für
   `UX-Methodik`, `Time to Clarity`, `HCAI`, `Bürgerin`, `Sachbearbeitung` und
   dokumentierte `RC-Gap`-Einträge.
-- `.claude/skills/ux-ui/` hält die Regeln für Coding Agents bereit.
+- `.agents/skills/ux-ui/` hält die Regeln für Coding Agents bereit.
 
 ## Teil 1: Methodik
 

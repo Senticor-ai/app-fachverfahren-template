@@ -1,0 +1,22 @@
+{
+  "$schema": "../schemas/source-registry.schema.json",
+  "schemaVersion": "1.0.0",
+  "sources":
+    [
+      {
+        "id": "fimportal",
+        "origins": ["https://fimportal.de"],
+        "paths": ["/leistung-steckbriefe/"],
+        "redirectPolicy": "same-origin",
+        "methods": ["GET"],
+        "authority": "FIM Portal",
+        "expectedContentTypes": ["text/html"],
+        "citationRequired": true,
+        "reuseConstraints": "Kurz zitieren, fachliche Inhalte zusammenfassen.",
+        "cache": "run-local",
+        "retention": "artifact-only",
+        "humanReviewRequired": false,
+        "defaultUrl": "https://fimportal.de/leistung-steckbriefe/99102013000000/hierarchy",
+      },
+    ],
+}

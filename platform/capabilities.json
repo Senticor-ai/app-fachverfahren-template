@@ -1,0 +1,109 @@
+{
+  "$schema": "../schemas/platform-capabilities.schema.json",
+  "schemaVersion": "1.0.0",
+  "capabilities": [
+    {
+      "id": "identity-and-trust",
+      "version": 1,
+      "publicPackage": "@senticor/platform-contracts",
+      "documentation": "docs/capabilities/identity-and-trust.md",
+      "extensionPoints": [
+        "role-mapping",
+        "permission-policy",
+        "assurance-level"
+      ],
+      "contractTests": ["test:platform-contracts"],
+      "forbidden": ["module-local-authentication", "domain-local-session-store"]
+    },
+    {
+      "id": "data-exchange",
+      "version": 1,
+      "publicPackage": "@senticor/platform-contracts",
+      "documentation": "docs/capabilities/data-exchange.md",
+      "extensionPoints": ["envelope-schema", "destination-routing"],
+      "contractTests": ["test:api-compatibility"],
+      "forbidden": ["module-local-fit-connect-client"]
+    },
+    {
+      "id": "evidence-retrieval",
+      "version": 1,
+      "publicPackage": "@senticor/platform-contracts",
+      "documentation": "docs/capabilities/evidence-retrieval.md",
+      "extensionPoints": ["evidence-type", "consent-policy"],
+      "contractTests": ["test:api-compatibility"],
+      "forbidden": ["module-local-register-client"]
+    },
+    {
+      "id": "payment",
+      "version": 1,
+      "publicPackage": "@senticor/platform-contracts",
+      "documentation": "docs/capabilities/payment.md",
+      "extensionPoints": ["payment-reference", "return-url-policy"],
+      "contractTests": ["test:api-compatibility"],
+      "forbidden": ["module-local-payment-provider"]
+    },
+    {
+      "id": "mailbox",
+      "version": 1,
+      "publicPackage": "@senticor/platform-contracts",
+      "documentation": "docs/capabilities/mailbox.md",
+      "extensionPoints": ["message-template", "attachment-policy"],
+      "contractTests": ["test:api-compatibility"],
+      "forbidden": ["module-local-mailbox-delivery"]
+    },
+    {
+      "id": "signature-seal",
+      "version": 1,
+      "publicPackage": "@senticor/platform-contracts",
+      "documentation": "docs/capabilities/signature-seal.md",
+      "extensionPoints": ["document-ref", "seal-policy"],
+      "contractTests": ["test:document-security"],
+      "forbidden": ["module-local-signature-validation"]
+    },
+    {
+      "id": "authority-directory",
+      "version": 1,
+      "publicPackage": "@senticor/platform-contracts",
+      "documentation": "docs/capabilities/authority-directory.md",
+      "extensionPoints": ["service-key", "jurisdiction-filter"],
+      "contractTests": ["test:api-compatibility"],
+      "forbidden": ["module-local-authority-registry"]
+    },
+    {
+      "id": "records-management",
+      "version": 1,
+      "publicPackage": "@senticor/platform-contracts",
+      "documentation": "docs/capabilities/records-management.md",
+      "extensionPoints": ["retention-policy", "legal-hold"],
+      "contractTests": ["test:retention-deletion"],
+      "forbidden": ["module-local-archive-store"]
+    },
+    {
+      "id": "notification",
+      "version": 1,
+      "publicPackage": "@senticor/platform-contracts",
+      "documentation": "docs/capabilities/notification.md",
+      "extensionPoints": ["template-id", "channel-policy"],
+      "contractTests": ["test:api-compatibility"],
+      "forbidden": ["module-local-notification-provider"]
+    },
+    {
+      "id": "workflow",
+      "version": 1,
+      "publicPackage": "@senticor/platform-contracts",
+      "documentation": "docs/capabilities/workflow.md",
+      "extensionPoints": ["workflow-key", "business-key", "signal-name"],
+      "contractTests": ["test:event-compatibility"],
+      "forbidden": ["module-local-workflow-engine"]
+    },
+    {
+      "id": "audit",
+      "version": 1,
+      "publicPackage": "@senticor/platform-contracts",
+      "documentation": "docs/capabilities/audit.md",
+      "extensionPoints": ["event-type", "legal-basis", "case-context"],
+      "contractTests": ["test:authorization"],
+      "forbidden": ["module-local-audit-log"]
+    }
+  ]
+}

@@ -6,11 +6,24 @@ UX/UI-, Storybook-, Screen-Contract-, Accessibility-, Design-System-,
 Architektur- und Toolchain-Regeln stehen in:
 
 - `AGENTS.md`
-- `.claude/skills/fachverfahren-app/SKILL.md`
-- `.claude/skills/ux-ui/SKILL.md`
+- `agent.discovery.json`
+- `.agents/skills/fachverfahren-app/SKILL.md`
+- `.agents/skills/ux-ui/SKILL.md`
+- `docs/examples/hundesteuer/app.spec.yaml`
 - `docs/ux-ui/fachverfahren-ux-contract.md`
 - `docs/reference/test-driven-development.md`
 - `docs/reference/storybook.md`
+
+Wenn dies dein einziger Startprompt ist:
+
+1. Arbeite im Root dieses Template-Repositories.
+2. Führe Package-Script `agent:discover` aus.
+3. Führe Package-Script `agent:context` mit
+   `docs/examples/hundesteuer/app.spec.yaml` aus.
+4. Lies die dort ausgewählten Pflichtdateien vor Änderungen.
+5. Nutze Package-Script `app:new` mit
+   `docs/examples/hundesteuer/app.spec.yaml`, wenn `modules/dog-tax/` erzeugt
+   werden soll.
 
 ## Aufgabe
 
