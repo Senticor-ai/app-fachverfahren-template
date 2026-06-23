@@ -20,8 +20,8 @@ werden erfunden.
 
 - Generische UX-Methodik und Design Manual werden hier als Plattformvertrag
   uebernommen.
-- Der Hundesteuer-Prompt bleibt ein Validierungsszenario. Er darf keine
-  Hundesteuer-Fachlogik in Template-Runtime, Plattformpakete oder UI-Tokens
+- Fachliche Beispielprompts bleiben unter `docs/examples/<domain>/`. Sie duerfen
+  keine Fachlogik in Template-Runtime, Plattformpakete oder UI-Tokens
   zurueckkopieren.
 - Domain-spezifische Werte wie Betraege, Fristen, Schwellen, Rechtsverweise und
   Berechnungen leben immer als Daten in einem Domain-/Regelmodul.
@@ -41,6 +41,14 @@ Ein Domain-Modul startet mit diesen Artefakten:
 
 Erst danach wird UI implementiert.
 
+## Source-Set-Regel
+
+Beispielprompts bleiben kurz. Wiederverwendbare Regeln fuer Shell, Tabellen,
+Formulare, Einstellungen, Accessibility, Tokens, Storybook und HCAI gehoeren in
+diesen Vertrag, die UX/UI-Skill-Referenzen, Storybook-Konventionen oder
+Template-Guardrails. Domain-Beispiele beschreiben nur fachliche Annahmen,
+synthetische Werte, Modulpfad, Akzeptanz und offene Validierungsfragen.
+
 ## IA-Grammatik
 
 Alle Fachverfahren nutzen dieselbe Informationsarchitektur:
@@ -53,6 +61,11 @@ Alle Fachverfahren nutzen dieselbe Informationsarchitektur:
   als Hauptmechanik.
 - Mobile Navigation ueber Sheet/Drawer; Tabellen auf Mobil horizontal scrollend,
   ohne eingefrorene Spalten.
+- Einklappbare Navigation braucht statischen Modus und optionalen verzögerten
+  Hover-Modus ohne Flackern. Umschalten wirkt live und respektiert reduzierte
+  Bewegung.
+- Role-/Profil-Wechsel reskopiert Navigation und Aktionen sofort. Nicht
+  erlaubte Routen leiten sauber um.
 
 Persona-Dichte:
 
@@ -70,6 +83,8 @@ Persona-Dichte:
 - Inter ist die Standardschrift; Zahlen nutzen `tabular-nums`.
 - Radius: `0.5rem`.
 - Motion ist sparsam, semantisch und respektiert `prefers-reduced-motion`.
+- Print-Regeln blenden Shell-Chrome aus, wenn ein fachlicher Nachweis gedruckt
+  wird.
 
 Token-Familien:
 
@@ -77,6 +92,9 @@ Token-Familien:
 - `--status-ok`, `--status-warn`, `--status-block`, `--status-info`,
   `--status-muted` mit `-soft` Varianten.
 - `--sidebar`, `--sidebar-foreground`, `--sidebar-accent`.
+
+Komponenten entstehen zuerst in `packages/public-sector-ui` oder nutzen dessen
+Vertrag. ShadCN-Primitives bleiben austauschbares Implementierungsdetail.
 
 ## Formulare
 
@@ -88,6 +106,10 @@ Token-Familien:
 - Validierung trennt `err`, `warn` und `ok`; nur `err` blockiert.
 - Freie Schrittnavigation ist erlaubt; Absenden erst bei voller Gueltigkeit.
 - Der Review-Schritt zeigt alle Angaben, Quellen und offenen Warnungen.
+- Der letzte Schritt benennt bei Luecken den ersten unvollstaendigen Schritt und
+  bietet einen Sprung dorthin.
+- Drafts duerfen bei Navigation oder Reload nicht verloren gehen, wenn ein
+  Fachverfahren Zwischenspeicherung vorsieht.
 
 ## Tabellen
 
@@ -99,6 +121,9 @@ Token-Familien:
   letzten aktiven Filter nicht abwaehlen.
 - Ganze Zeilen sind tastaturaktivierbar.
 - Zahlen rechtsbuendig mit `tabular-nums`.
+- Tabellen haben genug deterministische synthetische Daten, um Scrollen,
+  Sortieren, Filtern, horizontale Enge und Tastaturpfad sichtbar zu testen.
+- Zeilenaktionen brauchen Enter/Space, `aria-label` und klaren Fokuszustand.
 
 ## KI/HCAI
 
@@ -114,6 +139,8 @@ Pflichtmuster:
 - Draft-Zustand vor Festsetzung.
 - Auditierbare Ueberschreibungen.
 - Ehrliche Unsicherheit statt scheinbarer Sicherheit.
+- Missing-source, low-confidence und disputed states fuehren zu Review oder
+  Eskalation, nicht zu stiller Automatisierung.
 
 ## Accessibility
 
@@ -126,6 +153,8 @@ Ziel ist BITV 2.0 / WCAG 2.2 AA:
 - Fehlermeldungen mit Korrekturpfad und programmatischer Feldverknuepfung.
 - Hochkontrast, groessere Schrift, reduzierte Dichte und reduzierte Bewegung als
   persistierte Einstellungen, nicht automatisch fuer alle erzwungen.
+- Inaktive Platzhalter fuer Accessibility- oder Sprachmodi werden in der
+  Live-App nicht gerendert.
 
 ## Definition of Ready fuer UI
 
@@ -146,4 +175,4 @@ und folgende Tests beschrieben sind:
 - Keine Rohfarben in neuen Komponenten.
 - A11y-Akzeptanz ist dokumentiert.
 - Keine domain-spezifischen Demo-Texte ausserhalb von Validierungs- oder
-  Domain-Modul-Artefakten.
+  Beispiel- oder Domain-Modul-Artefakten.

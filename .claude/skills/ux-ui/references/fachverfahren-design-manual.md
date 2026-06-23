@@ -1,7 +1,7 @@
 # Fachverfahren Design Manual Checklist
 
-Use this as the compact checklist for
-`/Users/wolfgang/Downloads/mdfilesuxuiskill/02_fachverfahren-design-manual.md`.
+Use this as the compact checklist for generated Fachverfahren apps,
+Buergerportale and Storybook review surfaces.
 
 ## Design Principles
 
@@ -17,6 +17,8 @@ Use this as the compact checklist for
 - Accessibility is architectural: labels, keyboard, focus, contrast, reflow and
   reduced motion from the first story.
 - Failure states are designed: loading, empty, error, recovery, success.
+- Orientation comes before input: users must always understand where they are,
+  what is missing and what happens next.
 
 ## Shell And Navigation
 
@@ -29,6 +31,12 @@ Use this as the compact checklist for
 - Caseworker navigation supports inbox, assigned cases, reviews, deadlines,
   search and detail work.
 - Detail/workspace screens need breadcrumbs and independent scroll containers.
+- The shell must not rebuild or flicker on route changes. Shell chrome stays
+  stable while the active workspace changes.
+- Collapsible sidebars need a static mode and a delayed hover mode. If hover
+  expansion exists, pointer/focus timers must avoid open/close flicker and
+  respect reduced motion.
+- Mobile navigation uses an off-canvas drawer/sheet and closes on route change.
 - For Sachbearbeiter:in workspaces, keep the Design Manual story
   `Design Manual/Fachverfahren` aligned with the app shell, navigation,
   breadcrumbs and master-detail behavior.
@@ -37,6 +45,8 @@ Use this as the compact checklist for
 
 - `packages/public-sector-ui` is the public template contract.
 - shadcn/ui, Tailwind v4, Inter and Lucide are implementation primitives.
+- KERN-like public-sector patterns may inform UX, but shadcn primitives stay
+  underneath the template UI contract.
 - Use semantic HSL tokens: background, foreground, surface, border, ring,
   status-ok, status-warn, status-block, status-info, status-muted and soft
   variants.
@@ -44,6 +54,8 @@ Use this as the compact checklist for
   data.
 - Keep radius at `0.5rem`; avoid decorative spacing or one-off components.
 - Respect `prefers-reduced-motion`.
+- Keep a single font family. Use `tabular-nums` for numbers and dates instead
+  of mono text.
 
 ## Forms
 
@@ -53,6 +65,8 @@ Use this as the compact checklist for
 - Mark required fields clearly.
 - Provide review before submit and confirmation with case/reference number.
 - Persist drafts and support recovery.
+- Use real browser form semantics, labels, autocomplete tokens and
+  programmatically linked errors.
 
 ## Lists And Tables
 
@@ -63,6 +77,8 @@ Use this as the compact checklist for
 - Bulk review is expected where many similar decisions exist.
 - If pagination or bulk review is not implemented yet, keep it visible as an
   RC-Gap in `docs/ux-ui/fachverfahren-design-manual-audit.md`.
+- Rows that navigate must be whole-row keyboard targets with Enter/Space support
+  and clear `aria-label`s.
 
 ## AI/HCAI
 
@@ -72,6 +88,8 @@ Use this as the compact checklist for
 - Provide accept, reject and manual override controls.
 - Keep draft state before legally relevant decisions.
 - Audit overrides and show uncertainty honestly.
+- AI assistance needs a designed escalation path for missing source, low
+  confidence or disputed suggestions.
 
 ## Accessibility
 
@@ -84,6 +102,8 @@ Use this as the compact checklist for
   persistable settings.
 - Loading, Empty, Error and Success states must be represented in Storybook for
   each new user-facing workflow.
+- Inactive placeholders such as language or accessibility modes are not rendered
+  in the live app unless they have real destinations or functionality.
 
 ## Template Resolution Notes
 

@@ -5,7 +5,7 @@ description: Apply the Fachverfahren design manual when changing citizen, casewo
 
 # UX/UI Skill
 
-Use this before implementing UI. The source manuals are distilled in
+Use this before implementing UI. The reusable UX/UI source set is distilled in
 `references/fachverfahren-design-manual.md` and
 `references/public-sector-ux-methodik.md`; read both when adding or changing
 screen contracts, Storybook states, form flows, app shell, AI assistance, or
@@ -24,8 +24,8 @@ agent-facing UI.
 
 ## Non-Negotiables
 
-- Keep template/runtime domain-neutral. No Hundesteuer content outside
-  validation briefs or domain modules.
+- Keep template/runtime domain-neutral. Domain-specific examples belong under
+  `docs/examples/<domain>/` or in domain modules, never in platform runtime.
 - UI text and docs are German; code, identifiers, env vars and package names are
   English.
 - German copy uses proper umlauts, for example `Bürgerin`, `Vorgänge`,
@@ -48,6 +48,9 @@ agent-facing UI.
 - Do not add product explanations, disclaimers, demo labels or architecture
   terms to the live app unless they directly serve a user task. Put method and
   review material in docs or Storybook.
+- Keep example prompts short. Move reusable method, IA, table, form,
+  accessibility and token rules into this skill, docs or app guardrails instead
+  of repeating them in domain examples.
 
 ## Checks
 

@@ -34,8 +34,8 @@ pnpm run check:storybook
 - `Design Manual`: Dok.-2-Abnahme für Sachbearbeiter:in-Fachanwendung,
   Bürger:in-Patterns und gestaltete Zustände.
 - `UX-Methodik/Source Set`: Abnahme gegen das gesamte
-  `mdfilesuxuiskill`-Quellset, inklusive Doc 3, Build Console und
-  Hundesteuer-Abgrenzung.
+  repo-lokale UX/UI-Source-Set, inklusive Doc 3, Build Console und
+  Abgrenzung fachlicher Beispiele.
 - `Delivery`: Screen Contracts, Fehlerzustände und TDD-Akzeptanz.
 - `UX-Methodik`: Abnahme der generischen Public-Sector-Methodik mit
   Time-to-Clarity, HCAI, Bürgerin-Flows, Sachbearbeitung und dokumentierten
@@ -71,7 +71,7 @@ pnpm run check:storybook
   `docs/ux-ui/fachverfahren-design-manual-audit.md` prüfen und
   `Design Manual/Fachverfahren` aktualisieren.
 - Bei Token-, `public-sector-ui`- oder Build-Console-Änderungen zusätzlich
-  `docs/ux-ui/mdfilesuxuiskill-template-audit.md` prüfen und
+  `docs/ux-ui/source-set-template-audit.md` prüfen und
   `UX-Methodik/Source Set` aktualisieren.
 - Keine Rohfarben oder Einmal-Komponenten.
 - Neue `public-sector-ui` Exports müssen in Storybook erscheinen.
@@ -91,9 +91,9 @@ pnpm run check:storybook
 - das Fachverfahren Design Manual bleibt sichtbar, einschließlich
   `Sachbearbeiter:in`, `Bürger:in`, `Master-Detail` und
   `Loading, Empty, Error, Success`.
-- das `mdfilesuxuiskill`-Quellset bleibt sichtbar, einschließlich `Doc 3`,
+- das UX/UI-Source-Set bleibt sichtbar, einschließlich `Doc 3`,
   `Build Console`, `ContextRail`, `GovernanceBar`, `Run Cards`,
-  `Working Context` und `Hundesteuer-spezifisch ausgeschlossen`.
+  `Working Context` und `Fachbeispiele ausgeschlossen`.
 
 Der echte Storybook-Build bleibt zusätzlich erforderlich, sobald
 Abhängigkeiten installiert sind.

@@ -31,7 +31,7 @@ const auditRows = [
     topic: "Time to Clarity, Research, JTBD, offene Fragen",
     state: "Erfüllt",
     evidence:
-      "Screen Contracts, Domain-Modul-Manifest, TDD-Dokumentation und Validierungsbrief sind vorhanden. Human-Review-Gate und offene Fragen bleiben Pflicht je Fachverfahren.",
+      "Screen Contracts, Domain-Modul-Manifest, TDD-Dokumentation und kurze Beispielprompts sind vorhanden. Human-Review-Gate und offene Fragen bleiben Pflicht je Fachverfahren.",
   },
   {
     section: "Teil 1",

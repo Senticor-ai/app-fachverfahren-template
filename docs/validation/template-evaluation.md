@@ -11,7 +11,7 @@ Bewertungskriterien fuer externe Validierungen:
 - Erfolgreicher Rollback und Restore
 - Providerwechsel ohne Fachcode-Aenderung
 
-Weitere Validierungsbriefe:
+Weitere Validierungsszenarien:
 
 - Greenfield-Buergerantrag plus internes Fachverfahren
 - Erlaubnisverfahren mit Anlagen, Fristen und Vier-Augen-Freigabe

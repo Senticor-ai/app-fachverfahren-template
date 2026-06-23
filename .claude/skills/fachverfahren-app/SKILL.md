@@ -19,6 +19,18 @@ domain-neutral; put Fachlogik under `modules/<domain>/`.
 5. For UI, Storybook, app-shell, form or screen-contract work, read
    `.claude/skills/ux-ui/SKILL.md` before coding.
 
+## Source Lookup
+
+- Web search is allowed for official domain sources when building or validating
+  a domain module.
+- For German public-sector services, agents may search `https://fimportal.de`
+  and use FIM Leistung IDs, names and hierarchy as source references.
+- Treat FIM as a structural source, not as the complete legal basis. Concrete
+  statutes, fees, deadlines and local rules still need the responsible
+  jurisdiction's source or the status `Annahme zu validieren`.
+- Record source URLs and retrieved IDs in the domain manifest, screen contract,
+  compliance profile or test evidence where they affect behavior.
+
 ## Domain Module Workflow
 
 Create or update:
@@ -52,8 +64,7 @@ pnpm run test
 - Write implementation code in TypeScript only. Domain modules use `.ts` and
   `.tsx`; do not add `.js`, `.jsx`, `.cjs` or `.mjs` under `modules/`.
 - Use MSW mock handlers for early UI, integration and E2E states.
-- Do not add Hundesteuer or other validation-domain details to platform runtime
-  code.
+- Do not add domain-example details to platform runtime code.
 - Keep citizen UI guided and caseworker UI dense/list-detail. Do not expose
   Basisdienste, ports or adapters in primary user navigation.
 - Screen contracts must include persona, IA, content, HCAI, loading, empty,

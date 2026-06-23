@@ -1,6 +1,7 @@
 # Audit: UX-Methodik Public Sector
 
-Quelle: `/Users/wolfgang/Downloads/mdfilesuxuiskill/01_ux-methodik-public-sector-generisch.md`
+Quelle: repo-lokale UX/UI-Skill-Referenz
+`.claude/skills/ux-ui/references/public-sector-ux-methodik.md`
 
 Status: RC1-Template, fachneutral. Dieses Dokument bewertet, was im Template
 bereits durch App, Storybook, Skill, Tests oder Dokumentation abgesichert ist.
@@ -21,16 +22,16 @@ Die Methode ist jetzt repo-lokal codifiziert:
 
 ## Teil 1: Methodik
 
-| Callout                                         |                  Status | Nachweis                                                                                                                                        |
-| ----------------------------------------------- | ----------------------: | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Problem, Rolle und Erfolg vor Lösung klären     |               Teilweise | Domain-Module, Screen Contracts und TDD-Dokumentation erzwingen Vorarbeit. Konkrete Research-Ergebnisse bleiben pro Fachverfahren zu liefern.   |
-| HCAI als Entscheidungslinse                     |               Teilweise | Screen Contract und Skill verlangen KI-Kennzeichnung, Quelle, Konfidenz, Override und Audit. Die Template-App selbst enthält keine KI-Funktion. |
-| Personas und Touchpoints                        |    Erfüllt für Template | Login trennt Bürgerin und Sachbearbeitung. Management/Audit ist noch kein primärer App-Strang.                                                  |
-| Voice of Customer, Benchmarking, Double Diamond | Offen pro Fachverfahren | Muss im Domain-Modul oder Fachkonzept dokumentiert werden; das Template kann diese Recherche nicht vorwegnehmen.                                |
-| Service Blueprint, User Flow, JTBD              |               Teilweise | `docs/ux-ui/screen-contract.template.yaml` und Domain-Modul-Manifest bieten die Struktur. Befüllung ist Fachverfahrensarbeit.                   |
-| KI-Strategie, EU-AI-Act-Designsicht             |               Teilweise | Als Pflichtfelder in Guidance und Screen Contract vorhanden; konkrete Risikoklasse und Schwellen bleiben fachlich zu bewerten.                  |
-| Offene Fragen und Human Review                  |               Teilweise | Der Prozess ist dokumentiert. Ein hartes CI-Gate gegen unbefüllte offene Fragen existiert noch nicht.                                           |
-| Anti-Patterns                                   |               Teilweise | Keine Hundesteuer- oder Demo-Fachlogik in der Runtime, keine Basisdienste als prominente Navigation, keine unnötigen Disclaimer in der App.     |
+| Callout                                         |                  Status | Nachweis                                                                                                                                           |
+| ----------------------------------------------- | ----------------------: | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Problem, Rolle und Erfolg vor Lösung klären     |               Teilweise | Domain-Module, Screen Contracts und TDD-Dokumentation erzwingen Vorarbeit. Konkrete Research-Ergebnisse bleiben pro Fachverfahren zu liefern.      |
+| HCAI als Entscheidungslinse                     |               Teilweise | Screen Contract und Skill verlangen KI-Kennzeichnung, Quelle, Konfidenz, Override und Audit. Die Template-App selbst enthält keine KI-Funktion.    |
+| Personas und Touchpoints                        |    Erfüllt für Template | Login trennt Bürgerin und Sachbearbeitung. Management/Audit ist noch kein primärer App-Strang.                                                     |
+| Voice of Customer, Benchmarking, Double Diamond | Offen pro Fachverfahren | Muss im Domain-Modul oder Fachkonzept dokumentiert werden; das Template kann diese Recherche nicht vorwegnehmen.                                   |
+| Service Blueprint, User Flow, JTBD              |               Teilweise | `docs/ux-ui/screen-contract.template.yaml` und Domain-Modul-Manifest bieten die Struktur. Befüllung ist Fachverfahrensarbeit.                      |
+| KI-Strategie, EU-AI-Act-Designsicht             |               Teilweise | Als Pflichtfelder in Guidance und Screen Contract vorhanden; konkrete Risikoklasse und Schwellen bleiben fachlich zu bewerten.                     |
+| Offene Fragen und Human Review                  |               Teilweise | Der Prozess ist dokumentiert. Ein hartes CI-Gate gegen unbefüllte offene Fragen existiert noch nicht.                                              |
+| Anti-Patterns                                   |               Teilweise | Keine fachliche Beispiel- oder Demo-Fachlogik in der Runtime, keine Basisdienste als prominente Navigation, keine unnötigen Disclaimer in der App. |
 
 ## Teil 2: Umsetzungsspezifikation A-J
 
@@ -44,7 +45,7 @@ Die Methode ist jetzt repo-lokal codifiziert:
 | F Mehrschritt-Formulare              |    Erfüllt als Vertrag | Bürgerin-Erlebnis ist geführt; der generische Formular-Assistent mit err/warn/ok, Once-Only-Prefill und freier Step-Navigation ist in Storybook und Screen Contract codifiziert.                                                    |
 | G Einstellungen und Barrierefreiheit |                Erfüllt | Hell/Dunkel/System, Kontrast, größere Schrift, reduzierte Bewegung, Dichte und Sidebar-Autoausklappen werden persistiert.                                                                                                           |
 | H Info-/Hilfe-Seite                  | Offen/konfliktbehaftet | Die Methode fordert eine zentrale Info-Seite. Die aktuelle Template-Richtung vermeidet unnütze Meta-Texte in der App; Info-Inhalte bleiben daher in Docs/Storybook, bis eine Produktentscheidung getroffen ist.                     |
-| I Keine Demo-/Meta-Möblierung        |                Erfüllt | Sichtbare App-Copy ist fachneutral und nutzt keine Hundesteuer-, Sprint- oder Architekturbegriffe in primärer Navigation.                                                                                                           |
+| I Keine Demo-/Meta-Möblierung        |                Erfüllt | Sichtbare App-Copy ist fachneutral und nutzt keine Beispiel-, Sprint- oder Architekturbegriffe in primärer Navigation.                                                                                                              |
 | J Tokens und Accessibility           |                Erfüllt | Semantische Tokens, Dark Mode, Fokus, Status mit Text/Icon, reduzierte Bewegung, Print-Regeln und Doc-3-Motion-Utilities sind vorhanden. Manuelle Screenreader-, 400-Prozent-Zoom- und PDF/UA-Prüfungen bleiben ergänzende Abnahme. |
 
 ## Konflikte

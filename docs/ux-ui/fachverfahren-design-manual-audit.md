@@ -1,6 +1,7 @@
 # Audit: Fachverfahren Design Manual
 
-Quelle: `/Users/wolfgang/Downloads/mdfilesuxuiskill/02_fachverfahren-design-manual.md`
+Quelle: repo-lokale UX/UI-Skill-Referenz
+`.claude/skills/ux-ui/references/fachverfahren-design-manual.md`
 
 Stand: 2026-06-23.
 

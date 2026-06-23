@@ -1,7 +1,7 @@
 # Coding-Agent UI Und Design-System Checklist
 
-Use this as the compact checklist for
-`/Users/wolfgang/Downloads/mdfilesuxuiskill/03_coding-agent-ui-und-designsystem.md`.
+Use this as the compact checklist for the shared design-system and agent-facing
+Build Console vocabulary.
 
 ## Design-System Source Of Truth
 
@@ -17,6 +17,8 @@ Use this as the compact checklist for
   text or icon.
 - Respect `prefers-reduced-motion`; print rules hide shell chrome with
   `.no-print`.
+- The design-system source of truth is generic. Domain examples may define data
+  and rules, but not new token semantics or one-off component colors.
 
 ## Build Console Vocabulary
 
@@ -27,10 +29,13 @@ Use this as the compact checklist for
   control, not chat.
 - Agent progress appears as readable Run Cards with status, agent, inputs,
   summary and relevant detail.
+- Only active, blocked or decision-relevant cards should be expanded by default.
 - Findings must show finding ID, source/platform rule, affected artifact or
   agent, correction, owner and gate impact.
 - Gate status covers accessibility, SBOM, SCA, secrets, AI eval, tests and
   evidence.
+- Inbox, Compare and Story/Replays are management surfaces for decisions,
+  differences and reproducibility, not places to expose raw runtime internals.
 - No agent approves itself. Creating, checking, approving and deploying remain
   separate steps.
 
@@ -42,3 +47,5 @@ Use this as the compact checklist for
   and `UX-Methodik/Source Set`.
 - Do not surface agent-runtime internals, provider terms or raw token streams in
   citizen or Sachbearbeitung primary UI.
+- Gate and story text should use repo-relative references, never paths from a
+  local downloads folder.
