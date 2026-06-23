@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Replace With Domain Intake",
+  "type": "object",
+  "required": ["applicantName"],
+  "properties": {
+    "applicantName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "comment": {
+      "type": "string"
+    }
+  }
+}

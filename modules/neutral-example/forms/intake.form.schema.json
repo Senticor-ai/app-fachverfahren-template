@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Neutral Example Intake",
+  "type": "object",
+  "required": ["applicantName", "requestSummary"],
+  "properties": {
+    "applicantName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requestSummary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "attachmentsExpected": {
+      "type": "boolean",
+      "default": false
+    }
+  }
+}

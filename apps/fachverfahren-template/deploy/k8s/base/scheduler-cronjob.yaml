@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: fachverfahren-scheduler
+  labels:
+    app.kubernetes.io/name: fachverfahren-template
+    app.kubernetes.io/component: scheduler
+spec:
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: fachverfahren-template
+            app.kubernetes.io/component: scheduler
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: fachverfahren-scheduler
+          automountServiceAccountToken: false
+          containers:
+            - name: scheduler
+              image: registry.opencode.de/senticor/fachverfahren-template:0.1.0-rc.1
+              command: ["node", "-e"]
+              args:
+                - "console.log('scheduler role placeholder')"
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+                readOnlyRootFilesystem: true
+                runAsNonRoot: true
+                runAsUser: 53111
+                runAsGroup: 53111

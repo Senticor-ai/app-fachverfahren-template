@@ -1,0 +1,12 @@
+node_modules/
+.pnpm-store/
+dist/
+dist-server/
+storybook-static/
+coverage/
+playwright-report/
+test-results/
+.env
+.env.local
+.DS_Store
+*.tsbuildinfo

@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: jdx/mise-action@v3
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile=false
+      - name: Format
+        run: pnpm run format:check
+      - name: Lint
+        run: pnpm run lint
+      - name: Strict ESM
+        run: pnpm run check:esm
+      - name: TypeScript source policy
+        run: pnpm run check:typescript-policy
+      - name: Storybook coverage
+        run: pnpm run check:storybook
+      - name: Typecheck
+        run: pnpm run typecheck
+      - name: Test
+        run: pnpm run test
+      - name: Build
+        run: pnpm run build
+      - name: Render Kubernetes
+        run: pnpm run test:k8s:render
+      - name: Build evidence plan
+        run: pnpm run evidence:build

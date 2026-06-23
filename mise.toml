@@ -1,0 +1,12 @@
+[tools]
+node = "24.14.1"
+pnpm = "11.1.0"
+kubectl = "latest"
+
+[tasks.setup]
+description = "Installiert die lokale Entwicklungsumgebung"
+run = "pnpm install"
+
+[tasks.check]
+description = "Fuehrt die wichtigsten lokalen Pruefungen aus"
+run = "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test"

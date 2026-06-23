@@ -1,0 +1,7 @@
+permissions:
+  - permission: replace-with-domain-id.case.read
+    description: Vorgänge lesen
+  - permission: replace-with-domain-id.case.write
+    description: Vorgänge bearbeiten
+  - permission: replace-with-domain-id.case.decide
+    description: Entscheidung vorbereiten

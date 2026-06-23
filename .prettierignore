@@ -1,0 +1,10 @@
+node_modules
+dist
+**/dist
+dist-server
+**/dist-server
+**/dist-types
+coverage
+playwright-report
+pnpm-lock.yaml
+**/public/mockServiceWorker.js
