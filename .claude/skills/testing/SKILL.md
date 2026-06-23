@@ -1,22 +1,9 @@
-# Testing Skill
+---
+name: testing
+description: Compatibility shim. Use the canonical vendor-neutral testing skill in .agents/skills/testing/SKILL.md.
+---
 
-Nutze diese Anleitung, wenn ein Agent Änderungen in diesem Repository
-verifiziert.
+# Testing Skill Shim
 
-## Standardreihenfolge
-
-1. `pnpm run check:esm`
-2. `pnpm run check:typescript-policy`
-3. `pnpm run typecheck`
-4. `pnpm run test`
-5. `pnpm run test:k8s:render`
-6. `pnpm run evidence:build`
-
-Bei schmalen Änderungen darf zunächst ein Pakettest laufen. Vor Abschluss
-einer plattformweiten Änderung müssen die Standardchecks versucht werden.
-
-## Evidence
-
-Fehler nicht nur im Chat beschreiben. Wenn ein Test Evidence erzeugt, nutze den
-generierten Report als Quelle. Das Compliance-Evidence-Bundle liegt unter
-`dist/evidence/`.
+Read `.agents/skills/testing/SKILL.md`. That file is the canonical repo-local
+skill. This `.claude` copy exists only for tool compatibility.

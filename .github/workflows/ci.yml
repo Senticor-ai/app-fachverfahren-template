@@ -26,6 +26,16 @@ jobs:
         run: pnpm run check:storybook
       - name: CSS token aliases
         run: pnpm run check:css-tokens
+      - name: Template lifecycle tests
+        run: pnpm run test:template
+      - name: Agent platform checks
+        run: pnpm run check:agent-discovery && pnpm run check:module-contracts && pnpm run check:module-boundaries && pnpm run check:capability-catalog && pnpm run check:source-registry
+      - name: Agent readiness
+        run: pnpm run test:agent-readiness
+      - name: Template invariants
+        run: pnpm run check:template-invariants
+      - name: Scaffold output
+        run: pnpm run check:scaffold
       - name: Typecheck
         run: pnpm run typecheck
       - name: Test

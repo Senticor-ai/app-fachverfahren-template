@@ -1,25 +1,9 @@
-# TypeScript Strict Skill
+---
+name: ts-migration
+description: Compatibility shim. Use the canonical vendor-neutral ts-migration skill in .agents/skills/ts-migration/SKILL.md.
+---
 
-Nutze diese Anleitung für TypeScript- und ESM-Änderungen.
+# TypeScript Migration Skill Shim
 
-## Regeln
-
-- Alle Packages deklarieren `"type": "module"`.
-- TypeScript verwendet `NodeNext`, `strict`, `noUncheckedIndexedAccess`,
-  `exactOptionalPropertyTypes` und `noUnusedLocals`.
-- Relative Imports in TS-Quellen verwenden die zur Laufzeit entstehende
-  `.js`-Endung.
-- Keine CommonJS-Syntax, keine `.cjs`-/`.cts`-Dateien.
-- Implementierungscode unter `apps/`, `packages/`, `jurisdictions/` und
-  `modules/` ist TypeScript-only. Keine `.js`, `.jsx`, `.cjs` oder `.mjs` in
-  diesen Bereichen, außer generierte Assets wie der MSW Worker.
-- Optional Properties nicht als `undefined` serialisieren; Felder nur setzen,
-  wenn ein Wert vorhanden ist.
-
-## Check
-
-```bash
-pnpm run check:esm
-pnpm run check:typescript-policy
-pnpm run typecheck
-```
+Read `.agents/skills/ts-migration/SKILL.md`. That file is the canonical
+repo-local skill. This `.claude` copy exists only for tool compatibility.

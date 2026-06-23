@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://senticor.local/schemas/agent-run-report.schema.json",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "runId",
+    "task",
+    "taskHash",
+    "selectedInstructionHashes"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "runId": { "type": "string" },
+    "task": { "type": "string" },
+    "taskHash": { "type": "string" }
+  },
+  "additionalProperties": true
+}

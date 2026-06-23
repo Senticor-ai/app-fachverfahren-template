@@ -29,7 +29,7 @@ Ports aus `@senticor/platform-contracts` und Profile aus den Provider-Packs.
 - User-facing Dokumentation und UI-Texte: Deutsch.
 - Code, Typen, Variablen, Package-Namen, Env-Keys: Englisch.
 - Keine Hundesteuer-Inhalte im Template-Runtime-Code. Hundesteuer ist nur ein
-  externes Beispielprompt unter `docs/examples/hundesteuer/`.
+  externes Beispiel unter `docs/examples/hundesteuer/`.
 
 ## Runtime- und Toolchain-Vertrag
 
@@ -67,6 +67,43 @@ unterliegende Script weitergereicht werden:
 ```bash
 pnpm --filter "./packages/**" run --if-present build
 ```
+
+## Template-Lifecycle
+
+Dieses Repository ist ein versioniertes Template, kein einmaliger Dateikopierer.
+Neue vollständige Fachverfahren-Repositories werden über den TypeScript-CLI
+erzeugt:
+
+```bash
+pnpm run scaffold:domain-app -- --domain beispiel --target /tmp/app-beispiel
+```
+
+Generierte Repositories enthalten `.template/answers.json`,
+`.template/lock.json`, `.template/ownership.yaml` und `.template/README.md`.
+Diese Dateien sind reproduzierbare Provenienz und dürfen keine Zeitstempel oder
+lokalen Maschinenpfade enthalten.
+
+Alle Template-Lifecycle-Befehle laufen über `tooling/template/cli.ts`:
+
+```bash
+pnpm run template:status
+pnpm run template:diff -- --to <version>
+pnpm run template:update -- --to <version>
+pnpm run template:doctor
+pnpm run template:explain -- <path>
+```
+
+Template-Code wird testgetrieben und in TypeScript entwickelt. Vor Abschluss von
+Template-Änderungen mindestens ausführen:
+
+```bash
+pnpm run test:template
+pnpm run check:template-invariants
+pnpm run check:scaffold
+```
+
+Runbook-Befehle dürfen keine Inline-Shell-Kommentare enthalten. Schreibe die
+Erklärung vor den Codeblock, nicht hinter den Befehl.
 
 ## Domain-Module
 
@@ -115,7 +152,8 @@ Der aktuelle Abgleich zur generischen UX-Methodik steht in
 `docs/ux-ui/ux-methodik-public-sector-audit.md`; offene Abweichungen müssen als
 RC-Gap sichtbar bleiben, nicht in der App versteckt werden.
 Bei UI-, Storybook- oder Screen-Contract-Änderungen ist zusätzlich
-`.claude/skills/ux-ui/SKILL.md` anzuwenden.
+`.agents/skills/ux-ui/SKILL.md` anzuwenden. `.claude/skills` enthält nur
+Kompatibilitätsshims.
 
 Design-Tokens haben zwei Ebenen: rohe HSL-Komponenten wie `--foreground` sind
 nur Token-Quelle; Komponenten, Stories und generierter Code nutzen die
@@ -148,6 +186,9 @@ Das BFF/Backend basiert auf Fastify und TypeScript. Route-Schemas sind die
 OpenAPI-Quelle. OpenAPI JSON liegt unter `/api/openapi.json`; Swagger UI unter
 `/api/v1/docs`.
 
+Fastify validiert Request-Bodies vor dem Route-Handler. Tests für `401` müssen
+einen schema-gültigen Body senden, sonst kommt zuerst `400`.
+
 Datenbankmigrationen laufen über `@senticor/app-store-postgres` im
 `migrator`-Workload. Web-Replicas führen keine Migrationen beim Start aus.
 Fachverfahren legen eigene Migrationen in `modules/<domain>/migrations/` ab.
@@ -160,9 +201,35 @@ Benutzereinstellungen sowie Posteingang/Ausgang.
 Mit `APP_E2E_PG_URL` und optional `APP_E2E_PG_DIRECT_URL` prüft
 `pnpm run test:e2e:postgres` denselben Pfad gegen PostgreSQL.
 
-Agent-spezifische Kurzskills liegen unter `.claude/skills/`. Für komplette
+Agent-spezifische Kurzskills liegen kanonisch unter `.agents/skills/`. Für komplette
 Fachverfahren- oder Bürgerportal-Slices ist
-`.claude/skills/fachverfahren-app/SKILL.md` der Startpunkt.
+`.agents/skills/fachverfahren-app/SKILL.md` der Startpunkt.
+
+Vendor-neutrale Agenten starten mit:
+
+```bash
+pnpm run agent:discover
+pnpm run agent:context -- --task <app-spec> --paths <module-path>
+```
+
+`agent.discovery.json` ist die öffentliche Discovery-API. Default-JSON enthält
+nur relative Pfade, sortierte Listen und keine Git- oder Maschinenprovenienz;
+volatile Details gibt es nur mit `--provenance`.
+
+Jedes Domain-Modul braucht `module.contract.yaml`. Der Vertrag deklariert
+Capabilities, öffentliche Exports, erlaubte Abhängigkeiten, Routen, Rollen,
+Datenklassen, Retention, Events, Storage und erlaubte Domain-Pfade. Domain-
+Begriffe dürfen in ihren App-Spezifikationen und erlaubten Modulpfaden
+vorkommen, aber nicht in Plattformpaketen.
+
+Plattformfähigkeiten stehen in `platform/capabilities.json` und den
+Capability-Dokumenten unter `docs/capabilities/`. Fachmodule dürfen
+Authentifizierung, Benachrichtigung, Zahlung, Workflow oder Audit nicht lokal
+neu bauen, wenn sie eine Plattformfähigkeit konsumieren.
+
+Gouvernierte Webquellen stehen in `sources/registry.yaml`; Agenten verwenden
+`source:fetch` statt beliebiger Netzwerkzugriffe, wenn eine registrierte Quelle
+betroffen ist.
 
 Vor Abschluss neuer oder geänderter Domain-Module ausführen:
 
@@ -192,6 +259,11 @@ pnpm run check:esm
 pnpm run check:typescript-policy
 pnpm run check:storybook
 pnpm run check:css-tokens
+pnpm run check:agent-discovery
+pnpm run check:module-contracts
+pnpm run check:module-boundaries
+pnpm run check:capability-catalog
+pnpm run check:source-registry
 pnpm run lint
 pnpm run typecheck
 pnpm run test
@@ -199,6 +271,9 @@ pnpm run test:e2e
 pnpm run test:e2e:postgres
 pnpm run test:k8s:render
 pnpm run evidence:build
+pnpm run test:template
+pnpm run check:template-invariants
+pnpm run check:scaffold
 ```
 
 Wenn Abhängigkeiten nicht installiert sind, dokumentiere das klar im Ergebnis.

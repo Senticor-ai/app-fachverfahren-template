@@ -1,0 +1,204 @@
+{
+  "$schema": "./schemas/agent-discovery.schema.json",
+  "schemaVersion": "1.0.0",
+  "templateVersion": "0.1.0-rc.1",
+  "repository": {
+    "id": "senticor.fachverfahren-template",
+    "purpose": "Versionierte Public-Sector-Plattformbasis für Fachverfahren, Bürgerapps und interne Verwaltungsprozesse.",
+    "defaultLanguage": "de",
+    "codeLanguage": "en"
+  },
+  "determinism": {
+    "jsonMode": "stdout-only-json",
+    "paths": "relative-only",
+    "arrays": "sorted",
+    "colors": false,
+    "timestamps": false,
+    "absolutePaths": false,
+    "gitStateByDefault": false,
+    "provenanceFlag": "--provenance"
+  },
+  "instructionPrecedence": [
+    {
+      "level": 1,
+      "source": "AGENTS.md",
+      "meaning": "root policy"
+    },
+    {
+      "level": 2,
+      "source": "nested AGENTS.md",
+      "meaning": "path-specific tightening"
+    },
+    {
+      "level": 3,
+      "source": ".agents/skills/*/SKILL.md",
+      "meaning": "workflow skill"
+    },
+    {
+      "level": 4,
+      "source": "task app spec",
+      "meaning": "domain-specific build input"
+    },
+    {
+      "level": 5,
+      "source": "user prompt",
+      "meaning": "current assignment"
+    }
+  ],
+  "compatibility": {
+    "deprecationPolicy": "Stable IDs remain valid for one minor template line after deprecation.",
+    "manifestCompatibility": "Consumers must reject newer major schema versions.",
+    "nestedInstructions": "Nested AGENTS.md files may tighten but never relax root policy."
+  },
+  "requiredFiles": [
+    "AGENTS.md",
+    "docs/agents/bootstrap.md",
+    "docs/reference/template-lifecycle.md",
+    "docs/reference/test-driven-development.md",
+    "docs/reference/storybook.md",
+    "docs/ux-ui/fachverfahren-ux-contract.md",
+    "platform/capabilities.json",
+    "sources/registry.yaml"
+  ],
+  "schemas": [
+    {
+      "id": "schema:agent-discovery",
+      "path": "schemas/agent-discovery.schema.json"
+    },
+    {
+      "id": "schema:app-spec",
+      "path": "schemas/app-spec.schema.json"
+    },
+    {
+      "id": "schema:module-contract",
+      "path": "schemas/module-contract.schema.json"
+    },
+    {
+      "id": "schema:agent-run-report",
+      "path": "schemas/agent-run-report.schema.json"
+    },
+    {
+      "id": "schema:platform-capabilities",
+      "path": "schemas/platform-capabilities.schema.json"
+    },
+    {
+      "id": "schema:source-registry",
+      "path": "schemas/source-registry.schema.json"
+    }
+  ],
+  "skills": [
+    {
+      "id": "skill:fachverfahren-app",
+      "path": ".agents/skills/fachverfahren-app/SKILL.md"
+    },
+    {
+      "id": "skill:ux-ui",
+      "path": ".agents/skills/ux-ui/SKILL.md"
+    },
+    {
+      "id": "skill:testing",
+      "path": ".agents/skills/testing/SKILL.md"
+    },
+    {
+      "id": "skill:backend-fastify",
+      "path": ".agents/skills/backend-fastify/SKILL.md"
+    }
+  ],
+  "workflows": [
+    {
+      "id": "workflow:new-domain-module",
+      "description": "Build a Fachverfahren domain module from an app spec.",
+      "command": "app:new",
+      "defaultTask": "docs/examples/veranstaltungsanzeige/app.spec.yaml"
+    },
+    {
+      "id": "workflow:agent-context",
+      "description": "Select minimal task-specific context for a coding agent.",
+      "command": "agent:context"
+    },
+    {
+      "id": "workflow:template-upgrade",
+      "description": "Review or apply a template baseline upgrade.",
+      "command": "template:upgrade"
+    }
+  ],
+  "capabilities": [
+    "capability:identity-and-trust",
+    "capability:data-exchange",
+    "capability:evidence-retrieval",
+    "capability:payment",
+    "capability:mailbox",
+    "capability:signature-seal",
+    "capability:authority-directory",
+    "capability:records-management",
+    "capability:notification",
+    "capability:workflow",
+    "capability:audit"
+  ],
+  "commands": [
+    {
+      "id": "agent.discover",
+      "script": "agent:discover"
+    },
+    {
+      "id": "agent.context",
+      "script": "agent:context"
+    },
+    {
+      "id": "agent.preflight",
+      "script": "agent:preflight"
+    },
+    {
+      "id": "agent.verify",
+      "script": "agent:verify"
+    },
+    {
+      "id": "app.new",
+      "script": "app:new"
+    },
+    {
+      "id": "source.fetch",
+      "script": "source:fetch"
+    },
+    {
+      "id": "source.verify",
+      "script": "source:verify"
+    },
+    {
+      "id": "template.upgrade",
+      "script": "template:upgrade"
+    },
+    {
+      "id": "check.agent-discovery",
+      "script": "check:agent-discovery"
+    },
+    {
+      "id": "check.module-contracts",
+      "script": "check:module-contracts"
+    },
+    {
+      "id": "check.module-boundaries",
+      "script": "check:module-boundaries"
+    },
+    {
+      "id": "check.capability-catalog",
+      "script": "check:capability-catalog"
+    },
+    {
+      "id": "check.source-registry",
+      "script": "check:source-registry"
+    },
+    {
+      "id": "test.agent-readiness",
+      "script": "test:agent-readiness"
+    }
+  ],
+  "exitCodes": {
+    "ok": 0,
+    "usage": 2,
+    "dirtyWorktree": 3,
+    "invariantFailure": 4,
+    "conflict": 5,
+    "unavailable": 6
+  }
+}

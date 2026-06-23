@@ -1,24 +1,9 @@
-# Backend Fastify Skill
+---
+name: backend-fastify
+description: Compatibility shim. Use the canonical vendor-neutral backend-fastify skill in .agents/skills/backend-fastify/SKILL.md.
+---
 
-Nutze diese Anleitung für Backend-Änderungen an der Vorlage.
+# Backend Fastify Skill Shim
 
-## Backend-Vertrag
-
-- Fastify ist der BFF-/Backend-Standard.
-- Route-Schemas sind die OpenAPI-Quelle.
-- OpenAPI JSON liegt unter `/api/openapi.json`.
-- Swagger UI liegt unter `/api/v1/docs`.
-- Betriebsendpunkte bleiben getrennt:
-  - `/livez`
-  - `/readyz`
-  - `/startupz`
-  - `/internal/metrics`
-
-## Umsetzung
-
-- Neue Routen liegen unter `apps/fachverfahren-template/server/routes/`.
-- Fachlogik gehört in Domain-Module, nicht in Plattformrouten.
-- Fehlerantworten geben `requestId` aus, aber keine internen Hostnamen,
-  Secrets oder Providerdetails.
-- Migrationslogik läuft über den `migrator`-Workload und
-  `@senticor/app-store-postgres`.
+Read `.agents/skills/backend-fastify/SKILL.md`. That file is the canonical
+repo-local skill. This `.claude` copy exists only for tool compatibility.

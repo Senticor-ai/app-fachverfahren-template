@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://senticor.local/schemas/app-spec.schema.json",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "id",
+    "displayName",
+    "module",
+    "personas",
+    "roles",
+    "acceptanceCriteria",
+    "requiredCapabilities",
+    "routes"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "id": { "type": "string" },
+    "module": {
+      "type": "object",
+      "required": ["id", "destination", "owner", "lifecycle", "riskClass"]
+    }
+  },
+  "additionalProperties": true
+}

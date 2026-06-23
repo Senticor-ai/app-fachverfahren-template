@@ -1,0 +1,101 @@
+{
+  "$schema": "../../../schemas/app-spec.schema.json",
+  "schemaVersion": "1.0.0",
+  "id": "hundesteuer",
+  "displayName": "Hundesteuer",
+  "module":
+    {
+      "id": "dog-tax",
+      "destination": "modules/dog-tax",
+      "owner": "demo-domain",
+      "lifecycle": "example-generated",
+      "riskClass": "medium",
+    },
+  "personas": ["Bürgerin", "Sachbearbeitung", "Audit"],
+  "roles": ["citizen", "caseworker", "auditor"],
+  "journeys":
+    [
+      { "id": "J-DOG-001", "title": "Hund anmelden", "surface": "citizen" },
+      {
+        "id": "J-DOG-002",
+        "title": "Fall prüfen und Entscheidung vorbereiten",
+        "surface": "caseworker",
+      },
+      {
+        "id": "J-DOG-003",
+        "title": "Entscheidung nachvollziehen",
+        "surface": "audit",
+      },
+    ],
+  "acceptanceCriteria":
+    [
+      {
+        "id": "AC-DOG-001",
+        "text": "Das Modul deklariert FIM-Referenzen, Routen, Rechte, Ereignisse, Retention und Migrationen.",
+        "tests": ["check:module-contracts", "check:domain-contracts"],
+      },
+      {
+        "id": "AC-DOG-002",
+        "text": "Bürgerinnen erhalten clientseitige Validierung und verständliche Recovery-Pfade.",
+        "tests": ["check:storybook", "test"],
+      },
+      {
+        "id": "AC-DOG-003",
+        "text": "Steuerfestsetzung und Ermäßigung bleiben menschlich bestätigte Entscheidungen.",
+        "tests": ["test:authorization"],
+      },
+    ],
+  "assumptions":
+    [
+      "Musterstadt ist eine synthetische Demo-Kommune.",
+      "Steuersätze und Fristen sind synthetisch und zu validieren.",
+    ],
+  "nonGoals":
+    [
+      "Keine echte Steuerfestsetzung mit Rechtsfolge.",
+      "Keine echte Zahlung.",
+      "Kein Produktivdeploy.",
+    ],
+  "fim":
+    {
+      "sourceId": "fimportal",
+      "rootId": "99102013000000",
+      "services":
+        {
+          "99102013002000": "Hundesteuer Festsetzung",
+          "99102013010000": "Hundesteuer Befreiung",
+          "99102013011000": "Hundesteuer Änderung",
+          "99102013070000": "Hundesteuer Abmeldung",
+          "99102013104000": "Hundesteuer Anmeldung",
+          "99102013149000": "Hundesteuer Ermäßigung",
+        },
+    },
+  "dataClassifications": ["confidential"],
+  "requiredCapabilities":
+    ["identity-and-trust", "payment", "mailbox", "audit", "workflow"],
+  "permittedExternalSources": ["fimportal"],
+  "routes":
+    [
+      { "path": "/services/dog-tax", "surface": "citizen" },
+      { "path": "/cases/dog-tax", "surface": "caseworker" },
+      { "path": "/audit/dog-tax", "surface": "audit" },
+    ],
+  "workflows": ["registration-created", "decision-prepared", "audit-reviewed"],
+  "integrations": ["mailbox", "payment"],
+  "humanApproval":
+    [
+      "tax-assessment",
+      "dangerous-dog-classification",
+      "exemption",
+      "reduction",
+    ],
+  "domainVocabulary":
+    [
+      "Hundesteuer",
+      "Hund",
+      "gefährlicher Hund",
+      "Befreiung",
+      "Ermäßigung",
+      "Steuerfestsetzung",
+    ],
+}
