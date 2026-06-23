@@ -50,6 +50,8 @@ Bürgerportale and Storybook review surfaces.
 - Use semantic HSL tokens: background, foreground, surface, border, ring,
   status-ok, status-warn, status-block, status-info, status-muted and soft
   variants.
+- Use direct `--color-*` aliases in component code; raw HSL component tokens are
+  only the token source.
 - Use `tabular-nums` for numbers and dates. Do not use mono font for tabular
   data.
 - Keep radius at `0.5rem`; avoid decorative spacing or one-off components.
@@ -62,11 +64,16 @@ Bürgerportale and Storybook review surfaces.
 - Start with path-deciding questions.
 - Use progressive disclosure for dependent fields.
 - Provide inline validation in plain language; say what to correct and how.
+- Derive supported client-side constraints from
+  `modules/<domain>/forms/*.form.schema.json` and keep server-side schemas
+  authoritative.
 - Mark required fields clearly.
 - Provide review before submit and confirmation with case/reference number.
 - Persist drafts and support recovery.
 - Use real browser form semantics, labels, autocomplete tokens and
   programmatically linked errors.
+- Keep React helper components at module scope. Use local render helpers as
+  `{renderStep()}`, not as nested JSX component types.
 
 ## Lists And Tables
 

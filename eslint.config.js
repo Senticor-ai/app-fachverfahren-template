@@ -1,4 +1,5 @@
 import js from "@eslint/js";
+import react from "@eslint-react/eslint-plugin";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 import prettier from "eslint-config-prettier";
@@ -41,6 +42,15 @@ export default tseslint.config(
           varsIgnorePattern: "^_",
         },
       ],
+    },
+  },
+  {
+    files: ["**/*.{jsx,tsx}"],
+    plugins: {
+      "@eslint-react": react,
+    },
+    rules: {
+      "@eslint-react/no-nested-component-definitions": "error",
     },
   },
   prettier,

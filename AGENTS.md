@@ -94,14 +94,26 @@ RC-Gap sichtbar bleiben, nicht in der App versteckt werden.
 Bei UI-, Storybook- oder Screen-Contract-Änderungen ist zusätzlich
 `.claude/skills/ux-ui/SKILL.md` anzuwenden.
 
+Design-Tokens haben zwei Ebenen: rohe HSL-Komponenten wie `--foreground` sind
+nur Token-Quelle; Komponenten, Stories und generierter Code nutzen die
+direkten `--color-*`-Aliasse wie `--color-text`, `--color-sidebar` und
+`--color-status-warn`. Direkte Nutzung wie `color: var(--foreground)` ist
+ungültig und wird durch `pnpm run check:css-tokens` blockiert.
+
 Jede neue UI-Funktion braucht:
 
 - Tastaturbedienbarkeit
 - sinnvolle Semantik und Landmarks
 - sichtbaren Fokus
 - Fehlermeldungen mit Recovery-Pfad
+- clientseitige Inline-Validierung für unterstützte Regeln aus
+  `forms/*.form.schema.json`
 - Storybook- und Testzustand für Default, Loading, Empty, Error und relevante
   Accessibility-Varianten
+
+React-Komponenten dürfen nicht innerhalb von Render-Funktionen definiert
+werden. Hilfskomponenten stehen auf Modulebene; lokale Render-Helfer werden als
+Funktionsaufruf wie `{renderStep()}` verwendet, nicht als JSX-Komponente.
 
 Designer nutzen Storybook als gemeinsame Review-Fläche:
 `docs/reference/storybook.md`. Neue Exports aus `public-sector-ui` müssen in
@@ -156,6 +168,7 @@ pnpm run format:check
 pnpm run check:esm
 pnpm run check:typescript-policy
 pnpm run check:storybook
+pnpm run check:css-tokens
 pnpm run lint
 pnpm run typecheck
 pnpm run test

@@ -4,6 +4,7 @@ export {
   PostgresAppStore,
   UnavailableAppStore,
 } from "./app-store.js";
+export { createPgClient } from "./client.js";
 export type {
   AppStore,
   ColorSchemePreference,
@@ -15,6 +16,7 @@ export type {
   UserPreferences,
   UserPreferencesUpdate,
 } from "./app-store.js";
+export type { PgClient } from "./client.js";
 export {
   defaultMigrationOptionsFromEnv,
   loadMigrations,

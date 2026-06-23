@@ -9,6 +9,12 @@ Build Console vocabulary.
   component rules and accessibility.
 - Use React, Vite, Tailwind v4, shadcn-style primitives, Inter, Lucide and
   semantic HSL tokens.
+- Treat raw HSL component tokens as source values only. Components, stories and
+  generated code use direct `--color-*` aliases such as `--color-text`,
+  `--color-sidebar` and `--color-status-warn`.
+- Never write `color: var(--foreground)` or Tailwind classes like
+  `text-[var(--foreground)]`; use the matching color alias or a deliberate
+  token-source wrapper `hsl(var(--foreground))`.
 - Keep `packages/public-sector-ui` as the template's reusable public contract;
   shadcn primitives remain implementation details.
 - Use one font family throughout. Numbers and dates use `tabular-nums`, not a

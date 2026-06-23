@@ -8,13 +8,13 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "border-transparent bg-[hsl(var(--foreground))] text-[hsl(var(--background))] hover:opacity-90 focus-visible:outline-[hsl(var(--ring))]",
+          "border-transparent bg-[var(--color-primary)] text-[var(--color-primary-fg)] hover:opacity-90 focus-visible:outline-[var(--color-ring)]",
         secondary:
-          "border-[hsl(var(--border))] bg-[hsl(var(--surface))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--status-info-soft))] focus-visible:outline-[hsl(var(--ring))]",
+          "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] hover:bg-[var(--color-status-info-soft)] focus-visible:outline-[var(--color-ring)]",
         destructive:
-          "border-transparent bg-[hsl(var(--status-block))] text-white hover:opacity-90 focus-visible:outline-[hsl(var(--ring))]",
+          "border-transparent bg-[var(--color-status-block)] text-white hover:opacity-90 focus-visible:outline-[var(--color-ring)]",
         ghost:
-          "border-transparent bg-transparent text-[hsl(var(--foreground))] hover:bg-[hsl(var(--status-info-soft))] focus-visible:outline-[hsl(var(--ring))]",
+          "border-transparent bg-transparent text-[var(--color-text)] hover:bg-[var(--color-status-info-soft)] focus-visible:outline-[var(--color-ring)]",
       },
       size: {
         default: "h-10",

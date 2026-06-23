@@ -18,12 +18,19 @@ Artefakte beantworten die nächsten Anforderungen des OpenCode-Teams.
 1. `modules/_template/` in ein neues `modules/<domain>/` kopieren.
 2. `domain.module.yaml` ausfüllen.
 3. Screen Contracts unter `contracts/*.screen.yaml` schreiben.
-4. UI-Stories unter `ui/*.stories.tsx` anlegen.
+4. UI-Stories unter `ui/*.stories.tsx` anlegen und Formular-Constraints aus
+   `forms/*.form.schema.json` clientseitig sichtbar machen.
 5. Permissions, Events, Form-Schema, Migrationen, Tests und Compliance-Profil
    ergänzen.
 6. `pnpm run check:domain-contracts` ausführen.
 7. `pnpm run check:typescript-policy`, `pnpm run check:storybook`,
    `pnpm run typecheck` und `pnpm run test` ausführen.
+
+Wichtig für Server-Slices: `apps/fachverfahren-template/tsconfig.server.json`
+nimmt nur `server/` und `shared/` in den BFF-Build auf. Agenten sollen
+fachliche Serverlogik nicht direkt aus `modules/` in den Template-Server
+importieren, sondern gemeinsame DTOs über `shared/` oder Paketverträge führen
+und die Domain-Anbindung explizit registrieren.
 
 ## Standalone Export
 

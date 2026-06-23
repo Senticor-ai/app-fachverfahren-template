@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createPgClient } from "./client.js";
 
 export interface MigrationFile {
   id: string;
@@ -26,26 +27,6 @@ export interface MigrationOptions {
 export interface MigrationResult {
   applied: string[];
   skipped: string[];
-}
-
-interface PgClient {
-  connect(): Promise<void>;
-  query<T extends Record<string, unknown> = Record<string, unknown>>(
-    sql: string,
-    values?: unknown[],
-  ): Promise<{ rows: T[] }>;
-  end(): Promise<void>;
-}
-
-interface PgClientConstructor {
-  new (options: { connectionString: string }): PgClient;
-}
-
-interface PgModule {
-  Client?: PgClientConstructor;
-  default?: {
-    Client?: PgClientConstructor;
-  };
 }
 
 export function resolveDatabaseUrl(
@@ -139,7 +120,7 @@ export async function migrate(
 ): Promise<MigrationResult> {
   const migrationTable = quoteIdentifier(options.migrationTable);
   const migrations = await loadMigrations(options.migrationsDir);
-  const client = await createClient(options.databaseUrl);
+  const client = await createPgClient(options.databaseUrl);
   const applied: string[] = [];
   const skipped: string[] = [];
 
@@ -220,15 +201,6 @@ function quoteIdentifier(identifier: string): string {
     .split(".")
     .map((part) => `"${part.replaceAll('"', '""')}"`)
     .join(".");
-}
-
-async function createClient(databaseUrl: string): Promise<PgClient> {
-  const pg = (await import("pg")) as PgModule;
-  const Client = pg.default?.Client ?? pg.Client;
-  if (!Client) {
-    throw new Error("pg Client export not found");
-  }
-  return new Client({ connectionString: databaseUrl });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

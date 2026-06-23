@@ -5,10 +5,18 @@
   "required": ["applicantName"],
   "properties": {
     "applicantName": {
+      "title": "Name",
       "type": "string",
       "minLength": 1
     },
+    "contactPostalCode": {
+      "title": "Postleitzahl",
+      "type": "string",
+      "pattern": "^\\d{5}$",
+      "description": "Fünfstellige deutsche Postleitzahl."
+    },
     "comment": {
+      "title": "Kommentar",
       "type": "string"
     }
   }

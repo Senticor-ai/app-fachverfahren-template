@@ -66,6 +66,10 @@ copying it.
 - Once-only prefilled values are marked as übernommen and remain editable.
 - Use real `form` elements, autocomplete tokens and semantic validation with
   `err`, `warn` and `ok`; only `err` blocks submission.
+- Derive supported client-side constraints from the module form schema and show
+  inline recovery before submit; server-side schemas stay authoritative.
+- Keep form helper components at module scope. Local render helpers are plain
+  functions called as `{renderStep()}`, not nested React component definitions.
 - Step navigation may stay free, but submit stays gated until all blocking
   validation is resolved. The final review names the first incomplete step and
   offers a jump back.
@@ -80,6 +84,8 @@ copying it.
   reduced motion.
 - Use semantic tokens, radius `0.5rem`, tabular numbers and dark mode. Avoid
   raw component colors.
+- Generated UI uses direct `--color-*` aliases. Raw HSL component tokens such as
+  `--foreground` stay internal to the token source.
 - Do not turn every accessibility option on by default. Users choose their
   contrast, density, motion and font-size preferences.
 

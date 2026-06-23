@@ -44,6 +44,9 @@ pnpm run check:storybook
 ## Regeln für Designer
 
 - Designs nutzen dieselben semantischen Tokens wie der Code.
+- Token-Stories zeigen die direkt nutzbaren `--color-*`-Aliasse. Rohe
+  HSL-Komponententokens wie `--foreground` sind nur Token-Quelle und werden
+  nicht direkt in Komponenten verwendet.
 - Deutsche Copy nutzt echte Umlaute, zum Beispiel `Bürgerin`, `Vorgänge` und
   `Behörde`.
 - Inaktive Platzhalter wie `Gebärdensprache` und `Leichte Sprache` werden nicht
@@ -74,6 +77,8 @@ pnpm run check:storybook
   `docs/ux-ui/source-set-template-audit.md` prüfen und
   `UX-Methodik/Source Set` aktualisieren.
 - Keine Rohfarben oder Einmal-Komponenten.
+- Keine direkte Nutzung von HSL-Komponententokens wie `var(--foreground)`;
+  `pnpm run check:css-tokens` muss bestehen.
 - Neue `public-sector-ui` Exports müssen in Storybook erscheinen.
 - Accessibility-Parameter in Storybook nicht als Ersatz für manuelle
   Tastatur-/Screenreader-Prüfung behandeln.

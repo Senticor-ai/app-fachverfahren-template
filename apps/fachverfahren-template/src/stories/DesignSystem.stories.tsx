@@ -15,15 +15,20 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const tokens = [
-  ["background", "helles Papier"],
-  ["foreground", "Tinte"],
-  ["status-ok", "gültig"],
-  ["status-warn", "Review"],
-  ["status-block", "blockiert"],
-  ["status-info", "Hinweis"],
-  ["sidebar", "Sidebar"],
-];
+const colorAliases = [
+  ["--color-bg", "warmes Papier"],
+  ["--color-surface", "Fläche"],
+  ["--color-text", "Tinte"],
+  ["--color-primary", "Primäraktion"],
+  ["--color-sidebar", "Sidebar"],
+  ["--color-sidebar-fg", "Sidebar-Schrift"],
+  ["--color-sidebar-accent", "Sidebar-Akzent"],
+  ["--color-status-ok", "gültig"],
+  ["--color-status-warn", "Review"],
+  ["--color-status-block", "blockiert"],
+  ["--color-status-info", "Hinweis"],
+  ["--color-status-muted", "gedämpft"],
+] as const;
 
 export const TokenSystem: Story = {
   render: () => (
@@ -31,19 +36,20 @@ export const TokenSystem: Story = {
       <section className="sb-card">
         <h1>Semantische Tokens</h1>
         <p>
-          Komponenten verwenden semantische Tokens. Status wird immer mit Text
-          oder Icon plus Farbe kommuniziert.
+          Komponenten verwenden direkt nutzbare `--color-*`-Aliasse. Die
+          darunterliegenden HSL-Komponenten bleiben nur die Token-Quelle. Status
+          wird immer mit Text oder Icon plus Farbe kommuniziert.
         </p>
         <div className="sb-token-grid">
-          {tokens.map(([token, label]) => (
+          {colorAliases.map(([token, label]) => (
             <figure className="sb-token" key={token}>
               <span
                 className="sb-token__swatch"
-                style={{ background: `hsl(var(--${token}))` }}
+                style={{ background: `var(${token})` }}
               />
               <figcaption>
                 <strong>{label}</strong>
-                <code>--{token}</code>
+                <code>{token}</code>
               </figcaption>
             </figure>
           ))}
