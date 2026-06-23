@@ -1,6 +1,6 @@
 # Pre-Commit Hooks
 
-Dieses Repository nutzt Husky fuer lokale Git-Hooks. Die Hooks sind ein
+Dieses Repository nutzt Husky für lokale Git-Hooks. Die Hooks sind ein
 schnelles Sicherheitsnetz, ersetzen aber nicht die CI.
 
 ## Installation
@@ -11,9 +11,9 @@ pnpm install
 
 Der `prepare`-Schritt richtet Husky ein, wenn `.git` vorhanden ist. In
 Container-Builds oder exportierten Source-Artefakten ohne `.git` wird die
-Einrichtung bewusst uebersprungen.
+Einrichtung bewusst übersprungen.
 
-Manuell ausfuehren:
+Manuell ausführen:
 
 ```bash
 pnpm run precommit:check
@@ -33,17 +33,17 @@ pnpm run precommit:check
 
 ## Bypass
 
-Nur in begruendeten Ausnahmefaellen:
+Nur in begründeten Ausnahmefällen:
 
 ```bash
 git commit --no-verify
 ```
 
-Oder fuer Installationsumgebungen:
+Oder für Installationsumgebungen:
 
 ```bash
 HUSKY=0 pnpm install
 ```
 
-CI muss die gleichen oder strengere Gates ausfuehren. Ein lokaler Bypass ist
+CI muss die gleichen oder strengere Gates ausführen. Ein lokaler Bypass ist
 keine Freigabe.

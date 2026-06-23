@@ -1,7 +1,7 @@
 # Test Driven Development
 
-Dieses Repository soll Fachverfahren testgetrieben ermoeglichen. TDD heisst hier
-nicht nur Unit-Tests, sondern ein pruefbarer Vertrag aus Domain-Regeln,
+Dieses Repository soll Fachverfahren testgetrieben ermöglichen. TDD heißt hier
+nicht nur Unit-Tests, sondern ein prüfbarer Vertrag aus Domain-Regeln,
 Capabilities, API, UI, Accessibility und Evidence.
 
 ## Ablauf
@@ -9,25 +9,25 @@ Capabilities, API, UI, Accessibility und Evidence.
 1. Screen Contract oder Capability Contract schreiben.
 2. Fehlenden Test schreiben.
 3. Minimal implementieren.
-4. Refaktorieren, ohne den Vertrag zu veraendern.
+4. Refaktorieren, ohne den Vertrag zu verändern.
 5. Storybook-State oder Evidence aktualisieren.
 
 ## Testpyramide
 
-- Domain-Kernel: reine Unit-Tests fuer Zustaende, Fristen, Versionen,
+- Domain-Kernel: reine Unit-Tests für Zustände, Fristen, Versionen,
   Retention-Regeln und Berechtigungsentscheidungen.
-- Platform Contracts: Contract-Tests fuer Ports und Adapter.
-- Backend: Fastify `inject`-Tests fuer Routen, OpenAPI-Schemas, Fehlerpfade und
+- Platform Contracts: Contract-Tests für Ports und Adapter.
+- Backend: Fastify `inject`-Tests für Routen, OpenAPI-Schemas, Fehlerpfade und
   Autorisierung.
 - E2E: `apps/fachverfahren-template/e2e` prüft die erste vertikale Strecke aus
   Login, Rollen, Benutzereinstellungen, Posteingang/Ausgang und RBAC.
 - PostgreSQL-E2E: `pnpm run test:e2e:postgres` nutzt
   `APP_E2E_PG_URL` und optional `APP_E2E_PG_DIRECT_URL`, führt Migrationen aus
   und prüft dieselbe Strecke gegen den echten Datenbankdienst.
-- Mocking: MSW-Handler fuer Browser-, Node- und E2E-Tests, damit UI und
-  Integration frueh gegen stabile API-Zustaende laufen.
+- Mocking: MSW-Handler für Browser-, Node- und E2E-Tests, damit UI und
+  Integration früh gegen stabile API-Zustände laufen.
 - Datenbank: Migrationstests, Checksum-Drift, Rollback- und Restore-Szenarien.
-- UI: Component-Tests und Storybook-Stories fuer alle Screen States.
+- UI: Component-Tests und Storybook-Stories für alle Screen States.
 - Kubernetes/Evidence: Render-, Policy- und Evidence-Bundle-Checks.
 
 ## Domain-Modul-Struktur
@@ -47,8 +47,8 @@ modules/<domain>/
   compliance/
 ```
 
-Tests gehoeren in das Domain-Modul, wenn sie Fachlogik pruefen. Tests gehoeren in
-Plattformpakete, wenn sie wiederverwendbare Vertrage pruefen.
+Tests gehören in das Domain-Modul, wenn sie Fachlogik prüfen. Tests gehören in
+Plattformpakete, wenn sie wiederverwendbare Vertrage prüfen.
 
 ## Screen Contract
 
@@ -114,10 +114,10 @@ tests:
     - keyboard focus
 ```
 
-## Red-Green-Refactor fuer UI
+## Red-Green-Refactor für UI
 
 - Red: Story oder Test beschreibt den erwarteten Zustand und scheitert.
-- Green: Komponente erfuellt den Zustand mit minimalem Code.
+- Green: Komponente erfüllt den Zustand mit minimalem Code.
 - Refactor: Layout, Tokens und Wiederverwendung verbessern.
 
 ## Pflicht-Failure-Paths
@@ -128,7 +128,7 @@ Neue Fachverfahren testen mindestens:
 - externer Dienst nicht erreichbar.
 - Warnung blockiert nicht, Fehler blockiert.
 - Loading, empty, error, ready und success pro Screen.
-- offene Frist und ueberfaellige Frist.
+- offene Frist und überfällige Frist.
 - fehlende Nachweise.
 - Rollenwechsel und nicht erlaubte Route.
 - Restore oder Migration in leerer Umgebung, wenn Datenbank betroffen ist.

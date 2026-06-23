@@ -1,7 +1,7 @@
 # Runtime-Konfiguration
 
-`/runtime-config.json` enthaelt nur oeffentliche Informationen:
-Anwendungsname, Behoerde, Rechtsraum, Tenant-Hinweis, Lokalisierung,
+`/runtime-config.json` enthält nur öffentliche Informationen:
+Anwendungsname, Behörde, Rechtsraum, Tenant-Hinweis, Lokalisierung,
 Feature-Hinweise und sichtbare Capability-Beschreibungen.
 
 Geheimnisse, interne Upstreams und Provider-Bindings bleiben serverseitig im
@@ -10,11 +10,11 @@ Geheimnisse, interne Upstreams und Provider-Bindings bleiben serverseitig im
 Regeln:
 
 - Konfiguration hat eine Schema-Version.
-- Unbekannte oder widerspruechliche Kombinationen muessen beim Start fehlschlagen.
-- Logs duerfen Konfigurationswerte nur nach Klassifikation ausgeben.
+- Unbekannte oder widersprüchliche Kombinationen müssen beim Start fehlschlagen.
+- Logs dürfen Konfigurationswerte nur nach Klassifikation ausgeben.
 - Feature Flags sind keine Autorisierung.
-- Umgebungsvariablen duerfen Konfiguration befuellen, sind aber nicht der
-  oeffentliche Vertrag.
+- Umgebungsvariablen dürfen Konfiguration befüllen, sind aber nicht der
+  öffentliche Vertrag.
 
 Operative Endpunkte:
 
@@ -24,4 +24,4 @@ Operative Endpunkte:
 - `GET /runtime-config.json`
 - `GET /internal/metrics`
 
-`/internal/metrics` darf nicht oeffentlich geroutet werden.
+`/internal/metrics` darf nicht öffentlich geroutet werden.

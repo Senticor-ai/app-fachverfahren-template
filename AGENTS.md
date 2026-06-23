@@ -1,13 +1,13 @@
 # AGENTS.md
 
-Kanonische Arbeitsanweisung fuer Coding Agents in diesem Repository.
+Kanonische Arbeitsanweisung für Coding Agents in diesem Repository.
 
 ## Zweck
 
-Dieses Repository baut eine wiederverwendbare Public-Sector-App-Plattform fuer
-Fachverfahren, Buergerapps und interne Verwaltungsprozesse. Es ist nicht als
-dauerhaft geforkte Einmalvorlage gedacht. Wiederverwendbare Logik gehoert in
-versionierte Pakete; konkrete Fachlogik gehoert in Domain-Module.
+Dieses Repository baut eine wiederverwendbare Public-Sector-App-Plattform für
+Fachverfahren, Bürgerapps und interne Verwaltungsprozesse. Es ist nicht als
+dauerhaft geforkte Einmalvorlage gedacht. Wiederverwendbare Logik gehört in
+versionierte Pakete; konkrete Fachlogik gehört in Domain-Module.
 
 ## Architekturregel
 
@@ -41,7 +41,7 @@ Ports aus `@senticor/platform-contracts` und Profile aus den Provider-Packs.
   `jurisdictions/` und `modules/` sind `.ts` und `.tsx` die erlaubten
   Quellformate. `.js`, `.jsx`, `.cjs` und `.mjs` sind dort nicht zulässig,
   außer generierten Assets wie dem MSW Worker.
-- `pnpm run check:esm` muss fuer Plattformaenderungen bestanden werden.
+- `pnpm run check:esm` muss für Plattformänderungen bestanden werden.
 - `pnpm run check:typescript-policy` muss für App-, Package-, Jurisdiction- und
   Domain-Modul-Änderungen bestanden werden.
 
@@ -64,7 +64,7 @@ modules/<domain>/
   compliance/
 ```
 
-Das Manifest beschreibt Routen, benoetigte Capabilities, Rechte, Events,
+Das Manifest beschreibt Routen, benötigte Capabilities, Rechte, Events,
 Datenkategorien, Retention-Policies und Migrationen. Tooling und Agents sollen
 vom Manifest aus scaffolden.
 
@@ -72,26 +72,26 @@ Vor UI-Implementierung muss ein Screen Contract existieren. Vorlage:
 `docs/ux-ui/screen-contract.template.yaml`. Vorgehen und Teststrategie:
 `docs/reference/test-driven-development.md`.
 
-Fuer fruehe UI-, Integrations- und E2E-Tests stehen fachneutrale MSW-Mocks fuer
+Für frühe UI-, Integrations- und E2E-Tests stehen fachneutrale MSW-Mocks für
 Login, Logout, Sitzung und Benachrichtigungen bereit. Details:
-`docs/reference/mock-data-msw.md`. Fachliche Mockdaten gehoeren in das jeweilige
+`docs/reference/mock-data-msw.md`. Fachliche Mockdaten gehören in das jeweilige
 Domain-Modul, nicht in die Basis-App.
 
 ## UI
 
-`packages/public-sector-ui` ist der oeffentliche UI-Vertrag. KERN-Muster und
+`packages/public-sector-ui` ist der öffentliche UI-Vertrag. KERN-Muster und
 verwaltungsspezifische Komponenten stehen vor ShadCN. ShadCN bleibt
-Implementierungsdetail fuer Primitive.
+Implementierungsdetail für Primitive.
 
 Der verbindliche UX/UI-Vertrag steht in
 `docs/ux-ui/fachverfahren-ux-contract.md`. Generische Guidance wird dort in
-Repository-Regeln uebersetzt; Hundesteuer bleibt nur ein externes Beispiel.
+Repository-Regeln übersetzt; Hundesteuer bleibt nur ein externes Beispiel.
 Der aktuelle Abgleich zum Fachverfahren Design Manual steht in
 `docs/ux-ui/fachverfahren-design-manual-audit.md`.
 Der aktuelle Abgleich zur generischen UX-Methodik steht in
-`docs/ux-ui/ux-methodik-public-sector-audit.md`; offene Abweichungen muessen als
+`docs/ux-ui/ux-methodik-public-sector-audit.md`; offene Abweichungen müssen als
 RC-Gap sichtbar bleiben, nicht in der App versteckt werden.
-Bei UI-, Storybook- oder Screen-Contract-Aenderungen ist zusaetzlich
+Bei UI-, Storybook- oder Screen-Contract-Änderungen ist zusätzlich
 `.claude/skills/ux-ui/SKILL.md` anzuwenden.
 
 Jede neue UI-Funktion braucht:
@@ -100,11 +100,11 @@ Jede neue UI-Funktion braucht:
 - sinnvolle Semantik und Landmarks
 - sichtbaren Fokus
 - Fehlermeldungen mit Recovery-Pfad
-- Storybook- und Testzustand fuer Default, Loading, Empty, Error und relevante
+- Storybook- und Testzustand für Default, Loading, Empty, Error und relevante
   Accessibility-Varianten
 
-Designer nutzen Storybook als gemeinsame Review-Flaeche:
-`docs/reference/storybook.md`. Neue Exports aus `public-sector-ui` muessen in
+Designer nutzen Storybook als gemeinsame Review-Fläche:
+`docs/reference/storybook.md`. Neue Exports aus `public-sector-ui` müssen in
 Storybook sichtbar sein und `pnpm run check:storybook` bestehen.
 
 ## Backend, OpenAPI und Migrationen
@@ -113,23 +113,23 @@ Das BFF/Backend basiert auf Fastify und TypeScript. Route-Schemas sind die
 OpenAPI-Quelle. OpenAPI JSON liegt unter `/api/openapi.json`; Swagger UI unter
 `/api/v1/docs`.
 
-Datenbankmigrationen laufen ueber `@senticor/app-store-postgres` im
-`migrator`-Workload. Web-Replicas fuehren keine Migrationen beim Start aus.
+Datenbankmigrationen laufen über `@senticor/app-store-postgres` im
+`migrator`-Workload. Web-Replicas führen keine Migrationen beim Start aus.
 Fachverfahren legen eigene Migrationen in `modules/<domain>/migrations/` ab.
-Plattformdaten fuer Benutzereinstellungen, RBAC und Posteingang/Ausgang liegen
+Plattformdaten für Benutzereinstellungen, RBAC und Posteingang/Ausgang liegen
 in `@senticor/app-store-postgres`; produktive App-Datenendpunkte nutzen
-PostgreSQL ueber `APP_PG_URL` oder `APP_PG_DIRECT_URL`.
+PostgreSQL über `APP_PG_URL` oder `APP_PG_DIRECT_URL`.
 Der erste vertikale App-Datenpfad liegt unter
-`apps/fachverfahren-template/e2e` und prueft Login, Rollen,
+`apps/fachverfahren-template/e2e` und prüft Login, Rollen,
 Benutzereinstellungen sowie Posteingang/Ausgang.
-Mit `APP_E2E_PG_URL` und optional `APP_E2E_PG_DIRECT_URL` prueft
+Mit `APP_E2E_PG_URL` und optional `APP_E2E_PG_DIRECT_URL` prüft
 `pnpm run test:e2e:postgres` denselben Pfad gegen PostgreSQL.
 
-Agent-spezifische Kurzskills liegen unter `.claude/skills/`. Fuer komplette
-Fachverfahren- oder Buergerportal-Slices ist
+Agent-spezifische Kurzskills liegen unter `.claude/skills/`. Für komplette
+Fachverfahren- oder Bürgerportal-Slices ist
 `.claude/skills/fachverfahren-app/SKILL.md` der Startpunkt.
 
-Vor Abschluss neuer oder geaenderter Domain-Module ausfuehren:
+Vor Abschluss neuer oder geänderter Domain-Module ausführen:
 
 ```bash
 pnpm run check:domain-contracts
@@ -137,18 +137,18 @@ pnpm run check:domain-contracts
 
 ## Authorization und Audit
 
-Rollen in der UI sind keine Autorisierung. Entscheidungen gehoeren serverseitig
+Rollen in der UI sind keine Autorisierung. Entscheidungen gehören serverseitig
 in Policy-Checks mit Authority-, Jurisdiction-, Tenant-, Mandate- und
 Case-Kontext. Fachliche Audit-Events sind append-only und getrennt von
 technischen Logs und Security Events.
 
-Eingebaute Rollen sind `citizen` und `caseworker`. Neue Rollen werden ueber die
+Eingebaute Rollen sind `citizen` und `caseworker`. Neue Rollen werden über die
 RBAC-Registry in `@senticor/public-sector-sdk`, Migrationen und API-Tests
 erweitert; keine verstreuten Rollenbedingungen im UI-Code.
 
 ## Verifikation
 
-Vor Abschluss einer Aenderung nach Moeglichkeit ausfuehren:
+Vor Abschluss einer Änderung nach Möglichkeit ausführen:
 
 ```bash
 pnpm run precommit:check
@@ -165,4 +165,4 @@ pnpm run test:k8s:render
 pnpm run evidence:build
 ```
 
-Wenn Abhaengigkeiten nicht installiert sind, dokumentiere das klar im Ergebnis.
+Wenn Abhängigkeiten nicht installiert sind, dokumentiere das klar im Ergebnis.

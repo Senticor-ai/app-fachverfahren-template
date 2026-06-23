@@ -34,7 +34,7 @@ requiredCapabilities:
 
 permissions:
   - permission: example.case.read
-    description: Faelle lesen
+    description: Fälle lesen
 
 events:
   publishes:
@@ -53,5 +53,5 @@ migrations:
   documents: document-migrations/
 ```
 
-Das Manifest ist die Schnittstelle fuer Generatoren, Coding Agents und
-Conformance-Pruefungen.
+Das Manifest ist die Schnittstelle für Generatoren, Coding Agents und
+Conformance-Prüfungen.

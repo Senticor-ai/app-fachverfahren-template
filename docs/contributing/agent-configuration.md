@@ -1,8 +1,8 @@
 # Agent-Konfiguration
 
-Coding Agents nutzen `AGENTS.md` als kanonische Arbeitsanweisung. Zusaetzliche
+Coding Agents nutzen `AGENTS.md` als kanonische Arbeitsanweisung. Zusätzliche
 Skills liegen unter `.claude/skills/` und beschreiben wiederkehrende
-Arbeitsweisen fuer:
+Arbeitsweisen für:
 
 - Testing und Evidence
 - UX/UI nach Fachverfahren-Design-Manual
@@ -10,10 +10,10 @@ Arbeitsweisen fuer:
 - Fastify/OpenAPI-Backendarbeit
 
 Diese Skills sind bewusst kurz gehalten. Sie sollen Agents zum korrekten
-Repository-Vertrag fuehren, ohne Fachlogik fuer ein konkretes Verfahren
+Repository-Vertrag führen, ohne Fachlogik für ein konkretes Verfahren
 vorwegzunehmen.
 
-Bei UI-, Storybook- oder Screen-Contract-Aenderungen zuerst
+Bei UI-, Storybook- oder Screen-Contract-Änderungen zuerst
 `.claude/skills/ux-ui/SKILL.md` lesen. Der Skill verweist auf eine kompakte
 Checkliste aus dem Fachverfahren Design Manual und ist die operative Anleitung
-fuer Erweiterungen durch Coding Agents.
+für Erweiterungen durch Coding Agents.
