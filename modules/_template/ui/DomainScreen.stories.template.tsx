@@ -15,6 +15,79 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+interface TemplateFieldProps {
+  label: string;
+  name: string;
+  autoComplete: string;
+  pattern?: string;
+  hint?: string;
+  required?: boolean;
+}
+
+function TemplateField({
+  label,
+  name,
+  autoComplete,
+  pattern,
+  hint,
+  required = false,
+}: TemplateFieldProps) {
+  return (
+    <label className="sb-schema-field">
+      <span>
+        {label}
+        {required ? <strong aria-label="Pflichtfeld"> *</strong> : null}
+      </span>
+      <input
+        autoComplete={autoComplete}
+        name={name}
+        pattern={pattern}
+        required={required}
+      />
+      {hint ? <span className="sb-field-hint">{hint}</span> : null}
+    </label>
+  );
+}
+
+function TemplateIntakeWizardPreview() {
+  function renderStep() {
+    return (
+      <>
+        <ol className="sb-stepper">
+          <li className="sb-step sb-step--ok">Anliegen</li>
+          <li className="sb-step">Angaben prüfen</li>
+          <li className="sb-step">Absenden</li>
+        </ol>
+        <TemplateField
+          autoComplete="name"
+          label="Name"
+          name="applicantName"
+          required
+        />
+        <TemplateField
+          autoComplete="postal-code"
+          hint="Fünfstellige deutsche Postleitzahl."
+          label="Postleitzahl"
+          name="contactPostalCode"
+          pattern="^\d{5}$"
+        />
+      </>
+    );
+  }
+
+  return (
+    <form noValidate>
+      {renderStep()}
+      <p className="sb-validation-note">
+        Clientseitige Hinweise werden aus `forms/intake.form.schema.json`
+        abgeleitet; serverseitige Fastify-Schemas bleiben die verbindliche
+        Prüfung.
+      </p>
+      <button type="button">Angaben prüfen</button>
+    </form>
+  );
+}
+
 export const Ready: Story = {
   render: () => (
     <main className="sb-page sb-stack">
@@ -22,7 +95,7 @@ export const Ready: Story = {
         <p className="eyebrow">Bürgerportal</p>
         <h1>Replace With Domain</h1>
         <p>Geführter Einstieg mit einem klaren nächsten Schritt.</p>
-        <button type="button">Entwurf starten</button>
+        <TemplateIntakeWizardPreview />
       </section>
     </main>
   ),

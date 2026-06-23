@@ -28,6 +28,23 @@ Nutze `docs/ux-ui/screen-contract.template.yaml` als Vorlage. Schreibe zuerst
 Tests und Storybook-Zustände für Loading, Empty, Error, Ready,
 Rollen-/Rechte-Sichtbarkeit und Accessibility.
 
+Formulare beginnen mit `forms/*.form.schema.json`. Die UI soll unterstützte
+Schema-Constraints wie Pflichtfeld, `minLength`, `maxLength` und `pattern` in
+native Eingabeattribute und Inline-Fehler übersetzen. Der Serververtrag bleibt
+verbindlich; wenn eine Regel nur serverseitig geprüft wird, steht diese Lücke im
+Screen Contract.
+
+Mehrschritt-Formulare definieren React-Hilfskomponenten auf Modulebene. Kleine
+Render-Helfer innerhalb des Formulars werden als `{renderStep()}` aufgerufen und
+nicht als verschachtelte Komponenten gerendert.
+
+Der BFF-Server-Build umfasst nur `apps/fachverfahren-template/server/` und
+`apps/fachverfahren-template/shared/`. Domain-Module dürfen ihre fachliche
+Serverlogik unter `modules/<domain>/server/` modellieren, aber nicht ad hoc in
+den Template-Server importieren. Gemeinsame DTOs gehören in den expliziten
+Shared- oder Paketvertrag; die spätere Serveranbindung muss bewusst registriert
+werden.
+
 ## Vorlagen und Beispiele
 
 - `modules/_template/` ist die kopierbare Skeleton-Struktur für neue

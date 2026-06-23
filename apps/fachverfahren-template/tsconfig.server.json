@@ -9,5 +9,9 @@
     { "path": "../../packages/public-sector-sdk" },
     { "path": "../../packages/app-store-postgres" }
   ],
+  // The server build boundary is intentionally narrow. Keep runtime BFF code in
+  // server/ and cross-runtime DTOs/contracts in shared/. Domain modules own
+  // their own server code and should be wired through package exports or an
+  // explicit registration step, not imported here ad hoc.
   "include": ["server/**/*.ts", "shared/**/*.ts"]
 }

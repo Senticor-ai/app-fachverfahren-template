@@ -1,3 +1,4 @@
+import { createPgClient, type PgClient } from "./client.js";
 import { createDefaultUserPreferences } from "./preferences.js";
 
 export type ColorSchemePreference = "light" | "dark" | "system";
@@ -67,26 +68,6 @@ export interface AppStore {
   }): Promise<UserPreferences>;
   listMailboxMessages(query: MailboxQuery): Promise<MailboxMessage[]>;
   saveMailboxMessage(message: MailboxMessage): Promise<MailboxMessage>;
-}
-
-interface PgClient {
-  connect(): Promise<void>;
-  query<T extends Record<string, unknown> = Record<string, unknown>>(
-    sql: string,
-    values?: unknown[],
-  ): Promise<{ rows: T[] }>;
-  end(): Promise<void>;
-}
-
-interface PgClientConstructor {
-  new (options: { connectionString: string }): PgClient;
-}
-
-interface PgModule {
-  Client?: PgClientConstructor;
-  default?: {
-    Client?: PgClientConstructor;
-  };
 }
 
 export class PostgresAppStore implements AppStore {
@@ -244,7 +225,7 @@ export class PostgresAppStore implements AppStore {
   }
 
   private async withClient<T>(callback: (client: PgClient) => Promise<T>) {
-    const client = await createClient(this.databaseUrl);
+    const client = await createPgClient(this.databaseUrl);
     await client.connect();
     try {
       return await callback(client);
@@ -432,13 +413,4 @@ function preferenceKey(input: { tenantId: string; actorId: string }) {
 
 function toIsoString(value: Date | string) {
   return value instanceof Date ? value.toISOString() : value;
-}
-
-async function createClient(databaseUrl: string): Promise<PgClient> {
-  const pg = (await import("pg")) as PgModule;
-  const Client = pg.default?.Client ?? pg.Client;
-  if (!Client) {
-    throw new Error("pg Client export not found");
-  }
-  return new Client({ connectionString: databaseUrl });
 }

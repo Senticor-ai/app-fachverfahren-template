@@ -2,17 +2,26 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Neutral Example Intake",
   "type": "object",
-  "required": ["applicantName", "requestSummary"],
+  "required": ["applicantName", "requestSummary", "contactPostalCode"],
   "properties": {
     "applicantName": {
+      "title": "Name",
       "type": "string",
       "minLength": 1
     },
     "requestSummary": {
+      "title": "Anliegen",
       "type": "string",
       "minLength": 1
     },
+    "contactPostalCode": {
+      "title": "Postleitzahl",
+      "type": "string",
+      "pattern": "^\\d{5}$",
+      "description": "Fünfstellige deutsche Postleitzahl."
+    },
     "attachmentsExpected": {
+      "title": "Nachweise erwartet",
       "type": "boolean",
       "default": false
     }

@@ -20,6 +20,28 @@ APP_PG_DIRECT_URL=postgres://app:app@postgres:5432/app \
 pnpm run db:migrate
 ```
 
+## Lokale PostgreSQL-Instanz
+
+Für lokale Entwicklung liefert das Repository `dev/postgres.yaml` statt einer
+Compose-Datei. Das Manifest läuft mit Rancher Desktop auf containerd/k3s und mit
+Docker Desktop, sobald Kubernetes aktiviert ist.
+
+PostgreSQL starten und auf `127.0.0.1:5432` weiterleiten:
+
+```bash
+pnpm run dev:postgres
+```
+
+BFF, Vite und Port-Forwarding gemeinsam starten:
+
+```bash
+pnpm run dev:all
+```
+
+`pnpm run dev:all` setzt für den BFF die lokalen `APP_PG_URL`- und
+`APP_PG_DIRECT_URL`-Werte und konfiguriert Vite so, dass API-Aufrufe an den
+lokalen Fastify-Server gehen.
+
 ## Domain-Module
 
 Fachverfahren legen eigene Migrationen unter

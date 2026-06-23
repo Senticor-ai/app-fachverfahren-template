@@ -28,6 +28,9 @@ Capabilities, API, UI, Accessibility und Evidence.
   Integration früh gegen stabile API-Zustände laufen.
 - Datenbank: Migrationstests, Checksum-Drift, Rollback- und Restore-Szenarien.
 - UI: Component-Tests und Storybook-Stories für alle Screen States.
+- Formulare: Storybook- und Komponentenzustände prüfen clientseitige
+  Inline-Validierung aus `forms/*.form.schema.json`; serverseitige Schemas
+  bleiben zusätzlich verbindlich.
 - Kubernetes/Evidence: Render-, Policy- und Evidence-Bundle-Checks.
 
 ## Domain-Modul-Struktur
@@ -127,6 +130,8 @@ Neue Fachverfahren testen mindestens:
 - doppelte Einreichung oder Callback.
 - externer Dienst nicht erreichbar.
 - Warnung blockiert nicht, Fehler blockiert.
+- Schema-Regeln wie Pflichtfeld und `pattern` erzeugen vor dem Absenden
+  verständliche Inline-Fehler.
 - Loading, empty, error, ready und success pro Screen.
 - offene Frist und überfällige Frist.
 - fehlende Nachweise.

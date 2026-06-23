@@ -79,6 +79,13 @@ Persona-Dichte:
 - ShadCN-Primitives sind Implementierungsdetail.
 - Tailwind v4 und CSS-first Tokens sind Standard.
 - Semantische Tokens sind Pflicht; keine Rohfarben in Komponenten.
+- Rohe HSL-Komponententokens wie `--foreground: 220 25% 10%` werden nur im
+  Token-Quellblock definiert. UI-Code nutzt direkt einsetzbare Aliasse wie
+  `--color-text`, `--color-primary`, `--color-sidebar` und
+  `--color-status-warn`.
+- Direkte CSS-Nutzung von Komponententokens, zum Beispiel
+  `color: var(--foreground)`, ist ungültig. Nutze `var(--color-text)` oder in
+  Token-Definitionen bewusst `hsl(var(--foreground))`.
 - Status immer mit Farbe plus Text/Icon, nie Farbe allein.
 - Inter ist die Standardschrift; Zahlen nutzen `tabular-nums`.
 - Radius: `0.5rem`.
@@ -92,6 +99,9 @@ Token-Familien:
 - `--status-ok`, `--status-warn`, `--status-block`, `--status-info`,
   `--status-muted` mit `-soft` Varianten.
 - `--sidebar`, `--sidebar-foreground`, `--sidebar-accent`.
+- `--color-bg`, `--color-surface`, `--color-text`, `--color-primary`,
+  `--color-primary-fg`, `--color-sidebar`, `--color-sidebar-fg`,
+  `--color-sidebar-accent`, `--color-status-*`.
 
 Komponenten entstehen zuerst in `packages/public-sector-ui` oder nutzen dessen
 Vertrag. ShadCN-Primitives bleiben austauschbares Implementierungsdetail.
@@ -103,6 +113,14 @@ Vertrag. ShadCN-Primitives bleiben austauschbares Implementierungsdetail.
 - Once-Only-Vorausfüllung wird als übernommen gekennzeichnet und bleibt
   editierbar.
 - Es gibt echte `form`-Elemente mit passenden `autoComplete`-Tokens.
+- Formularschemas unter `modules/<domain>/forms/*.form.schema.json` sind die
+  Quelle für Feldnamen, Pflichtfelder und einfache Constraints wie `minLength`,
+  `maxLength` und `pattern`.
+- Clientseitige Formular-UI leitet unterstützte Constraints aus dem Schema ab
+  und zeigt Inline-Fehler mit Korrekturpfad vor dem Absenden. Serverseitige
+  Fastify-/Route-Schemas bleiben die verbindliche Prüfung.
+- Nicht unterstützte Schema-Regeln werden im Screen Contract als
+  Validierungslücke oder bewusste serverseitige Prüfung benannt.
 - Validierung trennt `err`, `warn` und `ok`; nur `err` blockiert.
 - Freie Schrittnavigation ist erlaubt; Absenden erst bei voller Gültigkeit.
 - Der Review-Schritt zeigt alle Angaben, Quellen und offenen Warnungen.
@@ -110,6 +128,9 @@ Vertrag. ShadCN-Primitives bleiben austauschbares Implementierungsdetail.
   bietet einen Sprung dorthin.
 - Drafts dürfen bei Navigation oder Reload nicht verloren gehen, wenn ein
   Fachverfahren Zwischenspeicherung vorsieht.
+- React-Hilfskomponenten für Formulare stehen auf Modulebene. Innerhalb eines
+  Formulars sind nur Render-Helfer wie `{renderStep()}` erlaubt; neue
+  Komponenten dürfen nicht in der Render-Funktion definiert werden.
 
 ## Tabellen
 
@@ -172,6 +193,9 @@ und folgende Tests beschrieben sind:
 - Unit-/Contract-Tests bestehen.
 - Storybook-Story deckt Default, Edge, Error und Accessibility-relevante States.
 - `pnpm run check:storybook` besteht.
+- `pnpm run check:css-tokens` besteht.
+- `pnpm run lint` besteht inklusive Guard gegen verschachtelte React-Komponenten
+  in Render-Funktionen.
 - Keine Rohfarben in neuen Komponenten.
 - A11y-Akzeptanz ist dokumentiert.
 - Keine domain-spezifischen Demo-Texte außerhalb von Validierungs- oder

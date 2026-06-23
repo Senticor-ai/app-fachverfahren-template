@@ -29,6 +29,12 @@ Route-Schemas sind die Quelle für OpenAPI. Neue Plattformrouten liegen unter
 aus `modules/<domain>/server/` registriert und behalten ihre eigenen
 Permissions, Events und Compliance-Hinweise im Domain-Manifest.
 
+Der Server-Build ist absichtlich eng geschnitten:
+`apps/fachverfahren-template/tsconfig.server.json` umfasst nur `server/` und
+`shared/`. Server-Code importiert deshalb nicht direkt aus `modules/`. Gemeinsame
+DTOs gehören nach `shared/`, fachliche Serverlogik bleibt im Domain-Modul und
+wird über einen expliziten Registrierungs- oder Paketexportpfad angebunden.
+
 ## App-Daten
 
 Benutzereinstellungen und Postfachdaten laufen über `AppStore`. In Produktion
