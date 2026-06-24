@@ -33,3 +33,22 @@ migrations:
   database: migrations/database/
   documents: migrations/documents/
   externalSystems: []
+
+# ── Governance-Erweiterung (vom governten Agenten autonom gefuellt) ──
+# Belegt die oeffentlichen Pflichten; CHOS spiegelt diese in spine/tracks.ts + conformance-kit.
+# FIM-Leistungs-/Prozess-IDs als Struktur-Provenienz (z.B. "99102013104000").
+fimReferences: []
+# Rechtsgrundlagen (Paragraph/Satzung) — keine Norm wird erfunden; unbestaetigte sind "annahme" (zu validieren).
+legalBases: []
+# Rechtsnahe Entscheidungen bleiben menschlich (Vier-Augen, serverseitig autorisiert).
+hitlDecisions:
+  - decision: replace-with-domain-id.decision
+    role: caseworker
+    fourEyes: true
+# KI nur assistiv/vorschlagend, transparent (EU-AI-Act limited-risk).
+aiBoundaries:
+  euAiActClass: limited-risk
+  assistOnly: true
+  humanDecisionsServerSide: true
+# Belegmatrix: oeffentliche Pflicht-id -> Nachweise (siehe conformance-kit PUBLIC_SECTOR_MANDATE_IDS).
+mandateMapping: {}
