@@ -1,0 +1,319 @@
+# ╔══════════════════════════════════════════════════════════════════════════╗
+# ║ governance.yaml — die VERFASSUNG der governten Fachverfahren-Fabrik.        ║
+# ║ GENERISCH (jede Leistung). Komponiert die vorhandenen Template-Artefakte    ║
+# ║ (AGENTS.md, .claude/skills, conformance-kit, .gitlab-ci.yml) + trägt die    ║
+# ║ Regel-Taxonomie (blocking/optional/hitl) + die hiveCode-Projektion          ║
+# ║ (→ cognitive-hive.policy.json). Hundesteuer = nur Instanz (instances.dog-tax)║
+# ║ Diese Datei ist die Quelle; sie wird in P2 an den Template-Root kopiert.    ║
+# ╚══════════════════════════════════════════════════════════════════════════╝
+schemaVersion: 2
+starter:
+  {
+    id: fachverfahren,
+    title: "Fachverfahren (governed, autonom)",
+    subtitle: "Bund / Land / Kommune",
+  }
+
+# ── Komposition: vorhandene Template-Artefakte sind die Quelle (nicht duplizieren) ──
+compose:
+  agentContract: ./AGENTS.md
+  skills:
+    - .claude/skills/fachverfahren-app/SKILL.md
+    - .claude/skills/ux-ui/SKILL.md
+    - .claude/skills/backend-fastify/SKILL.md
+    - .claude/skills/testing/SKILL.md
+  uxContract: ./docs/ux-ui/fachverfahren-ux-contract.md
+  screenContractTemplate: ./docs/ux-ui/screen-contract.template.yaml
+  moduleTemplate: ./modules/_template/
+  designSystem:
+    {
+      palette: packages/public-sector-ui,
+      stories: "apps/*/src/stories",
+      tokens: "--color-*",
+    }
+  complianceProfileSchema: ./packages/conformance-kit
+  ci: ./.gitlab-ci.yml
+  deploy: "./apps/*/deploy/k8s/"
+
+# ── Prozess (autonom): Pflicht-Vorartefakte vor UI (aus fachverfahren-ux-contract) ──
+process:
+  preUiArtifacts:
+    [
+      problemstatement,
+      personas,
+      jobs-to-be-done,
+      journey-blueprint,
+      ki-strategie,
+      offene-fragen,
+      screen-contracts-all,
+    ]
+  phases:
+    - intake
+    - kontext
+    - fachkonzept
+    - { id: compliance, gate: forbidden-block }
+    - security
+    - ux
+    - build
+    - evidence
+    - { id: cicd, gate: auto-pass-kpi-min-0.8 }
+    - preview
+  autonomy:
+    {
+      fachkonzept: agent-derives,
+      hitlQuestions: "3-6 bundled",
+      humanConfirm: [fachkonzept, epic, prod-promote],
+    }
+
+# ── DERIVE: was der Agent autonom füllt (generisches Fachschema) → Template-Artefakte ──
+derive:
+  schema:
+    [
+      persona,
+      journey,
+      legalAnchor,
+      register-onceonly,
+      domainDataset,
+      screenContract,
+      aiFeature,
+      knowledgeBinding,
+    ]
+  evidenceEachAgainstMandate: true
+  sourceEachClaim: true
+  transferFromPriorFachverfahren: true
+
+# ── Regel-Taxonomie (blocking/optional/hitl) — je Regel {class, verify, role?, scope, locked?} ──
+rules:
+  - { id: no-direct-llm-import, class: blocking, verify: code, scope: platform }
+  - {
+      id: secrets-server-only,
+      class: blocking,
+      verify: code,
+      scope: platform,
+      locked: true,
+    }
+  - { id: fachcode-in-module, class: blocking, verify: code, scope: project }
+  - { id: port-not-direct-db, class: blocking, verify: code, scope: platform }
+  - { id: screen-contract-first, class: blocking, verify: code, scope: project }
+  - {
+      id: bitv-aa,
+      class: blocking,
+      verify: measured,
+      scope: project,
+      locked: true,
+    }
+  - { id: four-eyes-server, class: blocking, verify: code, scope: project }
+  - { id: design-tokens-only, class: blocking, verify: code, scope: project }
+  - { id: ki-transparency, class: hitl, verify: epic-text, role: AI-Governance }
+  - {
+      id: dsfa,
+      class: hitl,
+      verify: epic-text,
+      role: Datenschutz,
+      locked: true,
+    }
+  - { id: prod-deploy, class: hitl, verify: measured, role: Platform-DevOps }
+  - { id: optional-ai-prefill, class: optional, verify: epic-text }
+  - { id: optional-register-anbindung, class: optional, verify: epic-text }
+  - { id: optional-mehrsprachigkeit, class: optional, verify: epic-text }
+
+# ── App-Level-Gates = repo-eigene check:* (Ground-Truth) ──
+gates:
+  blocking:
+    [
+      check:esm,
+      check:typescript-policy,
+      check:domain-contracts,
+      check:css-tokens,
+      typecheck,
+      test,
+      evidence:build,
+    ]
+  deploy: [check:storybook, test:e2e, test:k8s:render]
+
+# ── PaaS-Ports (required/optional) ──
+platform:
+  region: de-central-1
+  residency: DE
+  ports:
+    required: [identity-and-trust, records-management]
+    optionalWhen:
+      {
+        payment: gebuehr,
+        mailbox: bescheid,
+        data-exchange: register,
+        aiAssist: ki-funktion,
+      }
+  provider: { default: provider-local, target: provider-codesphere }
+  ci: { vendor: gitlab, imageBuild: kaniko, runner: unprivileged-k8s }
+
+# ── Governance (UX/Security/Data/KI/HITL/Evidence) ──
+governance:
+  ux:
+    {
+      bitv: "2.0",
+      wcag: "2.2-AA",
+      designSystemFirst: true,
+      screenContractFirst: true,
+      sprache: B1,
+    }
+  security:
+    authzServerSide: true
+    fourEyesServer: true
+    auditAppendOnly: true
+    secrets: server-only
+    tlsMin: "1.3"
+    sca: { cveBlock: high }
+    sbom: cyclonedx
+    slsa: 3
+    secretScan: gitleaks
+  data: { fimSource: "fimportal.de", piiServerSide: true, onceOnly: prefer }
+  aiGovernance:
+    euAiAct: limited-risk
+    assistOnly: true
+    transparency: [marking, source, confidence, why, override]
+    humanDecisionsServerSide: true
+  hitl:
+    roles:
+      [
+        Vorhabenleitung,
+        Datenschutz,
+        Security-Platform,
+        UX-Governance,
+        Platform-DevOps,
+        Zentrale-IT-Architektur,
+        Fachlich,
+        AI-Governance,
+      ]
+  evidence:
+    {
+      bundle: "conformance-kit:14-items",
+      export: [oscal-bundle, ozg-evidence-pack],
+    }
+
+# ── Lern-Hooks (autonomer + automatisierter werden) ──
+learning:
+  productRecord:
+    [
+      fachkonzept,
+      journey,
+      screen-contract,
+      legal-template,
+      ai-feature,
+      build-outcome,
+    ]
+  consolidateThreshold: 3
+  lessonsAsSoftMandates: 0.8
+  skillAutoPublishApprovals: 2
+  transferFromPriorFachverfahren: true
+
+# ── HIVE-CODE-PROJEKTION → cognitive-hive.policy.json (Feldnamen = Policy-Interface verbatim) ──
+hiveCode:
+  mode: enforce
+  tracks:
+    conceptFirst: { "fachverfahren-oeffentliche-hand": required }
+    publicSectorMandates: default # Sentinel → §3-Baseline aus tracks.ts (11 Pflichten, single source of truth)
+  stack:
+    required:
+      - {
+          id: identity,
+          name: "BundID/OIDC via @govtech/iam-oidc",
+          knowledge: "de:bundid",
+          appliesWhen: "auth|login|session|sso",
+        }
+      - {
+          id: accessibility,
+          name: "BITV 2.0 / WCAG 2.2 AA",
+          knowledge: "de:bitv",
+          appliesWhen: "ui|html|form|component|screen",
+        }
+      - {
+          id: aiAssist,
+          name: "GovTech AiAssistPort (kein Direkt-LLM)",
+          knowledge: "de:inference-broker",
+          appliesWhen: "ki|assist|vorschlag|prompt|llm",
+        }
+      - {
+          id: secrets,
+          name: "Vault/Server-only Secrets",
+          knowledge: "arch:golden-secrets",
+          appliesWhen: "secret|vault|credential|token",
+        }
+      - {
+          id: observability,
+          name: "OpenTelemetry",
+          knowledge: "arch:golden-logging",
+          appliesWhen: "logger|logging|metrics|tracing",
+        }
+    forbidden:
+      - {
+          module: openai,
+          reason: "KI nur über GovTech-Broker/AiAssistPort, kein Direkt-LLM-Import.",
+          knowledge: "de:inference-broker",
+        }
+      - {
+          module: anthropic,
+          reason: "KI nur über GovTech-Broker/AiAssistPort, kein Direkt-LLM-Import.",
+          knowledge: "de:inference-broker",
+        }
+      - {
+          module: pg,
+          reason: "Datenzugriff über Plattform-Port, nicht direkt PostgreSQL (AGENTS.md).",
+          knowledge: "arch:golden-single-source",
+        }
+      - {
+          module: passport,
+          reason: "BundID/OIDC statt eigenem Auth-Stack.",
+          knowledge: "de:bundid",
+        }
+  libraries:
+    licenseAllow: [MIT, Apache-2.0, BSD-3-Clause, ISC, EUPL-1.2, MPL-2.0]
+    licenseDeny: [AGPL-3.0, GPL-3.0, SSPL-1.0, BUSL-1.1, proprietary]
+  security: { maxSeverity: medium, mythosRequired: true }
+  quality: { diagnosticsClean: true, minCoverage: 60 }
+  data:
+    {
+      pii: redact,
+      residency: EU,
+      contracts: true,
+      classification: true,
+      lineageRequired: true,
+      knowledgeGate: true,
+    }
+  ops: { deployGate: control-plane, iacPolicy: true, otel: true }
+  budget: { defaultCeiling: 10, currency: EUR }
+  governance:
+    defaultPreset: oeffentliche-hand
+    presets: [innovation, intern, extern, oeffentliche-hand, assistant, cyber]
+    lockedControls:
+      [
+        "method:concept-first",
+        "method:evidence-per-step",
+        "ps:fachverfahren-pflichten",
+        "sec:security-concept",
+        "priv:privacy-concept",
+        "ux:bitv",
+      ]
+    bounds: { budgetMax: 50, minPostureProductive: enforce }
+
+# ── Instanzen — MINIMAL; der Rest wird abgeleitet (tighten-only) ──
+instances:
+  dog-tax:
+    goal: "Hundesteuer Bürgerportal + Sachbearbeitung als modules/dog-tax/ für Demo-Kommune Musterstadt"
+    fim:
+      [
+        "99102013104000",
+        "99102013002000",
+        "99102013010000",
+        "99102013149000",
+        "99102013011000",
+        "99102013070000",
+      ]
+    demoGrenzen:
+      [
+        keine-echte-festsetzung,
+        keine-echte-zahlung,
+        keine-echten-registerdaten,
+        kein-produktivdeploy,
+        mockdaten-synthetisch-deterministisch,
+      ]

@@ -216,8 +216,51 @@ export interface AuditPort {
   ): Promise<CapabilityResponse<{ auditEventId: string }>>;
 }
 
+// ── AiAssistPort — KI nur ASSISTIV/vorschlagend, transparent, EU-AI-Act limited-risk. ─────────────────
+// Eine rechtsnahe Entscheidung trifft die KI NIE (sie bleibt menschlich, 4-Augen, serverseitig); jeder
+// Vorschlag trägt das Pflicht-Transparenzmuster (Kennzeichnung/Quelle/Konfidenz/Warum/Override) und
+// reviewRequired=true. OSS-first: das Modell kommt aus dem Provider (z.B. lokales Ollama), nie als Inline-Key.
+export type AiAssistClass = "minimal" | "limited-risk" | "high-risk";
+
+export interface AiSuggestRequest {
+  /** Was assistiert werden soll, z.B. "adresse-vorschlag", "vollstaendigkeits-hinweis". */
+  task: string;
+  /** Strukturierter, PII-armer Kontext (synthetisch im Demo-Betrieb). */
+  input: Record<string, unknown>;
+  /** Höchste akzeptierte Klasse — high-risk wird abgelehnt (kein autonomes rechtsnahes Entscheiden). */
+  maxClass?: AiAssistClass;
+}
+
+export interface AiSuggestion {
+  /** Der Vorschlagswert — NIE eine Entscheidung. Der Aufrufer castet `value` fachlich. */
+  value: unknown;
+  /** 0..1 Konfidenz. */
+  confidence: number;
+  /** Welches Modell den Vorschlag erzeugt hat (OSS-first, z.B. "ollama:qwen3"). */
+  modelId: string;
+  /** Warum — für die Progressive-Disclosure-„Warum"-Affordance. */
+  rationale: string;
+  /** Quellen/Provenienz (z.B. Once-Only-Register, Wissensknoten). */
+  sources: string[];
+  /** Pflicht-Transparenzkennung (HCAI). */
+  marking: "ki-vorschlag";
+  /** EU-AI-Act-Einordnung — Assistenz ist limited-risk. */
+  euAiActClass: AiAssistClass;
+  /** IMMER true: die rechtsnahe Entscheidung bleibt menschlich (serverseitig erzwungen, 4-Augen). */
+  reviewRequired: true;
+}
+
+export interface AiAssistPort {
+  descriptor: CapabilityDescriptor;
+  suggest(
+    context: PortCallContext,
+    request: AiSuggestRequest,
+  ): Promise<CapabilityResponse<AiSuggestion>>;
+}
+
 export interface PlatformPorts {
   identityAndTrust: IdentityAndTrustPort;
+  aiAssist: AiAssistPort;
   dataExchange: DataExchangePort;
   evidenceRetrieval: EvidenceRetrievalPort;
   payment: PaymentPort;
