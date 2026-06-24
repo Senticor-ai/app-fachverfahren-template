@@ -77,6 +77,7 @@ process:
           [
             seed-de-verwaltung,
             seed-recht-bund,
+            seed-recht-kommunal-graph,
             seed-fim-bausteine,
             seed-uxgov,
             seed-xoev,
@@ -103,6 +104,7 @@ process:
             seed-fachverfahren-golden,
             seed-fim-bausteine,
             seed-recht-bund,
+            seed-recht-kommunal-graph,
             seed-de-verwaltung,
           ]
         skills: [.agents/skills/fachverfahren-app/SKILL.md]
@@ -125,7 +127,8 @@ process:
       substeps: [dsfa, bitv-testplan, grundschutz-notiz, compliance-profile]
       uses:
         tools: [knowledge_search, compliance_check]
-        knowledge: [seed-de-verwaltung, seed-recht-bund]
+        knowledge:
+          [seed-de-verwaltung, seed-recht-bund, seed-recht-kommunal-graph]
         skills:
           [
             .agents/skills/compliance-evidence/SKILL.md,
