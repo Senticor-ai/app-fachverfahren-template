@@ -1,9 +1,12 @@
 import {
+  capabilityFailure,
   capabilityOk,
   defaultSemantics,
   type CapabilityDescriptor,
 } from "./capabilities.js";
 import type {
+  AiAssistPort,
+  AiSuggestion,
   AuditPort,
   AuthorityDirectoryPort,
   DataExchangePort,
@@ -37,7 +40,9 @@ function id(prefix: string) {
   return `${prefix}.${crypto.randomUUID()}`;
 }
 
-export function createLocalPlatformPorts(): PlatformPorts {
+export function createLocalPlatformPorts(
+  options: { aiAssistModel?: string } = {},
+): PlatformPorts {
   const payments = new Map<
     string,
     { amountMinor: number; reference: string }
@@ -196,8 +201,40 @@ export function createLocalPlatformPorts(): PlatformPorts {
     },
   };
 
+  const aiAssist: AiAssistPort = {
+    descriptor: descriptor(
+      "ai-assist",
+      "Local AI Assist (OSS-first)",
+      "confidential",
+    ),
+    async suggest(_context, request) {
+      // OSS-first: Modell vom Provider/Runtime gesetzt (lokales Ollama als Default), KEIN Inline-Key.
+      const modelId = options.aiAssistModel ?? "ollama:qwen3";
+      // KI assistiert nie rechtsnah autonom: high-risk-Aufgaben werden abgelehnt.
+      if (request.maxClass === "high-risk") {
+        return capabilityFailure(
+          "ai-assist/high-risk-refused",
+          "KI darf rechtsnahe Entscheidungen nicht autonom treffen (assistiv/limited-risk).",
+          { retryable: false, classification: "confidential" },
+        );
+      }
+      const suggestion: AiSuggestion = {
+        value: request.input,
+        confidence: 0.5,
+        modelId,
+        rationale: `Lokaler OSS-Vorschlag (${modelId}) für Aufgabe '${request.task}' — synthetisch, menschlich zu prüfen.`,
+        sources: ["local-fake"],
+        marking: "ki-vorschlag",
+        euAiActClass: "limited-risk",
+        reviewRequired: true,
+      };
+      return capabilityOk(suggestion);
+    },
+  };
+
   return {
     identityAndTrust,
+    aiAssist,
     dataExchange,
     evidenceRetrieval,
     payment,

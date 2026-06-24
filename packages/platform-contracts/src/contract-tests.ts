@@ -69,5 +69,41 @@ export function platformContractScenarios(
         }
       },
     },
+    {
+      name: "ai-assist suggests transparently and never decides",
+      async run() {
+        const suggestion = await ports.aiAssist.suggest(sampleContext(), {
+          task: "adresse-vorschlag",
+          input: { plz: "00000" },
+        });
+        if (!suggestion.ok) {
+          throw new Error("ai-assist suggest failed");
+        }
+        const s = suggestion.value;
+        if (s.marking !== "ki-vorschlag" || s.reviewRequired !== true) {
+          throw new Error(
+            "ai-assist suggestion missing transparency/human-review markers",
+          );
+        }
+        if (s.euAiActClass !== "limited-risk") {
+          throw new Error("ai-assist must be limited-risk (assistive only)");
+        }
+      },
+    },
+    {
+      name: "ai-assist refuses high-risk autonomous decisions",
+      async run() {
+        const refused = await ports.aiAssist.suggest(sampleContext(), {
+          task: "binding-legal-decision",
+          input: {},
+          maxClass: "high-risk",
+        });
+        if (refused.ok) {
+          throw new Error(
+            "ai-assist must refuse high-risk autonomous decisions",
+          );
+        }
+      },
+    },
   ];
 }

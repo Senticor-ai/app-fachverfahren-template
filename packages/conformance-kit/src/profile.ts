@@ -23,6 +23,26 @@ export interface AccessibilityProfile {
   target: string;
 }
 
+export type EuAiActClass = "minimal" | "limited-risk" | "high-risk";
+
+/** Die öffentlich-rechtlichen Pflichten (§3-Grounding-Blueprint) als Conformance-Anker. Spiegelt
+ *  DEFAULT_PUBLIC_SECTOR_MANDATES im Orchestrator; hier template-lokal, damit das Conformance-Kit
+ *  unabhängig prüfbar bleibt. Das mandateMapping eines Profils soll jede dieser Pflichten belegen. */
+export const PUBLIC_SECTOR_MANDATE_IDS = [
+  "rechtsgrundlage",
+  "fim-leistung",
+  "register-interop",
+  "eid-zugang",
+  "dsfa",
+  "it-grundschutz",
+  "barrierefreiheit",
+  "saga-architektur",
+  "vergabe-evb-it",
+  "betrieb-nachweis",
+  "vvt-art30",
+] as const;
+export type PublicSectorMandateId = (typeof PUBLIC_SECTOR_MANDATE_IDS)[number];
+
 export interface ComplianceProfile {
   jurisdiction: string;
   authorityType: string;
@@ -30,6 +50,12 @@ export interface ComplianceProfile {
   processing: ProcessingProfile;
   operations: OperationsProfile;
   accessibility: AccessibilityProfile;
+  /** EU-AI-Act-Einordnung (KI-Assistenz = limited-risk; high-risk fordert eine AI-Eval-Evidenz). */
+  euAiActClass?: EuAiActClass;
+  /** FIM-Referenzen (Struktur-Provenienz, z.B. "99102013104000"). */
+  fimReferences?: string[];
+  /** Belegmatrix: öffentliche Pflicht-id → Nachweise (Doku/Code/Artefakt), die sie erfüllen. */
+  mandateMapping?: Partial<Record<string, string[]>>;
 }
 
 export function validateComplianceProfile(
@@ -46,4 +72,17 @@ export function validateComplianceProfile(
     findings.push("operations.dataResidency is required");
   }
   return findings;
+}
+
+/** Die öffentlichen Pflichten, die das Profil NICHT belegt (leeres/fehlendes mandateMapping-Eintrag).
+ *  Leere Rückgabe = alle Pflichten belegt. Speist das blocking-Gate des Conformance-Kits. */
+export function validateMandateCoverage(
+  profile: ComplianceProfile,
+  required: readonly string[] = PUBLIC_SECTOR_MANDATE_IDS,
+): string[] {
+  const mapping = profile.mandateMapping ?? {};
+  return required.filter((id) => {
+    const evidence = mapping[id];
+    return !evidence || evidence.length === 0;
+  });
 }

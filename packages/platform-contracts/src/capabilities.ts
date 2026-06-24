@@ -9,7 +9,8 @@ export type CapabilityId =
   | "records-management"
   | "notification"
   | "workflow"
-  | "audit";
+  | "audit"
+  | "ai-assist";
 
 export type DataClassification =
   | "public"
