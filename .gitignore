@@ -18,3 +18,4 @@ test-results/
 !.chos/warm-start.md
 !.chos/build-manifest.json
 !.chos/gold-checklist.json
+!.chos/governance.md
