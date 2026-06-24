@@ -22,6 +22,9 @@ compose:
     - .claude/skills/ux-ui/SKILL.md
     - .claude/skills/backend-fastify/SKILL.md
     - .claude/skills/testing/SKILL.md
+    - .claude/skills/security-dsfa/SKILL.md
+    - .claude/skills/accessibility-bitv/SKILL.md
+    - .claude/skills/compliance-evidence/SKILL.md
   uxContract: ./docs/ux-ui/fachverfahren-ux-contract.md
   screenContractTemplate: ./docs/ux-ui/screen-contract.template.yaml
   moduleTemplate: ./modules/_template/
