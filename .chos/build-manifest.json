@@ -1,0 +1,354 @@
+{
+  "$comment": "CHOS-CODE WARM-START DELTA-MAP — generisch für JEDES Fachverfahren. Dieses Repo ist die VOLLE Startbasis (Server, public-sector-ui, platform-contracts, Gates sind FERTIG). Ein Fachverfahren entsteht NICHT durch Neubau, sondern durch das Füllen der wenigen Delta-Dateien unter modules/<domain>/ (geklont aus modules/_template/) mit Domänen-WERTEN. Der CHOS-Generator (packages/journeys) liest diese Datei, erzeugt pro Delta EINEN kleinen Knoten mit GENAU EINEM Datei-Ziel + Vertrag + Kompositions-Liste und prüft mit den Template-eigenen Gates. Hundesteuer ist eine Instanz (docs/examples/hundesteuer/), NICHT Teil des Templates.",
+  "schemaVersion": "1.0.0",
+  "kind": "chos-warm-start",
+  "appliesTo": {
+    "template": "senticor-app-fachverfahren-template",
+    "track": "fachverfahren-oeffentliche-hand"
+  },
+  "principle": "compose-and-fill-deltas, never-build-from-scratch",
+  "alreadyProvided": {
+    "_note": "Diese Bausteine sind FERTIG im Klon vorhanden — NICHT neu bauen, nur importieren/komponieren.",
+    "server": "apps/fachverfahren-template/server/ — Fastify-App-Factory, OpenAPI/Swagger, AJV-Schema-Validierung, Session-Store, Health/Readiness, mock-session. Domänen-Routen kommen als modules/<domain>/server/routes.ts dazu.",
+    "uxLibrary": "packages/public-sector-ui/ — fertige, BITV-getestete, shadcn/Tailwind+KERN-Token Komponenten mit Storybook-Stories. NICHT nachbauen.",
+    "platformContracts": "packages/platform-contracts/ — Ports (IdentityAndTrust/Payment/Mailbox/Audit/Workflow/DataExchange/EvidenceRetrieval/SignatureSeal). Fachlogik nutzt NUR Ports, nie Provider direkt.",
+    "sdk": "packages/public-sector-sdk/ — Manifest-Parsing, Authorization/RBAC, Audit, Domain-Kernel.",
+    "appShell": "apps/fachverfahren-template/src/ — App-Shell mit Surfaces citizen/caseworker, API-Layer, MSW-Mocks, i18n, RuntimeConfig.",
+    "gates": "scripts/check-*.mjs + tooling/template/cli.ts — check:domain-contracts, check:module-contracts, check:storybook, check:css-tokens, check:typescript-policy, typecheck (tsc -b), test (vitest). Diese sind die WAHRHEIT, kein LLM-Judge.",
+    "referenceModule": "modules/neutral-example/ — eine VOLLSTÄNDIG GEFÜLLTE, kompilierende Referenz desselben Delta-Satzes. Form-Vorbild kopieren, Werte ersetzen.",
+    "skeleton": "modules/_template/ — leeres Delta-Skelett zum Klonen nach modules/<domain>/."
+  },
+  "workflow": [
+    {
+      "step": 1,
+      "id": "install",
+      "run": "pnpm install --frozen-lockfile",
+      "purpose": "Workspace + Husky bereitstellen (node_modules ggf. schon vorhanden)."
+    },
+    {
+      "step": 2,
+      "id": "context",
+      "run": "pnpm run agent:context -- <spec.yaml>",
+      "purpose": "Pflicht-Lese-Dateien für die App-Spec auswählen (z.B. docs/examples/hundesteuer/app.spec.yaml). Diese VOR dem Schreiben lesen."
+    },
+    {
+      "step": 3,
+      "id": "scaffold",
+      "run": "pnpm run app:new -- <spec.yaml>",
+      "purpose": "Erzeugt modules/<domain>/ aus modules/_template/ inkl. Manifest-Gerüst. Danach existieren alle Delta-Dateien als Platzhalter."
+    },
+    {
+      "step": 4,
+      "id": "fill-deltas",
+      "run": "<agent füllt die Delta-Dateien unten mit Domänen-WERTEN>",
+      "purpose": "Der EIGENTLICHE generative Anteil — klein, gebunden, je Datei ein Vertrag."
+    },
+    {
+      "step": 5,
+      "id": "verify",
+      "run": "pnpm run agent:verify && pnpm run check:domain-contracts && pnpm run check:module-contracts && pnpm run check:storybook && pnpm run typecheck && pnpm run test",
+      "purpose": "GEERDETE Prüfung (Compiles + Verträge + Stories + Tests). Bei Fehler: gezielt die betroffene Delta-Datei nachbessern (nicht neu starten)."
+    },
+    {
+      "step": 6,
+      "id": "dev",
+      "run": "pnpm run dev",
+      "purpose": "Vite-Dev-Server (127.0.0.1:5173, MSW-Mocks default). Surfaces im Browser klickbar."
+    }
+  ],
+  "deltas": [
+    {
+      "id": "manifest",
+      "target": "modules/<domain>/domain.module.yaml",
+      "role": "Domänen-Manifest: routes, requiredCapabilities, permissions, events (publishes/consumes), dataCategories, retentionPolicies, migrations, fimReferences.",
+      "mustContain": [
+        "routes je Surface",
+        "requiredCapabilities ⊆ platform-contracts",
+        "permissions (read/write/decide)",
+        "events append-only",
+        "fimReferences (FIM-IDs)"
+      ],
+      "source": "spec.requiredCapabilities, spec.routes, spec.fim, spec.workflows, spec.humanApproval",
+      "gate": "check:module-contracts, check:domain-contracts",
+      "shapeRef": "modules/neutral-example/domain.module.yaml"
+    },
+    {
+      "id": "screen-citizen",
+      "target": "modules/<domain>/contracts/citizen-intake.screen.yaml",
+      "surface": "citizen",
+      "role": "Screen-Contract Bürger-Antrag (DIE Integrations-Wahrheit für diese Oberfläche — Inputs/Outputs/States/IA/HCAI/a11y/tests). Verhindert Frontend↔Backend-Drift, weil Form UND Routen daran gebunden sind.",
+      "mustContain": [
+        "persona: citizen",
+        "ia.pattern: guided-stepper",
+        "states: loading/empty/error/ready/success",
+        "a11y landmarks+keyboard+focusOrder+zoom",
+        "tests unit/integration/storybook"
+      ],
+      "composeFrom": {
+        "ui": [
+          "FormStepper",
+          "FormStep",
+          "FormField",
+          "OnceOnlyField",
+          "ServiceHeader",
+          "ApplicantIdentity",
+          "PaymentStatus"
+        ],
+        "ports": ["IdentityAndTrustPort", "PaymentPort", "MailboxPort"]
+      },
+      "source": "spec.journeys[surface=citizen], docs/ux-ui/screen-contract.template.yaml",
+      "gate": "check:domain-contracts, check:storybook",
+      "shapeRef": "modules/neutral-example/contracts/citizen-intake.screen.yaml"
+    },
+    {
+      "id": "screen-caseworker",
+      "target": "modules/<domain>/contracts/caseworker-workspace.screen.yaml",
+      "surface": "caseworker",
+      "role": "Screen-Contract Sachbearbeitung (Master-Detail, dichte Mengensicht, serverseitig erzwungene 4-Augen-Entscheidung).",
+      "mustContain": [
+        "persona: caseworker",
+        "ia.pattern: master-detail",
+        "states",
+        "hcai controls (KI assistiv, Mensch entscheidet)",
+        "a11y",
+        "tests"
+      ],
+      "composeFrom": {
+        "ui": [
+          "CaseInbox",
+          "CaseDetailPanel",
+          "StatusBadge",
+          "DeadlineIndicator",
+          "EvidenceList",
+          "SubsumtionPanel",
+          "KiVorschlag"
+        ],
+        "ports": ["AuditPort", "WorkflowPort", "IdentityAndTrustPort"]
+      },
+      "source": "spec.journeys[surface=caseworker], spec.humanApproval",
+      "gate": "check:domain-contracts, check:storybook",
+      "shapeRef": "modules/neutral-example/contracts/caseworker-workspace.screen.yaml"
+    },
+    {
+      "id": "screen-audit",
+      "target": "modules/<domain>/contracts/audit-review.screen.yaml",
+      "surface": "audit",
+      "optional": true,
+      "condition": "nur wenn spec eine audit/Aufsichts-Surface hat",
+      "role": "Screen-Contract Aufsicht/Audit (Aggregate + revisionssicheres Log, Drilldown nur auf Pseudonym).",
+      "mustContain": [
+        "persona: auditor",
+        "ia.pattern: dashboard-drilldown",
+        "Pseudonymisierung",
+        "append-only audit",
+        "a11y",
+        "tests"
+      ],
+      "composeFrom": {
+        "ui": ["AuditDashboard", "WorkflowStatus"],
+        "ports": ["AuditPort"]
+      },
+      "source": "spec.journeys[surface=audit]",
+      "gate": "check:domain-contracts, check:storybook",
+      "shapeRef": "modules/neutral-example/contracts/caseworker-workspace.screen.yaml"
+    },
+    {
+      "id": "form-schema",
+      "target": "modules/<domain>/forms/intake.form.schema.json",
+      "surface": "citizen",
+      "role": "JSON-Schema des Antrags (Felder, Typen, Validierung, Once-Only-Vorbefüllung). Server-autoritativ via AJV.",
+      "mustContain": [
+        "Felder mit Validierung",
+        "required/optional",
+        "pfadentscheidende Frage zuerst",
+        "Once-Only-Felder markiert"
+      ],
+      "source": "spec.domainVocabulary, agent-prompt Fachannahmen",
+      "gate": "check:domain-contracts, typecheck, test",
+      "shapeRef": "modules/neutral-example/forms/intake.form.schema.json"
+    },
+    {
+      "id": "rules-data",
+      "target": "modules/<domain>/forms/<domain>.rules.json",
+      "role": "DOMÄNEN-DATEN als Single-Source: Tarife/Sätze/Fristen/Schwellen/Befreiungs- und Ermäßigungstatbestände — NIE hartkodiert im Code. Die Berechnung liest diese Daten.",
+      "mustContain": [
+        "Sätze/Tarife als Daten",
+        "Fristen",
+        "Schwellenwerte",
+        "Quelle/Provenienz je Wert (Satzung/Annahme-zu-validieren)"
+      ],
+      "source": "agent-prompt Fachannahmen, spec.assumptions",
+      "gate": "typecheck, test",
+      "note": "tariff-as-data (Gold-Bar): die Berechnung referenziert diese Datei, keine Inline-Zahlen."
+    },
+    {
+      "id": "server-routes",
+      "target": "modules/<domain>/server/routes.ts",
+      "role": "Fastify-Routen-Plugin des Moduls: registriert Endpunkte EXAKT nach den Screen-Contracts, nutzt platform-contracts Ports, validiert via AJV-Schema, erzwingt 4-Augen serverseitig. KEIN eigener Server — wird in die fertige App-Factory eingehängt.",
+      "mustContain": [
+        "Routen aus domain.module.yaml",
+        "Port-Nutzung (kein Provider direkt)",
+        "Schema-Validierung",
+        "4-Augen serverseitig autorisiert",
+        "append-only Audit-Events"
+      ],
+      "composeFrom": {
+        "ports": [
+          "PaymentPort",
+          "MailboxPort",
+          "AuditPort",
+          "WorkflowPort",
+          "IdentityAndTrustPort"
+        ]
+      },
+      "source": "domain.module.yaml routes+events, screen contracts outputs",
+      "gate": "typecheck, test, check:module-boundaries",
+      "shapeRef": "modules/neutral-example/server/routes.ts"
+    },
+    {
+      "id": "calc",
+      "target": "modules/<domain>/server/berechnung.ts",
+      "role": "Reine Berechnungs-/Subsumtionsfunktion(en): liest <domain>.rules.json (Daten), liefert nachvollziehbares Ergebnis + Begründung. VOLLSTÄNDIG implementieren (bis zur schließenden Klammer), keine Stubs.",
+      "mustContain": [
+        "reine Funktion(en) ohne Seiteneffekte",
+        "liest Regeln aus Daten",
+        "deckt alle Tatbestände der spec ab",
+        "Begründungs-/Subsumtions-Ausgabe"
+      ],
+      "source": "agent-prompt Fachannahmen (Staffel/Schwellen/Befreiung/Ermäßigung), rules-data",
+      "gate": "typecheck, test",
+      "note": "Wird durch tests/<domain>.test.ts geerdet (Tabellen-Tests gegen die spec-Beispielwerte)."
+    },
+    {
+      "id": "ui-stories",
+      "target": "modules/<domain>/ui/<Domain>.stories.tsx",
+      "role": "Storybook-Stories, die die public-sector-ui-Komponenten zum konkreten Verfahren KOMPONIEREN (keine neuen Primitive). Pflicht-States: Default/Loading/Empty/Error/Success + relevante a11y.",
+      "mustContain": [
+        "Default",
+        "Loading",
+        "Empty",
+        "Error",
+        "Success",
+        "Accessibility",
+        "nur Imports aus @senticor/public-sector-ui"
+      ],
+      "composeFrom": {
+        "ui": [
+          "FormStepper",
+          "CaseInbox",
+          "AuditDashboard",
+          "SubsumtionPanel",
+          "KiVorschlag"
+        ]
+      },
+      "source": "screen contracts states",
+      "gate": "check:storybook, typecheck:storybook",
+      "shapeRef": "modules/neutral-example/ui/NeutralExample.stories.tsx"
+    },
+    {
+      "id": "permissions",
+      "target": "modules/<domain>/permissions/permissions.yaml",
+      "role": "RBAC-Rechte (read/write/decide) je Rolle.",
+      "mustContain": ["read", "write", "decide (4-Augen)"],
+      "source": "spec.roles, spec.humanApproval",
+      "gate": "check:module-contracts, test:authorization",
+      "shapeRef": "modules/neutral-example/permissions/permissions.yaml"
+    },
+    {
+      "id": "events",
+      "target": "modules/<domain>/events/events.yaml",
+      "role": "Fachliche Domänen-Events (publishes/consumes), append-only, versioniert.",
+      "mustContain": [
+        "publishes je Workflow-Schritt",
+        "consumes (z.B. mailbox.message-received)"
+      ],
+      "source": "spec.workflows",
+      "gate": "check:module-contracts, test:event-compatibility",
+      "shapeRef": "modules/neutral-example/events/events.yaml"
+    },
+    {
+      "id": "i18n",
+      "target": "modules/<domain>/i18n/de.json",
+      "role": "Deutsche Microcopy (Sie-Form, lösungsorientierte Fehlertexte).",
+      "mustContain": [
+        "Labels",
+        "Fehlertexte lösungsorientiert",
+        "keine Architektur-/Port-Begriffe in der UI"
+      ],
+      "source": "screen contracts content.language",
+      "gate": "check:storybook, test",
+      "shapeRef": "modules/neutral-example/i18n/de.json"
+    },
+    {
+      "id": "migration",
+      "target": "modules/<domain>/migrations/database/<timestamp>_<domain>.sql",
+      "role": "DB-Migration für die Fall-/Vorgangsdaten des Moduls.",
+      "mustContain": ["Tabellen für Vorgänge/Fälle", "Retention-konform"],
+      "source": "domain.module.yaml retentionPolicies",
+      "gate": "test:migration",
+      "shapeRef": "modules/neutral-example/migrations/database/20260623000000_neutral_example.sql"
+    },
+    {
+      "id": "compliance",
+      "target": "modules/<domain>/compliance/profile.example.json",
+      "role": "Compliance-Profil: Rechtsgrundlagen, Datenkategorien, Retention, Mandats-Mapping.",
+      "mustContain": [
+        "Rechtsgrundlagen (Satzung/KAG/DSGVO)",
+        "dataCategories",
+        "retention",
+        "Mandate"
+      ],
+      "source": "spec.dataClassifications, jurisdictions/de, conformance-kit",
+      "gate": "check:domain-contracts, test:retention-deletion",
+      "shapeRef": "modules/neutral-example/compliance/profile.example.json"
+    },
+    {
+      "id": "tests",
+      "target": "modules/<domain>/tests/<domain>.test.ts",
+      "role": "Geerdete Tests: Tabellen-Tests der Berechnung gegen die spec-Beispielwerte + Modul-Vertrag + 'kein Fremd-Domänen-Leak'.",
+      "mustContain": [
+        "Tabellen-Test der Berechnung gegen Beispielwerte",
+        "manifest-Vertragstest",
+        "not.toMatch(Fremd-Domäne)"
+      ],
+      "source": "spec.acceptanceCriteria, agent-prompt Beispielwerte",
+      "gate": "test",
+      "shapeRef": "modules/neutral-example/tests/neutral-example.test.ts"
+    }
+  ],
+  "surfaces": {
+    "citizen": {
+      "route": "/services/<domain>",
+      "pattern": "guided-stepper",
+      "primaryComponents": ["FormStepper", "OnceOnlyField", "BundIDLoginForm"]
+    },
+    "caseworker": {
+      "route": "/cases/<domain>",
+      "pattern": "master-detail",
+      "primaryComponents": [
+        "CaseInbox",
+        "CaseDetailPanel",
+        "SubsumtionPanel",
+        "KiVorschlag"
+      ]
+    },
+    "audit": {
+      "route": "/audit/<domain>",
+      "pattern": "dashboard-drilldown",
+      "primaryComponents": ["AuditDashboard"]
+    }
+  },
+  "verifyGates": {
+    "_note": "GEERDET — diese ersetzen den verrauschten LLM-Judge. Ein Knoten gilt erst als fertig, wenn sein Gate grün ist UND die Ziel-Datei existiert (0 Writes = FAIL).",
+    "compiles": "pnpm run typecheck",
+    "domainContracts": "pnpm run check:domain-contracts",
+    "moduleContracts": "pnpm run check:module-contracts",
+    "moduleBoundaries": "pnpm run check:module-boundaries",
+    "storybook": "pnpm run check:storybook",
+    "cssTokens": "pnpm run check:css-tokens",
+    "tests": "pnpm run test",
+    "agentVerify": "pnpm run agent:verify"
+  },
+  "goldBar": ".chos/gold-checklist.json",
+  "instanceExample": "docs/examples/hundesteuer/ (app.spec.yaml + agent-prompt.md) — die Hundesteuer-Fachannahmen als Validierungsbeispiel. Werte sind synthetisch."
+}
