@@ -52,17 +52,308 @@ process:
       offene-fragen,
       screen-contracts-all,
     ]
+  # ── Per-Phase-STEUERUNG (die EINE Quelle: was wann wie, Sub-Schritte, Freigaben, optional, HITL, was-von-wo,
+  #    Doku/Stack/Tests/Deployment/Audit/Security). Der Governance-Spine (contract.ts→phase-steering→exec) liest
+  #    das DYNAMISCH und ersetzt, was sonst der Entwickler manuell entscheidet. Reihenfolge = Journey. ──
   phases:
-    - intake
-    - kontext
-    - fachkonzept
-    - { id: compliance, gate: forbidden-block }
-    - security
-    - ux
-    - build
-    - evidence
-    - { id: cicd, gate: auto-pass-kpi-min-0.8 }
-    - preview
+    - id: intake
+      title: "Auftrag verstehen (der EINE Bau-Auftrag, kein Chat)"
+      description: "Den Owner-Auftrag erfassen, Track/Engagement/Tiefe ableiten. Danach autonom; Mensch nur bei Entscheidung/Credential."
+      autonomy: agent-drives
+      substeps: [auftrag-lesen, governance_track, scope-intent]
+      uses: { tools: [governance_track, plan_context], knowledge: [] }
+      produces: [intake-summary]
+      success: [track-bestimmt, kind+depth-bestimmt]
+
+    - id: kontext
+      title: "Erden im Wissensgraph (FIM/Recht/BITV/BSI)"
+      description: "Belegtes Korpus + Compliance-Regeln binden, BEVOR etwas entsteht. Nichts erfinden."
+      autonomy: agent-drives
+      substeps: [knowledge_search, policy_check, compliance_check]
+      uses:
+        tools:
+          [knowledge_search, knowledge_node, policy_check, compliance_check]
+        knowledge:
+          [
+            seed-de-verwaltung,
+            seed-recht-bund,
+            seed-fim-bausteine,
+            seed-uxgov,
+            seed-xoev,
+          ]
+      produces: [korpus-bindung, compliance-regeln]
+      success: [korpus-knoten-gebunden, lizenz+stack-geprueft]
+
+    - id: fachkonzept
+      title: "Fachkonzept + Epic + PRD ableiten (MAXIMAL, mit Mermaid)"
+      description: "Vollständiges Fachkonzept (Vorschriften + Wiederverwendung FIM/KGSt/OZG + voller Stack + Anschlussfähigkeit), Epic + PRD — code-frei, jede Aussage belegt."
+      autonomy: agent-derives
+      substeps:
+        [
+          fachkonzept-md,
+          epic-md,
+          prd-md,
+          mermaid-diagramme,
+          offene-fragen-buendeln,
+        ]
+      uses:
+        tools: [knowledge_search, gate_submit_fachkonzept, gate_submit_plan]
+        knowledge:
+          [
+            seed-fachverfahren-golden,
+            seed-fim-bausteine,
+            seed-recht-bund,
+            seed-de-verwaltung,
+          ]
+        skills: [.agents/skills/fachverfahren-app/SKILL.md]
+      produces: [FACHKONZEPT.md, EPIC.md, PRD.md]
+      mermaidRequired:
+        [flowchart, sequenceDiagram, stateDiagram-v2, erDiagram, journey]
+      hitl:
+        gate: true
+        roles: [Fachlich, Vorhabenleitung]
+        question: "Ist das Fachkonzept vollständig, rechtssicher und der Schnitt korrekt?"
+        precedence: required
+      success:
+        [requirements-must-erfuellt, evidence-pro-aussage, quelle-pro-claim]
+
+    - id: compliance
+      title: "Compliance-Artefakte (DSFA · BITV-Plan · Grundschutz · Profil)"
+      description: "Rechtsgrundlagen, Datenkategorien, Retention, Mandats-Mapping; DSFA + IT-Grundschutz."
+      autonomy: agent-drives
+      gate: forbidden-block
+      substeps: [dsfa, bitv-testplan, grundschutz-notiz, compliance-profile]
+      uses:
+        tools: [knowledge_search, compliance_check]
+        knowledge: [seed-de-verwaltung, seed-recht-bund]
+        skills:
+          [
+            .agents/skills/compliance-evidence/SKILL.md,
+            .agents/skills/security-dsfa/SKILL.md,
+          ]
+      produces:
+        [
+          DSFA.md,
+          BITV-Testplan.md,
+          Grundschutz-Notiz.md,
+          compliance/profile.example.json,
+        ]
+      hitl:
+        {
+          gate: true,
+          roles: [Datenschutz],
+          question: "DSFA tragfähig?",
+          precedence: required,
+          locked: true,
+        }
+      mandates: [dsfa, ki-transparency, fachverfahren-public-sector]
+      success:
+        [rechtsgrundlagen-belegt, dataCategories+retention, mandate-evidence]
+
+    - id: security
+      title: "Security-Konzept (Server-Authz · 4-Augen · Secrets · SCA/SBOM/SLSA)"
+      description: "Authz serverseitig, 4-Augen serverseitig erzwungen, Secrets server-only, append-only Audit, SBOM/SLSA, Secret-Scan."
+      autonomy: agent-drives
+      substeps:
+        [
+          authz-server,
+          four-eyes-server,
+          secrets-server-only,
+          sbom,
+          sca-gate,
+          secret-scan,
+        ]
+      uses:
+        knowledge: [arch:golden-secrets, arch:golden-logging]
+        skills: [.agents/skills/security-dsfa/SKILL.md]
+      produces: [security-konzept, sbom.cdx.json]
+      mandates: [security-concept, llm-firewall]
+      success:
+        [
+          authz-server-only,
+          four-eyes-server,
+          secrets-server-only,
+          sbom-vorhanden,
+          sca-high-block,
+        ]
+
+    - id: ux
+      title: "UX KOMPONIEREN (public-sector-ui · BITV · Screen-Contracts · Stories)"
+      description: "Keine Primitive neu bauen — public-sector-ui komponieren; KERN-Token; Screen-Contract ZUERST; alle Pflicht-States; BITV/WCAG AA."
+      autonomy: agent-drives
+      substeps:
+        [
+          screen-contracts,
+          ui-stories,
+          i18n,
+          states-default-loading-empty-error-success,
+        ]
+      uses:
+        knowledge: [seed-ux-patterns, seed-uxgov, de:bitv, kern:designsystem]
+        skills:
+          [
+            .agents/skills/ux-ui/SKILL.md,
+            .agents/skills/accessibility-bitv/SKILL.md,
+          ]
+        components:
+          [
+            FormStepper,
+            OnceOnlyField,
+            BundIDLoginForm,
+            CaseInbox,
+            CaseDetailPanel,
+            AuditDashboard,
+            SubsumtionPanel,
+            KiVorschlag,
+          ]
+      produces: [contracts/*.screen.yaml, ui/*.stories.tsx, i18n/de.json]
+      gates: [check:storybook, check:css-tokens]
+      success:
+        [
+          screen-contract-first,
+          alle-pflicht-states,
+          bitv-aa,
+          design-tokens-only,
+          kein-from-scratch,
+        ]
+
+    - id: build
+      title: "Delta-Build (Module füllen · Ports · Tarife als Daten · Tests)"
+      description: "Die modules/<domain>/-Deltas mit WERTEN füllen; nur Ports; Tarife/Fristen als Daten; reine, vollständige Berechnung; Tests geerdet."
+      autonomy: agent-drives
+      substeps:
+        [
+          manifest,
+          routes-ports,
+          berechnung+rules-daten,
+          form-schema,
+          codegen,
+          typecheck,
+          test,
+          code-review,
+        ]
+      uses:
+        knowledge: [arch:golden-single-source, de:bundid]
+        skills:
+          [
+            .agents/skills/backend-fastify/SKILL.md,
+            .agents/skills/testing/SKILL.md,
+          ]
+        sdkPorts:
+          [
+            identity-and-trust,
+            payment,
+            mailbox,
+            audit,
+            workflow,
+            records-management,
+          ]
+      produces:
+        [
+          modules/<domain>/server/*,
+          modules/<domain>/forms/*,
+          modules/<domain>/domain.module.yaml,
+          modules/<domain>/tests/*,
+        ]
+      hitl:
+        {
+          gate: false,
+          roles: [Zentrale-IT-Architektur],
+          question: "Code-Review (optional)",
+          precedence: optional,
+        }
+      mandates: [data-handling, cicd]
+      gates:
+        [
+          check:domain-contracts,
+          check:module-contracts,
+          check:module-boundaries,
+          check:typescript-policy,
+          typecheck,
+          test,
+        ]
+      success:
+        [
+          compiles,
+          tests-gruen,
+          tarife-als-daten,
+          ports-statt-provider,
+          four-eyes-server,
+          coverage>=60,
+        ]
+
+    - id: evidence
+      title: "Nachweis-Dossier + Evidence-Bundle (revisionssicher)"
+      description: "Dossier (Epic + Reviews + Validierungen + Provenienz + Sign-off) + conformance-kit-Bundle + OSCAL/OZG-Export."
+      autonomy: agent-drives
+      substeps: [dossier, evidence-bundle, mandate-signoff, oscal-export]
+      uses:
+        skills: [.agents/skills/compliance-evidence/SKILL.md]
+      produces: [DOSSIER.md, evidence-bundle, oscal-bundle]
+      gates: [evidence:build]
+      mandates: [measured-evidence]
+      success: [dossier-vollstaendig, mandate-signoff, evidence-append-only]
+
+    - id: cicd
+      title: "CI/CD-Absicherung (Kaniko · SBOM · Scan · Sign · Deploy-Manifeste)"
+      description: "GitLab/GitHub-Pipeline (lint→test→build→sbom→scan→sign→deploy), k8s-Manifeste; Produktivdeploy bleibt Control-Plane/HITL."
+      autonomy: agent-drives
+      gate: auto-pass-kpi-min-0.8
+      substeps:
+        [
+          ci-pipeline,
+          k8s-manifeste,
+          kaniko-build,
+          sbom,
+          trivy-scan,
+          cosign-sign,
+        ]
+      uses:
+        knowledge: [arch:golden-cicd, arch:golden-logging]
+      produces: [.gitlab-ci.yml, apps/*/deploy/k8s/*, sbom]
+      mandates: [cicd, rollback-readiness, observability]
+      gates: [check:storybook, test:e2e, test:k8s:render]
+      success: [pipeline-stufen-vollstaendig, k8s-render-ok, sbom+sign]
+      optionalWhen: { depth: ">= mvp" }
+
+    - id: preview
+      title: "Dev-Server starten + App testen (klickbar)"
+      description: "pnpm run dev (Vite 5173); die drei Surfaces im Browser klickbar; Smoke gegen echte Routen (kein 5xx); Screenshots."
+      autonomy: agent-drives
+      substeps: [dev-server-start, smoke-routen, surfaces-klickbar, screenshots]
+      produces: [dev-url, screenshots]
+      success: [dev-server-up, drei-surfaces-klickbar, kein-5xx]
+
+  # ── Tiefen-Routing: welche Phasen je Tiefe (prototyp/mvp/produktiv) — löst die offenen Punkte Deploy/15min ──
+  depthRouting:
+    prototyp: [intake, kontext, fachkonzept, ux, build, preview]
+    mvp:
+      [
+        intake,
+        kontext,
+        fachkonzept,
+        compliance,
+        security,
+        ux,
+        build,
+        evidence,
+        cicd,
+        preview,
+      ]
+    produktiv:
+      [
+        intake,
+        kontext,
+        fachkonzept,
+        compliance,
+        security,
+        ux,
+        build,
+        evidence,
+        cicd,
+        preview,
+      ]
+
   autonomy:
     {
       fachkonzept: agent-derives,
