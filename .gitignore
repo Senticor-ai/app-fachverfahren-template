@@ -11,3 +11,10 @@ test-results/
 .agent/
 .DS_Store
 *.tsbuildinfo
+
+# CHOS-Code runtime artifacts — only the committed seed files under .chos/ are tracked
+.chos/*
+!.chos/README.md
+!.chos/warm-start.md
+!.chos/build-manifest.json
+!.chos/gold-checklist.json
