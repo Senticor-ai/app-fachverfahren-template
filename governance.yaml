@@ -17,14 +17,16 @@ starter:
 # ── Komposition: vorhandene Template-Artefakte sind die Quelle (nicht duplizieren) ──
 compose:
   agentContract: ./AGENTS.md
+  # Kanonische, vendor-neutrale Skills (Markdown — von Entwicklern OHNE governed AI-Build lesbar UND vom
+  # governten Agenten konsumiert). CHOS-Code nutzt kein Claude → .agents/skills, nicht .claude.
   skills:
-    - .claude/skills/fachverfahren-app/SKILL.md
-    - .claude/skills/ux-ui/SKILL.md
-    - .claude/skills/backend-fastify/SKILL.md
-    - .claude/skills/testing/SKILL.md
-    - .claude/skills/security-dsfa/SKILL.md
-    - .claude/skills/accessibility-bitv/SKILL.md
-    - .claude/skills/compliance-evidence/SKILL.md
+    - .agents/skills/fachverfahren-app/SKILL.md
+    - .agents/skills/ux-ui/SKILL.md
+    - .agents/skills/backend-fastify/SKILL.md
+    - .agents/skills/testing/SKILL.md
+    - .agents/skills/security-dsfa/SKILL.md
+    - .agents/skills/accessibility-bitv/SKILL.md
+    - .agents/skills/compliance-evidence/SKILL.md
   uxContract: ./docs/ux-ui/fachverfahren-ux-contract.md
   screenContractTemplate: ./docs/ux-ui/screen-contract.template.yaml
   moduleTemplate: ./modules/_template/
