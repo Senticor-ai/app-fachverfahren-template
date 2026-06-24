@@ -58,6 +58,50 @@
   ],
   "deltas": [
     {
+      "id": "fachkonzept",
+      "target": "modules/<domain>/docs/FACHKONZEPT.md",
+      "role": "MAXIMAL ausgeprägtes Fachkonzept (vollständig, kein Skelett) — Zielbild, Personas, Journeys, belegte Rechtsgrundlagen, Datenobjekte/FIM, Tatbestände/Subsumtion, Once-Only, Nicht-Ziele, Annahmen-zu-validieren, DSFA-Bezug.",
+      "mustContain": [
+        "alle 3 Surfaces (Bürger/SB/Aufsicht)",
+        "belegte Rechtsgrundlagen + FIM-IDs",
+        "PFLICHT-Mermaid: flowchart (Architektur) + sequenceDiagram (je Journey) + stateDiagram-v2 (Vorgangs-Lebenszyklus) + erDiagram (Datenmodell)",
+        "Annahmen zu validieren markiert"
+      ],
+      "source": "spec, agent-prompt, Wissen (FIM/Recht/BITV), governance.md",
+      "gate": "check:docs-language",
+      "render": "Builder-Card (open/preview) — Mermaid wie in der CHOS-Hive-Code-UI",
+      "reviewable": true
+    },
+    {
+      "id": "epic",
+      "target": "modules/<domain>/docs/EPIC.md",
+      "role": "MAXIMAL ausgeprägtes Epic — Titel, Ziel & Kontext, Lösung, Schnittstellen, Datenmodell, Security, Compliance (Mandate), Scope, Akzeptanzkriterien, Governance-Checkliste.",
+      "mustContain": [
+        "Mandate→Anforderung-Mapping",
+        "Scope (welche Dateien/Module)",
+        "Akzeptanzkriterien + Governance-Checkliste",
+        "PFLICHT-Mermaid: flowchart (Lösungsarchitektur) + Liefer-Schnitt"
+      ],
+      "source": "fachkonzept, governance.yaml, Mandate, build-manifest deltas",
+      "gate": "check:docs-language",
+      "render": "Builder-Card (open/preview)",
+      "reviewable": true
+    },
+    {
+      "id": "prd",
+      "target": "modules/<domain>/docs/PRD.md",
+      "role": "MAXIMAL ausgeprägtes PRD — Problem, Zielgruppen/Personas, Use-Cases, funktionale + nicht-funktionale Anforderungen, Metriken/KPIs, Rollout, offene Fragen.",
+      "mustContain": [
+        "funktionale + nicht-funktionale Anforderungen",
+        "Metriken/KPIs",
+        "PFLICHT-Mermaid: journey (User-Journey) + flowchart (Feature-Map) + sequenceDiagram (Kern-Flow)"
+      ],
+      "source": "fachkonzept, epic, spec.acceptanceCriteria",
+      "gate": "check:docs-language",
+      "render": "Builder-Card (open/preview)",
+      "reviewable": true
+    },
+    {
       "id": "manifest",
       "target": "modules/<domain>/domain.module.yaml",
       "role": "Domänen-Manifest: routes, requiredCapabilities, permissions, events (publishes/consumes), dataCategories, retentionPolicies, migrations, fimReferences.",
@@ -348,6 +392,33 @@
     "cssTokens": "pnpm run check:css-tokens",
     "tests": "pnpm run test",
     "agentVerify": "pnpm run agent:verify"
+  },
+  "governanceSteering": ".chos/governance.md",
+  "qualityBar": {
+    "_note": "Sehr hohe Qualität, geerdet. Nutze das KOMPLETTE Repo als Basis (compose, not rebuild); am Ende Dev-Server starten + App testen.",
+    "wholeRepoAsBase": true,
+    "devServerAndTest": "pnpm run dev (Vite 5173) — die 3 Surfaces klickbar, Smoke gegen echte Routen (kein 5xx)",
+    "planningArtifactsMaximal": true,
+    "mermaidRequiredIn": ["fachkonzept", "epic", "prd"],
+    "groundedGatesNotJudge": true
+  },
+  "workspaceJourney": {
+    "_note": "CHOS-Code bleibt die Dev-Console (Engine). Jede der 10 Governance-Phasen erzeugt EINE strukturierte Zusammenfassung → eine Card im GovTech-Builder-Arbeitsbereich. Aus der Card werden die Artefakte zusammengebaut, mit Funktionen Open/Preview/Review. Emittiert als .chos/builder-summary.json (CHOS packages/fachverfahren/builder-summary.ts).",
+    "phases": [
+      "intake",
+      "kontext",
+      "fachkonzept",
+      "compliance",
+      "security",
+      "ux",
+      "build",
+      "evidence",
+      "cicd",
+      "preview"
+    ],
+    "cardPerPhase": true,
+    "cardFunctions": ["open", "preview", "review"],
+    "summaryArtifact": ".chos/builder-summary.json"
   },
   "goldBar": ".chos/gold-checklist.json",
   "instanceExample": "docs/examples/hundesteuer/ (app.spec.yaml + agent-prompt.md) — die Hundesteuer-Fachannahmen als Validierungsbeispiel. Werte sind synthetisch."
