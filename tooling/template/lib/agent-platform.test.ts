@@ -14,6 +14,17 @@ import {
 } from "./agent-platform.ts";
 
 const root = process.cwd();
+const ignoredCopyParts = new Set([
+  ".git",
+  ".pnpm",
+  ".pnpm-store",
+  "coverage",
+  "dist",
+  "dist-server",
+  "dist-types",
+  "node_modules",
+  "storybook-static",
+]);
 
 describe("agent platform contract", () => {
   it("emits deterministic discovery without local paths by default", async () => {
@@ -57,9 +68,7 @@ describe("agent platform contract", () => {
       await cp(root, temp, {
         recursive: true,
         filter: (path) =>
-          !path
-            .split("/")
-            .some((part) => part === ".git" || part === "node_modules"),
+          !path.split("/").some((part) => ignoredCopyParts.has(part)),
       });
       const first = await appNew(temp, {
         specPath: "docs/examples/veranstaltungsanzeige/app.spec.yaml",

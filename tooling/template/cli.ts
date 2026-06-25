@@ -55,6 +55,17 @@ const rawArgs =
 const command = rawArgs[0] ?? "help";
 const args = rawArgs.slice(1);
 const jsonMode = args.includes("--json");
+const ignoredRepositoryCopyParts = new Set([
+  ".git",
+  ".pnpm",
+  ".pnpm-store",
+  "coverage",
+  "dist",
+  "dist-server",
+  "dist-types",
+  "node_modules",
+  "storybook-static",
+]);
 
 const exitCodes = {
   ok: 0,
@@ -1065,9 +1076,7 @@ async function testAgentReadiness() {
   await cp(process.cwd(), root, {
     recursive: true,
     filter: (path) =>
-      !path
-        .split("/")
-        .some((part) => part === ".git" || part === "node_modules"),
+      !path.split("/").some((part) => ignoredRepositoryCopyParts.has(part)),
   });
   const result = await appNew(root, {
     specPath: "docs/examples/veranstaltungsanzeige/app.spec.yaml",
@@ -1223,9 +1232,7 @@ async function testTemplateAdopt() {
   await cp(process.cwd(), root, {
     recursive: true,
     filter: (path) =>
-      !path
-        .split("/")
-        .some((part) => part === ".git" || part === "node_modules"),
+      !path.split("/").some((part) => ignoredRepositoryCopyParts.has(part)),
   });
   await rm(join(root, ".template"), { recursive: true, force: true });
   await writeTemplateMetadata(root, {
@@ -1675,9 +1682,7 @@ async function collectFiles(root, extensions) {
   const files = [];
   for (const entry of entries) {
     const path = join(root, entry.name);
-    if (
-      [".git", "node_modules", "dist", "storybook-static"].includes(entry.name)
-    ) {
+    if (ignoredRepositoryCopyParts.has(entry.name)) {
       continue;
     }
     if (entry.isDirectory()) {

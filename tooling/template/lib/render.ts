@@ -31,6 +31,7 @@ interface RenderDomainAppOptions {
 const ignoredNames = new Set([
   ".git",
   ".agent",
+  ".pnpm",
   ".pnpm-store",
   "coverage",
   "dist",
