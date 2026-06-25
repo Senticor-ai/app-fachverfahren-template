@@ -108,6 +108,7 @@ process:
             seed-recht-kommunal-graph,
             seed-register-catalog,
             seed-integration-catalog,
+            seed-business-rules,
             seed-de-verwaltung,
           ]
         skills: [.agents/skills/fachverfahren-app/SKILL.md]
@@ -239,7 +240,7 @@ process:
           code-review,
         ]
       uses:
-        knowledge: [arch:golden-single-source, de:bundid]
+        knowledge: [arch:golden-single-source, de:bundid, seed-business-rules]
         skills:
           [
             .agents/skills/backend-fastify/SKILL.md,
