@@ -290,6 +290,34 @@
       "shapeRef": "modules/neutral-example/ui/NeutralExample.stories.tsx"
     },
     {
+      "id": "ui-screens",
+      "target": "modules/<domain>/ui/screens.tsx",
+      "role": "App-EINSTIEG des Moduls — die LAUFENDE App (Dev-Server) entdeckt diese Datei automatisch (ModuleHost.tsx, import.meta.glob) und hängt CitizenScreen/CaseworkerScreen in die Bürger-/Sachbearbeitungs-Surface ein. OHNE diese Datei ist das Modul nur in Storybook sichtbar, NICHT in der laufenden App. Komponiere DIESELBEN public-sector-ui-Bausteine wie in den Stories (keine neuen Primitive).",
+      "mustContain": [
+        "export const moduleMeta = { domain, label, citizenLabel, caseworkerLabel }",
+        "export function CitizenScreen()",
+        "export function CaseworkerScreen()",
+        "nur Imports aus @senticor/public-sector-ui (+ react)",
+        "deterministisch (kein Date.now() — ISO-Datumsliterale)"
+      ],
+      "composeFrom": {
+        "ui": [
+          "FormStepper",
+          "FormStep",
+          "FormField",
+          "OnceOnlyField",
+          "CaseInbox",
+          "CaseDetailPanel",
+          "AuditDashboard",
+          "SubsumtionPanel",
+          "KiVorschlag"
+        ]
+      },
+      "source": "screen contracts, ui-stories",
+      "gate": "build:app (Vite mountet das Modul), typecheck:storybook",
+      "shapeRef": "modules/neutral-example/ui/screens.tsx"
+    },
+    {
       "id": "permissions",
       "target": "modules/<domain>/permissions/permissions.yaml",
       "role": "RBAC-Rechte (read/write/decide) je Rolle.",

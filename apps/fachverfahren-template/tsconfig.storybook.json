@@ -14,6 +14,7 @@
     "../../.storybook/**/*.ts",
     "../../modules/**/ui/**/*.stories.ts",
     "../../modules/**/ui/**/*.stories.tsx",
+    "../../modules/**/ui/**/screens.tsx",
     "../../packages/public-sector-ui/src/**/*.stories.ts",
     "../../packages/public-sector-ui/src/**/*.stories.tsx",
     "src/**/*.stories.ts",

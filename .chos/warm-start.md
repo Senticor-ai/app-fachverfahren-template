@@ -13,16 +13,17 @@ existiert. Der häufigste und teuerste Fehler ist, einen eigenen `server/`, ein 
 
 ## Was bereits FERTIG ist (NICHT neu bauen)
 
-| Baustein                                                    | Ort                                        | Du nutzt es durch                                             |
-| ----------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------- |
-| Fastify-Server (App-Factory, OpenAPI, AJV, Session, Health) | `apps/fachverfahren-template/server/`      | Modul-Routen einhängen (`modules/<domain>/server/routes.ts`)  |
-| UX-Komponenten (BITV, shadcn/Tailwind+KERN, Storybook)      | `packages/public-sector-ui/`               | **importieren** (`@senticor/public-sector-ui`), nie nachbauen |
-| Plattform-Ports (Identity/Payment/Mailbox/Audit/Workflow/…) | `packages/platform-contracts/`             | Ports aufrufen, nie Provider direkt                           |
-| Domain-Kernel/Authz/Audit/Manifest                          | `packages/public-sector-sdk/`              | `@senticor/public-sector-sdk`                                 |
-| App-Shell + Surfaces + MSW-Mocks + i18n                     | `apps/fachverfahren-template/src/`         | Modul-Screens werden hier sichtbar                            |
-| Qualitäts-Gates (geerdet, kein LLM-Judge)                   | `scripts/check-*.mjs`, `tooling/template/` | `pnpm run agent:verify` & `check:*`                           |
-| **Gefüllte Referenz** (kompiliert!)                         | `modules/neutral-example/`                 | Form kopieren, Werte ersetzen                                 |
-| **Leeres Delta-Skelett**                                    | `modules/_template/`                       | nach `modules/<domain>/` klonen                               |
+| Baustein                                                      | Ort                                                  | Du nutzt es durch                                                     |
+| ------------------------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------- |
+| Fastify-Server (App-Factory, OpenAPI, AJV, Session, Health)   | `apps/fachverfahren-template/server/`                | Modul-Routen einhängen (`modules/<domain>/server/routes.ts`)          |
+| UX-Komponenten (BITV, shadcn/Tailwind+KERN, Storybook)        | `packages/public-sector-ui/`                         | **importieren** (`@senticor/public-sector-ui`), nie nachbauen         |
+| Plattform-Ports (Identity/Payment/Mailbox/Audit/Workflow/…)   | `packages/platform-contracts/`                       | Ports aufrufen, nie Provider direkt                                   |
+| Domain-Kernel/Authz/Audit/Manifest                            | `packages/public-sector-sdk/`                        | `@senticor/public-sector-sdk`                                         |
+| App-Shell + Surfaces + MSW-Mocks + i18n                       | `apps/fachverfahren-template/src/`                   | Modul-Screens werden hier sichtbar                                    |
+| **Generischer Modul-Mount** (App entdeckt Module automatisch) | `apps/fachverfahren-template/src/app/ModuleHost.tsx` | `modules/<domain>/ui/screens.tsx` anlegen → erscheint live in der App |
+| Qualitäts-Gates (geerdet, kein LLM-Judge)                     | `scripts/check-*.mjs`, `tooling/template/`           | `pnpm run agent:verify` & `check:*`                                   |
+| **Gefüllte Referenz** (kompiliert!)                           | `modules/neutral-example/`                           | Form kopieren, Werte ersetzen                                         |
+| **Leeres Delta-Skelett**                                      | `modules/_template/`                                 | nach `modules/<domain>/` klonen                                       |
 
 ## Der einzige Weg (5 Schritte)
 
@@ -34,6 +35,16 @@ pnpm run app:new      -- docs/examples/<instanz>/app.spec.yaml   # erzeugt modul
 pnpm run agent:verify && pnpm run check:domain-contracts && pnpm run typecheck && pnpm run test
 pnpm run dev   # Surfaces im Browser klickbar (127.0.0.1:5173)
 ```
+
+## Die App SICHTBAR machen: `modules/<domain>/ui/screens.tsx` (WICHTIG)
+
+Die `*.stories.tsx` rendern NUR in Storybook. Damit dein Verfahren im **laufenden Dev-Server** erscheint
+(die drei Surfaces, klickbar), erzeuge **`modules/<domain>/ui/screens.tsx`** — den App-Einstieg:
+`export const moduleMeta`, `export function CitizenScreen()`, `export function CaseworkerScreen()`, komponiert
+aus `@senticor/public-sector-ui`. Die App entdeckt diese Datei automatisch (`ModuleHost.tsx`, `import.meta.glob`)
+und hängt sie unter „Fachverfahren" in die Bürger-/Sachbearbeitungs-Surface ein — **ohne** die App-Shell zu
+ändern. Referenz: **[`modules/neutral-example/ui/screens.tsx`](../modules/neutral-example/ui/screens.tsx)**.
+Ohne diese Datei baust du nur ein Modul-Verzeichnis, das im Browser NICHT sichtbar ist.
 
 ## Die Delta-Dateien (das ist ALLES, was du generierst)
 
