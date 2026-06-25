@@ -107,6 +107,7 @@ process:
             seed-recht-bund,
             seed-recht-kommunal-graph,
             seed-register-catalog,
+            seed-integration-catalog,
             seed-de-verwaltung,
           ]
         skills: [.agents/skills/fachverfahren-app/SKILL.md]
