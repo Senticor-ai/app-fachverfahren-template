@@ -1,5 +1,6 @@
 stages:
   - validate
+  - pages
   - image
 
 variables:
@@ -32,6 +33,21 @@ validate:
     - pnpm run build:server
     - pnpm run test:k8s:render
     - pnpm run evidence:build
+
+pages:
+  extends: .node-base
+  stage: pages
+  needs:
+    - validate
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - pnpm run build:storybook
+    - rm -rf public
+    - mv storybook-static public
+  artifacts:
+    paths:
+      - public
 
 container-image:
   extends: .kaniko-base

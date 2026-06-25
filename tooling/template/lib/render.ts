@@ -44,6 +44,8 @@ const ignoredNames = new Set([
   "tmp",
 ]);
 
+const repositoryOnlyPaths = new Set([".gitlab/CODEOWNERS"]);
+
 const textExtensions = new Set([
   ".css",
   ".html",
@@ -221,9 +223,12 @@ async function collectFiles(root: string): Promise<string[]> {
 }
 
 function shouldCopy(path: string, sourceRoot: string) {
-  const relativePath = relative(sourceRoot, path);
+  const relativePath = relative(sourceRoot, path).split("\\").join("/");
   if (relativePath === "") {
     return true;
+  }
+  if (repositoryOnlyPaths.has(relativePath)) {
+    return false;
   }
   return !relativePath.split("/").some((part) => ignoredNames.has(part));
 }

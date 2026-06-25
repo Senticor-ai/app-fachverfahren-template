@@ -17,5 +17,11 @@ Sicherheitsrelevante Änderungen müssen besonders vorsichtig erfolgen.
 ## Melden
 
 Bitte Sicherheitsprobleme nicht in öffentlichen Issues mit Exploit-Details
-melden. Nutze den projektspezifischen vertraulichen Meldeweg, sobald das
-Repository auf openCode veröffentlicht ist.
+melden. Sende vertrauliche Meldungen an
+[security@senticor.ai](mailto:security@senticor.ai) und beschreibe betroffene
+Komponenten, Reproduktionsschritte, mögliche Auswirkungen und bekannte
+Workarounds.
+
+Wir bestätigen den Eingang so schnell wie möglich und stimmen Offenlegung,
+Korrektur und Veröffentlichung mit der meldenden Person ab. Bitte veröffentliche
+Details erst nach Abstimmung mit den Maintainer:innen.
