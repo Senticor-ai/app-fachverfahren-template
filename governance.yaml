@@ -78,6 +78,7 @@ process:
             seed-de-verwaltung,
             seed-recht-bund,
             seed-recht-kommunal-graph,
+            seed-register-catalog,
             seed-fim-bausteine,
             seed-uxgov,
             seed-xoev,
@@ -105,6 +106,7 @@ process:
             seed-fim-bausteine,
             seed-recht-bund,
             seed-recht-kommunal-graph,
+            seed-register-catalog,
             seed-de-verwaltung,
           ]
         skills: [.agents/skills/fachverfahren-app/SKILL.md]
