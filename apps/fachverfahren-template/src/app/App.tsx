@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Toaster, toast } from "sonner";
 import type { PublicRuntimeConfig } from "@senticor/public-sector-sdk";
 import {
   ApplicantIdentity,
@@ -18,11 +19,14 @@ import {
   ClipboardList,
   Filter,
   FileText,
+  HelpCircle,
   Inbox,
+  Info,
   LogIn,
   LogOut,
   Menu,
   Search,
+  Settings,
   ShieldCheck,
   User,
   Users,
@@ -50,6 +54,7 @@ import type {
 } from "../../shared/app-contracts.js";
 import {
   createLoggedOutSession,
+  mockUsers,
   type MockNotification,
   type MockSessionResponse,
   type MockUser,
@@ -63,6 +68,7 @@ type WorkspaceSection =
   | "decisions"
   | "search";
 type CitizenSection = "overview" | "cases" | "messages";
+type GlobalSection = "settings" | "info";
 
 interface NavigationItem {
   href: `#${string}`;
@@ -90,6 +96,11 @@ const caseworkerNavigation: NavigationItem[] = [
   { href: "#deadlines", label: "Fristen" },
   { href: "#decisions", label: "Entscheidungen" },
   { href: "#search", label: "Suche" },
+];
+
+const globalNavigation: NavigationItem[] = [
+  { href: "#settings", label: "Einstellungen" },
+  { href: "#info", label: "Informationen" },
 ];
 
 const citizenSteps = [
@@ -346,8 +357,10 @@ export function App() {
       setInboxMessages([]);
       setOutboxMessages([]);
       setSessionStatus("ready");
+      toast.success("Erfolgreich abgemeldet.");
     } catch {
       setSessionStatus("error");
+      toast.error("Abmeldung fehlgeschlagen. Bitte erneut versuchen.");
     }
   }
 
@@ -356,8 +369,13 @@ export function App() {
   async function handlePreferenceUpdate(
     update: UserPreferencesUpdate,
   ): Promise<void> {
-    const nextPreferences = await saveUserPreferences(update);
-    setPreferences(nextPreferences.preferences);
+    try {
+      const nextPreferences = await saveUserPreferences(update);
+      setPreferences(nextPreferences.preferences);
+      toast.success("Einstellung gespeichert.");
+    } catch {
+      toast.error("Einstellung konnte nicht gespeichert werden.");
+    }
   }
 
   return (
@@ -379,6 +397,7 @@ export function App() {
           notifications={notifications}
           onLogout={handleLogout}
           onPreferenceUpdate={handlePreferenceUpdate}
+          onSwitchUser={handleLogin}
           outboxMessages={outboxMessages}
           preferences={preferences}
           sessionStatus={sessionStatus}
@@ -391,6 +410,8 @@ export function App() {
           sessionStatus={sessionStatus}
         />
       )}
+
+      <Toaster position="bottom-right" richColors />
     </div>
   );
 }
@@ -596,6 +617,17 @@ function citizenSectionFromHash(hash: `#${string}`): CitizenSection {
   }
 }
 
+function globalSectionFromHash(hash: `#${string}`): GlobalSection | null {
+  switch (hash) {
+    case "#settings":
+      return "settings";
+    case "#info":
+      return "info";
+    default:
+      return null;
+  }
+}
+
 interface LoginScreenProps {
   config: PublicRuntimeConfig;
   onLogin: (userId: string) => Promise<void>;
@@ -666,6 +698,7 @@ interface AuthenticatedShellProps {
   notifications: MockNotification[];
   onLogout: () => Promise<void>;
   onPreferenceUpdate: (update: UserPreferencesUpdate) => Promise<void>;
+  onSwitchUser: (userId: string) => Promise<void>;
   outboxMessages: MailboxMessage[];
   preferences: UserPreferences | null;
   sessionStatus: SessionStatus;
@@ -679,14 +712,19 @@ function AuthenticatedShell({
   notifications,
   onLogout,
   onPreferenceUpdate,
+  onSwitchUser,
   outboxMessages,
   preferences,
   sessionStatus,
   user,
 }: AuthenticatedShellProps) {
   const isCaseworker = user.kind === "caseworker";
-  const navigation = isCaseworker ? caseworkerNavigation : citizenNavigation;
+  const roleNavigation = isCaseworker
+    ? caseworkerNavigation
+    : citizenNavigation;
+  const navigation = [...roleNavigation, ...globalNavigation];
   const activeHash = useActiveHash(navigation);
+  const globalSection = globalSectionFromHash(activeHash);
   const activeSection = isCaseworker
     ? caseworkerSectionFromHash(activeHash)
     : "inbox";
@@ -699,119 +737,160 @@ function AuthenticatedShell({
 
   if (isCaseworker) {
     return (
-      <>
-        <ServiceHeader
-          appName="Fachverfahren"
-          authorityName={config.authority.displayName}
-          jurisdictionLabel={config.jurisdiction.legalProfile}
+      <div className="caseworker-shell">
+        <div
+          className={[
+            "caseworker-sidebar-frame",
+            sidebarExpanded
+              ? "caseworker-sidebar-frame--expanded"
+              : "caseworker-sidebar-frame--collapsed",
+            sidebarAutoExpand
+              ? "caseworker-sidebar-frame--auto"
+              : "caseworker-sidebar-frame--static",
+          ].join(" ")}
+          onBlur={autoSidebar.onBlur}
+          onFocus={autoSidebar.onFocus}
+          onPointerEnter={autoSidebar.onPointerEnter}
+          onPointerLeave={autoSidebar.onPointerLeave}
         >
-          <div className="caseworker-mobile-actions">
-            <MobileNavigationDrawer
-              activeHash={activeHash}
-              navigation={caseworkerNavigation}
-              title="Arbeitsbereich"
-            />
-            <UserMenu
-              capabilityItems={capabilityItems}
-              notifications={notifications}
-              onLogout={onLogout}
-              onPreferenceUpdate={onPreferenceUpdate}
-              preferences={preferences}
-              sessionStatus={sessionStatus}
-              user={user}
-            />
-          </div>
-        </ServiceHeader>
+          <aside className="caseworker-sidebar" aria-label="Fachnavigation">
+            {!sidebarAutoExpand ? (
+              <button
+                aria-label={
+                  manualSidebarExpanded
+                    ? "Seitenleiste einklappen"
+                    : "Seitenleiste ausklappen"
+                }
+                aria-pressed={!manualSidebarExpanded}
+                className="caseworker-sidebar__toggle"
+                onClick={() =>
+                  setManualSidebarExpanded((isExpanded) => !isExpanded)
+                }
+                type="button"
+              >
+                {manualSidebarExpanded ? (
+                  <ChevronLeft aria-hidden="true" size={18} />
+                ) : (
+                  <ChevronRight aria-hidden="true" size={18} />
+                )}
+              </button>
+            ) : null}
 
-        <div className="caseworker-shell">
-          <div
-            className={[
-              "caseworker-sidebar-frame",
-              sidebarExpanded
-                ? "caseworker-sidebar-frame--expanded"
-                : "caseworker-sidebar-frame--collapsed",
-              sidebarAutoExpand
-                ? "caseworker-sidebar-frame--auto"
-                : "caseworker-sidebar-frame--static",
-            ].join(" ")}
-            onBlur={autoSidebar.onBlur}
-            onFocus={autoSidebar.onFocus}
-            onPointerEnter={autoSidebar.onPointerEnter}
-            onPointerLeave={autoSidebar.onPointerLeave}
-          >
-            <aside className="caseworker-sidebar" aria-label="Fachnavigation">
-              {!sidebarAutoExpand ? (
-                <button
-                  aria-label={
-                    manualSidebarExpanded
-                      ? "Seitenleiste einklappen"
-                      : "Seitenleiste ausklappen"
-                  }
-                  aria-pressed={!manualSidebarExpanded}
-                  className="caseworker-sidebar__toggle"
-                  onClick={() =>
-                    setManualSidebarExpanded((isExpanded) => !isExpanded)
-                  }
-                  type="button"
+            <nav className="caseworker-sidebar__nav">
+              {caseworkerNavigation.map((item) => (
+                <a
+                  aria-current={activeHash === item.href ? "page" : undefined}
+                  data-tooltip={sidebarExpanded ? undefined : item.label}
+                  href={item.href}
+                  key={item.href}
+                  onClick={autoSidebar.holdOpenAfterNavigation}
                 >
-                  {manualSidebarExpanded ? (
-                    <ChevronLeft aria-hidden="true" size={18} />
-                  ) : (
-                    <ChevronRight aria-hidden="true" size={18} />
-                  )}
-                </button>
-              ) : null}
-
-              <nav className="caseworker-sidebar__nav">
-                {caseworkerNavigation.map((item) => (
-                  <a
-                    aria-current={activeHash === item.href ? "page" : undefined}
-                    href={item.href}
-                    key={item.href}
-                    onClick={autoSidebar.holdOpenAfterNavigation}
-                    title={sidebarExpanded ? undefined : item.label}
-                  >
-                    <CaseworkerNavigationIcon href={item.href} />
-                    <span className="caseworker-sidebar__label">
-                      {item.label}
+                  <CaseworkerNavigationIcon href={item.href} />
+                  <span className="caseworker-sidebar__label">
+                    {item.label}
+                  </span>
+                  {caseworkerNavigationCount(item.href) ? (
+                    <span className="caseworker-sidebar__count">
+                      {caseworkerNavigationCount(item.href)}
                     </span>
-                    {caseworkerNavigationCount(item.href) ? (
-                      <span className="caseworker-sidebar__count">
-                        {caseworkerNavigationCount(item.href)}
-                      </span>
-                    ) : null}
-                  </a>
-                ))}
-              </nav>
+                  ) : null}
+                </a>
+              ))}
+            </nav>
 
-              <div className="caseworker-sidebar__footer">
-                <UserMenu
-                  capabilityItems={capabilityItems}
-                  notifications={notifications}
-                  onLogout={onLogout}
-                  onPreferenceUpdate={onPreferenceUpdate}
-                  preferences={preferences}
-                  sessionStatus={sessionStatus}
-                  user={user}
-                />
-              </div>
-            </aside>
-          </div>
+            <nav
+              className="caseworker-sidebar__nav caseworker-sidebar__nav--global"
+              aria-label="Allgemein"
+            >
+              <a
+                aria-current={activeHash === "#settings" ? "page" : undefined}
+                data-tooltip={sidebarExpanded ? undefined : "Einstellungen"}
+                href="#settings"
+                onClick={autoSidebar.holdOpenAfterNavigation}
+              >
+                <Settings aria-hidden="true" size={18} />
+                <span className="caseworker-sidebar__label">Einstellungen</span>
+              </a>
+              <a
+                aria-current={activeHash === "#info" ? "page" : undefined}
+                data-tooltip={sidebarExpanded ? undefined : "Informationen"}
+                href="#info"
+                onClick={autoSidebar.holdOpenAfterNavigation}
+              >
+                <Info aria-hidden="true" size={18} />
+                <span className="caseworker-sidebar__label">Informationen</span>
+              </a>
+            </nav>
+
+            <div className="caseworker-sidebar__footer">
+              <RoleSwitcher
+                currentUser={user}
+                onSwitch={onSwitchUser}
+                sidebarExpanded={sidebarExpanded}
+              />
+              <UserMenu
+                capabilityItems={capabilityItems}
+                notifications={notifications}
+                onLogout={onLogout}
+                onPreferenceUpdate={onPreferenceUpdate}
+                preferences={preferences}
+                sessionStatus={sessionStatus}
+                user={user}
+              />
+            </div>
+          </aside>
+        </div>
+
+        <div className="caseworker-workspace-shell">
+          <ServiceHeader
+            appName="Fachverfahren"
+            authorityName={config.authority.displayName}
+            jurisdictionLabel={config.jurisdiction.legalProfile}
+          >
+            <div className="caseworker-mobile-actions">
+              <MobileNavigationDrawer
+                activeHash={activeHash}
+                navigation={caseworkerNavigation}
+                title="Arbeitsbereich"
+              />
+              <UserMenu
+                capabilityItems={capabilityItems}
+                notifications={notifications}
+                onLogout={onLogout}
+                onPreferenceUpdate={onPreferenceUpdate}
+                preferences={preferences}
+                sessionStatus={sessionStatus}
+                user={user}
+              />
+            </div>
+          </ServiceHeader>
 
           <main
             id="main-content"
             className="workspace-content workspace-content--caseworker"
             tabIndex={-1}
           >
-            <EmployeeWorkspace
-              activeSection={activeSection}
-              authorityName={config.authority.displayName}
-              inboxMessages={inboxMessages}
-              outboxMessages={outboxMessages}
-            />
+            {globalSection === "settings" ? (
+              <SettingsPage
+                onPreferenceUpdate={onPreferenceUpdate}
+                preferences={preferences}
+              />
+            ) : globalSection === "info" ? (
+              <InfoPage
+                appName={config.application.displayName}
+                authorityName={config.authority.displayName}
+              />
+            ) : (
+              <EmployeeWorkspace
+                activeSection={activeSection}
+                authorityName={config.authority.displayName}
+                inboxMessages={inboxMessages}
+                outboxMessages={outboxMessages}
+              />
+            )}
           </main>
         </div>
-      </>
+      </div>
     );
   }
 
@@ -822,9 +901,25 @@ function AuthenticatedShell({
         authorityName={config.authority.displayName}
         jurisdictionLabel={config.jurisdiction.legalProfile}
       >
+        <a
+          aria-current={activeHash === "#settings" ? "page" : undefined}
+          aria-label="Einstellungen"
+          className="header-icon-link"
+          href="#settings"
+        >
+          <Settings aria-hidden="true" size={18} />
+        </a>
+        <a
+          aria-current={activeHash === "#info" ? "page" : undefined}
+          aria-label="Informationen"
+          className="header-icon-link"
+          href="#info"
+        >
+          <HelpCircle aria-hidden="true" size={18} />
+        </a>
         <MobileNavigationDrawer
           activeHash={activeHash}
-          navigation={citizenNavigation}
+          navigation={roleNavigation}
           title="Arbeitsbereich"
         />
         <UserMenu
@@ -839,24 +934,39 @@ function AuthenticatedShell({
       </ServiceHeader>
 
       <nav className="workspace-nav" aria-label="Arbeitsbereich">
-        {navigation.map((item) => (
-          <a
+        {roleNavigation.map((item) => (
+          <button
             aria-current={activeHash === item.href ? "page" : undefined}
-            href={item.href}
             key={item.href}
+            onClick={() => {
+              window.location.hash = item.href.slice(1);
+            }}
+            type="button"
           >
             {item.label}
-          </a>
+          </button>
         ))}
       </nav>
 
       <main id="main-content" className="workspace-content" tabIndex={-1}>
-        <CitizenWorkspace
-          activeSection={citizenSectionFromHash(activeHash)}
-          authorityName={config.authority.displayName}
-          inboxMessages={inboxMessages}
-          outboxMessages={outboxMessages}
-        />
+        {globalSection === "settings" ? (
+          <SettingsPage
+            onPreferenceUpdate={onPreferenceUpdate}
+            preferences={preferences}
+          />
+        ) : globalSection === "info" ? (
+          <InfoPage
+            appName={config.application.displayName}
+            authorityName={config.authority.displayName}
+          />
+        ) : (
+          <CitizenWorkspace
+            activeSection={citizenSectionFromHash(activeHash)}
+            authorityName={config.authority.displayName}
+            inboxMessages={inboxMessages}
+            outboxMessages={outboxMessages}
+          />
+        )}
       </main>
     </>
   );
@@ -958,6 +1068,115 @@ function CaseworkerNavigationIcon({ href }: { href: NavigationItem["href"] }) {
     default:
       return <FileText aria-hidden="true" size={18} />;
   }
+}
+
+interface RoleSwitcherProps {
+  currentUser: MockUser;
+  onSwitch: (userId: string) => Promise<void>;
+  sidebarExpanded: boolean;
+}
+
+function userInitials(name: string): string {
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((part) => part[0] ?? "")
+    .join("")
+    .toUpperCase();
+}
+
+function userRoleLabel(kind: MockUser["kind"]): string {
+  return kind === "caseworker" ? "Sachbearbeitung" : "Bürgerin";
+}
+
+function RoleSwitcher({
+  currentUser,
+  onSwitch,
+  sidebarExpanded,
+}: RoleSwitcherProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const otherUsers = mockUsers.filter((u) => u.id !== currentUser.id);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const close = (e: PointerEvent) => {
+      if (e.target instanceof Node && !ref.current?.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    const closeOnEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", closeOnEsc);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", closeOnEsc);
+    };
+  }, [isOpen]);
+
+  return (
+    <div
+      className={[
+        "role-switcher",
+        sidebarExpanded ? undefined : "role-switcher--collapsed",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      ref={ref}
+    >
+      <button
+        aria-expanded={isOpen}
+        aria-label={`Rolle wechseln – aktuell: ${userRoleLabel(currentUser.kind)}`}
+        className="role-switcher__trigger"
+        data-tooltip={
+          sidebarExpanded ? undefined : userRoleLabel(currentUser.kind)
+        }
+        onClick={() => setIsOpen((v) => !v)}
+        type="button"
+      >
+        <span className="role-switcher__avatar" aria-hidden="true">
+          {userInitials(currentUser.displayName)}
+        </span>
+        <span className="role-switcher__info">
+          <strong>{currentUser.displayName}</strong>
+          <small>{userRoleLabel(currentUser.kind)}</small>
+        </span>
+        <ChevronRight
+          aria-hidden="true"
+          className="role-switcher__chevron"
+          size={14}
+        />
+      </button>
+
+      {isOpen && (
+        <div className="role-switcher__menu" role="menu">
+          <p className="role-switcher__menu-label">Rolle wechseln</p>
+          {otherUsers.map((user) => (
+            <button
+              className="role-switcher__option"
+              key={user.id}
+              onClick={() => {
+                setIsOpen(false);
+                void onSwitch(user.id);
+              }}
+              role="menuitem"
+              type="button"
+            >
+              <span className="role-switcher__avatar" aria-hidden="true">
+                {userInitials(user.displayName)}
+              </span>
+              <span>
+                <strong>{user.displayName}</strong>
+                <small>{userRoleLabel(user.kind)}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function caseworkerNavigationCount(href: NavigationItem["href"]) {
@@ -1223,6 +1442,117 @@ function PreferenceControls({
   );
 }
 
+interface SettingsPageProps {
+  onPreferenceUpdate: (update: UserPreferencesUpdate) => Promise<void>;
+  preferences: UserPreferences | null;
+}
+
+function SettingsPage({ onPreferenceUpdate, preferences }: SettingsPageProps) {
+  return (
+    <div className="global-page">
+      <header className="global-page__header">
+        <Settings aria-hidden="true" size={22} />
+        <div>
+          <h1>Einstellungen</h1>
+          <p>
+            Darstellung, Barrierefreiheit und Navigationsverhalten anpassen.
+          </p>
+        </div>
+      </header>
+
+      <div className="global-page__body">
+        <PreferenceControls
+          onPreferenceUpdate={onPreferenceUpdate}
+          preferences={preferences}
+        />
+      </div>
+    </div>
+  );
+}
+
+interface InfoPageProps {
+  appName: string;
+  authorityName: string;
+}
+
+function InfoPage({ appName, authorityName }: InfoPageProps) {
+  return (
+    <div className="global-page">
+      <header className="global-page__header">
+        <Info aria-hidden="true" size={22} />
+        <div>
+          <h1>Informationen</h1>
+          <p>Über diese Anwendung und verfügbare Funktionen.</p>
+        </div>
+      </header>
+
+      <div className="global-page__body">
+        <section className="info-section" aria-labelledby="info-app-title">
+          <h2 id="info-app-title">{appName}</h2>
+          <p>
+            Diese Anwendung dient als generische Vorlage für Fachverfahren im
+            öffentlichen Sektor ({authorityName}). Sie zeigt das Zusammenspiel
+            von Bürger:innen-Portal, Sachbearbeitungs-Arbeitsbereich und
+            KI-gestützten Assistenzfunktionen.
+          </p>
+        </section>
+
+        <section className="info-section" aria-labelledby="info-roles-title">
+          <h2 id="info-roles-title">Verfügbare Rollen</h2>
+          <dl className="info-roles">
+            <div>
+              <dt>
+                <User aria-hidden="true" size={16} />
+                Bürgerin (Anna Muster)
+              </dt>
+              <dd>
+                Eigene Vorgänge einsehen, Nachrichten lesen, nächste Schritte
+                verfolgen. Einstieg über „Als Bürgerin anmelden".
+              </dd>
+            </div>
+            <div>
+              <dt>
+                <Briefcase aria-hidden="true" size={16} />
+                Sachbearbeitung (Max Beispiel)
+              </dt>
+              <dd>
+                Eingang bearbeiten, Fristen prüfen, Entscheidungsvorlagen
+                reviewen, Vorgänge suchen. Einstieg über „Als Sachbearbeitung
+                anmelden".
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        <section className="info-section" aria-labelledby="info-flow-title">
+          <h2 id="info-flow-title">Ablauf</h2>
+          <ol className="info-flow">
+            <li>Bürger:in stellt Antrag oder startet Vorgang im Portal.</li>
+            <li>Vorgang erscheint im Eingang der Sachbearbeitung.</li>
+            <li>
+              Sachbearbeitung prüft, ergänzt und trifft eine Entscheidung.
+            </li>
+            <li>Rückmeldung wird als Nachricht an Bürger:in übermittelt.</li>
+          </ol>
+        </section>
+
+        <section
+          className="info-section info-section--disclaimer"
+          aria-labelledby="info-disclaimer-title"
+        >
+          <h2 id="info-disclaimer-title">Hinweis</h2>
+          <p>
+            Dies ist eine Demo-Instanz mit synthetischen Daten. Alle
+            dargestellten Vorgänge, Personen und Informationen sind fiktiv.
+            KI-Funktionen sind als Vorlage vorbereitet, aber nicht aktiv
+            geschaltet.
+          </p>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 interface WorkspaceMailboxProps {
   authorityName: string;
   inboxMessages: MailboxMessage[];
@@ -1435,12 +1765,27 @@ function CitizenCaseWorkspace({
   selectedCase,
   selectedCaseId,
 }: CitizenCaseWorkspaceProps) {
+  const [mobileView, setMobileView] = useState<"list" | "detail">("list");
   const relatedMessages = inboxMessages.filter(
     (message) => message.caseId === selectedCase.id,
   );
 
+  function handleCaseSelect(caseId: string): void {
+    onOpenCase(caseId);
+    setMobileView("detail");
+  }
+
   return (
-    <div className="citizen-case-workspace">
+    <div
+      className={[
+        "citizen-case-workspace",
+        mobileView === "detail"
+          ? "citizen-case-workspace--detail-active"
+          : undefined,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
       <section className="citizen-case-list" aria-labelledby="citizen-cases">
         <h3 id="citizen-cases">Vorgänge</h3>
         <div className="citizen-case-buttons">
@@ -1449,7 +1794,7 @@ function CitizenCaseWorkspace({
               aria-current={selectedCaseId === caseItem.id ? "true" : undefined}
               className="citizen-case-button"
               key={caseItem.id}
-              onClick={() => onOpenCase(caseItem.id)}
+              onClick={() => handleCaseSelect(caseItem.id)}
               type="button"
             >
               <span>
@@ -1463,6 +1808,19 @@ function CitizenCaseWorkspace({
       </section>
 
       <section className="citizen-case-detail" aria-labelledby="case-detail">
+        <nav className="breadcrumb" aria-label="Breadcrumb">
+          <button
+            className="breadcrumb__back"
+            onClick={() => setMobileView("list")}
+            type="button"
+          >
+            <ChevronLeft aria-hidden="true" size={16} />
+            Meine Vorgänge
+          </button>
+          <span aria-hidden="true">/</span>
+          <span aria-current="page">{selectedCase.id}</span>
+        </nav>
+
         <header className="panel-header">
           <div>
             <h3 id="case-detail">{selectedCase.id}</h3>
@@ -1596,6 +1954,81 @@ function MessageContent({ message }: { message: MailboxMessage }) {
   );
 }
 
+type SortDir = "asc" | "desc" | null;
+
+interface SortState {
+  column: string | null;
+  dir: SortDir;
+}
+
+interface QuickFilter {
+  id: string;
+  label: string;
+  matches: (row: CaseRow) => boolean;
+}
+
+const caseQuickFilters: QuickFilter[] = [
+  {
+    id: "decision",
+    label: "Entscheidung offen",
+    matches: (r) => r.decisionRequired,
+  },
+  {
+    id: "active",
+    label: "In Bearbeitung",
+    matches: (r) =>
+      !r.decisionRequired &&
+      !r.status.includes("Wartet") &&
+      !r.status.includes("Frist"),
+  },
+  {
+    id: "waiting",
+    label: "Wartet",
+    matches: (r) => r.status.includes("Wartet"),
+  },
+  {
+    id: "deadline",
+    label: "Frist nah",
+    matches: (r) => r.status.includes("Frist"),
+  },
+];
+
+const PAGE_SIZE = 10;
+
+function sortRows(rows: readonly CaseRow[], sort: SortState): CaseRow[] {
+  if (!sort.column || !sort.dir) {
+    return [...rows];
+  }
+  return [...rows].sort((a, b) => {
+    let aVal = "";
+    let bVal = "";
+    switch (sort.column) {
+      case "Vorgang":
+        aVal = a.id;
+        bVal = b.id;
+        break;
+      case "Person":
+        aVal = a.applicant;
+        bVal = b.applicant;
+        break;
+      case "Status":
+        aVal = a.status;
+        bVal = b.status;
+        break;
+      case "Frist":
+        aVal = a.dueAt;
+        bVal = b.dueAt;
+        break;
+      case "Einheit":
+        aVal = a.unit;
+        bVal = b.unit;
+        break;
+    }
+    const cmp = aVal.localeCompare(bVal);
+    return sort.dir === "asc" ? cmp : -cmp;
+  });
+}
+
 function rowsForSection(
   activeSection: WorkspaceSection,
   rows: {
@@ -1622,6 +2055,15 @@ function EmployeeWorkspace({
   authorityName,
 }: EmployeeWorkspaceProps) {
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [sort, setSort] = useState<SortState>({ column: null, dir: null });
+  const [activeFilters, setActiveFilters] = useState<ReadonlySet<string>>(
+    () => new Set(caseQuickFilters.map((f) => f.id)),
+  );
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(
+    () => new Set<string>(),
+  );
+  const [page, setPage] = useState(1);
+
   const assignedRows = caseRows.filter(
     (row) => row.assignedTo === "Max Beispiel",
   );
@@ -1629,16 +2071,81 @@ function EmployeeWorkspace({
     left.dueAt.localeCompare(right.dueAt),
   );
   const decisionRows = caseRows.filter((row) => row.decisionRequired);
-  const visibleRows = rowsForSection(activeSection, {
+  const sectionRows = rowsForSection(activeSection, {
     assignedRows,
     deadlineRows,
     decisionRows,
   });
+
+  const filteredRows = sortRows(
+    sectionRows.filter((row) =>
+      caseQuickFilters
+        .filter((f) => !activeFilters.has(f.id))
+        .every((f) => !f.matches(row)),
+    ),
+    sort,
+  );
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const pagedRows = filteredRows.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE,
+  );
+
   const selectedCase =
-    visibleRows.find((row) => row.id === selectedCaseId) ??
-    visibleRows[0] ??
+    pagedRows.find((row) => row.id === selectedCaseId) ??
+    filteredRows.find((row) => row.id === selectedCaseId) ??
+    pagedRows[0] ??
     caseRows[0]!;
+
   const view = employeeViewMeta[activeSection];
+
+  function handleSort(column: string): void {
+    setSort((prev) => {
+      if (prev.column !== column) return { column, dir: "asc" };
+      if (prev.dir === "asc") return { column, dir: "desc" };
+      return { column: null, dir: null };
+    });
+    setPage(1);
+  }
+
+  function toggleFilter(id: string): void {
+    setActiveFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        if (next.size <= 1) return prev;
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+    setPage(1);
+    setSelectedIds(new Set());
+  }
+
+  function toggleRowSelect(id: string): void {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll(): void {
+    const allIds = pagedRows.map((r) => r.id);
+    const allSelected = allIds.every((id) => selectedIds.has(id));
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(allIds));
+    }
+  }
+
+  function clearSelection(): void {
+    setSelectedIds(new Set());
+  }
 
   return (
     <div className="employee-workspace" id={activeSection}>
@@ -1701,7 +2208,7 @@ function EmployeeWorkspace({
               aria-describedby="search-result-count"
             />
           </label>
-          <p id="search-result-count">{visibleRows.length} Treffer</p>
+          <p id="search-result-count">{filteredRows.length} Treffer</p>
         </section>
       ) : null}
 
@@ -1712,26 +2219,142 @@ function EmployeeWorkspace({
               <h2 id="case-list-title">{view.listTitle}</h2>
               <p>{view.listDescription}</p>
             </div>
-            <div className="filter-pills" aria-label="Filter">
-              <a aria-current={activeSection === "inbox"} href="#inbox">
-                Alle
-              </a>
-              <a aria-current={activeSection === "decisions"} href="#decisions">
-                Review
-              </a>
-              <a aria-current={activeSection === "deadlines"} href="#deadlines">
-                Frist
-              </a>
-            </div>
           </header>
+
+          <div
+            className="quick-filter-bar"
+            aria-label="Schnellfilter"
+            role="group"
+          >
+            {caseQuickFilters.map((f) => {
+              const count = sectionRows.filter(f.matches).length;
+              const isActive = activeFilters.has(f.id);
+              return (
+                <button
+                  aria-pressed={isActive}
+                  className="quick-filter-chip"
+                  key={f.id}
+                  onClick={() => toggleFilter(f.id)}
+                  type="button"
+                >
+                  {f.label}
+                  <span className="quick-filter-chip__count">{count}</span>
+                </button>
+              );
+            })}
+            {activeFilters.size < caseQuickFilters.length ? (
+              <button
+                className="quick-filter-chip quick-filter-chip--reset"
+                onClick={() =>
+                  setActiveFilters(new Set(caseQuickFilters.map((f) => f.id)))
+                }
+                type="button"
+              >
+                Alle einblenden
+              </button>
+            ) : null}
+          </div>
+
+          {selectedIds.size > 0 ? (
+            <div className="batch-action-bar" aria-live="polite" role="status">
+              <span className="batch-action-bar__count">
+                {selectedIds.size} ausgewählt
+              </span>
+              <div className="batch-action-bar__actions">
+                <Button
+                  onClick={() => {
+                    toast.success(
+                      `${selectedIds.size} Vorgang/Vorgänge genehmigt.`,
+                    );
+                    clearSelection();
+                  }}
+                  type="button"
+                  variant="default"
+                >
+                  <CheckCircle aria-hidden="true" size={16} />
+                  Genehmigen
+                </Button>
+                <Button
+                  onClick={() => {
+                    toast.error(
+                      `${selectedIds.size} Vorgang/Vorgänge abgelehnt.`,
+                    );
+                    clearSelection();
+                  }}
+                  type="button"
+                  variant="secondary"
+                >
+                  Ablehnen
+                </Button>
+                <Button onClick={clearSelection} type="button" variant="ghost">
+                  <X aria-hidden="true" size={16} />
+                  Auswahl aufheben
+                </Button>
+              </div>
+            </div>
+          ) : null}
 
           <div className="case-table-frame">
             <CaseTable
               onSelect={setSelectedCaseId}
-              rows={visibleRows}
+              onSort={handleSort}
+              onToggleAll={toggleSelectAll}
+              onToggleSelect={toggleRowSelect}
+              rows={pagedRows}
               selectedCaseId={selectedCase.id}
+              selectedIds={selectedIds}
+              sort={sort}
             />
           </div>
+
+          {pagedRows.length === 0 ? (
+            <div className="table-empty-state">
+              <Filter aria-hidden="true" size={32} />
+              <p>Keine Vorgänge für den aktuellen Filter.</p>
+              <button
+                className="quick-filter-chip"
+                onClick={() =>
+                  setActiveFilters(new Set(caseQuickFilters.map((f) => f.id)))
+                }
+                type="button"
+              >
+                Filter zurücksetzen
+              </button>
+            </div>
+          ) : null}
+
+          {totalPages > 1 ? (
+            <nav className="table-pagination" aria-label="Seitennavigation">
+              <span className="table-pagination__info">
+                {(page - 1) * PAGE_SIZE + 1}–
+                {Math.min(page * PAGE_SIZE, filteredRows.length)} von{" "}
+                {filteredRows.length}
+              </span>
+              <div className="table-pagination__controls">
+                <button
+                  aria-label="Vorherige Seite"
+                  className="table-pagination__btn"
+                  disabled={page === 1}
+                  onClick={() => setPage((p) => p - 1)}
+                  type="button"
+                >
+                  <ChevronLeft aria-hidden="true" size={16} />
+                </button>
+                <span aria-current="page">
+                  {page} / {totalPages}
+                </span>
+                <button
+                  aria-label="Nächste Seite"
+                  className="table-pagination__btn"
+                  disabled={page === totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                  type="button"
+                >
+                  <ChevronRight aria-hidden="true" size={16} />
+                </button>
+              </div>
+            </nav>
+          ) : null}
         </section>
 
         <aside className="case-detail-panel" aria-labelledby="detail-title">
@@ -1797,26 +2420,77 @@ function EmployeeWorkspace({
 
 interface CaseTableProps {
   onSelect: (caseId: string) => void;
+  onSort: (column: string) => void;
+  onToggleAll: () => void;
+  onToggleSelect: (id: string) => void;
   rows: readonly CaseRow[];
   selectedCaseId: string;
+  selectedIds: ReadonlySet<string>;
+  sort: SortState;
 }
 
 const caseTableColumns = ["Vorgang", "Person", "Status", "Frist", "Einheit"];
 
-function CaseTable({ onSelect, rows, selectedCaseId }: CaseTableProps) {
+function CaseTable({
+  onSelect,
+  onSort,
+  onToggleAll,
+  onToggleSelect,
+  rows,
+  selectedCaseId,
+  selectedIds,
+  sort,
+}: CaseTableProps) {
+  const allSelected =
+    rows.length > 0 && rows.every((r) => selectedIds.has(r.id));
+  const someSelected = rows.some((r) => selectedIds.has(r.id));
+
+  function ariaSortFor(column: string): "ascending" | "descending" | "none" {
+    if (sort.column !== column) return "none";
+    return sort.dir === "asc" ? "ascending" : "descending";
+  }
+
   return (
     <table className="case-table">
       <thead>
         <tr>
+          <th scope="col" className="case-table__check-col">
+            <input
+              aria-label="Alle auswählen"
+              checked={allSelected}
+              onChange={onToggleAll}
+              ref={(el) => {
+                if (el) el.indeterminate = someSelected && !allSelected;
+              }}
+              type="checkbox"
+            />
+          </th>
           {caseTableColumns.map((column) => (
-            <th key={column} scope="col">
-              <span className="case-table__heading">
+            <th key={column} scope="col" aria-sort={ariaSortFor(column)}>
+              <button
+                className="case-table__sort-btn"
+                onClick={() => onSort(column)}
+                type="button"
+              >
                 <span>{column}</span>
-                <span className="case-table__tools" aria-hidden="true">
-                  <ArrowUpDown size={14} />
-                  <Filter size={14} />
+                <span className="case-table__sort-icon" aria-hidden="true">
+                  {sort.column === column && sort.dir === "asc" ? (
+                    <ChevronLeft
+                      aria-hidden="true"
+                      size={12}
+                      style={{ transform: "rotate(90deg)" }}
+                    />
+                  ) : sort.column === column && sort.dir === "desc" ? (
+                    <ChevronRight
+                      aria-hidden="true"
+                      size={12}
+                      style={{ transform: "rotate(90deg)" }}
+                    />
+                  ) : (
+                    <ArrowUpDown aria-hidden="true" size={12} />
+                  )}
                 </span>
-              </span>
+              </button>
             </th>
           ))}
         </tr>
@@ -1837,6 +2511,21 @@ function CaseTable({ onSelect, rows, selectedCaseId }: CaseTableProps) {
             role="link"
             tabIndex={0}
           >
+            <td
+              className="case-table__check-col"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSelect(row.id);
+              }}
+            >
+              <input
+                aria-label={`Vorgang ${row.id} auswählen`}
+                checked={selectedIds.has(row.id)}
+                onChange={() => onToggleSelect(row.id)}
+                onClick={(e) => e.stopPropagation()}
+                type="checkbox"
+              />
+            </td>
             <th scope="row">
               <span>{row.id}</span>
               <small>{row.procedure}</small>
