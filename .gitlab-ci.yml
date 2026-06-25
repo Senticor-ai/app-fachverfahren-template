@@ -32,14 +32,22 @@ validate:
     - pnpm run build:packages
     - pnpm run build:app
     - pnpm run build:server
-    - pnpm run test:k8s:render
     - pnpm run evidence:build
+
+k8s-render:
+  image:
+    name: bitnami/kubectl:latest
+    entrypoint: [""]
+  stage: validate
+  script:
+    - scripts/validate-k8s-render.sh
 
 pages:
   extends: .node-base
   stage: pages
   needs:
     - validate
+    - k8s-render
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
@@ -55,6 +63,7 @@ container-image:
   stage: image
   needs:
     - validate
+    - k8s-render
   rules:
     - if: $CI_COMMIT_BRANCH
     - if: $CI_COMMIT_TAG

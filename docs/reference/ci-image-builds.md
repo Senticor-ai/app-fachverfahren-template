@@ -18,6 +18,10 @@ und pnpm schreiben damit in Geschwisterverzeichnisse von `${CI_PROJECT_DIR}`.
 Shell-Skripte im Validierungspfad müssen mit POSIX `sh` laufen und dürfen kein
 installiertes Bash voraussetzen.
 
+Kubernetes-Renderchecks laufen als eigener `k8s-render`-Job mit einem
+`kubectl`-Image. Das hält die Node-Validierung unabhängig vom Kubernetes-CLI und
+bewahrt den Manifest-Rendercheck als verpflichtendes CI-Gate.
+
 Container-Images werden mit Kaniko gebaut. Die Vorlage nutzt:
 
 ```yaml
