@@ -10,8 +10,9 @@ variables:
   image: registry.opencode.de/open-code/oci/nodejs:24
   before_script:
     - export PNPM_HOME="${CI_PROJECT_DIR}/.pnpm"
+    - export TMPDIR="$(dirname "${CI_PROJECT_DIR}")/.tmp-${CI_PROJECT_NAME}"
     - export PATH="${PNPM_HOME}:${PATH}"
-    - mkdir -p "${PNPM_HOME}"
+    - mkdir -p "${PNPM_HOME}" "${TMPDIR}"
     - corepack enable --install-directory "${PNPM_HOME}" pnpm
     - pnpm install --frozen-lockfile=false
 

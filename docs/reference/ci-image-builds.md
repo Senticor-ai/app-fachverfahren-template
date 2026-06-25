@@ -9,6 +9,12 @@ opencode.de-Runner sind unprivilegierte Kubernetes-Pods. Sie haben keinen
 Docker-Socket und dürfen keine privilegierten Sidecars starten. `docker:dind`
 und `docker build` sind deshalb kein belastbarer Standard.
 
+Node-Validierungsjobs nutzen ein Build-Workspace-lokales `TMPDIR` außerhalb des
+Repository-Checkouts, weil Kubernetes-Runner je nach Image- und
+SecurityContext-Konfiguration `/tmp` nicht beschreibbar bereitstellen. Vitest,
+Vite und Node-Testhilfen schreiben damit in ein Geschwisterverzeichnis von
+`${CI_PROJECT_DIR}`.
+
 Container-Images werden mit Kaniko gebaut. Die Vorlage nutzt:
 
 ```yaml
