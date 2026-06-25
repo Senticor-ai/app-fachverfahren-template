@@ -1,10 +1,22 @@
 # Fachverfahren App Platform Template
 
+[![CI pipeline](https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-platform/senticor/senticor-app-fachverfahren-template/badges/main/pipeline.svg)](https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-platform/senticor/senticor-app-fachverfahren-template/-/pipelines)
+[![License: EUPL-1.2](https://img.shields.io/badge/license-EUPL--1.2-blue)](LICENSE)
+
+**English summary:** This repository provides a reusable public-sector
+application template for case-management portals and citizen services. It
+combines a React/Fastify starter app, German/EU jurisdiction profiles,
+capability contracts, provider adapters, conformance tooling and a template
+lifecycle so GovTech teams can create maintainable domain applications instead
+of long-lived forks.
+
 Dieses Repository ist der Startpunkt für wiederverwendbare
 Fachverfahren- und Bürgerapp-Stacks auf Kubernetes. Es ist bewusst nicht nur
 eine kopierbare App-Vorlage: Der wiederverwendbare Teil lebt in versionierten
 Paketen, Provider-Packs, Jurisdiction-Packs und einem Conformance-Kit. Die
 generierte Fachanwendung soll hauptsächlich Fachlogik enthalten.
+
+![Sachbearbeitungsansicht mit Sidebar, Vorgangstabelle und Status-Chips](docs/assets/fachverfahren-template-sachbearbeitung.png)
 
 ## Zielbild
 
@@ -142,6 +154,13 @@ Provenienz, Ownership, Updates, Migrationen und Fleet-Befehle stehen in
 App-Spezifikationen liegen unter `docs/examples/*/app.spec.yaml`. Sie erzeugen
 Domain-Module mit `module.contract.yaml`; Capability-IDs und verbotene
 Reimplementierungen stehen in `platform/capabilities.json`.
+
+## Projekt und Community
+
+- Sicherheitsmeldungen: `SECURITY.md`
+- Verhaltenskodex: `CODE_OF_CONDUCT.md`
+- Änderungen und Release-Hinweise: `CHANGELOG.md`
+- Öffentliche Adopter und Evaluierungen: `ADOPTERS.md`
 
 ## Wichtige Regeln
 

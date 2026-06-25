@@ -31,7 +31,15 @@ export interface TemplateOwnership {
 
 export const defaultOwnership: TemplateOwnership = {
   paths: {
+    "README.md": "merge",
+    "SECURITY.md": "merge",
+    "CHANGELOG.md": "merge",
+    "CODE_OF_CONDUCT.md": "replace",
+    "ADOPTERS.md": "consumer",
     ".gitlab-ci.yml": "replace",
+    ".gitlab/CODEOWNERS": "consumer",
+    ".gitlab/issue_templates/**": "replace",
+    ".gitlab/merge_request_templates/**": "replace",
     Dockerfile: "merge",
     "package.json": "structured-merge",
     "pnpm-workspace.yaml": "structured-merge",
@@ -39,6 +47,7 @@ export const defaultOwnership: TemplateOwnership = {
     ".agents/skills/**": "replace",
     ".claude/skills/**": "replace",
     "docs/agents/**": "replace",
+    "docs/assets/**": "replace",
     "schemas/**": "replace",
     "platform/capabilities.json": "replace",
     "docs/capabilities/**": "replace",
