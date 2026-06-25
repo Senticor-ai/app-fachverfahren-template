@@ -55,6 +55,7 @@ export const defaultOwnership: TemplateOwnership = {
     "sources/source-lock.json": "structured-merge",
     "tooling/template/**": "replace",
     "scripts/check-template-*.mjs": "replace",
+    "scripts/validate-k8s-render.sh": "replace",
     "scripts/scaffold-*.mjs": "replace",
     "apps/*/src/domain/**": "consumer",
     "docs/domain/**": "consumer",

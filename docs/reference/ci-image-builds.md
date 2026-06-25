@@ -15,6 +15,8 @@ Kubernetes-Runner je nach Image- und SecurityContext-Konfiguration `/tmp` nicht
 beschreibbar bereitstellen und Full-Repo-Scaffold-Tests keine
 Toolchain-Artefakte aus dem Checkout kopieren sollen. Vitest, Vite, Corepack
 und pnpm schreiben damit in Geschwisterverzeichnisse von `${CI_PROJECT_DIR}`.
+Shell-Skripte im Validierungspfad müssen mit POSIX `sh` laufen und dürfen kein
+installiertes Bash voraussetzen.
 
 Container-Images werden mit Kaniko gebaut. Die Vorlage nutzt:
 
