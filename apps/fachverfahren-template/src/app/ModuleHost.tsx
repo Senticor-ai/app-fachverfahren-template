@@ -46,7 +46,16 @@ export const mountedModules: MountedModule[] = Object.entries(discovered)
       Audit: mod.AuditScreen,
     };
   })
-  .filter((m) => m.Citizen || m.Caseworker || m.Audit);
+  // Gerüst-Module (`_template`, `neutral-example`, `_`-präfixiert) sind nur KOMPILIERENDE Vorlagen für den Build —
+  // NIE die laufende App. Sobald der governte Build ein echtes `modules/<domain>/` erzeugt hat, IST dieses Modul die
+  // App; die Vorlagen werden hier ausgeblendet (sonst Modul-Picker / falsches Default → die App zeigt das Gerüst).
+  .filter(
+    (m) =>
+      (m.Citizen || m.Caseworker || m.Audit) &&
+      m.domain !== "_template" &&
+      m.domain !== "neutral-example" &&
+      !m.domain.startsWith("_"),
+  );
 
 /** True, sobald mindestens ein Modul mit einer App-Surface gemountet ist (steuert den Navigations-Eintrag). */
 export const hasMountedModule = mountedModules.length > 0;
