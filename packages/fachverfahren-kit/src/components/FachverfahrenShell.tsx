@@ -78,7 +78,9 @@ function navFor<T>(persona: Persona, config: LeistungConfig<T>): ShellNavItem[] 
   switch (persona) {
     case "buerger": {
       const items: ShellNavItem[] = [{ key: "start", label: "Start", icon: Home, href: "/buerger" }];
-      if (config.antrag.steps.length > 0) {
+      // DEFENSIV: eine (agent-generierte) Config kann Felder vermissen/anders geformt sein. Ein fehlendes
+      // antrag.steps darf NIE die ganze App weiß-screenen — optionale Verkettung + Default 0.
+      if ((config.antrag?.steps?.length ?? 0) > 0) {
         items.push({ key: "antrag", label: "Antrag stellen", icon: FileText, href: "/buerger/antrag" });
       }
       return items;
@@ -87,7 +89,7 @@ function navFor<T>(persona: Persona, config: LeistungConfig<T>): ShellNavItem[] 
       const items: ShellNavItem[] = [
         { key: "eingang", label: "Eingangskorb", icon: Inbox, href: "/amt" },
       ];
-      if ((config.register.mock?.length ?? 0) > 0) {
+      if ((config.register?.mock?.length ?? 0) > 0) {
         items.push({ key: "register", label: "Register", icon: Database, href: "/amt/register" });
       }
       return items;

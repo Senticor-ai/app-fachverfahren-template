@@ -39,10 +39,11 @@ export function EntscheidungPanel<T = Record<string, unknown>>({
   className,
 }: EntscheidungPanelProps<T>) {
   // Erlaubte Übergänge AUSSCHLIESSLICH aus dem Vertrag (from === aktueller Status, Rolle berechtigt).
-  const transitions = config.statusMachine.transitions.filter(
+  // DEFENSIV gegen eine unvollständig generierte Config (statusMachine evtl. nicht vertragskonform).
+  const transitions = (config.statusMachine?.transitions ?? []).filter(
     (t) => t.from === vorgang.status && t.rollen.includes(rolle),
   );
-  const states = config.statusMachine.states;
+  const states = config.statusMachine?.states ?? [];
   const toneOf = (key: string) => states.find((s) => s.key === key)?.tone;
 
   // Pro Übergang ein eigenes Begründungsfeld (nur bei detailPflicht sichtbar/erforderlich).

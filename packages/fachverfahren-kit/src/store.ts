@@ -38,7 +38,8 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
   const setState = (fn: (s: Vorgang<T>[]) => Vorgang<T>[]) => use.setState((s) => ({ vorgaenge: fn(s.vorgaenge) }));
 
   const transitionsFrom = (status: string, rolle?: string): Transition[] =>
-    config.statusMachine.transitions.filter((t) => t.from === status && (!rolle || t.rollen.includes(rolle)));
+    // DEFENSIV gegen eine unvollständig generierte Config (statusMachine evtl. nicht vertragskonform).
+    (config.statusMachine?.transitions ?? []).filter((t) => t.from === status && (!rolle || t.rollen.includes(rolle)));
 
   const store: FachverfahrenStore<T> = {
     config,
