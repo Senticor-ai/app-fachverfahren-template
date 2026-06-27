@@ -8,14 +8,10 @@
 import {
   createFachverfahrenStore,
   type FachverfahrenStore,
-  type LeistungConfig,
 } from "@senticor/fachverfahren-kit";
-import { hundesteuerConfig } from "@senticor/fachverfahren-kit/leistungen/hundesteuer";
+// Die Config kommt aus DER EINEN Austausch-Naht (./leistung.config) — Default = Hundesteuer-Beispiel,
+// vom governten CHOS-Build überschrieben mit der generierten Config. Die Composition-App bleibt
+// VERFAHRENS-AGNOSTISCH: sie reicht eine beliebige LeistungConfig an dieselben Kit-Bausteine.
+import { leistungConfig } from "./leistung.config";
 
-// Die Composition-App ist VERFAHRENS-AGNOSTISCH: sie kennt nur den generischen Vertrag (VorgangPort/LeistungConfig),
-// nie den leistungs-spezifischen Antragstyp (HundesteuerAntrag). Genau das ist der Beweis-Punkt — die App reicht eine
-// beliebige `LeistungConfig` an dieselben Bausteine. Darum wird die typisierte Hundesteuer-Config an der EINEN Grenze
-// hier auf die generische Record-Form angehoben; jedes Verfahren passt ohne App-Änderung.
-const config = hundesteuerConfig as unknown as LeistungConfig;
-
-export const store: FachverfahrenStore<Record<string, unknown>> = createFachverfahrenStore(config);
+export const store: FachverfahrenStore<Record<string, unknown>> = createFachverfahrenStore(leistungConfig);
