@@ -172,7 +172,7 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
   const flaggedCount = useMemo(() => alle.filter((v) => v.ki.flags.length > 0).length, [alle]);
 
   return (
-    <main className="flex h-full min-h-0 flex-col">
+    <section className="flex h-full min-h-0 flex-col">
       {/* Kopf — sticky, mit Bestands-Kurzinfo */}
       <div className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur">
         <div className="mx-auto flex w-full max-w-6xl items-end justify-between gap-6 px-6 py-5">
@@ -332,7 +332,7 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
           </div>
         </div>
       </div>
-    </main>
+    </section>
   );
 }
 

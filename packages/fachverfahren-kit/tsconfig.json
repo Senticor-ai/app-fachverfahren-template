@@ -4,20 +4,5 @@
     "strict": true, "exactOptionalPropertyTypes": true, "noEmit": true, "skipLibCheck": true,
     "jsx": "react-jsx", "lib": ["ES2022", "DOM", "DOM.Iterable"], "types": ["react", "react-dom"]
   },
-  "include": [
-    "src/types.ts",
-    "src/store.ts",
-    "src/leistungen/*.ts",
-    "src/lib/*.ts",
-    "src/ui/button.tsx",
-    "src/ui/input.tsx",
-    "src/ui/textarea.tsx",
-    "src/ui/label.tsx",
-    "src/ui/checkbox.tsx",
-    "src/ui/select.tsx",
-    "src/ui/badge.tsx",
-    "src/ui/card.tsx",
-    "src/ui/icons.tsx",
-    "src/components/AntragStepper.tsx"
-  ]
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

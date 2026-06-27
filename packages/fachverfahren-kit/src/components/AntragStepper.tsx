@@ -193,7 +193,7 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
   }
 
   return (
-    <main className="mx-auto w-full max-w-2xl px-6 py-8 md:max-w-3xl lg:max-w-5xl">
+    <section className="mx-auto w-full max-w-2xl px-6 py-8 md:max-w-3xl lg:max-w-5xl">
       <Stepper steps={steps} stepIdx={stepIdx} setStepIdx={setStepIdx} daten={daten} />
 
       {config.antrag.einleitung && stepIdx === 0 && (
@@ -306,7 +306,7 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
           )}
         </div>
       </div>
-    </main>
+    </section>
   );
 }
 
