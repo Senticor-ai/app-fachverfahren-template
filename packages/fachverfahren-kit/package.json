@@ -35,12 +35,16 @@
     "@radix-ui/react-tabs": "^1.1.15",
     "@radix-ui/react-toggle": "^1.1.12",
     "@radix-ui/react-toggle-group": "^1.1.13",
+    "@tanstack/react-table": "^8.21.3",
     "@types/react": "^19.2.3",
     "@types/react-dom": "^19.2.3",
+    "date-fns": "^4.4.0",
     "lucide-react": "^1.17.0",
     "react": "^19.2.0",
+    "react-day-picker": "^9.14.0",
     "react-dom": "^19.2.0",
     "react-resizable-panels": "^2.1.7",
+    "recharts": "^2.15.0",
     "typescript": "catalog:"
   },
   "dependencies": {
@@ -75,9 +79,13 @@
     "@radix-ui/react-tabs": "^1",
     "@radix-ui/react-toggle": "^1",
     "@radix-ui/react-toggle-group": "^1",
+    "@tanstack/react-table": "^8",
+    "date-fns": "^3 || ^4",
     "lucide-react": "^1 || ^0.4",
     "react": "^18 || ^19",
+    "react-day-picker": "^9",
     "react-dom": "^18 || ^19",
-    "react-resizable-panels": "^2 || ^3"
+    "react-resizable-panels": "^2 || ^3",
+    "recharts": "^2 || ^3"
   }
 }
