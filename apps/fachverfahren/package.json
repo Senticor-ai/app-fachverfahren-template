@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "emit:contract": "tsx ./scripts/emit-contract.mts"
   },
   "dependencies": {
     "@senticor/fachverfahren-kit": "workspace:*",

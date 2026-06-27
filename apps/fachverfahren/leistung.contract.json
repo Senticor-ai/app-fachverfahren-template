@@ -1,0 +1,354 @@
+{
+  "id": "hundesteuer",
+  "label": "Hundesteuer",
+  "kommune": "Stadt Musterstadt",
+  "rechtsgrundlagen": [
+    {
+      "norm": "KAG",
+      "titel": "Kommunalabgabengesetz des Landes"
+    },
+    {
+      "norm": "§ 1 ff. Hundesteuersatzung",
+      "titel": "Hundesteuersatzung der Kommune",
+      "satzung": true
+    }
+  ],
+  "fimLeistung": {
+    "id": "99102013000000",
+    "status": "annahme-zu-validieren"
+  },
+  "antrag": {
+    "steps": [
+      {
+        "id": "halter",
+        "titel": "Halter:in",
+        "beschreibung": "Angaben zur anmeldepflichtigen Person.",
+        "felder": [
+          {
+            "name": "halter.vorname",
+            "label": "Vorname",
+            "typ": "text",
+            "required": true,
+            "onceOnly": true
+          },
+          {
+            "name": "halter.nachname",
+            "label": "Nachname",
+            "typ": "text",
+            "required": true,
+            "onceOnly": true
+          },
+          {
+            "name": "halter.strasse",
+            "label": "Straße & Hausnummer",
+            "typ": "text",
+            "required": true,
+            "onceOnly": true
+          },
+          {
+            "name": "halter.plz",
+            "label": "Postleitzahl",
+            "typ": "plz",
+            "required": true,
+            "pattern": "^\\d{5}$",
+            "hint": "5-stellig",
+            "onceOnly": true
+          },
+          {
+            "name": "halter.ort",
+            "label": "Ort",
+            "typ": "text",
+            "required": true,
+            "onceOnly": true
+          }
+        ]
+      },
+      {
+        "id": "hund",
+        "titel": "Hund",
+        "felder": [
+          {
+            "name": "hund.name",
+            "label": "Name des Hundes",
+            "typ": "text",
+            "required": true
+          },
+          {
+            "name": "hund.rasse",
+            "label": "Rasse",
+            "typ": "text",
+            "required": true,
+            "hint": "Bei Mischlingen die überwiegende Rasse"
+          },
+          {
+            "name": "hund.geschlecht",
+            "label": "Geschlecht",
+            "typ": "select",
+            "required": true,
+            "options": [
+              {
+                "value": "m",
+                "label": "männlich"
+              },
+              {
+                "value": "w",
+                "label": "weiblich"
+              }
+            ]
+          },
+          {
+            "name": "hund.geburtsdatum",
+            "label": "Geburtsdatum",
+            "typ": "date",
+            "required": true
+          },
+          {
+            "name": "hund.beginnHaltung",
+            "label": "Beginn der Haltung",
+            "typ": "date",
+            "required": true,
+            "hint": "Anzeige binnen 14 Tagen"
+          },
+          {
+            "name": "hund.chipnummer",
+            "label": "Chip-Nummer",
+            "typ": "text",
+            "hint": "falls vorhanden"
+          }
+        ]
+      },
+      {
+        "id": "einstufung",
+        "titel": "Einstufung",
+        "felder": [
+          {
+            "name": "haushaltsHundezahl",
+            "label": "Wievielter Hund im Haushalt?",
+            "typ": "select",
+            "required": true,
+            "options": [
+              {
+                "value": "1",
+                "label": "1. Hund"
+              },
+              {
+                "value": "2",
+                "label": "2. Hund"
+              },
+              {
+                "value": "3",
+                "label": "weiterer Hund"
+              }
+            ]
+          },
+          {
+            "name": "listenhund",
+            "label": "Gefährlicher Hund / Listenhund",
+            "typ": "checkbox",
+            "hint": "nach Landes-Listenhundeverordnung"
+          }
+        ]
+      },
+      {
+        "id": "befreiung",
+        "titel": "Ermäßigung / Befreiung",
+        "felder": [
+          {
+            "name": "befreiungId",
+            "label": "Befreiungsgrund (optional)",
+            "typ": "select",
+            "options": [
+              {
+                "value": "assistenz",
+                "label": "Assistenz-/Blindenführhund (§ 6 Abs. 1 Nr. 1)"
+              },
+              {
+                "value": "tierheim",
+                "label": "Hund aus Tierheim (erste 12 Monate) (§ 6 Abs. 1 Nr. 3)"
+              },
+              {
+                "value": "dienst",
+                "label": "Diensthund (Behörde/Rettung) (§ 6 Abs. 1 Nr. 2)"
+              }
+            ],
+            "hint": "Nachweis erforderlich"
+          }
+        ]
+      }
+    ],
+    "einleitung": "Melden Sie Ihren Hund an, damit die Hundesteuer korrekt festgesetzt werden kann."
+  },
+  "statusMachine": {
+    "initial": "eingegangen",
+    "states": [
+      {
+        "key": "eingegangen",
+        "label": "Eingegangen",
+        "tone": "neu"
+      },
+      {
+        "key": "in_pruefung",
+        "label": "In Prüfung",
+        "tone": "info"
+      },
+      {
+        "key": "review_noetig",
+        "label": "Review nötig",
+        "tone": "warn"
+      },
+      {
+        "key": "festgesetzt",
+        "label": "Festgesetzt",
+        "tone": "ok",
+        "terminal": true
+      },
+      {
+        "key": "abgelehnt",
+        "label": "Abgelehnt",
+        "tone": "block",
+        "terminal": true
+      }
+    ],
+    "transitions": [
+      {
+        "from": "eingegangen",
+        "to": "in_pruefung",
+        "label": "Prüfung starten",
+        "rollen": [
+          "sachbearbeitung"
+        ]
+      },
+      {
+        "from": "in_pruefung",
+        "to": "review_noetig",
+        "label": "Zur Zweitprüfung",
+        "rollen": [
+          "sachbearbeitung"
+        ]
+      },
+      {
+        "from": "in_pruefung",
+        "to": "festgesetzt",
+        "label": "Festsetzen",
+        "rollen": [
+          "sachbearbeitung"
+        ],
+        "vierAugen": true
+      },
+      {
+        "from": "review_noetig",
+        "to": "festgesetzt",
+        "label": "Festsetzen (4-Augen)",
+        "rollen": [
+          "sachbearbeitung"
+        ],
+        "vierAugen": true
+      },
+      {
+        "from": "in_pruefung",
+        "to": "abgelehnt",
+        "label": "Ablehnen",
+        "rollen": [
+          "sachbearbeitung"
+        ],
+        "detailPflicht": true
+      },
+      {
+        "from": "review_noetig",
+        "to": "abgelehnt",
+        "label": "Ablehnen",
+        "rollen": [
+          "sachbearbeitung"
+        ],
+        "detailPflicht": true
+      }
+    ]
+  },
+  "register": {
+    "suchfelder": [
+      "nachname",
+      "plz"
+    ],
+    "mock": [
+      {
+        "nachname": "Müller",
+        "vorname": "Anna",
+        "strasse": "Lindenweg 4",
+        "plz": "12345",
+        "ort": "Musterstadt",
+        "geburtsdatum": "1989-04-12"
+      },
+      {
+        "nachname": "Schmidt",
+        "vorname": "Tarek",
+        "strasse": "Ahornstr. 22",
+        "plz": "12345",
+        "ort": "Musterstadt",
+        "geburtsdatum": "1975-11-02"
+      }
+    ]
+  },
+  "detailSektionen": [
+    {
+      "titel": "Halter:in",
+      "felder": [
+        {
+          "pfad": "halter.vorname",
+          "label": "Vorname"
+        },
+        {
+          "pfad": "halter.nachname",
+          "label": "Nachname"
+        },
+        {
+          "pfad": "halter.strasse",
+          "label": "Anschrift"
+        },
+        {
+          "pfad": "halter.plz",
+          "label": "PLZ"
+        },
+        {
+          "pfad": "halter.ort",
+          "label": "Ort"
+        }
+      ]
+    },
+    {
+      "titel": "Hund",
+      "felder": [
+        {
+          "pfad": "hund.name",
+          "label": "Name"
+        },
+        {
+          "pfad": "hund.rasse",
+          "label": "Rasse"
+        },
+        {
+          "pfad": "hund.geschlecht",
+          "label": "Geschlecht"
+        },
+        {
+          "pfad": "hund.geburtsdatum",
+          "label": "Geburtsdatum"
+        },
+        {
+          "pfad": "hund.beginnHaltung",
+          "label": "Beginn Haltung"
+        },
+        {
+          "pfad": "hund.chipnummer",
+          "label": "Chip-Nr."
+        }
+      ]
+    }
+  ],
+  "ki": {
+    "schwelleAutonom": 0.9
+  },
+  "berechne": "[function]",
+  "nachweise": "[function]",
+  "seedCount": 4,
+  "_snapshot": true
+}

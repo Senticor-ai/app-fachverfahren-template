@@ -2,6 +2,7 @@
 // folgen in ./components und werden hier re-exportiert.
 export * from "./types.js";
 export * from "./store.js";
+export * from "./contract-snapshot.js";
 
 // UI-Bausteine (Tailwind + shadcn/ui OSS) — konsumieren ausschließlich den Vertrag (config/port/vorgang).
 export * from "./ui/badge.js";
