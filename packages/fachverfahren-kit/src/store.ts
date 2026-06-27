@@ -50,13 +50,15 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
 
     einreichen: (antragsdaten) => {
       const ki = { confidence: 0, flags: [] as string[] };
+      const berechnung = safeBerechne(config, antragsdaten);
       const v: Vorgang<T> = {
         id: `v-${pad(++__seq, 6)}`,
         vorgangsnummer: vorgangsnummer(),
         eingangIso: now(),
         antragsdaten,
         status: config.statusMachine.initial,
-        berechnung: safeBerechne(config, antragsdaten),
+        // berechnung ist optional — unter exactOptionalPropertyTypes nur setzen, wenn vorhanden.
+        ...(berechnung ? { berechnung } : {}),
         ki,
         nachweise: config.nachweise?.(antragsdaten) ?? [],
         history: [{ ts: now(), aktion: "Antrag eingegangen", rolle: "buerger" }],
@@ -77,7 +79,15 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
       setState((vs) =>
         vs.map((x) =>
           x.id === id
-            ? { ...x, status: to, history: [...x.history, { ts: now(), aktion: `${t.label} (→ ${to})`, rolle, detail }] }
+            ? {
+                ...x,
+                status: to,
+                history: [
+                  ...x.history,
+                  // detail ist optional — unter exactOptionalPropertyTypes nur setzen, wenn vorhanden.
+                  { ts: now(), aktion: `${t.label} (→ ${to})`, rolle, ...(detail ? { detail } : {}) },
+                ],
+              }
             : x,
         ),
       );

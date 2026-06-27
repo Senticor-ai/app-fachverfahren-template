@@ -1,0 +1,6 @@
+/* App-Styles = nur die Einbindung der Kit-Design-Tokens (das Design-System lebt im Kit, keine eigenen Werte). */
+@import "@senticor/fachverfahren-kit/styles.css";
+
+/* Tailwind v4 ignoriert node_modules; die Kit-Komponenten liegen dort als Workspace-Paket. Ihr src/ explizit
+   als Content-Quelle registrieren, sonst werden ihre Utility-Klassen aus dem Build gepurgt. */
+@source "../node_modules/@senticor/fachverfahren-kit/src/**/*.tsx";

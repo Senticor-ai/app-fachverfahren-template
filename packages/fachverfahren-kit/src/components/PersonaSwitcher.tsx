@@ -1,0 +1,149 @@
+// fachverfahren-kit/components/PersonaSwitcher — der generische, UMSCHALTBARE Rollen-Wechsler.
+//
+// 1:1 aus der Referenz-UX (lovable PersonaSwitcher) abgeleitet: gleicher Aufbau (Avatar + Label/Sub + Chevron),
+// gleicher Popup-Look (role="menu" / menuitemradio), gleiche a11y (aria-haspopup/expanded, Esc + Outside-Click).
+// ABER entkoppelt: In der Referenz triggert der Wechsel eine URL-Navigation (router). Hier ist es eine reine,
+// kontrollierte Auswahl über Props (persona/onPersonaChange) — die App entscheidet, ob daraus eine Route wird.
+// Domänen-frei: keine Verfahrens-Texte, nur Rollen. Beschriftungen sind generische Defaults bzw. überschreibbar.
+import { ChevronsUpDown, ClipboardCheck, LineChart, User, type LucideIcon } from "lucide-react";
+import * as React from "react";
+import { cn } from "../lib/utils.js";
+
+/** Die drei generischen Rollen jedes kommunalen Fachverfahrens (Antragsteller · Bearbeitung · Aufsicht). */
+export type Persona = "buerger" | "sachbearbeitung" | "aufsicht";
+
+/** Anzeige-Beschreibung einer Rolle (rein generisch — keine Leistungs-Inhalte). */
+export interface PersonaDescriptor {
+  key: Persona;
+  /** Anzeigename (Demo-Persona oder generische Rollenbezeichnung). */
+  label: string;
+  /** Untertitel/Funktion (z.B. „Sachbearbeitung"). */
+  sub: string;
+  /** Avatar-Initialen. */
+  initials: string;
+  icon: LucideIcon;
+}
+
+/** Generische Standard-Rollen — bewusst verfahrens-neutral; per Prop überschreibbar (z.B. mit Demo-Namen). */
+export const DEFAULT_PERSONAS: readonly PersonaDescriptor[] = [
+  { key: "buerger", label: "Bürger:in", sub: "Antragstellung", initials: "BÜ", icon: User },
+  { key: "sachbearbeitung", label: "Sachbearbeitung", sub: "Bearbeitung / Prüfung", initials: "SB", icon: ClipboardCheck },
+  { key: "aufsicht", label: "Aufsicht", sub: "Kennzahlen / Audit", initials: "AU", icon: LineChart },
+];
+
+export interface PersonaSwitcherProps {
+  /** Aktiv gewählte Rolle (kontrolliert). */
+  persona: Persona;
+  /** Wechsel-Callback — die App entscheidet über Folgewirkung (z.B. Routing). */
+  onPersonaChange: (persona: Persona) => void;
+  /** Rollen-Beschreibungen (Reihenfolge = Menü-Reihenfolge). Default: DEFAULT_PERSONAS. */
+  personas?: readonly PersonaDescriptor[];
+  /** Kompakt = nur Avatar (eingeklappte Sidebar). */
+  compact?: boolean;
+  className?: string;
+}
+
+/** Rollen-Wechsler mit Popup-Menü (Radix-frei, aber Radix-konform in a11y: menu / menuitemradio). */
+export function PersonaSwitcher({
+  persona,
+  onPersonaChange,
+  personas = DEFAULT_PERSONAS,
+  compact = false,
+  className,
+}: PersonaSwitcherProps): React.JSX.Element {
+  const current = personas.find((p) => p.key === persona) ?? personas[0]!;
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  // Schließen bei Klick außerhalb + Escape (wie Referenz).
+  React.useEffect(() => {
+    if (!open) return;
+    function onDocClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onEsc(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [open]);
+
+  return (
+    <div className={cn("relative", className)} ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Rolle wechseln — aktuell ${current.label}`}
+        title={compact ? `${current.label} · Rolle wechseln` : undefined}
+        className={cn(
+          "flex w-full items-center gap-2.5 rounded-sm text-left transition-colors hover:bg-white/5",
+          compact ? "justify-center p-1.5" : "px-2 py-2",
+        )}
+      >
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar-accent/25 text-[11px] font-bold text-sidebar-foreground">
+          {current.initials}
+        </span>
+        {!compact && (
+          <>
+            <span className="min-w-0 flex-1 leading-tight">
+              <span className="block truncate text-sm font-medium text-sidebar-foreground">{current.label}</span>
+              <span className="block truncate text-[11px] text-sidebar-muted">{current.sub}</span>
+            </span>
+            <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-sidebar-muted" aria-hidden="true" />
+          </>
+        )}
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          aria-label="Rolle wählen"
+          className="absolute bottom-full left-0 z-50 mb-2 w-64 overflow-hidden rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
+        >
+          <div className="border-b border-border bg-muted/40 px-3 py-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+            Rolle wechseln
+          </div>
+          <ul className="p-1">
+            {personas.map((p) => {
+              const isActive = p.key === persona;
+              return (
+                <li key={p.key}>
+                  <button
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={isActive}
+                    onClick={() => {
+                      setOpen(false);
+                      onPersonaChange(p.key);
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-2.5 rounded-sm px-2 py-2 text-left transition-colors hover:bg-accent/10",
+                      isActive && "bg-accent/10",
+                    )}
+                  >
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] font-bold text-foreground">
+                      {p.initials}
+                    </span>
+                    <span className="min-w-0 flex-1 leading-tight">
+                      <span className="block truncate text-sm font-medium text-foreground">{p.label}</span>
+                      <span className="block truncate text-[11px] text-muted-foreground">{p.sub}</span>
+                    </span>
+                    {isActive && (
+                      <span className="text-[10px] font-medium uppercase tracking-wide text-accent">aktiv</span>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
