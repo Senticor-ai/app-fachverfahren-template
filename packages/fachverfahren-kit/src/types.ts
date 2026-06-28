@@ -113,6 +113,93 @@ export interface DetailSektion {
   felder: { pfad: string; label: string }[];
 }
 
+// ── OPTIONALE Kit-Komponenten-Signale (additiv) ─────────────────────────────
+// Jedes Feld ist OPTIONAL: trägt die Config das Signal NICHT, rendert die App unverändert (Hundesteuer-
+// Fallback bleibt). Die Strukturen spiegeln EXAKT die Prop-Typen der jeweiligen Komponente — definiert hier
+// lokal (kein Import aus components/, sonst Zyklus types↔components). Die Generierung füllt diese Felder aus
+// dem Fachkonzept; ist keines gesetzt, ist die neue UX schlicht abwesend.
+
+/** Ein konkreter, transparenter KI-Vorschlag (spiegelt KiAssistPanel `KiAssistVorschlag` + Panel-Kopf).
+ *  `risikoklasse` spiegelt die KiAssistPanel-`KiRisikoklasse` (inline, um Doppel-Exporte zu vermeiden). */
+export interface KiVorschlagConfig {
+  /** Der vorgeschlagene Wert (Text/Zahl als String — kompatibel zu ReactNode der Komponente). */
+  wert: string;
+  /** Herkunft (Modell/Datenquelle) — Transparenzelement „source". */
+  quelle: string;
+  /** Konfidenz 0..1 — Transparenzelement „confidence". */
+  konfidenz: number;
+  /** Begründung für genau diesen Vorschlag — Transparenzelement „why". */
+  begruendung: string;
+  /** Name der unterstützten Funktion/des Feldes (Überschrift + SR-Ansage). */
+  funktionsName: string;
+  /** Risiko-Einstufung; „hochrisiko-pruefen" erzwingt den Annex-III-Hinweis. */
+  risikoklasse: "begrenzt" | "hochrisiko-pruefen";
+}
+
+/** Eine Gebührenposition (spiegelt EPaymentPanel `EPaymentPosition`). */
+export interface EPaymentPositionConfig {
+  bezeichnung: string;
+  betrag: number;
+}
+
+/** Eine wählbare Zahlart (spiegelt EPaymentPanel `EPaymentZahlart`). */
+export interface EPaymentZahlartConfig {
+  id: string;
+  label: string;
+}
+
+/** E-Payment-Signal: nur wenn gesetzt + `berechnung.betrag > 0` rendert das EPaymentPanel im Bürger-Antrag. */
+export interface EPaymentConfig {
+  /** Wählbare Zahlarten (mindestens eine erwartet). */
+  zahlarten: EPaymentZahlartConfig[];
+  /** Optionale Gebührenaufschlüsselung (sonst nur der Gesamtbetrag aus `berechne`). */
+  positionen?: EPaymentPositionConfig[] | undefined;
+  /** ISO-4217-Währungscode (Default EUR). */
+  waehrung?: string | undefined;
+  /** Überschrift der Bezahl-Karte (Default „Gebühr bezahlen"). */
+  titel?: string | undefined;
+}
+
+/** Zustellungs-/Bekanntgabe-Signal: schaltet Bescheid-Tab (PdfViewer) + Bürger-Postfach frei. */
+export interface ZustellungConfig {
+  /** ISO-Datum der rechtlichen Bekanntgabe (§ 41 VwVfG) — maßgeblich für den Fristlauf. */
+  bekanntgabeIso?: string | undefined;
+  /** true = Bekanntgabe kraft Fiktion (z. B. 3-Tages-Fiktion) — wird als Hinweis ausgewiesen. */
+  fiktion?: boolean | undefined;
+  /** URL des Bescheid-PDFs — gesetzt ⇒ Bescheid-Tab (PdfViewer) + Postfach-Dokument. */
+  bescheidUrl?: string | undefined;
+}
+
+/** Eine zu überwachende Frist (spiegelt TerminFristPanel `FristItem` — `status` exakt-optional, ohne `| undefined`). */
+export interface FristItemConfig {
+  id: string;
+  titel: string;
+  /** Fälligkeit als ISO-8601-Zeitstempel. */
+  faelligIso: string;
+  status?: "offen" | "gewahrt";
+}
+
+/** Ein buchbarer Terminslot (spiegelt TerminFristPanel `TerminSlot`). */
+export interface TerminSlotConfig {
+  id: string;
+  /** Start als ISO-8601-Zeitstempel. */
+  startIso: string;
+  /** Dauer in Minuten. */
+  dauerMin: number;
+}
+
+/** Termin-/Frist-Signal: schaltet das TerminFristPanel (Bürger-Route) frei. */
+export interface TerminConfig {
+  fristen?: FristItemConfig[] | undefined;
+  slots?: TerminSlotConfig[] | undefined;
+}
+
+/** Adress-/Melderegister-Validierung (XÖV/XMeld) im Antrag — deterministisch, KEINE KI. */
+export interface AdressValidierungConfig {
+  /** true ⇒ AdressValidierung wird im Bürger-Antrag eingeblendet. */
+  enabled?: boolean | undefined;
+}
+
 /** Die EINE Config, die ein Fachverfahren vollständig beschreibt — von der Generierung aus dem Fachkonzept gefüllt. */
 export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   id: string; // slug, z.B. "hundesteuer"
@@ -128,7 +215,20 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   nachweise?: (antragsdaten: TAntragsdaten) => Nachweis[];
   register: RegisterConfig;
   detailSektionen: DetailSektion[];
-  ki?: { schwelleAutonom: number }; // ab dieser Konfidenz + 0 Flags = "autonom-fähig" (Aufsichts-Kennzahl)
+  /** KI-Schwelle (Aufsichts-Kennzahl) + optional EIN transparenter, menschlich entscheidbarer Vorschlag (KiAssistPanel). */
+  ki?: {
+    schwelleAutonom: number; // ab dieser Konfidenz + 0 Flags = "autonom-fähig" (Aufsichts-Kennzahl)
+    /** Gesetzt ⇒ KiAssistPanel (5 Transparenzelemente) statt/zusätzlich zur KiVorschlag-Karte. */
+    vorschlag?: KiVorschlagConfig | undefined;
+  };
+  /** Gesetzt + `berechnung.betrag > 0` ⇒ EPaymentPanel im Bürger-Antrag (verbindliche Gebühr). */
+  ePayment?: EPaymentConfig | undefined;
+  /** Gesetzt ⇒ Bescheid-Tab (PdfViewer) im ReviewWorkspace + Bürger-Postfach (Zustellnachweis). */
+  zustellung?: ZustellungConfig | undefined;
+  /** Gesetzt ⇒ TerminFristPanel (Fristen-Überwachung + Terminbuchung) als Bürger-Route. */
+  termin?: TerminConfig | undefined;
+  /** `enabled` ⇒ AdressValidierung (deterministischer Registerabgleich) im Bürger-Antrag. */
+  adressValidierung?: AdressValidierungConfig | undefined;
   /** Seed-Fälle (Demo-Arbeitsvorrat), damit die SB-Sicht sofort echte Vorgänge zeigt. */
   seed?: (helpers: { vorgangsnummer: () => string }) => Vorgang<TAntragsdaten>[];
 }

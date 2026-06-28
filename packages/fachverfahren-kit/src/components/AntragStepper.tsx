@@ -19,6 +19,7 @@ import {
 
 import { ErrorSummary, type FieldError } from "./ErrorSummary.js";
 import { useStatusRegion } from "./StatusRegion.js";
+import { AdressValidierung, type AdressTreffer, type AdressWert } from "./AdressValidierung.js";
 
 import type {
   Berechnung,
@@ -79,6 +80,53 @@ function coerceFeldwert(feld: FeldDef, v: unknown): unknown {
 function asString(v: unknown): string {
   if (v === undefined || v === null) return "";
   return String(v);
+}
+
+// ── Adress-Validierung (OPTIONAL, generisch) ─────────────────────────────────────────────────────
+// Sammelt eine (Teil-)Anschrift aus den Antragsdaten über die GENERISCHEN Adress-Blattnamen strasse/plz/ort
+// (irgendwo verschachtelt) — keine Domänen-Annahme. Der Registerabgleich läuft über den vorhandenen
+// `lookupRegister`-Port; ein Treffer wird in genau einen strukturellen AdressTreffer übersetzt.
+
+/** Liest das erste Vorkommen eines Blattschlüssels (z.B. "plz") im verschachtelten Datenobjekt. */
+function findeBlatt(obj: Antragsdaten, leaf: string): string | undefined {
+  for (const [key, value] of Object.entries(obj)) {
+    if (key === leaf && (typeof value === "string" || typeof value === "number")) {
+      return String(value);
+    }
+    if (value && typeof value === "object") {
+      const tiefer = findeBlatt(value as Antragsdaten, leaf);
+      if (tiefer !== undefined) return tiefer;
+    }
+  }
+  return undefined;
+}
+
+/** Baut den Ausgangs-Adresswert für die AdressValidierung aus den Antragsdaten (best effort, generisch). */
+function adressAus(daten: Antragsdaten): AdressWert {
+  const wert: AdressWert = {};
+  const strasse = findeBlatt(daten, "strasse");
+  const plz = findeBlatt(daten, "plz");
+  const ort = findeBlatt(daten, "ort");
+  if (strasse !== undefined) wert.strasse = strasse;
+  if (plz !== undefined) wert.plz = plz;
+  if (ort !== undefined) wert.ort = ort;
+  return wert;
+}
+
+/** Deterministischer Registerabgleich über den Port: ein Treffer mit allen Adressbestandteilen → genau-1-Treffer. */
+function adressValidieren<T extends Antragsdaten>(
+  port: VorgangPort<T>,
+  wert: AdressWert,
+): Promise<AdressTreffer[]> {
+  const query = [wert.strasse, wert.plz, wert.ort].map((s) => (s ?? "").trim()).filter(Boolean).join(" ");
+  const treffer = query ? port.lookupRegister(query) : undefined;
+  if (!treffer) return Promise.resolve([]);
+  const strasse = treffer["strasse"] ?? wert.strasse ?? "";
+  const plz = treffer["plz"] ?? wert.plz ?? "";
+  const ort = treffer["ort"] ?? wert.ort ?? "";
+  // Nur als vollständiger amtlicher Treffer melden, wenn alle Bestandteile vorliegen.
+  if (!strasse || !plz || !ort) return Promise.resolve([]);
+  return Promise.resolve([{ strasse, plz, ort }]);
 }
 
 // ── Validierung eines Einzelfelds (required + pattern + min/max) ─────────────────────────────
@@ -356,6 +404,17 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
                 }),
               )}
             </dl>
+
+            {/* OPTIONAL (nur wenn config.adressValidierung.enabled): deterministischer Melderegister-Abgleich
+                der erfassten Anschrift VOR dem Absenden — additiv, ohne den bestehenden Flow zu ändern. */}
+            {config.adressValidierung?.enabled ? (
+              <div className="mt-6">
+                <AdressValidierung
+                  wert={adressAus(daten)}
+                  onValidieren={(w) => adressValidieren(port, w)}
+                />
+              </div>
+            ) : null}
 
             <div className="mt-6 flex items-start gap-2 rounded-sm border border-border bg-background p-3 text-[12px] text-muted-foreground">
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />

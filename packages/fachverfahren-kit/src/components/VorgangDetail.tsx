@@ -7,6 +7,7 @@ import { Database, FileText, Sparkles } from "lucide-react";
 import type { DetailSektion, KiEinschaetzung, LeistungConfig, Vorgang } from "../types.js";
 import { cn } from "../lib/cn.js";
 import { KiVorschlag } from "./KiVorschlag.js";
+import { KiAssistPanel } from "./KiAssistPanel.js";
 
 /** Liest einen verschachtelten Pfad ("a.b.c") aus einem Objekt — defensiv, ohne Annahmen über die Form. */
 export function getPfad(obj: unknown, pfad: string): unknown {
@@ -192,8 +193,25 @@ export function VorgangDetail<T = Record<string, unknown>>({
   zeigeUebergabe = true,
   className,
 }: VorgangDetailProps<T>) {
+  // Optionaler transparenter KI-Vorschlag (KiAssistPanel) — NUR wenn die Config das Signal trägt.
+  // Additiv: die bestehende BerechnungsKarte/KiVorschlag-Sicht bleibt als Fallback unverändert.
+  const kiVorschlag = config.ki?.vorschlag;
+
   return (
     <div className={cn("space-y-6", className)}>
+      {kiVorschlag ? (
+        <KiAssistPanel
+          vorschlag={{
+            wert: kiVorschlag.wert,
+            quelle: kiVorschlag.quelle,
+            konfidenz: kiVorschlag.konfidenz,
+            begruendung: kiVorschlag.begruendung,
+          }}
+          funktionsName={kiVorschlag.funktionsName}
+          risikoklasse={kiVorschlag.risikoklasse}
+        />
+      ) : null}
+
       <BerechnungsKarte
         vorgang={vorgang as Vorgang}
         {...(config.ki ? { schwelleAutonom: config.ki.schwelleAutonom } : {})}

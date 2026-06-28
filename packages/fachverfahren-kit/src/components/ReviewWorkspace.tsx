@@ -5,8 +5,8 @@
 // ist hartkodiert (kein "Hund"/"Halter"). Der Entscheidungs-Flow stammt aus `amt.vorgang.$id.tsx` und läuft über
 // `EntscheidungPanel` → `port.uebergang`. Ein zweites Verfahren (Gewerbe/Parkausweis/Bauantrag) läuft unverändert.
 import { useMemo, useState } from "react";
-import { ArrowLeft, FileText, ListChecks, ScrollText } from "lucide-react";
-import type { LeistungConfig, VorgangPort } from "../types.js";
+import { ArrowLeft, FileText, ListChecks, ScrollText, Stamp } from "lucide-react";
+import type { LeistungConfig, Vorgang, VorgangPort } from "../types.js";
 import { cn } from "../lib/cn.js";
 import { Button } from "../ui/button.js";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs.js";
@@ -15,6 +15,9 @@ import { StatusPill } from "./StatusPill.js";
 import { EvidenceCard } from "./EvidenceCard.js";
 import { VorgangDetail, formatWert, getPfad } from "./VorgangDetail.js";
 import { EntscheidungPanel } from "./EntscheidungPanel.js";
+import { NachweisBrowser, type NachweisEintrag } from "./NachweisBrowser.js";
+import { PdfViewer } from "./PdfViewer.js";
+import { FourEyesReview, type FourEyesStatus } from "./FourEyesReview.js";
 
 export interface ReviewWorkspaceProps<T = Record<string, unknown>> {
   /** Die Leistungs-Config (Sektionen, Status-Machine, Rechtsgrundlagen, KI-Schwelle …). */
@@ -72,6 +75,34 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
       })),
     );
   }, [config.detailSektionen, vorgang]);
+
+  // ── OPTIONALE Signale (additiv) — nur aktiv, wenn die Config sie trägt ──────────────────────────
+  // (1) Aufgewertete Dokumenten-Mappe (NachweisBrowser) NUR wenn die Leistung `nachweise` definiert.
+  const hatNachweisVertrag = typeof config.nachweise === "function";
+  const nachweisEintraege: NachweisEintrag[] = useMemo(
+    () =>
+      nachweise.map((n) => ({
+        id: n.id,
+        titel: n.label,
+        pflicht: n.erforderlich ?? false,
+        status: n.hochgeladen ? "eingereicht" : n.erforderlich ? "fehlend" : "fehlend",
+      })),
+    [nachweise],
+  );
+
+  // (2) Bescheid-Tab (PdfViewer) NUR wenn ein Bescheid-PDF in der Zustellung hinterlegt ist.
+  const bescheidUrl = config.zustellung?.bescheidUrl;
+
+  // (3) 4-Augen-Vorprüfung: anstehende Übergänge (Status + Rolle), die `vierAugen` fordern.
+  const vierAugenTransition = useMemo(
+    () =>
+      vorgang
+        ? (config.statusMachine?.transitions ?? []).find(
+            (t) => t.from === vorgang.status && t.rollen.includes(rolle) && t.vierAugen === true,
+          )
+        : undefined,
+    [config.statusMachine, vorgang, rolle],
+  );
 
   if (!vorgang) {
     return (
@@ -148,39 +179,52 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
                     <ScrollText className="h-3.5 w-3.5" aria-hidden="true" />
                     Prüfschema
                   </TabsTrigger>
+                  {/* Bescheid-Tab NUR wenn ein Bescheid-PDF in der Zustellung hinterlegt ist (additiv). */}
+                  {bescheidUrl ? (
+                    <TabsTrigger value="bescheid" className="flex-1 gap-1.5">
+                      <Stamp className="h-3.5 w-3.5" aria-hidden="true" />
+                      Bescheid
+                    </TabsTrigger>
+                  ) : null}
                 </TabsList>
 
-                {/* Dokumente: die geforderten Nachweise (Vertrag) mit Status hochgeladen/fehlt. */}
+                {/* Dokumente: die geforderten Nachweise (Vertrag) mit Status hochgeladen/fehlt.
+                    Definiert die Leistung einen `nachweise`-Vertrag, wertet NachweisBrowser die Mappe auf
+                    (Vollständigkeits-Hinweis, Provenienz, Vorschau). Sonst die schlanke Liste als Fallback. */}
                 <TabsContent value="dokumente">
                   {nachweise.length > 0 ? (
-                    <ul className="space-y-2">
-                      {nachweise.map((n) => (
-                        <li
-                          key={n.id}
-                          className="flex items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm"
-                        >
-                          <span className="flex min-w-0 items-center gap-2">
-                            <FileText
-                              className="h-4 w-4 shrink-0 text-muted-foreground"
-                              aria-hidden="true"
-                            />
-                            <span className="truncate text-foreground">{n.label}</span>
-                          </span>
-                          <span
-                            className={cn(
-                              "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold",
-                              n.hochgeladen
-                                ? "bg-status-ok-soft text-status-ok"
-                                : n.erforderlich
-                                  ? "bg-status-warn-soft text-status-warn"
-                                  : "bg-muted text-muted-foreground",
-                            )}
+                    hatNachweisVertrag ? (
+                      <NachweisBrowser nachweise={nachweisEintraege} titel="Nachweise" />
+                    ) : (
+                      <ul className="space-y-2">
+                        {nachweise.map((n) => (
+                          <li
+                            key={n.id}
+                            className="flex items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm"
                           >
-                            {n.hochgeladen ? "Hochgeladen" : n.erforderlich ? "Fehlt" : "Optional"}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                            <span className="flex min-w-0 items-center gap-2">
+                              <FileText
+                                className="h-4 w-4 shrink-0 text-muted-foreground"
+                                aria-hidden="true"
+                              />
+                              <span className="truncate text-foreground">{n.label}</span>
+                            </span>
+                            <span
+                              className={cn(
+                                "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold",
+                                n.hochgeladen
+                                  ? "bg-status-ok-soft text-status-ok"
+                                  : n.erforderlich
+                                    ? "bg-status-warn-soft text-status-warn"
+                                    : "bg-muted text-muted-foreground",
+                              )}
+                            >
+                              {n.hochgeladen ? "Hochgeladen" : n.erforderlich ? "Fehlt" : "Optional"}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )
                   ) : (
                     <LeeresPanel text="Keine Nachweise für diesen Vorgang erforderlich." />
                   )}
@@ -227,11 +271,35 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
                     <LeeresPanel text="Keine Rechtsgrundlagen hinterlegt." />
                   )}
                 </TabsContent>
+
+                {/* Bescheid: das hinterlegte Bescheid-PDF im barrierearmen Viewer (nur wenn config.zustellung.bescheidUrl). */}
+                {bescheidUrl ? (
+                  <TabsContent value="bescheid">
+                    <PdfViewer url={bescheidUrl} title={`Bescheid · ${vorgang.vorgangsnummer}`} />
+                  </TabsContent>
+                ) : null}
               </Tabs>
             </div>
 
             {/* Entscheidung — erlaubte Übergänge aus dem Vertrag, fest am unteren Rand des Belege-Panels. */}
-            <div className="shrink-0 border-t border-border bg-muted/20 p-4">
+            <div className="shrink-0 space-y-4 border-t border-border bg-muted/20 p-4">
+              {/* 4-Augen-Vorprüfung NUR wenn ein anstehender Übergang vierAugen fordert (additiv, sichtbare Schicht). */}
+              {vierAugenTransition ? (
+                <FourEyesReview
+                  vorgangId={vorgang.id}
+                  status={fourEyesStatusFuer(vorgang.status, config)}
+                  vorlage={{
+                    erstellerId: erstellerVon(vorgang),
+                    erstelltAmIso: vorgang.eingangIso,
+                    entscheidung: vierAugenTransition.label,
+                    ...(vorgang.berechnung?.begruendung
+                      ? { begruendung: vorgang.berechnung.begruendung }
+                      : {}),
+                  }}
+                  pruefer={{ aktuelleNutzerId: rolle }}
+                />
+              ) : null}
+
               <EntscheidungPanel
                 config={config}
                 port={port}
@@ -245,4 +313,20 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
       </ResizablePanelGroup>
     </div>
   );
+}
+
+// ── 4-Augen-Helfer (generisch, kein Domänen-Literal) ─────────────────────────────────────────────
+
+/** Ersteller-Kennung eines Vorgangs für die Selbstfreigabe-Sperre: erste handelnde Rolle aus der Historie,
+ *  sonst der Initial-Eingang. Rein strukturell — keine Domänen-Annahme. */
+function erstellerVon<T>(vorgang: Vorgang<T>): string {
+  return vorgang.history[0]?.rolle ?? "antragseingang";
+}
+
+/** Bildet den Vorgangs-Status auf den FourEyes-Lebenszyklus ab: terminaler Status → freigegeben/abgelehnt,
+ *  sonst „vorgelegt" (wartet auf Zweitprüfung). Generisch über den Ziel-Ton der Status-Machine. */
+function fourEyesStatusFuer<T>(status: string, config: LeistungConfig<T>): FourEyesStatus {
+  const def = (config.statusMachine?.states ?? []).find((s) => s.key === status);
+  if (def?.terminal) return def.tone === "block" ? "abgelehnt" : "freigegeben";
+  return "vorgelegt";
 }

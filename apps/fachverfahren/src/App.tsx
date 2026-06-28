@@ -16,9 +16,13 @@ import {
   AntragStepper,
   Arbeitsvorrat,
   AufsichtDashboard,
+  EPaymentPanel,
   FachverfahrenShell,
+  Postfach,
   ReviewWorkspace,
+  TerminFristPanel,
   type Persona,
+  type PostfachNachricht,
   type ShellNavItem,
 } from "@senticor/fachverfahren-kit";
 import { store } from "./store.js";
@@ -130,6 +134,22 @@ function BuergerBestaetigung(): React.JSX.Element {
                 {v.berechnung.label}: {v.berechnung.betrag} {v.berechnung.einheit}
               </p>
             ) : null}
+
+            {/* E-Payment NUR wenn die Config das Signal trägt UND ein positiver Betrag anfällt (additiv). */}
+            {store.config.ePayment && v.berechnung && v.berechnung.betrag > 0 ? (
+              <div className="mt-5">
+                <EPaymentPanel
+                  betrag={v.berechnung.betrag}
+                  waehrung={store.config.ePayment.waehrung}
+                  positionen={store.config.ePayment.positionen}
+                  zahlarten={store.config.ePayment.zahlarten}
+                  titel={store.config.ePayment.titel}
+                  // DEV: kein Zahl-Backend — der verbindliche Vorgang resolved sofort (Beleg).
+                  onZahlen={() => Promise.resolve()}
+                />
+              </div>
+            ) : null}
+
             <button
               type="button"
               onClick={() => navigate("/buerger/anmelden")}
@@ -141,6 +161,54 @@ function BuergerBestaetigung(): React.JSX.Element {
         ) : (
           <p className="text-sm text-muted-foreground">Vorgang nicht gefunden.</p>
         )}
+      </div>
+    </Shell>
+  );
+}
+
+/** /buerger/postfach — OPTIONAL (nur wenn config.zustellung): Bescheide/Nachrichten mit Zustellnachweis.
+ *  Die Nachrichten entstehen aus den Vorgängen der EINEN Quelle; ein Bescheid-Dokument/Bekanntgabedatum
+ *  trägt die Config-Zustellung. Trägt die Config kein `zustellung`, ist diese Route nicht montiert. */
+function BuergerPostfach(): React.JSX.Element {
+  useStoreVersion();
+  const zustellung = store.config.zustellung;
+  const nachrichten: PostfachNachricht[] = store
+    .list()
+    .map((v) => ({
+      id: v.id,
+      betreff: `${store.config.label} · Vorgang ${v.vorgangsnummer}`,
+      eingangIso: v.eingangIso,
+      gelesen: false,
+      typ: "bescheid" as const,
+      ...(zustellung?.bescheidUrl ? { dokumentUrl: zustellung.bescheidUrl } : {}),
+      zustellung: {
+        zugestelltAmIso: v.eingangIso,
+        ...(zustellung?.bekanntgabeIso ? { bekanntgabeAmIso: zustellung.bekanntgabeIso } : {}),
+        ...(zustellung?.fiktion !== undefined ? { fiktion: zustellung.fiktion } : {}),
+      },
+    }));
+  return (
+    <Shell persona="buerger" activeNavKey="postfach">
+      <div className="mx-auto max-w-4xl p-4 md:p-8">
+        <Postfach nachrichten={nachrichten} />
+      </div>
+    </Shell>
+  );
+}
+
+/** /buerger/termine — OPTIONAL (nur wenn config.termin): Fristen-Überwachung + Terminbuchung (TerminFristPanel).
+ *  Fristen/Slots kommen aus der Config; ohne `termin` ist die Route nicht montiert. */
+function BuergerTermine(): React.JSX.Element {
+  const termin = store.config.termin;
+  return (
+    <Shell persona="buerger" activeNavKey="termine">
+      <div className="mx-auto max-w-3xl p-4 md:p-8">
+        <TerminFristPanel
+          fristen={termin?.fristen}
+          slots={termin?.slots}
+          // DEV: kein Buchungs-Backend — die verbindliche Buchung resolved sofort (ICS-Export verfügbar).
+          onBuchen={() => Promise.resolve()}
+        />
       </div>
     </Shell>
   );
@@ -192,6 +260,13 @@ export function App(): React.JSX.Element {
       <Route path="/buerger" element={<BuergerStart />} />
       <Route path="/buerger/anmelden" element={<BuergerAnmelden />} />
       <Route path="/buerger/bestaetigung/:id" element={<BuergerBestaetigung />} />
+      {/* OPTIONALE Bürger-Routen — NUR montiert, wenn die Config das jeweilige Signal trägt (additiv). */}
+      {store.config.zustellung ? (
+        <Route path="/buerger/postfach" element={<BuergerPostfach />} />
+      ) : null}
+      {store.config.termin ? (
+        <Route path="/buerger/termine" element={<BuergerTermine />} />
+      ) : null}
       <Route path="/amt" element={<AmtEingang />} />
       <Route path="/amt/vorgang/:id" element={<AmtVorgang />} />
       <Route path="/aufsicht" element={<Aufsicht />} />
