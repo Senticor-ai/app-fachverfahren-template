@@ -17,10 +17,30 @@
     "gates": "scripts/check-*.mjs + tooling/template/cli.ts — check:leistung-contract, check:domain-contracts, check:typescript-policy, typecheck (tsc -b), test (vitest). Diese sind die WAHRHEIT, kein LLM-Judge."
   },
   "workflow": [
-    { "step": 1, "id": "plan", "run": "<eigene HITL-gegatete Phasen: fachkonzept → epic-prd → architektur>", "purpose": "Die Planungs-Wahrheit (FACHKONZEPT/EPIC/PRD/ARCHITEKTUR) entsteht + wird freigegeben VOR dem Build." },
-    { "step": 2, "id": "compose-config", "run": "<Build-Phase: leistung.config.ts aus den freigegebenen Artefakten füllen>", "purpose": "Der EINZIGE generative Build-Schritt: die EINE typisierte LeistungConfig, kein verstreuter Modul-Code." },
-    { "step": 3, "id": "verify", "run": "pnpm run check:leistung-contract && pnpm run typecheck && pnpm run test", "purpose": "GEERDETE Prüfung (Vertrag gültig + Compiles + Tests). Bei Fehler: gezielt die Config nachbessern." },
-    { "step": 4, "id": "dev", "run": "pnpm run dev", "purpose": "Vite-Dev-Server — die 3 Surfaces rendern AUS der gefüllten Config, im Browser klickbar." }
+    {
+      "step": 1,
+      "id": "plan",
+      "run": "<eigene HITL-gegatete Phasen: fachkonzept → epic-prd → architektur>",
+      "purpose": "Die Planungs-Wahrheit (FACHKONZEPT/EPIC/PRD/ARCHITEKTUR) entsteht + wird freigegeben VOR dem Build."
+    },
+    {
+      "step": 2,
+      "id": "compose-config",
+      "run": "<Build-Phase: leistung.config.ts aus den freigegebenen Artefakten füllen>",
+      "purpose": "Der EINZIGE generative Build-Schritt: die EINE typisierte LeistungConfig, kein verstreuter Modul-Code."
+    },
+    {
+      "step": 3,
+      "id": "verify",
+      "run": "pnpm run check:leistung-contract && pnpm run typecheck && pnpm run test",
+      "purpose": "GEERDETE Prüfung (Vertrag gültig + Compiles + Tests). Bei Fehler: gezielt die Config nachbessern."
+    },
+    {
+      "step": 4,
+      "id": "dev",
+      "run": "pnpm run dev",
+      "purpose": "Vite-Dev-Server — die 3 Surfaces rendern AUS der gefüllten Config, im Browser klickbar."
+    }
   ],
   "deltas": [
     {
@@ -32,20 +52,53 @@
         "antrag mit Feldern (FeldDef: name/label/typ/required/pattern/onceOnly)",
         "statusMachine (initial + states + transitions mit Rollen/vierAugen)",
         "Tarif/Berechnung als DATEN (keine Inline-Zahlen im Code)",
-        "Personas/Rollen des Verfahrens"
+        "Personas/Rollen des Verfahrens",
+        "berechne setzt JEDE im Fachkonzept genannte Regel um: jede Tarifstufe/Staffel, jede Tatbestandsvariante, JEDEN Befreiungs-/Ermaessigungstatbestand und jede zeitanteilige/fristbezogene Regel als EIGENE pruefbare Verzweigung (NICHT nur den Grundfall — keine flache 1-Zweig-Berechnung; Vollstaendigkeit gegen die Quelle).",
+        "antrag.felder: jedes Pflichtfeld required:true MIT passender Validierung (pattern/min/max), damit fehlende/ungueltige Eingaben blockieren (kein stilles Durchwinken)."
       ],
-      "groundsOn": ["FACHKONZEPT.md", "EPIC.md", "PRD.md", "ARCHITEKTUR.md"],
+      "groundsOn": [
+        "FACHKONZEPT.md",
+        "EPIC.md",
+        "PRD.md",
+        "ARCHITEKTUR.md"
+      ],
       "source": "die freigegebenen Planungs-Artefakte (Fachkonzept-Datenmodell/Regellogik, Epic-Akzeptanzkriterien, PRD-Felder, Architektur-Mapping)",
       "gate": "check:leistung-contract, check:typescript-policy, typecheck, test",
       "shapeRef": "apps/fachverfahren/src/leistung.config.ts",
       "render": "Build-Card (open/preview) — die Live-App rendert direkt aus dieser Config",
-      "reviewable": true
+      "reviewable": true,
+      "guidingQuestions": [
+        "Welche Tatbestandsmerkmale, Tarifstufen, Befreiungen/Ermaessigungen und zeitanteiligen/fristbezogenen Regeln nennt das Fachkonzept — und ist JEDE davon in berechne als Verzweigung umgesetzt (kein Weglassen)?"
+      ]
     }
   ],
   "surfaces": {
-    "citizen": { "route": "/services/<domain>", "pattern": "guided-stepper", "primaryComponents": ["AntragStepper", "OnceOnlyField", "BundIDLoginForm"] },
-    "caseworker": { "route": "/cases/<domain>", "pattern": "master-detail", "primaryComponents": ["Arbeitsvorrat", "ReviewWorkspace", "SubsumtionPanel", "KiVorschlag"] },
-    "audit": { "route": "/audit/<domain>", "pattern": "dashboard-drilldown", "primaryComponents": ["AuditDashboard"] }
+    "citizen": {
+      "route": "/services/<domain>",
+      "pattern": "guided-stepper",
+      "primaryComponents": [
+        "AntragStepper",
+        "OnceOnlyField",
+        "BundIDLoginForm"
+      ]
+    },
+    "caseworker": {
+      "route": "/cases/<domain>",
+      "pattern": "master-detail",
+      "primaryComponents": [
+        "Arbeitsvorrat",
+        "ReviewWorkspace",
+        "SubsumtionPanel",
+        "KiVorschlag"
+      ]
+    },
+    "audit": {
+      "route": "/audit/<domain>",
+      "pattern": "dashboard-drilldown",
+      "primaryComponents": [
+        "AuditDashboard"
+      ]
+    }
   },
   "verifyGates": {
     "_note": "GEERDET — diese ersetzen den verrauschten LLM-Judge. Der Build gilt erst als fertig, wenn der LeistungConfig-Vertrag gültig ist UND die App kompiliert.",
