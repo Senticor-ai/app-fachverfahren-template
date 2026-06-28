@@ -4,7 +4,11 @@
 // parse-first (suppressErrors, kein „Syntax-error"-Bombe im DOM) → ELK-Layout (knoten-ausweichendes Routing) mit
 // dagre-Fallback → DOMPurify-Sanitisierung → Vollbild-Zoom/Pan. Alles dep-MIT (mermaid · @mermaid-js/layout-elk ·
 // isomorphic-dompurify). Generisch, barrierefrei.
-import { memo, useEffect, useId, useRef, useState, type WheelEvent as ReactWheelEvent, type MouseEvent as ReactMouseEvent } from "react";
+import { memo, useCallback, useEffect, useId, useRef, useState, type ReactNode, type WheelEvent as ReactWheelEvent, type MouseEvent as ReactMouseEvent } from "react";
+
+import { ErrorState } from "./ErrorState.js";
+import { useStatusRegion } from "./StatusRegion.js";
+import { SkeletonCard } from "../ui/skeleton.js";
 
 // Mermaid hängt bei fehlschlagendem render() gelegentlich verwaiste „Syntax error"-SVGs an document.body. Diese
 // Sammelreinigung entfernt jede solche Waise, die nicht in einem gerenderten Diagramm-Container hängt.
@@ -75,23 +79,42 @@ export function normalizeMermaid(src: string): string {
  * und bietet Vollbild-Zoom/Pan. `memo` auf `code` stabilisiert: re-rendert das Elternelement (Live-Polls), bleibt das
  * SVG stehen statt zu flackern.
  */
+export interface MermaidViewProps {
+  /** Mermaid-Quelltext des Diagramms. */
+  code: string;
+  /** Überschreibt die Fehler-Überschrift (Default: „Diagramm konnte nicht dargestellt werden"). */
+  errorTitle?: string | undefined;
+  /** Zusätzliche Beschriftung/Kontext für den Lade-Platzhalter (Screenreader-Ansage). */
+  loadingLabel?: string | undefined;
+  /** Blendet den Roh-Quelltext-Ausweg (<details>) im Fehlerfall aus (Default: anzeigen). */
+  showSourceOnError?: boolean | undefined;
+  /** Zusätzliche Recovery-Affordances neben „Erneut versuchen" (z. B. Quelle kopieren). */
+  errorActions?: ReactNode;
+}
+
 export const MermaidView = memo(
-  function MermaidView({ code }: { code: string }) {
+  function MermaidView({ code, errorTitle, loadingLabel, showSourceOnError = true, errorActions }: MermaidViewProps) {
     const id = useId().replace(/:/g, "_");
     const [svg, setSvg] = useState<string>("");
     const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [attempt, setAttempt] = useState(0);
     const [zoomed, setZoomed] = useState(false);
+    const { announce } = useStatusRegion();
+
+    const retry = useCallback(() => { setAttempt((n) => n + 1); }, []);
 
     useEffect(() => {
       let cancelled = false;
       setError(null);
+      setLoading(true);
       (async () => {
         try {
           const mermaid = await loadMermaid();
           const normalized = normalizeMermaid(code);
           let valid = false;
           try { valid = !!(await mermaid.parse(normalized, { suppressErrors: true })); } catch { valid = false; }
-          if (!valid) { sweepMermaidOrphans(); if (!cancelled) setError("Syntaxfehler im Diagramm"); return; }
+          if (!valid) { sweepMermaidOrphans(); if (!cancelled) { setError("Syntaxfehler im Diagramm"); setLoading(false); announce("Diagramm konnte nicht dargestellt werden.", "assertive"); } return; }
           // ELK zuerst; wirft render(), Fallback auf dagre (per-Diagramm-Direktive) → nie ein „Render-Fehler".
           let raw: string;
           try {
@@ -103,20 +126,41 @@ export const MermaidView = memo(
           const { default: DOMPurify } = await import("isomorphic-dompurify");
           const safe = DOMPurify.sanitize(raw, { USE_PROFILES: { svg: true, svgFilters: true } });
           sweepMermaidOrphans();
-          if (!cancelled) setSvg(safe);
+          if (!cancelled) { setSvg(safe); setLoading(false); announce("Diagramm dargestellt.", "polite"); }
         } catch (e) {
           sweepMermaidOrphans();
-          if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+          if (!cancelled) { setError(e instanceof Error ? e.message : String(e)); setLoading(false); announce("Diagramm konnte nicht dargestellt werden.", "assertive"); }
         }
       })();
       return () => { cancelled = true; };
-    }, [code, id]);
+    }, [code, id, attempt, announce]);
 
     if (error) {
       return (
-        <div className="my-2 rounded-md ring-1 ring-[color:var(--status-warn)]/40 bg-surface-2/40 p-3 text-[11.5px]">
-          <div className="text-[color:var(--status-warn)] font-medium mb-1">Mermaid-Render-Fehler</div>
-          <pre className="font-mono text-[11px] overflow-x-auto whitespace-pre-wrap text-muted-foreground">{code}</pre>
+        <div className="my-2">
+          <ErrorState
+            title={errorTitle ?? "Diagramm konnte nicht dargestellt werden"}
+            description="Das Diagramm konnte nicht aus dem Quelltext erzeugt werden. Sie können es erneut versuchen oder den Quelltext unten einsehen."
+            onRetry={retry}
+            actions={errorActions}
+          />
+          {showSourceOnError && (
+            <details className="mt-2 rounded-md border border-border bg-surface-2/40 p-3 text-[11.5px]">
+              <summary className="cursor-pointer font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                Quelltext des Diagramms anzeigen
+              </summary>
+              <pre className="mt-2 overflow-x-auto whitespace-pre-wrap font-mono text-[11px] text-muted-foreground">{code}</pre>
+            </details>
+          )}
+        </div>
+      );
+    }
+
+    if (loading) {
+      return (
+        <div className="my-3" aria-busy="true">
+          <SkeletonCard className="bg-surface" />
+          <span className="sr-only">{loadingLabel ?? "Diagramm wird dargestellt …"}</span>
         </div>
       );
     }

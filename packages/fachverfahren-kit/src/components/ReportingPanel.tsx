@@ -6,17 +6,26 @@
 // Chart-Lib) und einen rein dep-freien CSV-Export via Blob + Download. Barrierefrei nach BITV 2.0 / WCAG 2.2 AA:
 // jeder Balken hat eine Text-Alternative, eine SR-only-Tabelle ist der zugängliche Fallback, der Export-Button ist
 // tastatur-bedienbar mit sichtbarem Fokus-Ring; Animationen respektieren prefers-reduced-motion.
+import * as React from "react";
 import { useMemo, type ReactElement } from "react";
-import { BarChart3, Download, Sparkles } from "lucide-react";
+import { BarChart3, Download, FileBarChart, Sparkles } from "lucide-react";
 
 import type { LeistungConfig, StatusDef, Vorgang } from "../types.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card.js";
+import { Skeleton, SkeletonCard } from "../ui/skeleton.js";
+import { EmptyState } from "./EmptyState.js";
+import { useStatusRegion } from "./StatusRegion.js";
 
 export interface ReportingPanelProps<T = Record<string, unknown>> {
   vorgaenge: Vorgang<T>[];
   config: LeistungConfig<T>;
+  /**
+   * Zeigt layout-treue Lade-Platzhalter statt der Auswertung an (z. B. während der Bestand nachgeladen wird).
+   * Default `false` — bestehendes Verhalten bleibt unverändert. Die Lade-ANSAGE läuft über useStatusRegion.
+   */
+  loading?: boolean | undefined;
 }
 
 // ── Aggregat-Helfer (rein, deterministisch — kein Date.now()/Random) ─────────────────────────────
@@ -127,9 +136,18 @@ function exportiereCsv<T>(vorgaenge: Vorgang<T>[], statusLabel: Record<string, s
 export function ReportingPanel<T = Record<string, unknown>>({
   vorgaenge,
   config,
+  loading = false,
 }: ReportingPanelProps<T>): ReactElement {
   const states = config.statusMachine.states;
   const gesamt = vorgaenge.length;
+
+  // Dynamische Lade-/Leer-Ansage über die EINE zentrale Live-Region (kein eigenes aria-live im Widget).
+  const { announce } = useStatusRegion();
+  React.useEffect(() => {
+    if (loading) announce("Reporting wird geladen.", "polite");
+    else if (gesamt === 0) announce("Reporting geladen. Noch keine Vorgänge im Bestand.", "polite");
+    else announce(`Reporting geladen. ${gesamt} ${gesamt === 1 ? "Vorgang" : "Vorgänge"} ausgewertet.`, "polite");
+  }, [announce, loading, gesamt]);
 
   const statusLabel = useMemo(() => {
     const m: Record<string, string> = {};
@@ -156,6 +174,47 @@ export function ReportingPanel<T = Record<string, unknown>>({
     ok: "bg-status-ok",
     block: "bg-status-block",
   };
+
+  // ── Ladezustand: layout-treue Skeletons (kein Layout-Shift), Ansage via StatusRegion ──────────────
+  if (loading) {
+    return (
+      <section aria-labelledby="reporting-titel" aria-busy="true" className="mx-auto w-full max-w-5xl px-6 py-8">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="h-5 w-5 text-foreground" aria-hidden="true" />
+          <h1 id="reporting-titel" className="text-2xl font-semibold text-foreground">
+            Reporting für die Aufsicht
+          </h1>
+        </div>
+        <Skeleton className="mt-2 h-4 w-64" />
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }, (_, i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
+        <SkeletonCard className="mt-6" />
+      </section>
+    );
+  }
+
+  // ── Leerzustand: ein ruhiger EmptyState tritt an die Stelle der gesamten Auswertung ───────────────
+  if (gesamt === 0) {
+    return (
+      <section aria-labelledby="reporting-titel" className="mx-auto w-full max-w-5xl px-6 py-8">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="h-5 w-5 text-foreground" aria-hidden="true" />
+          <h1 id="reporting-titel" className="text-2xl font-semibold text-foreground">
+            Reporting für die Aufsicht
+          </h1>
+        </div>
+        <EmptyState
+          icon={FileBarChart}
+          title="Noch keine Auswertung möglich"
+          description={`Für ${config.label} (${config.kommune}) sind noch keine Vorgänge im Bestand. Sobald Vorgänge erfasst sind, erscheinen hier Kennzahlen, die Statusverteilung und der CSV-Export.`}
+          className="mt-6"
+        />
+      </section>
+    );
+  }
 
   return (
     // Root ist eine `section` (KEIN `main`): die FachverfahrenShell stellt bereits den `main`-Landmark
@@ -225,6 +284,11 @@ export function ReportingPanel<T = Record<string, unknown>>({
             <p className="text-sm text-muted-foreground">Noch keine Vorgänge im Bestand.</p>
           ) : (
             <>
+              {/* Textalternative zum Diagramm: Hinweis auf den tabellarischen Fallback (WCAG 1.1.1).
+                  Sichtbar UND nicht nur über Farbe — assistive Technik erhält dieselben Daten als Tabelle. */}
+              <p className="mb-3 text-xs text-muted-foreground">
+                Balkendiagramm der Statusverteilung. Eine gleichwertige Datentabelle steht für Screenreader zur Verfügung.
+              </p>
               {/* Visuelle Balken — pro Balken eine Text-Alternative (aria-hidden auf der Grafik, Text sichtbar). */}
               <ul className="grid gap-3" aria-hidden="true">
                 {states.map((s) => {

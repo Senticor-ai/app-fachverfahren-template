@@ -9,12 +9,50 @@
 // fokussier-/auslösbarer Button (Enter/Space triggert den File-Dialog), trägt aria-describedby auf die Anforderung,
 // Status wird in einer aria-live-Region gemeldet, Fehler tragen role="alert", Fokus-Ring sichtbar, Ziele >=24px,
 // Animationen respektieren prefers-reduced-motion.
-import { useId, useRef, useState, type DragEvent, type ReactElement } from "react";
-import { CheckCircle2, FileUp, Paperclip, Trash2, UploadCloud } from "lucide-react";
+import { useEffect, useId, useRef, useState, type DragEvent, type ReactElement } from "react";
+import {
+  CheckCircle2,
+  FileUp,
+  Loader2,
+  Paperclip,
+  ShieldAlert,
+  ShieldCheck,
+  Trash2,
+  UploadCloud,
+  XCircle,
+} from "lucide-react";
 
 import type { Nachweis } from "../types.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "../ui/button.js";
+import { Progress } from "../ui/progress.js";
+import { useStatusRegion } from "./StatusRegion.js";
+
+/**
+ * Server-autoritativer Detail-Zustand einer einzelnen Nachweis-Position (data-driven, OPTIONAL).
+ * Der echte Datei-Inhalt + die Prüfung (Format/Größe/Virenscan) laufen im PROD über den Port; diese
+ * Komponente RENDERT nur den vom Server gemeldeten Zustand — sie entscheidet nichts selbst.
+ *
+ * - `idle`     — nichts im Gange (Standard, wenn kein Status gemeldet ist).
+ * - `uploading`— Übertragung läuft; `fortschritt` (0–100) optional für eine bestimmte Anzeige.
+ * - `scanning` — Übertragung fertig, Virenscan/serverseitige Prüfung läuft.
+ * - `rejected` — serverseitig abgelehnt; `grund` (Format/Größe/Virus/…) als Klartext für Anzeige + Ansage.
+ */
+export type NachweisUploadPhase = "idle" | "uploading" | "scanning" | "rejected";
+
+/** Grund-Kategorie einer Ablehnung (nur für Icon/Wording; der Klartext kommt in `meldung`). */
+export type NachweisAblehnungsGrund = "format" | "groesse" | "virus" | "sonstiges";
+
+export interface NachweisUploadStatus {
+  /** Aktuelle Phase dieser Position (server-autoritativ). */
+  phase: NachweisUploadPhase;
+  /** Übertragungs-Fortschritt 0–100 (nur bei `uploading`; fehlt = unbestimmt). */
+  fortschritt?: number | undefined;
+  /** Kategorie der Ablehnung (nur bei `rejected`) — steuert Icon/Wording, nicht den Text. */
+  grund?: NachweisAblehnungsGrund | undefined;
+  /** Klartext-Meldung (z. B. der Ablehnungsgrund) für sichtbare Anzeige + Screenreader-Ansage. */
+  meldung?: string | undefined;
+}
 
 export interface DateiUploadProps {
   /** Die erforderlichen/optionalen Nachweise (data-driven, z.B. aus `config.nachweise(antragsdaten)`). */
@@ -26,6 +64,11 @@ export interface DateiUploadProps {
   onChange: (id: string, datei: { name: string; groesse: number } | null) => void;
   /** Optionale Überschrift (generisch, ohne Domänen-Bezug). */
   titel?: string;
+  /**
+   * OPTIONAL + server-autoritativ: Detail-Zustand je Nachweis-Id (Upload-Fortschritt, Virenscan,
+   * Ablehnung). Fehlt eine Id (oder die ganze Map), verhält sich die Position exakt wie bisher.
+   */
+  uploadStatus?: Record<string, NachweisUploadStatus | undefined> | undefined;
   className?: string;
 }
 
@@ -55,6 +98,7 @@ export function DateiUpload({
   nachweise,
   onChange,
   titel = "Nachweise hochladen",
+  uploadStatus,
   className,
 }: DateiUploadProps): ReactElement {
   const [dateien, setDateien] = useState<Record<string, LokaleDatei>>({});
@@ -118,6 +162,7 @@ export function DateiUpload({
                 nachweis={nachweis}
                 datei={dateien[nachweis.id]}
                 bereitsHochgeladen={nachweis.hochgeladen}
+                status={uploadStatus?.[nachweis.id]}
                 onPick={(datei) => setDatei(nachweis, datei)}
                 onRemove={() => setDatei(nachweis, null)}
               />
@@ -129,17 +174,35 @@ export function DateiUpload({
   );
 }
 
+/** Übersetzt eine server-autoritative Phase in eine sprechende Ansage (Screenreader, zentral). */
+function ansageFuerPhase(label: string, status: NachweisUploadStatus): string | null {
+  switch (status.phase) {
+    case "uploading":
+      return typeof status.fortschritt === "number"
+        ? `${label}: Wird hochgeladen, ${Math.round(status.fortschritt)} Prozent.`
+        : `${label}: Wird hochgeladen.`;
+    case "scanning":
+      return `${label}: Datei wird auf Viren geprüft.`;
+    case "rejected":
+      return `${label}: Abgelehnt. ${status.meldung ?? "Die Datei wurde nicht angenommen."}`;
+    default:
+      return null;
+  }
+}
+
 /** Eine einzelne Nachweis-Position: Dropzone (leer) ODER Datei-Karte (befüllt) + Status-Badge. */
 function NachweisZeile({
   nachweis,
   datei,
   bereitsHochgeladen,
+  status,
   onPick,
   onRemove,
 }: {
   nachweis: Nachweis;
   datei: LokaleDatei | undefined;
   bereitsHochgeladen: boolean;
+  status: NachweisUploadStatus | undefined;
   onPick: (datei: LokaleDatei) => void;
   onRemove: () => void;
 }): ReactElement {
@@ -147,9 +210,31 @@ function NachweisZeile({
   const inputId = useId();
   const anforderungId = useId();
   const fehlerId = useId();
+  const statusFehlerId = useId();
 
+  const { announce } = useStatusRegion();
   const [dragOver, setDragOver] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
+
+  // Server-autoritative Detail-Zustände ableiten (alles OPTIONAL — fehlt der Status, verhält es sich wie bisher).
+  const phase = status?.phase ?? "idle";
+  const laeuft = phase === "uploading" || phase === "scanning";
+  const abgelehnt = phase === "rejected";
+  const fortschritt = phase === "uploading" ? status?.fortschritt : undefined;
+
+  // Phasenwechsel + Fortschritt ZENTRAL ansagen (useStatusRegion) — eine Wahrheit, nicht je Widget verstreut.
+  const letzteAnsage = useRef<string | null>(null);
+  useEffect(() => {
+    if (!status) {
+      letzteAnsage.current = null;
+      return;
+    }
+    const text = ansageFuerPhase(nachweis.label, status);
+    if (text && text !== letzteAnsage.current) {
+      letzteAnsage.current = text;
+      announce(text, status.phase === "rejected" ? "assertive" : "polite");
+    }
+  }, [announce, nachweis.label, status]);
 
   const istHochgeladen = !!datei || bereitsHochgeladen;
   const erforderlich = !!nachweis.erforderlich;
@@ -220,11 +305,29 @@ function NachweisZeile({
           </p>
         </div>
 
-        {istHochgeladen && (
-          <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-status-ok">
-            <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-            Hochgeladen
+        {/* Status-Badge: laufend/abgelehnt haben Vorrang vor „Hochgeladen" (server-autoritativ). */}
+        {phase === "uploading" ? (
+          <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-status-info">
+            <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+            Wird hochgeladen
           </span>
+        ) : phase === "scanning" ? (
+          <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-status-info">
+            <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+            Virenscan läuft
+          </span>
+        ) : abgelehnt ? (
+          <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-status-block">
+            <XCircle className="h-4 w-4" aria-hidden="true" />
+            Abgelehnt
+          </span>
+        ) : (
+          istHochgeladen && (
+            <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-status-ok">
+              <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+              Hochgeladen
+            </span>
+          )
         )}
       </div>
 
@@ -242,7 +345,65 @@ function NachweisZeile({
         }}
       />
 
-      {istHochgeladen && datei ? (
+      {/* ── Server-autoritativer Detail-Zustand: Übertragung läuft (mit/ohne Fortschritt) ── */}
+      {phase === "uploading" && (
+        <div className="mt-3 rounded-sm border border-status-info/40 bg-status-info-soft/40 p-3">
+          <div className="flex items-center gap-2 text-[13px] font-medium text-foreground">
+            <Loader2 className="h-4 w-4 shrink-0 text-status-info animate-spin motion-reduce:animate-none" aria-hidden="true" />
+            <span>
+              Datei wird hochgeladen
+              {typeof fortschritt === "number" ? ` — ${Math.round(fortschritt)} %` : "…"}
+            </span>
+          </div>
+          {typeof fortschritt === "number" && (
+            <Progress
+              value={fortschritt}
+              aria-label={`Upload-Fortschritt für ${nachweis.label}`}
+              className="mt-2"
+            />
+          )}
+        </div>
+      )}
+
+      {/* ── Server-autoritativer Detail-Zustand: Virenscan / serverseitige Prüfung läuft ── */}
+      {phase === "scanning" && (
+        <div className="mt-3 flex items-center gap-2 rounded-sm border border-status-info/40 bg-status-info-soft/40 p-3 text-[13px] font-medium text-foreground">
+          <ShieldCheck className="h-4 w-4 shrink-0 text-status-info" aria-hidden="true" />
+          <Loader2 className="h-4 w-4 shrink-0 text-status-info animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          <span>Datei wird auf Viren geprüft…</span>
+        </div>
+      )}
+
+      {/* ── Server-autoritativer Detail-Zustand: abgelehnt (Format/Größe/Virus) ── */}
+      {abgelehnt && (
+        <div
+          id={statusFehlerId}
+          role="alert"
+          className="mt-3 flex items-start gap-2.5 rounded-sm border border-status-block/40 bg-status-block-soft/50 p-3"
+        >
+          {status?.grund === "virus" ? (
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-status-block" aria-hidden="true" />
+          ) : (
+            <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-status-block" aria-hidden="true" />
+          )}
+          <div className="min-w-0">
+            <p className="text-[13px] font-medium text-status-block">
+              {status?.grund === "virus"
+                ? "Sicherheitsprüfung fehlgeschlagen — Datei abgelehnt"
+                : status?.grund === "format"
+                  ? "Dateiformat nicht zulässig — Datei abgelehnt"
+                  : status?.grund === "groesse"
+                    ? "Datei zu groß — Datei abgelehnt"
+                    : "Datei abgelehnt"}
+            </p>
+            <p className="mt-0.5 text-[12px] text-foreground">
+              {status?.meldung ?? "Bitte wählen Sie eine andere Datei und versuchen Sie es erneut."}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {laeuft ? null : istHochgeladen && datei ? (
         // ── Befüllte Position: Datei-Karte mit Name/Größe + Ersetzen/Entfernen ──
         <div className="mt-3 flex items-center justify-between gap-3 rounded-sm border border-border bg-card p-2.5">
           <div className="flex min-w-0 items-center gap-2.5">
@@ -306,8 +467,16 @@ function NachweisZeile({
           onDrop={onDrop}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
-          aria-label={`Datei für ${nachweis.label} auswählen oder hierher ziehen`}
-          aria-describedby={cn(anforderungId, fehler ? fehlerId : undefined)}
+          aria-label={
+            abgelehnt
+              ? `Andere Datei für ${nachweis.label} auswählen oder hierher ziehen`
+              : `Datei für ${nachweis.label} auswählen oder hierher ziehen`
+          }
+          aria-describedby={cn(
+            anforderungId,
+            fehler ? fehlerId : undefined,
+            abgelehnt ? statusFehlerId : undefined,
+          )}
           className={cn(
             "mt-3 flex min-h-[3rem] w-full flex-col items-center justify-center gap-1.5 rounded-md border border-dashed px-4 py-5 text-center transition-colors motion-reduce:transition-none",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",

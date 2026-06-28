@@ -8,10 +8,13 @@
 // UX 1:1 aus lovable audit.tsx (KPI-Kacheln · Status-Balken · Summen-Kachel · Audit-Trail) im Reporting-Rahmen
 // aus sift Reporting.tsx (Header + Card-Sektionen). Status-Farben ausschließlich über die Tokens (status-*).
 import * as React from "react";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, Database, History, Inbox } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card.js";
 import { Badge } from "../ui/badge.js";
+import { SkeletonCard, SkeletonTable } from "../ui/skeleton.js";
+import { EmptyState } from "./EmptyState.js";
+import { useStatusRegion } from "./StatusRegion.js";
 import type {
   LeistungConfig,
   StatusDef,
@@ -25,6 +28,11 @@ import type {
 export interface AufsichtDashboardProps<T = Record<string, unknown>> {
   config: LeistungConfig<T>;
   port: VorgangPort<T>;
+  /**
+   * Lädt der Vorgangsbestand noch? Dann werden layout-treue Skeletons statt der Aggregate gezeigt
+   * (kein Layout-Shift). Default `false` — bestehendes Verhalten bleibt unverändert.
+   */
+  loading?: boolean | undefined;
 }
 
 // ── Tone → Tailwind-Tokens (Füllung/Rahmen/Text) ────────────────────────────
@@ -75,7 +83,14 @@ function pseudonym(vorgangsnummer: string): string {
 export function AufsichtDashboard<T = Record<string, unknown>>({
   config,
   port,
+  loading = false,
 }: AufsichtDashboardProps<T>): React.ReactElement {
+  const { announce } = useStatusRegion();
+  // Lade-/Fertig-Ansage zentral über die EINE Live-Region (BITV: Zustand nicht nur visuell).
+  React.useEffect(() => {
+    announce(loading ? "Kennzahlen werden geladen." : "Kennzahlen aktualisiert.", "polite");
+  }, [loading, announce]);
+
   const vorgaenge: Vorgang<T>[] = port.list();
   const states: StatusDef[] = config.statusMachine.states;
   const total = vorgaenge.length;
@@ -136,6 +151,26 @@ export function AufsichtDashboard<T = Record<string, unknown>>({
         </p>
       </div>
 
+      {loading ? (
+        /* Ladezustand — layout-treue Skeletons (KPI-Kacheln · Status-Mix · Summe · Audit-Trail).
+           Die Lade-ANSAGE übernimmt StatusRegion (oben), die Skeletons sind rein dekorativ (aria-hidden). */
+        <div className="px-6 py-6" aria-busy="true">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }, (_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
+          <div className="mt-8 grid gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <SkeletonCard />
+            </div>
+            <SkeletonCard />
+          </div>
+          <div className="mt-8">
+            <SkeletonTable rows={6} cols={3} />
+          </div>
+        </div>
+      ) : (
       <div className="px-6 py-6">
         {/* KPI-Kacheln (lovable audit) — data-driven aus den Aggregaten. */}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -152,17 +187,26 @@ export function AufsichtDashboard<T = Record<string, unknown>>({
               <CardTitle className="text-sm">Vorgangs-Mix nach Status</CardTitle>
             </CardHeader>
             <CardContent>
-              <ul className="space-y-3">
-                {states.map((s) => (
-                  <Bar
-                    key={s.key}
-                    label={s.label}
-                    value={counts.get(s.key) ?? 0}
-                    total={total}
-                    tone={s.tone}
-                  />
-                ))}
-              </ul>
+              {total === 0 ? (
+                <EmptyState
+                  icon={Inbox}
+                  as="h3"
+                  title="0 Vorgänge im Bestand"
+                  description="Sobald Vorgänge angelegt sind, erscheint hier der Status-Mix nach Status."
+                />
+              ) : (
+                <ul className="space-y-3">
+                  {states.map((s) => (
+                    <Bar
+                      key={s.key}
+                      label={s.label}
+                      value={counts.get(s.key) ?? 0}
+                      total={total}
+                      tone={s.tone}
+                    />
+                  ))}
+                </ul>
+              )}
             </CardContent>
           </Card>
 
@@ -173,7 +217,12 @@ export function AufsichtDashboard<T = Record<string, unknown>>({
             </CardHeader>
             <CardContent>
               {summen.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Noch keine Berechnungen vorhanden.</p>
+                <EmptyState
+                  icon={Database}
+                  as="h3"
+                  title="0 Berechnungen vorhanden"
+                  description="Aus der Subsumtion vorgeschlagene Beträge werden hier je Einheit summiert."
+                />
               ) : (
                 <ul className="space-y-3">
                   {summen.map((s) => (
@@ -203,7 +252,12 @@ export function AufsichtDashboard<T = Record<string, unknown>>({
           </CardHeader>
           <CardContent>
             {auditTrail.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Noch keine Historie vorhanden.</p>
+              <EmptyState
+                icon={History}
+                as="h3"
+                title="0 Audit-Einträge"
+                description="Jede Aktion an einem Vorgang erscheint hier pseudonymisiert — ohne PII."
+              />
             ) : (
               <ol className="space-y-3">
                 {auditTrail.map((h, i) => (
@@ -229,6 +283,7 @@ export function AufsichtDashboard<T = Record<string, unknown>>({
           </CardContent>
         </Card>
       </div>
+      )}
     </div>
   );
 }

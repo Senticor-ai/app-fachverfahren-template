@@ -29,6 +29,8 @@ import {
 import { Bold, Italic, Underline, List, ListOrdered, Heading2, Eraser } from "lucide-react";
 
 import { cn } from "../lib/utils.js";
+import { SaveIndicator, type SaveStatus } from "./SaveIndicator.js";
+import { useStatusRegion } from "./StatusRegion.js";
 
 // ── Sanitisierung (strikte Allow-List) ──────────────────────────────────────────────────────────
 // Nur diese Tags überleben — alles andere wird entpackt (Inhalt bleibt) oder verworfen.
@@ -225,6 +227,18 @@ export interface RichTextEditorProps {
   /** id für Verknüpfung mit externem Label/Fehlertext. */
   id?: string;
   className?: string;
+  /**
+   * Optionaler Speicher-Status. Ist er gesetzt, zeigt der Editor eine einheitliche Fußzeile mit
+   * <SaveIndicator/> und sagt Zustandswechsel zentral über useStatusRegion an. Bleibt er undefined,
+   * verhält sich der Editor exakt wie bisher (keine Fußzeile, kein zusätzliches DOM).
+   */
+  saveStatus?: SaveStatus | undefined;
+  /** Zeitpunkt des letzten Speicherns (ISO-String oder Date) — für „gespeichert vor X". */
+  savedAt?: string | Date | undefined;
+  /** „Jetzt speichern"-Handler. Aktiviert den passiven Speicher-Button für Nutzer ohne Autosave-Vertrauen. */
+  onSaveNow?: (() => void) | undefined;
+  /** Retry-Handler für den Fehlerfall (Pflicht-Recovery im SaveIndicator). Default: onSaveNow. */
+  onRetrySave?: (() => void) | undefined;
 }
 
 // ── Komponente ─────────────────────────────────────────────────────────────────────────────────
@@ -237,6 +251,10 @@ export function RichTextEditor({
   minHeight = "12rem",
   id,
   className,
+  saveStatus,
+  savedAt,
+  onSaveNow,
+  onRetrySave,
 }: RichTextEditorProps): ReactElement {
   const generatedId = useId();
   const editorId = id ?? generatedId;
@@ -254,6 +272,16 @@ export function RichTextEditor({
       typeof document !== "undefined" && typeof document.execCommand === "function",
     );
   }, []);
+
+  // Speicher-Status zentral ansagen (eine Wahrheit). Nur aktiv, wenn saveStatus gesetzt ist.
+  // „saving"/„saved" höflich (polite), „error" dringend (assertive) — Information nie nur über Farbe.
+  const { announce } = useStatusRegion();
+  useEffect(() => {
+    if (saveStatus == null) return;
+    if (saveStatus === "saving") announce("Speichert …");
+    else if (saveStatus === "saved") announce("Entwurf gespeichert.");
+    else if (saveStatus === "error") announce("Entwurf nicht gespeichert.", "assertive");
+  }, [saveStatus, announce]);
 
   // Initialen/extern geänderten Wert sanitisiert ins Feld setzen — nur wenn er vom aktuellen DOM abweicht,
   // damit die Caret-Position während des Tippens nicht zurückspringt.
@@ -455,6 +483,22 @@ export function RichTextEditor({
           Formatierung wird in dieser Umgebung nicht unterstützt — der Text lässt sich weiterhin
           eingeben und wird unformatiert gespeichert.
         </p>
+      )}
+
+      {/* Einheitliche Speicher-Status-Fußzeile — nur sichtbar, wenn ein saveStatus übergeben wird. */}
+      {saveStatus != null && (
+        <div className="flex items-center justify-end border-t border-border px-4 py-2">
+          <SaveIndicator
+            status={saveStatus}
+            {...(savedAt != null ? { savedAt } : {})}
+            {...(onRetrySave != null
+              ? { onRetry: onRetrySave }
+              : onSaveNow != null
+                ? { onRetry: onSaveNow }
+                : {})}
+            {...(onSaveNow != null ? { onSaveNow } : {})}
+          />
+        </div>
       )}
     </div>
   );

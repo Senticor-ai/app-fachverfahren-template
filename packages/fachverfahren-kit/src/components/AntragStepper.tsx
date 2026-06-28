@@ -6,7 +6,8 @@
 // ABER vollständig CONFIG-GETRIEBEN: keine Domänen-Literale — Schritte/Felder/Berechnung/Register kommen aus
 // `config`, die Datenschicht aus `port`. Ein zweites Verfahren (Gewerbe/Parkausweis/Bauantrag) läuft ohne
 // jede Änderung an dieser Datei.
-import { useId, useMemo, useState } from "react";
+import * as React from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Check,
@@ -15,6 +16,9 @@ import {
   Info,
   Sparkles,
 } from "lucide-react";
+
+import { ErrorSummary, type FieldError } from "./ErrorSummary.js";
+import { useStatusRegion } from "./StatusRegion.js";
 
 import type {
   Berechnung,
@@ -112,6 +116,24 @@ function stepGueltig(step: StepDef, daten: Antragsdaten): boolean {
   return step.felder.every((f) => feldFehler(f, getPath(daten, f.name)) === null);
 }
 
+/** DETERMINISTISCHE Feld-DOM-id (gemeinsame Wahrheit für Control, aria-describedby UND ErrorSummary-Anker).
+ *  Aus dem Instanz-Präfix (useId) + dem Feldpfad → eindeutig pro Stepper-Instanz, aber vorhersagbar, damit der
+ *  Summary-Anker (#feldId) genau auf das Control zeigt. Punkte/Sonderzeichen → Bindestrich (CSS/HTML-id-tauglich). */
+function feldDomId(prefix: string, feldName: string): string {
+  return `${prefix}-${feldName}`.replace(/[^a-zA-Z0-9_-]/g, "-");
+}
+
+/** Sammelt alle offenen Pflicht-/Format-Fehler eines Schritts als ErrorSummary-Einträge — gleicher Wortlaut wie
+ *  inline (feldFehler), gleicher Anker wie das Control (feldDomId). */
+function stepFehlerEintraege(idPrefix: string, step: StepDef, daten: Antragsdaten): FieldError[] {
+  const out: FieldError[] = [];
+  for (const f of step.felder) {
+    const fehler = feldFehler(f, getPath(daten, f.name));
+    if (fehler) out.push({ feldId: feldDomId(idPrefix, f.name), text: `${f.label}: ${fehler}` });
+  }
+  return out;
+}
+
 // ── Props ────────────────────────────────────────────────────────────────────────────────────
 export interface AntragStepperProps<T extends Antragsdaten = Antragsdaten> {
   config: LeistungConfig<T>;
@@ -133,6 +155,12 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
   const [daten, setDaten] = useState<Antragsdaten>({});
   const [registerHinweis, setRegisterHinweis] = useState<string | null>(null);
 
+  // ── a11y-Fehlerverdrahtung (additiv): ein Instanz-Präfix für deterministische Feld-ids, eine Fehler-Zusammenfassung
+  // oben (GOV.UK-Muster) die bei „Weiter"/„Absenden" den Fokus erhält, plus zentrale Ansage über useStatusRegion. ──
+  const idPrefix = useId();
+  const summaryRef = useRef<HTMLDivElement>(null);
+  const { announce } = useStatusRegion();
+
   const setFeld = (path: string, value: unknown) =>
     setDaten((prev) => setPath(prev, path, value));
 
@@ -149,13 +177,32 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
   // Pflichtangabe versucht wurde. So sieht der/die Nutzer:in die roten Felder genau dann, wenn der Prozess sie blockiert.
   const [versuchteWeiter, setVersuchteWeiter] = useState<Set<number>>(() => new Set<number>());
   const showErrors = stepIdx >= reviewIndex || versuchteWeiter.has(stepIdx);
+
+  // Fehler-Zusammenfassung (oben): leer, solange nicht blockiert wurde. Bei „Weiter"/„Absenden" mit offenen
+  // Pflicht-/Format-Angaben gefüllt, Fokus springt hinein (summaryRef), zentrale Ansage über announce.
+  const [summaryErrors, setSummaryErrors] = useState<FieldError[]>([]);
+  const focusSummary = (errs: FieldError[]): void => {
+    setSummaryErrors(errs);
+    const anzahl = errs.length;
+    announce(
+      `${anzahl} ${anzahl === 1 ? "Pflichtangabe fehlt" : "Pflichtangaben fehlen"} — bitte ergänzen.`,
+      "assertive",
+    );
+    // Nach dem Render fokussieren (rAF stellt sicher, dass die Summary im DOM ist).
+    if (typeof window !== "undefined") {
+      window.requestAnimationFrame(() => summaryRef.current?.focus());
+    }
+  };
+
   // ECHTE PFLICHT-SPERRE (eine Wahrheit, Desktop + Mobil): ist der aktuelle Fach-Schritt unvollständig, NICHT weitergehen
   // — die offenen Pflichtfelder rot markieren statt still durchzuwinken. Sonst zum nächsten Schritt.
   const gehWeiter = (): void => {
     if (stepIdx < steps.length && !stepGueltig(steps[stepIdx]!, daten)) {
       setVersuchteWeiter((prev) => new Set(prev).add(stepIdx));
+      focusSummary(stepFehlerEintraege(idPrefix, steps[stepIdx]!, daten));
       return;
     }
+    setSummaryErrors([]);
     setStepIdx((s) => Math.min(lastIndex, s + 1));
   };
 
@@ -198,7 +245,39 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
     setRegisterHinweis("Aus dem Register vorausgefüllt — bitte prüfen und ggf. korrigieren.");
   }
 
+  // Alle offenen Fehler über alle Schritte (für die Review-Zusammenfassung), inkl. Ziel-Schritt je Feld.
+  const alleFehlerEintraege = (): { errors: FieldError[]; stepOf: Map<string, number> } => {
+    const errors: FieldError[] = [];
+    const stepOf = new Map<string, number>();
+    for (let i = 0; i < steps.length; i++) {
+      for (const e of stepFehlerEintraege(idPrefix, steps[i]!, daten)) {
+        errors.push(e);
+        stepOf.set(e.feldId, i);
+      }
+    }
+    return { errors, stepOf };
+  };
+
+  // Klick in der Zusammenfassung: zuerst zum richtigen Schritt wechseln, dann den Fokus auf das Feld setzen.
+  const onSummaryErrorClick = (feldId: string, event: React.MouseEvent<HTMLAnchorElement>): void => {
+    const ziel = alleFehlerEintraege().stepOf.get(feldId);
+    if (ziel !== undefined && ziel !== stepIdx) {
+      event.preventDefault();
+      setStepIdx(ziel);
+      setVersuchteWeiter((prev) => new Set(prev).add(ziel));
+    }
+    if (typeof window !== "undefined") {
+      window.requestAnimationFrame(() => document.getElementById(feldId)?.focus());
+    }
+  };
+
   function submit() {
+    // PFLICHT-SPERRE auch beim Absenden: offene Angaben sammeln, oben anzeigen, Fokus + Ansage — NICHT einreichen.
+    if (!allValid) {
+      focusSummary(alleFehlerEintraege().errors);
+      return;
+    }
+    setSummaryErrors([]);
     const vorgang = port.einreichen(daten as T);
     onDone(vorgang);
   }
@@ -212,6 +291,17 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
       )}
 
       <div className="mt-8 rounded-md border border-border bg-card p-6">
+        {/* Fehler-Zusammenfassung (GOV.UK-Muster) — oben im Formular, erhält bei „Weiter"/„Absenden" den Fokus,
+            verlinkt per Anker auf das jeweilige Feld (gleicher Wortlaut wie inline). */}
+        {summaryErrors.length > 0 && (
+          <ErrorSummary
+            ref={summaryRef}
+            errors={summaryErrors}
+            onErrorClick={onSummaryErrorClick}
+            className="mb-6"
+          />
+        )}
+
         {/* Fach-Schritte (dynamisch aus config) */}
         {stepIdx < reviewIndex && (
           <Section title={steps[stepIdx]!.titel} sub={steps[stepIdx]!.beschreibung}>
@@ -223,6 +313,7 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
               {steps[stepIdx]!.felder.map((feld) => (
                 <FeldRenderer
                   key={feld.name}
+                  id={feldDomId(idPrefix, feld.name)}
                   feld={feld}
                   wert={getPath(daten, feld.name)}
                   fehler={feldFehler(feld, getPath(daten, feld.name))}
@@ -422,6 +513,7 @@ function Stepper({
 
 // ── Ein Feld → passendes shadcn-Element je `typ` ───────────────────────────────────────────────
 function FeldRenderer({
+  id: idProp,
   feld,
   wert,
   fehler,
@@ -429,6 +521,8 @@ function FeldRenderer({
   onChange,
   onRegisterLookup,
 }: {
+  /** DETERMINISTISCHE Control-id (= ErrorSummary-Anker). Optional: fällt auf useId() zurück (Abwärtskompatibilität). */
+  id?: string | undefined;
   feld: FeldDef;
   wert: unknown;
   fehler: string | null;
@@ -436,7 +530,8 @@ function FeldRenderer({
   onChange: (value: unknown) => void;
   onRegisterLookup: (rohwert: string) => void;
 }) {
-  const id = useId();
+  const fallbackId = useId();
+  const id = idProp ?? fallbackId;
   // Fehler erst zeigen, wenn die Prüfungsseite erreicht ODER bereits etwas Ungültiges eingegeben wurde.
   // Pflichtfeld-Fehler nur ab Review; Format-/Wertefehler auch sofort bei Eingabe.
   const hatEingabe = asString(wert).trim().length > 0;
@@ -444,6 +539,11 @@ function FeldRenderer({
   const sichtbarerFehler = fehler && (showErrors || (hatEingabe && !istPflichtLeer)) ? fehler : null;
 
   const wide = feld.typ === "textarea";
+  // ids für aria-describedby: Fehlertext UND/ODER Hinweis ans Control koppeln (Screenreader liest beide vor).
+  const errorId = `${id}-error`;
+  const hintId = `${id}-hint`;
+  const describedBy =
+    [sichtbarerFehler ? errorId : null, feld.hint ? hintId : null].filter(Boolean).join(" ") || undefined;
 
   return (
     <Field
@@ -453,6 +553,8 @@ function FeldRenderer({
       wide={wide}
       invalid={!!sichtbarerFehler}
       error={sichtbarerFehler ?? undefined}
+      errorId={errorId}
+      hintId={hintId}
     >
       {renderControl()}
     </Field>
@@ -466,7 +568,7 @@ function FeldRenderer({
       case "select":
         return (
           <Select {...(s ? { value: s } : {})} onValueChange={(v) => onChange(v)}>
-            <SelectTrigger id={id} aria-invalid={invalidAttr}>
+            <SelectTrigger id={id} aria-invalid={invalidAttr} aria-describedby={describedBy}>
               <SelectValue placeholder={feld.hint ?? "Bitte auswählen"} />
             </SelectTrigger>
             <SelectContent>
@@ -487,6 +589,7 @@ function FeldRenderer({
               checked={wert === true}
               onCheckedChange={(c) => onChange(c === true)}
               aria-invalid={invalidAttr}
+              aria-describedby={describedBy}
             />
             {feld.hint && (
               <label htmlFor={id} className="cursor-pointer text-sm text-muted-foreground">
@@ -505,6 +608,7 @@ function FeldRenderer({
             placeholder={feld.hint}
             required={feld.required}
             aria-invalid={invalidAttr}
+            aria-describedby={describedBy}
           />
         );
 
@@ -522,6 +626,7 @@ function FeldRenderer({
             required={feld.required}
             autoComplete="postal-code"
             aria-invalid={invalidAttr}
+            aria-describedby={describedBy}
           />
         );
 
@@ -538,6 +643,7 @@ function FeldRenderer({
             required={feld.required}
             inputMode="numeric"
             aria-invalid={invalidAttr}
+            aria-describedby={describedBy}
           />
         );
 
@@ -550,6 +656,7 @@ function FeldRenderer({
             onChange={(e) => onChange(e.target.value)}
             required={feld.required}
             aria-invalid={invalidAttr}
+            aria-describedby={describedBy}
           />
         );
 
@@ -565,6 +672,7 @@ function FeldRenderer({
             required={feld.required}
             autoComplete="email"
             aria-invalid={invalidAttr}
+            aria-describedby={describedBy}
           />
         );
 
@@ -580,6 +688,7 @@ function FeldRenderer({
             autoComplete="tel"
             inputMode="tel"
             aria-invalid={invalidAttr}
+            aria-describedby={describedBy}
           />
         );
 
@@ -594,6 +703,7 @@ function FeldRenderer({
             placeholder={feld.hint}
             required={feld.required}
             aria-invalid={invalidAttr}
+            aria-describedby={describedBy}
           />
         );
     }
@@ -707,6 +817,8 @@ function Field({
   error,
   invalid,
   hint,
+  errorId,
+  hintId,
 }: {
   htmlFor: string;
   label: string;
@@ -715,6 +827,10 @@ function Field({
   error?: string | undefined;
   invalid?: boolean | undefined;
   hint?: string | undefined;
+  /** id des Fehlertexts (für aria-describedby des Controls). Optional. */
+  errorId?: string | undefined;
+  /** id des Hinweistexts (für aria-describedby des Controls). Optional. */
+  hintId?: string | undefined;
 }) {
   return (
     <div className={wide ? "sm:col-span-2" : ""}>
@@ -726,9 +842,13 @@ function Field({
       </Label>
       <div className="mt-1">{children}</div>
       {error ? (
-        <p className="mt-1 text-[11px] text-status-block">{error}</p>
+        // Information nie nur über Farbe: Warn-Icon (aria-hidden) + Text neben dem roten Token.
+        <p id={errorId} className="mt-1 flex items-start gap-1 text-[11px] text-status-block">
+          <AlertTriangle className="mt-px h-3 w-3 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
+        </p>
       ) : hint ? (
-        <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>
+        <p id={hintId} className="mt-1 text-[11px] text-muted-foreground">{hint}</p>
       ) : null}
     </div>
   );

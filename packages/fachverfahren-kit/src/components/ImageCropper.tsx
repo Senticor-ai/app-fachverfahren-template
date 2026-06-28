@@ -11,6 +11,7 @@
 // fokussier-/bedienbares `role="application"`-Element (Pfeile = verschieben, +/- = zoomen, 0 = zurücksetzen),
 // trägt ein `aria-label` + Bedien-Hinweis, der Slider hat `aria-valuetext`, Status wird in einer aria-live-Region
 // gemeldet, Fokus-Ring sichtbar, alle Bedien-Ziele >=24px, Animationen respektieren prefers-reduced-motion.
+import * as React from "react";
 import {
   useCallback,
   useEffect,
@@ -27,6 +28,9 @@ import { Crop, ImageOff, Maximize2, Minus, Plus, RotateCcw, Upload } from "lucid
 import { cn } from "../lib/utils.js";
 import { Button } from "../ui/button.js";
 import { Label } from "../ui/label.js";
+import { ErrorState } from "./ErrorState.js";
+import { useStatusRegion } from "./StatusRegion.js";
+import { Skeleton } from "../ui/skeleton.js";
 
 /** Ausgabe-Format des Zuschnitts. */
 export type CropOutputType = "blob" | "dataURL";
@@ -69,6 +73,12 @@ export interface ImageCropperProps {
   beschreibung?: string;
   /** Beschriftung der primären Aktion. Default "Zuschnitt übernehmen". */
   uebernehmenLabel?: string;
+  /** Überschrift des Fehlerzustands (statt Roh-Text), wenn ein Bild nicht geladen/gelesen werden kann. */
+  fehlerTitel?: string;
+  /** Label der Recovery-Aktion „erneut laden" im Fehlerzustand. Default "Bild erneut laden". */
+  erneutVersuchenLabel?: string;
+  /** Ansage, während das Bild initialisiert/dekodiert wird (aria-live über die zentrale StatusRegion). */
+  ladeAnsage?: string;
   /** Wird bei „Zuschnitt übernehmen" mit dem fertigen Ergebnis gerufen. */
   onCrop?: (ergebnis: CropResult) => void;
   /** Wird gerufen, wenn der Nutzer ein neues Bild lädt (DataURL des Originals). */
@@ -101,6 +111,9 @@ export function ImageCropper({
   titel = "Bildausschnitt festlegen",
   beschreibung = "Verschieben und zoomen Sie das Bild, bis der gewünschte Ausschnitt im Rahmen liegt.",
   uebernehmenLabel = "Zuschnitt übernehmen",
+  fehlerTitel = "Bild konnte nicht verwendet werden",
+  erneutVersuchenLabel = "Bild erneut laden",
+  ladeAnsage = "Bild wird geladen …",
   onCrop,
   onImageLoad,
   className,
@@ -122,11 +135,16 @@ export function ImageCropper({
   const [stageBreite, setStageBreite] = useState(0);
   const [fehler, setFehler] = useState<string | null>(null);
   const [statusMeldung, setStatusMeldung] = useState<string>("");
+  // Reload-Nonce: erlaubt die Recovery-Aktion „erneut laden" denselben `imageSrc` neu zu dekodieren.
+  const [reloadNonce, setReloadNonce] = useState(0);
 
   const titelId = useId();
   const hinweisId = useId();
   const fehlerId = useId();
   const zoomId = useId();
+
+  // Zentrale Ansage (aria-live) — additiv zur bestehenden lokalen role="status"-Region. No-Op ohne Provider.
+  const { announce } = useStatusRegion();
 
   // Vorschau-Höhe folgt dem Seitenverhältnis; Versatz wird stets so begrenzt, dass keine leere Fläche entsteht.
   const stageHoehe = stageBreite > 0 ? stageBreite / aspectRatio : 0;
@@ -180,6 +198,15 @@ export function ImageCropper({
     return () => {
       abgebrochen = true;
     };
+  }, [imageSrc, reloadNonce]);
+
+  // Recovery: denselben `imageSrc` erneut dekodieren (setzt Fehler zurück → Lade-/Init-Zustand).
+  const erneutLaden = useCallback(() => {
+    if (!imageSrc) return;
+    setFehler(null);
+    setImgNatur(null);
+    imgRef.current = null;
+    setReloadNonce((n) => n + 1);
   }, [imageSrc]);
 
   /**
@@ -230,6 +257,23 @@ export function ImageCropper({
     setOffset({ x: 0, y: 0 });
     setStatusMeldung("Ausschnitt zurückgesetzt.");
   }, []);
+
+  // Lade-/Initialisierungs-Zustand: Quelle gesetzt, aber Bild noch nicht dekodiert und (noch) kein Fehler.
+  const initialisiert = !!imageSrc && !imgNatur && !fehler;
+
+  // Status-Meldungen additiv zentral ansagen (höflich; Fehler assertiv) — eine Ansage-Wahrheit, ohne die
+  // bestehende lokale Region zu entfernen. Lade-Ansage feuert beim Start der Initialisierung.
+  useEffect(() => {
+    if (initialisiert) announce(ladeAnsage, "polite");
+  }, [initialisiert, ladeAnsage, announce]);
+
+  useEffect(() => {
+    if (statusMeldung) announce(statusMeldung, "polite");
+  }, [statusMeldung, announce]);
+
+  useEffect(() => {
+    if (fehler) announce(fehler, "assertive");
+  }, [fehler, announce]);
 
   // ── Pointer-Pan (Maus + Touch über Pointer-Events) ─────────────────────────────────────────────
   const dragRef = useRef<{ id: number; startX: number; startY: number; offX: number; offY: number } | null>(null);
@@ -433,6 +477,8 @@ export function ImageCropper({
             tabIndex={0}
             aria-label={`${titel}. Pfeiltasten verschieben, Plus und Minus zoomen, Null setzt zurück.`}
             aria-describedby={cn(hinweisId, fehler ? fehlerId : undefined)}
+            aria-busy={initialisiert || undefined}
+            aria-disabled={!hatBild || undefined}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
@@ -454,7 +500,7 @@ export function ImageCropper({
                   alt=""
                   draggable={false}
                   aria-hidden="true"
-                  className="pointer-events-none absolute left-1/2 top-1/2 max-w-none"
+                  className="pointer-events-none absolute left-1/2 top-1/2 max-w-none motion-reduce:transition-none"
                   style={{
                     width: `${gerendert.breite}px`,
                     height: `${gerendert.hoehe}px`,
@@ -463,6 +509,12 @@ export function ImageCropper({
                 />
                 {faceGuide && <FaceGuideOverlay />}
               </>
+            ) : initialisiert ? (
+              // Init-Loading: layout-treuer Platzhalter, während das Bild dekodiert wird (kein irreführendes
+              // „kein Bild"). Rein dekorativ (aria-hidden); die Ansage übernimmt die StatusRegion.
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4" aria-hidden="true">
+                <Skeleton className="h-full w-full motion-reduce:animate-none" />
+              </div>
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center">
                 <ImageOff className="h-7 w-7 text-muted-foreground" aria-hidden="true" />
@@ -479,10 +531,32 @@ export function ImageCropper({
             )}
           </div>
 
+          {/* Fehler MIT Ausweg: ErrorState garantiert >=1 Recovery (erneut laden + ggf. anderes Bild wählen),
+              sagt den Fehler an (role="alert") und nutzt Token-Farben statt Roh-Text. */}
           {fehler && (
-            <p id={fehlerId} role="alert" className="mt-2 text-[12px] text-[color:var(--status-block)]">
-              {fehler}
-            </p>
+            <div id={fehlerId} className="mt-3">
+              <ErrorState
+                inline
+                icon={ImageOff}
+                title={fehlerTitel}
+                description={fehler}
+                onRetry={imageSrc ? erneutLaden : undefined}
+                retryLabel={erneutVersuchenLabel}
+                actions={
+                  allowUpload ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload aria-hidden="true" className="size-4" />
+                      Anderes Bild wählen
+                    </Button>
+                  ) : undefined
+                }
+              />
+            </div>
           )}
         </div>
 

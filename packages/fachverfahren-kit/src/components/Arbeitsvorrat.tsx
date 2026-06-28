@@ -4,6 +4,7 @@
 // Klick/Enter öffnet den Vorgang, KI-Flag-Indikatoren, StatusPill) — aber data-driven über die `LeistungConfig`
 // statt fest verdrahtet. Tabellen-Container nach dem sift-Pattern (maskierter Card-Rahmen, innen-scrollender Body,
 // sticky Header). KEIN domänen-Literal: Spalten/Status/Flags/Felder kommen ausschliesslich aus props.
+import * as React from "react";
 import { useMemo, useState, type ReactElement } from "react";
 import {
   AlertTriangle,
@@ -25,12 +26,25 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table.js";
+import { SkeletonTable } from "../ui/skeleton.js";
+import { EmptyState } from "./EmptyState.js";
+import { useStatusRegion } from "./StatusRegion.js";
 
 export interface ArbeitsvorratProps<T = Record<string, unknown>> {
   config: LeistungConfig<T>;
   port: VorgangPort<T>;
   /** Wird beim Aktivieren einer Zeile (Klick/Enter/Space) mit der Vorgang-Id gerufen. */
   onOpen: (id: string) => void;
+  /**
+   * Lädt der Bestand gerade? Zeigt additiv einen layout-treuen Tabellen-Platzhalter (SkeletonTable)
+   * und sagt den Ladezustand zentral an. Default false (bestehendes Verhalten unverändert).
+   */
+  loading?: boolean | undefined;
+  /**
+   * Optionale Aktualisieren-Aktion. Wird — falls gesetzt — im Leerzustand „0 offene Vorgänge"
+   * als Recovery-Affordance angeboten. Ohne diese Prop bleibt der Leerzustand rein informativ.
+   */
+  onReload?: (() => void) | undefined;
 }
 
 /** StatusPill — generisch über StatusDef; Ton mappt 1:1 auf die Token-getriebene Badge (status-ok/warn/info/block/neu). */
@@ -81,9 +95,17 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
   config,
   port,
   onOpen,
+  loading = false,
+  onReload,
 }: ArbeitsvorratProps<T>): ReactElement {
+  const { announce } = useStatusRegion();
   const alle = port.list();
   const states = config.statusMachine.states;
+
+  // Roving-Tabindex für die Tabellen-Navigation: nur die aktive Zeile ist im Tab-Fokus,
+  // Pfeiltasten/Home/End wandern durch die Liste (WAI-ARIA Grid-Muster).
+  const rowRefs = React.useRef<Array<HTMLTableRowElement | null>>([]);
+  const [activeRow, setActiveRow] = React.useState(0);
 
   // Schlüssel-Antragsfelder: 1–2 Felder aus der ersten Detail-Sektion (generisch, ohne Domänen-Literal).
   const schluesselFelder = useMemo(
@@ -161,6 +183,54 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
     }
   };
 
+  // Aktive Zeile gültig halten, wenn sich Filter/Sortierung die Zeilenzahl ändern.
+  React.useEffect(() => {
+    setActiveRow((cur) => (rows.length === 0 ? 0 : Math.min(cur, rows.length - 1)));
+  }, [rows.length]);
+
+  // Lade-/Ergebnis-Zustand zentral ansagen (eine Ansage-Wahrheit, nicht je Widget).
+  React.useEffect(() => {
+    if (loading) {
+      announce("Arbeitsvorrat wird geladen", "polite");
+    }
+  }, [loading, announce]);
+  React.useEffect(() => {
+    if (loading) return;
+    announce(`${sichtbar.length} von ${alle.length} Vorgängen angezeigt`, "polite");
+  }, [loading, sichtbar.length, alle.length, announce]);
+
+  // Pfeiltasten-Navigation der Tabellenzeilen (Roving-Tabindex). Enter/Space öffnen bleiben erhalten.
+  const handleRowKeyDown = React.useCallback(
+    (event: React.KeyboardEvent<HTMLTableRowElement>, index: number, id: string) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        onOpen(id);
+        return;
+      }
+      let next: number | null = null;
+      switch (event.key) {
+        case "ArrowDown":
+          next = Math.min(index + 1, rows.length - 1);
+          break;
+        case "ArrowUp":
+          next = Math.max(index - 1, 0);
+          break;
+        case "Home":
+          next = 0;
+          break;
+        case "End":
+          next = rows.length - 1;
+          break;
+        default:
+          return;
+      }
+      event.preventDefault();
+      setActiveRow(next);
+      rowRefs.current[next]?.focus();
+    },
+    [onOpen, rows.length],
+  );
+
   const statusByKey = useMemo(() => {
     const m: Record<string, StatusDef> = {};
     for (const s of states) m[s.key] = s;
@@ -190,6 +260,27 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
       </div>
 
       <div className="mx-auto flex w-full min-h-0 max-w-6xl flex-1 flex-col px-6 py-6">
+        {loading ? (
+          // Ladezustand: layout-treuer Tabellen-Platzhalter statt Spinner (kein Layout-Shift).
+          // Ansage übernimmt zentral useStatusRegion; das Skeleton selbst ist dekorativ (aria-hidden).
+          <div className="mt-1 flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card p-4">
+            <SkeletonTable rows={6} cols={4 + schluesselFelder.length} />
+          </div>
+        ) : alle.length === 0 ? (
+          // Echter Leerzustand des Eingangskorbs (nicht nur ein Filter): tritt an die Stelle der Tabelle
+          // und kündigt den Zustand auch nicht-visuell an (EmptyState rendert role="status").
+          <div className="mt-1 flex min-h-0 w-full min-w-0 flex-1 flex-col">
+            <EmptyState
+              icon={InboxIcon}
+              title="0 offene Vorgänge"
+              description="Im Arbeitsvorrat liegen derzeit keine Vorgänge zur Bearbeitung."
+              {...(onReload
+                ? { action: { label: "Aktualisieren", onClick: onReload } }
+                : {})}
+            />
+          </div>
+        ) : (
+          <>
         {/* Schnellfilter-Chips je StatusDef (mit Counts) */}
         <div className="flex items-center gap-3">
           <span className="shrink-0 text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -258,23 +349,27 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((v) => {
+                {rows.map((v, index) => {
                   const ber = berechnungText(v.berechnung);
                   const st = statusByKey[v.status];
                   return (
                     <TableRow
                       key={v.id}
-                      tabIndex={0}
+                      ref={(el: HTMLTableRowElement | null) => {
+                        rowRefs.current[index] = el;
+                      }}
+                      // Roving-Tabindex: nur die aktive Zeile ist im Tab-Fokus; Pfeiltasten wandern
+                      // (statt jede Zeile einzeln in die Tab-Reihenfolge zu legen).
+                      tabIndex={index === activeRow ? 0 : -1}
                       role="link"
                       aria-label={`Vorgang ${v.vorgangsnummer} öffnen`}
-                      onClick={() => onOpen(v.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          onOpen(v.id);
-                        }
+                      onClick={() => {
+                        setActiveRow(index);
+                        onOpen(v.id);
                       }}
-                      className="group cursor-pointer border-t border-border transition-colors hover:bg-secondary/40 focus:bg-secondary/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                      onFocus={() => setActiveRow(index)}
+                      onKeyDown={(e) => handleRowKeyDown(e, index, v.id)}
+                      className="group cursor-pointer border-t border-border transition-colors hover:bg-secondary/40 focus:bg-secondary/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 motion-reduce:transition-none"
                     >
                       <TableCell className="align-top">
                         <span className="font-mono text-[12px] font-medium text-primary group-hover:underline">
@@ -321,9 +416,25 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                   <TableRow>
                     <TableCell
                       colSpan={4 + schluesselFelder.length}
-                      className="py-10 text-center text-sm text-muted-foreground"
+                      className="p-6"
                     >
-                      Keine Vorgänge in diesem Filter.
+                      {/* Leerer FILTER (Bestand ist nicht leer) — mit Recovery „Filter zurücksetzen". */}
+                      <EmptyState
+                        as="p"
+                        icon={InboxIcon}
+                        title="Keine Vorgänge im aktuellen Filter"
+                        description="Für die gewählten Statusfilter gibt es keine Treffer. Setzen Sie die Filter zurück, um alle Vorgänge zu sehen."
+                        className="border-0 bg-transparent py-4"
+                        {...(allActive
+                          ? {}
+                          : {
+                              action: {
+                                label: "Alle anzeigen",
+                                onClick: () => setActive(new Set(alleStatusKeys)),
+                                variant: "outline",
+                              },
+                            })}
+                      />
                     </TableCell>
                   </TableRow>
                 )}
@@ -331,6 +442,8 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
             </Table>
           </div>
         </div>
+          </>
+        )}
       </div>
     </section>
   );

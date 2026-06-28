@@ -10,6 +10,7 @@
 // Fallback-Hinweisen ab. BARRIEREFREI (BITV 2.0 / WCAG 2.2 AA): alle Bedien-Elemente sind echte, per Tastatur
 // bedienbare Buttons mit aria-label, Status/Hinweise in aria-live-Regionen, Fehler role="alert", Fokus-Ring
 // sichtbar, Ziele >=24px, Animationen respektieren prefers-reduced-motion, Farbe nie alleiniger Bedeutungsträger.
+import * as React from "react";
 import {
   useCallback,
   useEffect,
@@ -19,17 +20,19 @@ import {
   type ReactElement,
 } from "react";
 import {
-  AlertTriangle,
   Camera,
   CameraOff,
   Check,
   RefreshCcw,
   ShieldQuestion,
+  Upload,
   Video,
 } from "lucide-react";
 
 import { cn } from "../lib/utils.js";
 import { Button } from "../ui/button.js";
+import { ErrorState } from "./ErrorState.js";
+import { useStatusRegion } from "./StatusRegion.js";
 
 /** Das fertige Aufnahme-Ergebnis (beide Repräsentationen, damit der Aufrufer frei wählen kann). */
 export interface CaptureResult {
@@ -66,6 +69,17 @@ export interface CameraCaptureProps {
   uebernehmenLabel?: string;
   /** Wird bei „Foto übernehmen" mit dem fertigen Ergebnis gerufen. */
   onCapture?: (ergebnis: CaptureResult) => void;
+  /**
+   * OPTIONAL: Datei-Upload-Alternative, falls die Kamera nicht verfügbar ist (verweigert/keine Kamera/
+   * nicht unterstützt). Wird mit der gewählten Datei gerufen; ist sie gesetzt, erscheint im Fehler-Zustand
+   * eine zusätzliche Recovery-Aktion „Bild hochladen". Ohne diese Prop bleibt das bisherige Verhalten
+   * unverändert (nur „Erneut versuchen").
+   */
+  onFallbackFile?: ((datei: File) => void) | undefined;
+  /** Beschriftung der Datei-Upload-Alternative im Fehler-Zustand. Default "Bild hochladen". */
+  fallbackUploadLabel?: string;
+  /** accept-Filter der Datei-Upload-Alternative. Default "image/*". */
+  fallbackUploadAccept?: string;
   className?: string;
 }
 
@@ -136,15 +150,22 @@ export function CameraCapture({
   beschreibung = "Richten Sie sich im Rahmen aus und lösen Sie aus. Sie können die Aufnahme beliebig oft wiederholen.",
   uebernehmenLabel = "Foto übernehmen",
   onCapture,
+  onFallbackFile,
+  fallbackUploadLabel = "Bild hochladen",
+  fallbackUploadAccept = "image/*",
   className,
 }: CameraCaptureProps): ReactElement {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const dateiInputRef = useRef<HTMLInputElement>(null);
 
   const [phase, setPhase] = useState<Phase>("leer");
   const [fehler, setFehler] = useState<KameraFehler | null>(null);
   const [foto, setFoto] = useState<string>("");
   const [statusMeldung, setStatusMeldung] = useState<string>("");
+
+  // Zentrale Ansage (eine Wahrheit). Ohne Provider ein No-Op — die lokale sr-only-Region bleibt als Fallback.
+  const { announce } = useStatusRegion();
 
   const titelId = useId();
   const hinweisId = useId();
@@ -207,6 +228,14 @@ export function CameraCapture({
   useEffect(() => {
     return () => stoppeStream();
   }, [stoppeStream]);
+
+  // Jede Statusmeldung zusätzlich über die ZENTRALE Ansage feuern (eine Wahrheit, BITV 2.2 AA).
+  // Fehler-Phase = assertive (unterbricht), sonst polite (reiht ein). Die lokale sr-only-Region bleibt.
+  useEffect(() => {
+    if (statusMeldung) announce(statusMeldung, phase === "fehler" ? "assertive" : "polite");
+    // Absichtlich nur auf statusMeldung lauschen — eine Meldung = eine Ansage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusMeldung]);
 
   // Auslösen: aktuelles Video-Frame auf ein Canvas zeichnen und als DataURL halten.
   const ausloesen = useCallback(() => {
@@ -277,7 +306,32 @@ export function CameraCapture({
     void starteKamera();
   }, [starteKamera]);
 
+  // Datei-Upload-Alternative (nur wenn onFallbackFile gesetzt): gewählte Datei an den Aufrufer reichen.
+  const waehleDatei = useCallback(() => {
+    dateiInputRef.current?.click();
+  }, []);
+
+  const onDateiGewaehlt = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const datei = e.target.files?.[0];
+      // Wert zurücksetzen, damit dieselbe Datei erneut gewählt werden kann.
+      e.target.value = "";
+      if (!datei) return;
+      onFallbackFile?.(datei);
+      setStatusMeldung(`Bild „${datei.name}" wurde hochgeladen.`);
+    },
+    [onFallbackFile],
+  );
+
   const fehlerInfo = fehler ? fehlerText(fehler) : null;
+  // Im Fehler-Zustand zusätzliche Recovery-Affordance, falls eine Datei-Upload-Alternative angeboten wird.
+  const fallbackUploadButton =
+    onFallbackFile != null ? (
+      <Button type="button" size="sm" variant="outline" onClick={waehleDatei}>
+        <Upload aria-hidden="true" className="size-4" />
+        {fallbackUploadLabel}
+      </Button>
+    ) : null;
 
   return (
     <section
@@ -377,22 +431,33 @@ export function CameraCapture({
           </div>
         )}
 
-        {/* ── Fehler-Block (role=alert) mit handlungsleitendem Fallback ───────────────────────────── */}
+        {/* ── Fehler-Block über das Fundament-Primitiv ErrorState (role=alert, GARANTIERTE Recovery) ─ */}
+        {/* Bietet immer mindestens eine Wiederherstellung; ist eine Datei-Upload-Alternative gesetzt, */}
+        {/* erscheint zusätzlich „Bild hochladen". Recovery nie nur über Farbe (Icon + Klartext + Buttons). */}
         {phase === "fehler" && fehlerInfo && (
-          <div
-            id={fehlerId}
-            role="alert"
-            className="flex items-start gap-2 rounded-md border border-border bg-background p-3 text-[12px]"
-          >
-            <AlertTriangle
-              className="mt-0.5 h-4 w-4 shrink-0 text-[color:var(--status-warn)]"
-              aria-hidden="true"
+          <div id={fehlerId}>
+            <ErrorState
+              icon={CameraOff}
+              title={fehlerInfo.titel}
+              description={fehlerInfo.text}
+              onRetry={() => void starteKamera()}
+              retryLabel="Erneut versuchen"
+              {...(fallbackUploadButton ? { actions: fallbackUploadButton } : {})}
             />
-            <div>
-              <p className="font-medium text-foreground">{fehlerInfo.titel}</p>
-              <p className="mt-0.5 text-muted-foreground">{fehlerInfo.text}</p>
-            </div>
           </div>
+        )}
+
+        {/* Verstecktes Datei-Eingabefeld für die Upload-Alternative (echtes <input type=file>). */}
+        {onFallbackFile != null && (
+          <input
+            ref={dateiInputRef}
+            type="file"
+            accept={fallbackUploadAccept}
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
+            onChange={onDateiGewaehlt}
+          />
         )}
 
         {/* ── Aktionsleiste je Phase ─────────────────────────────────────────────────────────────── */}
@@ -406,6 +471,14 @@ export function CameraCapture({
             >
               <Camera className="h-4 w-4" aria-hidden="true" />
               {phase === "fehler" ? "Erneut versuchen" : "Kamera starten"}
+            </Button>
+          )}
+
+          {/* Datei-Upload-Alternative in der Aktionsleiste (additiv, nur wenn angeboten). */}
+          {(phase === "leer" || phase === "fehler") && onFallbackFile != null && (
+            <Button type="button" variant="outline" onClick={waehleDatei}>
+              <Upload className="h-4 w-4" aria-hidden="true" />
+              {fallbackUploadLabel}
             </Button>
           )}
 

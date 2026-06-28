@@ -30,6 +30,10 @@ import { MapPin, Minus, Plus, Crosshair } from "lucide-react";
 
 import { cn } from "../lib/utils.js";
 import { Button } from "../ui/button.js";
+import { Skeleton } from "../ui/skeleton.js";
+import { ErrorState } from "./ErrorState.js";
+import { StatusRegion } from "./StatusRegion.js";
+import { useViewState, announcePoliteness } from "../hooks/use-view-state.js";
 
 // ── Vertrag ───────────────────────────────────────────────────────────────────────────────────
 /** Geografische Position in Grad (WGS84). */
@@ -70,6 +74,27 @@ export interface MapViewProps {
   ariaLabel?: string;
   /** Hinweistext, wenn keine `tileUrl` konfiguriert ist (sonst generisch). */
   fallbackHint?: string;
+  /**
+   * Ladezustand der Kartenquelle (z. B. asynchron aufgelöste `tileUrl`/Geokodierung).
+   * `true` → layout-treuer Lade-Platzhalter + Ansage; Default `false` (bestehendes Verhalten).
+   */
+  loading?: boolean;
+  /**
+   * Fehler der Kartenquelle. Gesetzt → ErsetzungsAnsicht mit garantierter Recovery (ErrorState).
+   * Default `undefined` (kein Fehler — bestehendes Verhalten).
+   */
+  error?: unknown;
+  /** Überschrift im Fehlerzustand (sonst generisch). */
+  errorTitle?: string;
+  /** Beschreibung im Fehlerzustand (sonst generisch). */
+  errorDescription?: string;
+  /** Recovery-Aktion im Fehlerzustand (z. B. Kachel-Quelle neu laden). Fehlt sie, bietet ErrorState ein Neuladen an. */
+  onRetry?: (() => void) | undefined;
+  /**
+   * Wird gerufen, wenn der Marker per Klick/Tastatur (Enter/Leertaste) aktiviert wird.
+   * Gesetzt → der Marker wird zu einer fokussierbaren Schaltfläche; sonst bleibt er rein visuell.
+   */
+  onMarkerActivate?: (() => void) | undefined;
   className?: string;
 }
 
@@ -151,11 +176,29 @@ export function MapView({
   onViewChange,
   ariaLabel,
   fallbackHint,
+  loading = false,
+  error,
+  errorTitle,
+  errorDescription,
+  onRetry,
+  onMarkerActivate,
   className,
 }: MapViewProps): ReactElement {
   const titleId = useId();
   const descId = useId();
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // ── Zustand der Kartenquelle (nur aktiv, wenn loading/error-Props genutzt werden) ──────────────
+  // Spiegelt die loading/error-Props in den EINEN ViewState-Vertrag; ohne diese Props bleibt der
+  // Zustand „ready" und das bestehende Verhalten/Layout ist unverändert.
+  const source = useViewState({ initial: "ready" });
+  const sourceStatus = source.state.status;
+  useEffect(() => {
+    if (error != null) source.fail(error);
+    else if (loading) source.start();
+    // Nur zurück auf „ready", wenn vorher wirklich geladen/fehlerhaft — kein Ansage-Rauschen sonst.
+    else if (sourceStatus !== "ready") source.set("ready");
+  }, [loading, error, sourceStatus, source.fail, source.start, source.set]);
 
   // Interner Ansichts-Zustand (kontrolliert über props initialisiert, danach intern fortgeführt).
   const [view, setView] = useState<{ center: LatLng; zoom: number }>(() => ({
@@ -421,22 +464,46 @@ export function MapView({
             ) : null,
           )}
 
-          {/* Marker */}
-          {markerPos && (
-            <div
-              className="pointer-events-none absolute -translate-x-1/2 -translate-y-full"
-              style={{ left: markerPos.left, top: markerPos.top }}
-            >
-              <MapPin
-                className="h-7 w-7 text-primary drop-shadow"
-                aria-hidden="true"
-                strokeWidth={2.25}
-              />
-              {marker?.label && (
-                <span className="sr-only">{marker.label}</span>
-              )}
-            </div>
-          )}
+          {/* Marker — fokussierbare Schaltfläche, wenn onMarkerActivate gesetzt ist; sonst rein visuell. */}
+          {markerPos &&
+            (onMarkerActivate ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  // Klick auf den Marker nicht als Pan-Klick durchreichen.
+                  e.stopPropagation();
+                  onMarkerActivate();
+                }}
+                onPointerDown={(e) => {
+                  // Drag-Pan des Containers beim Antippen des Markers verhindern.
+                  e.stopPropagation();
+                }}
+                aria-label={marker?.label ?? "Markierung auf der Karte"}
+                className={cn(
+                  "absolute flex min-h-6 min-w-6 -translate-x-1/2 -translate-y-full items-end justify-center rounded",
+                  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                )}
+                style={{ left: markerPos.left, top: markerPos.top }}
+              >
+                <MapPin
+                  className="h-7 w-7 text-primary drop-shadow"
+                  aria-hidden="true"
+                  strokeWidth={2.25}
+                />
+              </button>
+            ) : (
+              <div
+                className="pointer-events-none absolute -translate-x-1/2 -translate-y-full"
+                style={{ left: markerPos.left, top: markerPos.top }}
+              >
+                <MapPin
+                  className="h-7 w-7 text-primary drop-shadow"
+                  aria-hidden="true"
+                  strokeWidth={2.25}
+                />
+                {marker?.label && <span className="sr-only">{marker.label}</span>}
+              </div>
+            ))}
 
           {/* Fadenkreuz im Mittelpunkt (dezent) */}
           <div
@@ -458,6 +525,35 @@ export function MapView({
             </div>
           )}
         </div>
+
+        {/* Lade-Overlay der Kartenquelle — layout-treuer Platzhalter (Ansage über StatusRegion). */}
+        {source.state.status === "loading" && (
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 z-10 flex flex-col gap-2 bg-card/80 p-3 motion-reduce:transition-none"
+          >
+            <Skeleton className="h-full w-full rounded-md" />
+          </div>
+        )}
+
+        {/* Fehler-Overlay der Kartenquelle — garantierte Recovery (ErrorState). */}
+        {source.state.status !== "loading" &&
+          source.state.status !== "ready" &&
+          source.state.status !== "idle" && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-card/95 p-4">
+              <ErrorState
+                title={errorTitle ?? "Kartenmaterial konnte nicht geladen werden"}
+                description={
+                  errorDescription ??
+                  source.state.message ??
+                  "Die konfigurierte Kachel-Quelle ist nicht erreichbar."
+                }
+                onRetry={onRetry}
+                inline
+                className="max-w-md"
+              />
+            </div>
+          )}
 
         {/* Zoom-Bedienung — schwebend, ≥ 24px Zielgröße */}
         <div className="absolute right-3 top-3 flex flex-col gap-1">
@@ -518,6 +614,13 @@ export function MapView({
         gedrückter Maustaste lässt sich die Karte ziehen. Die aktuellen Koordinaten stehen als Text
         unter der Karte.
       </p>
+
+      {/* Dynamische Ansage des Kartenquellen-Zustands (laden/Fehler) über die zentrale Live-Region. */}
+      <StatusRegion
+        message={source.state.message}
+        politeness={announcePoliteness(source.state.status)}
+        busy={source.state.status === "loading"}
+      />
     </div>
   );
 }
