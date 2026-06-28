@@ -27,6 +27,7 @@ export * from "./components/BescheidView.js";
 export * from "./components/AuditTimeline.js";
 export * from "./components/ReportingPanel.js";
 export * from "./components/DateiUpload.js";
+export * from "./components/AdressValidierung.js";
 export * from "./components/ConsentBanner.js";
 export * from "./components/KommandoPalette.js";
 export * from "./components/StatCard.js";
@@ -41,6 +42,19 @@ export * from "./components/ErrorState.js";
 export * from "./components/ViewStateBoundary.js";
 export * from "./components/SaveIndicator.js";
 export * from "./components/KommuneTheme.js";
+
+// ── Neue Komponenten (M2–M7): Bürger-Viewer, Sachbearbeitung, Zustellung, KI-Assist, A11y/i18n ──
+export * from "./components/PdfViewer.js";
+export * from "./components/OfficeDocViewer.js";
+export * from "./components/NachweisBrowser.js";
+export * from "./components/EPaymentPanel.js";
+export * from "./components/TerminFristPanel.js";
+export * from "./components/FourEyesReview.js";
+export * from "./components/Postfach.js";
+export * from "./components/ConfirmDialog.js";
+export * from "./components/LanguageSwitch.js";
+export * from "./components/Barrierefreiheitserklaerung.js";
+export * from "./components/KiAssistPanel.js";
 
 // ── Vollständige Primitiv-Bibliothek (shadcn/Radix, MIT) — öffentlich für Konsumenten ──
 export * from "./ui/accordion.js";

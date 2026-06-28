@@ -79,8 +79,8 @@ export function StatusRegionProvider({ children }: StatusRegionProviderProps) {
 // ── 2. Standalone-Region (kontrolliert, für lokale ViewState-Meldungen) ──────────────────────────
 
 export interface StatusRegionProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "role"> {
-  /** Anzusagender Text (leer = nichts angesagt). */
-  message?: string;
+  /** Anzusagender Text (leer/undefined = nichts angesagt). */
+  message?: string | undefined;
   /** polite (Standard) oder assertive für Fehler/Konflikt. */
   politeness?: Politeness;
   /** Markiert einen laufenden Vorgang (aria-busy). */
