@@ -32,6 +32,16 @@ export * from "./components/KommandoPalette.js";
 export * from "./components/StatCard.js";
 export * from "./components/ErrorSummary.js";
 
+// ── Standardisierungs-Layer (M0/M1): der EINE Zustands-/Ansage-/Theming-Vertrag, auf den alle ──
+// ── Komponenten zurückgreifen (shadcn/ui + Tailwind-Token). Eine Wahrheit pro Belang. ──
+export * from "./hooks/use-view-state.js";
+export * from "./hooks/use-step-machine.js";
+export * from "./components/StatusRegion.js";
+export * from "./components/ErrorState.js";
+export * from "./components/ViewStateBoundary.js";
+export * from "./components/SaveIndicator.js";
+export * from "./components/KommuneTheme.js";
+
 // ── Vollständige Primitiv-Bibliothek (shadcn/Radix, MIT) — öffentlich für Konsumenten ──
 export * from "./ui/accordion.js";
 export * from "./ui/alert.js";
