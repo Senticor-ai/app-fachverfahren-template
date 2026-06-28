@@ -376,7 +376,7 @@ function MehrdeutigAuswahl({
   const groupLabelId = React.useId();
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, index: number) => {
-    let next = index;
+    let next: number;
     if (event.key === "ArrowDown" || event.key === "ArrowRight") next = (index + 1) % treffer.length;
     else if (event.key === "ArrowUp" || event.key === "ArrowLeft") next = (index - 1 + treffer.length) % treffer.length;
     else return;

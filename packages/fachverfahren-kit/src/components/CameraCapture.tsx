@@ -234,7 +234,6 @@ export function CameraCapture({
   useEffect(() => {
     if (statusMeldung) announce(statusMeldung, phase === "fehler" ? "assertive" : "polite");
     // Absichtlich nur auf statusMeldung lauschen — eine Meldung = eine Ansage.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusMeldung]);
 
   // Auslösen: aktuelles Video-Frame auf ein Canvas zeichnen und als DataURL halten.

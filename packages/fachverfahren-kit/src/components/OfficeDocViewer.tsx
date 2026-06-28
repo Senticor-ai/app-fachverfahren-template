@@ -112,7 +112,6 @@ export function OfficeDocViewer({
       view.fail(err);
     }
     // view-API ist stabil (useCallback in useViewState); Quelle ist die einzige echte Abhängigkeit.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [renderedHtml]);
 
   return (

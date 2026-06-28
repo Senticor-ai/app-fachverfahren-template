@@ -75,7 +75,6 @@ export function PdfViewer({ url, title = "Dokument", filename, restricted = fals
     if (restricted) view.set("forbidden");
     else view.start();
     // view-Methoden sind stabil (useCallback); nur auf restricted reagieren.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restricted]);
 
   const status = view.state.status;
@@ -90,12 +89,10 @@ export function PdfViewer({ url, title = "Dokument", filename, restricted = fals
 
   const handleLoaded = React.useCallback(() => {
     if (!restricted) view.succeed({ url });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restricted, url]);
 
   const handleError = React.useCallback(() => {
     if (!restricted) view.fail({ code: "render_failed" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restricted]);
 
   // Drucken: separates Fenster mit dem PDF öffnen und dessen Druckdialog auslösen. Schlägt das fehl

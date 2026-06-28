@@ -340,7 +340,7 @@ export function Postfach({
   // Pfeiltasten-Navigation in der Listbox (Home/End/Up/Down) — Fokus folgt der Auswahl.
   const handleKeyDown = React.useCallback(
     (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
-      let nextIndex: number | null = null;
+      let nextIndex: number;
       switch (event.key) {
         case "ArrowDown":
           nextIndex = Math.min(index + 1, nachrichten.length - 1);

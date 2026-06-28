@@ -207,7 +207,7 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
         onOpen(id);
         return;
       }
-      let next: number | null = null;
+      let next: number;
       switch (event.key) {
         case "ArrowDown":
           next = Math.min(index + 1, rows.length - 1);

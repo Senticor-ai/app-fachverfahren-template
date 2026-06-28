@@ -136,7 +136,7 @@ function sanitizeHtml(dirty: string): string {
 
 /** True, wenn der (bereits sanitisierte) Inhalt sichtbar leer ist. */
 function isEmptyHtml(html: string): boolean {
-  return html.replace(/<br\s*\/?>/gi, "").replace(/<[^>]*>/g, "").replace(/ /g, "").trim()
+  return html.replace(/<br\s*\/?>/gi, "").replace(/<[^>]*>/g, "").replace(/\u00A0/g, "").trim()
     .length === 0;
 }
 
@@ -354,7 +354,7 @@ export function RichTextEditor({
   // Roving-Tabindex-Navigation der Toolbar (Pfeil/Home/End).
   const onToolbarKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     const last = TOOLBAR.length - 1;
-    let next = activeTool;
+    let next: number;
     switch (e.key) {
       case "ArrowRight":
       case "ArrowDown":
