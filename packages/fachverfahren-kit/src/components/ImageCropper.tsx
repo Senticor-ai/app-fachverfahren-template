@@ -592,7 +592,7 @@ export function ImageCropper({
                 onChange={(e) => zoomenAuf(Number(e.target.value))}
                 aria-valuetext={`${zoomProzent} Prozent`}
                 className={cn(
-                  "h-9 w-full cursor-pointer accent-[color:var(--primary)]",
+                  "h-9 w-full cursor-pointer accent-primary",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                   "disabled:cursor-not-allowed disabled:opacity-50",
                 )}

@@ -43,10 +43,10 @@ const bannerVariants = cva(
 
 /** Akzent-Farbe des Icons je Variante — token-getrieben (kein Hardcode). */
 const iconToneClass: Record<NonNullable<BannerVariant>, string> = {
-  info: "text-[color:var(--status-info)]",
-  warn: "text-[color:var(--status-warn)]",
-  success: "text-[color:var(--status-ok)]",
-  error: "text-[color:var(--status-block)]",
+  info: "text-status-info",
+  warn: "text-status-warn",
+  success: "text-status-ok",
+  error: "text-status-block",
 };
 
 /** Standard-Icon je Variante — überschreibbar via `icon`-Prop. */

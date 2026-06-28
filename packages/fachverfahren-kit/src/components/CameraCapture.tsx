@@ -349,8 +349,8 @@ export function CameraCapture({
           </p>
         </div>
         {phase === "live" && (
-          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-sm border border-border bg-background px-2 py-1 text-[11px] font-medium text-[color:var(--status-ok)]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--status-ok)]" aria-hidden="true" />
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-sm border border-border bg-background px-2 py-1 text-[11px] font-medium text-status-ok">
+            <span className="h-1.5 w-1.5 rounded-full bg-status-ok" aria-hidden="true" />
             Kamera aktiv
           </span>
         )}

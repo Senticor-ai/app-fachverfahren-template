@@ -86,12 +86,15 @@ export function themeToCssVars(theme: KommuneTheme): Record<string, string> {
   const vars: Record<string, string> = {};
   if (b.primary) {
     vars["--primary"] = b.primary;
-    vars["--primary-foreground"] = b.primaryForeground ?? pickForeground(b.primary) ?? "var(--primary-foreground)";
+    // Nur setzen, wenn ein konkreter Wert vorliegt — sonst bleibt der Default-Token (kein var()-Fallback).
+    const fg = b.primaryForeground ?? pickForeground(b.primary);
+    if (fg) vars["--primary-foreground"] = fg;
     vars["--ring"] = b.ring ?? b.primary;
   }
   if (b.accent) {
     vars["--accent"] = b.accent;
-    vars["--accent-foreground"] = b.accentForeground ?? pickForeground(b.accent) ?? "var(--accent-foreground)";
+    const accentFg = b.accentForeground ?? pickForeground(b.accent);
+    if (accentFg) vars["--accent-foreground"] = accentFg;
   }
   if (b.surface) vars["--surface"] = b.surface;
   if (b.rail) vars["--rail"] = b.rail;

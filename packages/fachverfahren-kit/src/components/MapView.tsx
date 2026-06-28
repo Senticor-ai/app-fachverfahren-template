@@ -436,7 +436,7 @@ export function MapView({
             className="pointer-events-none absolute inset-0 opacity-60"
             style={{
               backgroundImage:
-                "linear-gradient(to right, color-mix(in oklch, var(--border) 70%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in oklch, var(--border) 70%, transparent) 1px, transparent 1px)",
+                "linear-gradient(to right, color-mix(in oklch, var(--color-border) 70%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in oklch, var(--color-border) 70%, transparent) 1px, transparent 1px)",
               backgroundSize: "32px 32px",
             }}
           />

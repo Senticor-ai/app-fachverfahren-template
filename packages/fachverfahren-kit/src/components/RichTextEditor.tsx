@@ -478,7 +478,7 @@ export function RichTextEditor({
       {!execAvailable && !readOnly && (
         <p
           role="status"
-          className="border-t border-border px-4 py-2 text-[12px] text-[color:var(--status-warn)]"
+          className="border-t border-border px-4 py-2 text-[12px] text-status-warn"
         >
           Formatierung wird in dieser Umgebung nicht unterstützt — der Text lässt sich weiterhin
           eingeben und wird unformatiert gespeichert.

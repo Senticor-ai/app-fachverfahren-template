@@ -79,7 +79,7 @@ export function FileBrowser({ nodes, onOpen, onDownload, onDelete, onRename, tit
             {isFolder ? (
               <>
                 <ChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none", isOpen && "rotate-90")} aria-hidden />
-                {isOpen ? <FolderOpen className="size-4 shrink-0 text-[color:var(--status-warn)]" aria-hidden /> : <Folder className="size-4 shrink-0 text-[color:var(--status-warn)]" aria-hidden />}
+                {isOpen ? <FolderOpen className="size-4 shrink-0 text-status-warn" aria-hidden /> : <Folder className="size-4 shrink-0 text-status-warn" aria-hidden />}
               </>
             ) : (
               <>
@@ -146,7 +146,7 @@ function IconBtn({ icon: Icon, label, onClick, danger }: { icon: typeof Download
       aria-label={label}
       className={cn(
         "inline-flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        danger && "hover:text-[color:var(--status-block)]",
+        danger && "hover:text-status-block",
       )}
     >
       <Icon className="size-3.5" aria-hidden />
