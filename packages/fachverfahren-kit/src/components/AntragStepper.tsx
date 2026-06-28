@@ -145,8 +145,19 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
     }
   }, [config, daten]);
 
-  // Pflichtfeld-Markierung erst aktiv, sobald der/die Nutzer:in den Review-Schritt erreicht hat (wie Referenz).
-  const showErrors = stepIdx >= reviewIndex;
+  // Pflichtfeld-Markierung (rot) aktiv: am Review-Schritt IMMER — ODER sobald in DIESEM Schritt „Weiter" trotz offener
+  // Pflichtangabe versucht wurde. So sieht der/die Nutzer:in die roten Felder genau dann, wenn der Prozess sie blockiert.
+  const [versuchteWeiter, setVersuchteWeiter] = useState<Set<number>>(() => new Set<number>());
+  const showErrors = stepIdx >= reviewIndex || versuchteWeiter.has(stepIdx);
+  // ECHTE PFLICHT-SPERRE (eine Wahrheit, Desktop + Mobil): ist der aktuelle Fach-Schritt unvollständig, NICHT weitergehen
+  // — die offenen Pflichtfelder rot markieren statt still durchzuwinken. Sonst zum nächsten Schritt.
+  const gehWeiter = (): void => {
+    if (stepIdx < steps.length && !stepGueltig(steps[stepIdx]!, daten)) {
+      setVersuchteWeiter((prev) => new Set(prev).add(stepIdx));
+      return;
+    }
+    setStepIdx((s) => Math.min(lastIndex, s + 1));
+  };
 
   const firstInvalidStep = (): number | null => {
     for (let i = 0; i < steps.length; i++) if (!stepGueltig(steps[i]!, daten)) return i;
@@ -194,7 +205,7 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
 
   return (
     <section className="mx-auto w-full max-w-2xl px-6 py-8 md:max-w-3xl lg:max-w-5xl">
-      <Stepper steps={steps} stepIdx={stepIdx} setStepIdx={setStepIdx} daten={daten} />
+      <Stepper steps={steps} stepIdx={stepIdx} setStepIdx={setStepIdx} daten={daten} onWeiter={gehWeiter} />
 
       {config.antrag.einleitung && stepIdx === 0 && (
         <p className="mt-4 text-sm text-muted-foreground">{config.antrag.einleitung}</p>
@@ -294,7 +305,7 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
             Zurück
           </Button>
           {stepIdx < lastIndex ? (
-            <Button onClick={() => setStepIdx((s) => Math.min(lastIndex, s + 1))}>
+            <Button onClick={gehWeiter} aria-disabled={stepIdx < steps.length && !stepGueltig(steps[stepIdx]!, daten)}>
               Weiter
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -316,11 +327,13 @@ function Stepper({
   stepIdx,
   setStepIdx,
   daten,
+  onWeiter,
 }: {
   steps: StepDef[];
   stepIdx: number;
   setStepIdx: React.Dispatch<React.SetStateAction<number>>;
   daten: Antragsdaten;
+  onWeiter?: () => void; // gemeinsame Pflicht-Sperre (eine Wahrheit): blockt an leeren Pflichtfeldern, markiert rot
 }) {
   // Labels: Fach-Schritte + virtueller Review-Schritt am Ende.
   const labels = [...steps.map((s) => s.titel), "Prüfen"];
@@ -355,7 +368,7 @@ function Stepper({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setStepIdx((s) => Math.min(total - 1, s + 1))}
+          onClick={() => (onWeiter ? onWeiter() : setStepIdx((s) => Math.min(total - 1, s + 1)))}
           disabled={stepIdx === total - 1}
           aria-label="Nächster Schritt"
         >
