@@ -24,6 +24,7 @@ import * as React from "react";
 import type { LeistungConfig } from "../types.js";
 import { cn } from "../lib/utils.js";
 import { Badge } from "../ui/badge.js";
+import { useKommuneTheme, KommuneLogo } from "./KommuneTheme.js";
 import {
   DEFAULT_PERSONAS,
   PersonaSwitcher,
@@ -123,6 +124,9 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
   const nav = navFor(persona, config);
   const activeKey = activeNavKey ?? nav[0]?.key;
   const initials = brandInitials(config.label);
+  // Kommunales Wappen (verifiziert, aus dem Fachkonzept via runtime-config → KommuneThemeProvider), wenn vorhanden.
+  const kommuneTheme = useKommuneTheme();
+  const wappen = kommuneTheme?.logo;
 
   const handleNav = (item: ShellNavItem) => (e: React.MouseEvent) => {
     if (onNavigate) {
@@ -149,9 +153,13 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
       >
         {/* Marke — Branding ausschließlich aus config. */}
         <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-sidebar-border px-3" role="banner">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-sidebar-accent text-sidebar-accent-foreground">
-            <span className="text-[11px] font-bold tracking-tight">{initials}</span>
-          </span>
+          {wappen ? (
+            <KommuneLogo logo={wappen} height={28} className="shrink-0" />
+          ) : (
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-sidebar-accent text-sidebar-accent-foreground">
+              <span className="text-[11px] font-bold tracking-tight">{initials}</span>
+            </span>
+          )}
           <span className="overflow-hidden leading-tight">
             <span className="block truncate text-sm font-semibold">{config.label}</span>
             <span className="block truncate text-[10px] text-sidebar-muted">{config.kommune}</span>
