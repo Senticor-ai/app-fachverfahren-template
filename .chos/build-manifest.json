@@ -54,7 +54,8 @@
         "Tarif/Berechnung als DATEN (keine Inline-Zahlen im Code)",
         "Personas/Rollen des Verfahrens",
         "berechne setzt JEDE im Fachkonzept genannte Regel um: jede Tarifstufe/Staffel, jede Tatbestandsvariante, JEDEN Befreiungs-/Ermaessigungstatbestand und jede zeitanteilige/fristbezogene Regel als EIGENE pruefbare Verzweigung (NICHT nur den Grundfall — keine flache 1-Zweig-Berechnung; Vollstaendigkeit gegen die Quelle).",
-        "antrag.felder: jedes Pflichtfeld required:true MIT passender Validierung (pattern/min/max), damit fehlende/ungueltige Eingaben blockieren (kein stilles Durchwinken)."
+        "antrag.felder: jedes Pflichtfeld required:true MIT passender Validierung (pattern/min/max), damit fehlende/ungueltige Eingaben blockieren (kein stilles Durchwinken).",
+        "OPTIONALE Komponenten-Signale aus dem Fachkonzept ableiten (NUR setzen, wenn das Fachkonzept es vorsieht — sonst weglassen, dann rendert die App den schlanken Standard): wenn eine GEBUEHR/Zahlung anfaellt -> config.ePayment { zahlarten:[{id,label}], positionen?:[{bezeichnung,betrag}] } (App komponiert EPaymentPanel im Buerger-Abschluss); wenn ein BESCHEID zugestellt wird (Bekanntgabe/Zustellungsfiktion §41 VwVfG) -> config.zustellung { bekanntgabeIso?, fiktion?, bescheidUrl? } (App: Postfach-Route + PdfViewer-Bescheid-Tab); wenn FRISTEN/TERMINE relevant sind -> config.termin { fristen?, slots? } (App: TerminFristPanel-Route); wenn KI-Unterstuetzung vorgesehen ist -> config.ki.vorschlag { wert, quelle, konfidenz, begruendung, funktionsName, risikoklasse } (App: KiAssistPanel mit 5 Transparenz-Elementen, statt nur KiVorschlag); wenn eine ADRESS-/Melderegisterpruefung vorgesehen ist -> config.adressValidierung { enabled:true } (App: AdressValidierung im Antrag-Review). Generisch, data-driven — kein Hardcode."
       ],
       "groundsOn": [
         "FACHKONZEPT.md",
