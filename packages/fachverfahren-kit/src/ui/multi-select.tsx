@@ -248,7 +248,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
                 tabIndex={-1}
                 disabled={disabled}
                 onClick={() => removeAt(opt.value)}
-                aria-label={`„${opt.label}“ entfernen`}
+                aria-label={`"${opt.label}" entfernen`}
                 className={cn(
                   // Zielgröße ≥ 24px (WCAG 2.2 AA SC 2.5.8): 24×24px Trefferfläche, Icon bleibt klein.
                   "inline-flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground",

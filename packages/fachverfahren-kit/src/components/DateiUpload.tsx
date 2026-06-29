@@ -114,7 +114,7 @@ export function DateiUpload({
     onChange(nachweis.id, datei);
     setStatusMeldung(
       datei
-        ? `${nachweis.label}: Datei „${datei.name}" (${formatGroesse(datei.groesse)}) hinzugefügt.`
+        ? `${nachweis.label}: Datei "${datei.name}" (${formatGroesse(datei.groesse)}) hinzugefügt.`
         : `${nachweis.label}: Datei entfernt.`,
     );
   };
@@ -433,7 +433,7 @@ function NachweisZeile({
               variant="ghost"
               size="sm"
               onClick={onRemove}
-              aria-label={`Datei „${datei.name}" für ${nachweis.label} entfernen`}
+              aria-label={`Datei "${datei.name}" für ${nachweis.label} entfernen`}
               className="text-status-block hover:text-status-block"
             >
               <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />

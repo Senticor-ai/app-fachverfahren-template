@@ -211,7 +211,7 @@ export function AuditTimeline({ history, rollenfilter }: AuditTimelineProps): Re
       {/* Vertikale Timeline — semantische geordnete Liste, durchgehender Zeitstrahl, KEINE Edit/Lösch-Affordanz */}
       {sichtbar.length === 0 ? (
         <p className="mt-6 rounded-md border border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
-          Keine Historien-Einträge{filter !== ALLE ? ` für die Rolle „${filter}"` : ""}.
+          Keine Historien-Einträge{filter !== ALLE ? ` für die Rolle "${filter}"` : ""}.
         </p>
       ) : (
         <ol className="relative mt-6 ms-2 border-s border-border ps-6">

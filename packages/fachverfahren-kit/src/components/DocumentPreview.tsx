@@ -166,7 +166,7 @@ export function DocumentPreview({
           >
             <img
               src={url as string}
-              alt={`Vorschau des Dokuments „${name}"`}
+              alt={`Vorschau des Dokuments "${name}"`}
               onError={() => setBildFehler(true)}
               className="max-h-full max-w-full object-contain"
               style={{ maxHeight: hoehe }}

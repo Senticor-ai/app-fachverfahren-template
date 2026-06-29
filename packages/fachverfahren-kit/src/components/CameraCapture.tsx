@@ -317,7 +317,7 @@ export function CameraCapture({
       e.target.value = "";
       if (!datei) return;
       onFallbackFile?.(datei);
-      setStatusMeldung(`Bild „${datei.name}" wurde hochgeladen.`);
+      setStatusMeldung(`Bild "${datei.name}" wurde hochgeladen.`);
     },
     [onFallbackFile],
   );

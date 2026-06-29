@@ -69,7 +69,7 @@ export function EntscheidungPanel<T = Record<string, unknown>>({
   function ausloesen(t: Transition) {
     const text = (detail[t.to] ?? "").trim();
     if (t.detailPflicht && !text) {
-      setFehler(`„${t.label}" erfordert eine Begründung.`);
+      setFehler(`"${t.label}" erfordert eine Begründung.`);
       return;
     }
     try {
@@ -106,7 +106,7 @@ export function EntscheidungPanel<T = Record<string, unknown>>({
                   <Textarea
                     id={`detail-${t.to}`}
                     rows={3}
-                    placeholder={`Begründung für „${t.label}" …`}
+                    placeholder={`Begründung für "${t.label}" …`}
                     value={detail[t.to] ?? ""}
                     onChange={(e) => setDetail((d) => ({ ...d, [t.to]: e.target.value }))}
                     className="text-sm"
