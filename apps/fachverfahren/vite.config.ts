@@ -20,12 +20,9 @@ export default defineConfig({
     },
     dedupe: ["react", "react-dom"],
   },
-  optimizeDeps: {
-    // Den Kit (Workspace-Paket) + seine transitiven Deps (lucide/radix/tanstack …) beim Server-START vor-bündeln,
-    // statt sie erst beim ersten Import zu entdecken. Sonst re-optimiert Vite mitten im ersten Load und die in-flight
-    // Requests scheitern mit „504 Outdated Optimize Dep" → weiße Seite beim allerersten Aufruf der gebauten App.
-    include: ["@senticor/fachverfahren-kit"],
-  },
+  // KEIN optimizeDeps.include des Kit-Workspace-Pakets: das zwingt den Dev-Optimizer (esbuild/rolldown) auf den
+  // Kit-Quelltext und brach den Dev-Server (Parse-Fehler auf deutsche Quotes in Template-Literalen) → weiße Seite.
+  // Der normale Vite-Dev-Transform verarbeitet den Kit problemlos on-demand; `vite build` (Prod) ohnehin grün.
   server: {
     host: process.env["VITE_DEV_HOST"] ?? "127.0.0.1",
     port: Number(process.env["VITE_DEV_PORT"] ?? 5174),
