@@ -608,6 +608,7 @@ function FeldRenderer({
     <Field
       htmlFor={id}
       label={feld.label}
+      required={feld.required}
       hint={feld.hint}
       wide={wide}
       invalid={!!sichtbarerFehler}
@@ -871,6 +872,7 @@ function Section({
 function Field({
   htmlFor,
   label,
+  required,
   children,
   wide,
   error,
@@ -881,6 +883,8 @@ function Field({
 }: {
   htmlFor: string;
   label: string;
+  /** Pflichtfeld → sichtbarer „*"-Marker am Label (a11y: aria-hidden + sr-only „Pflichtfeld"). */
+  required?: boolean | undefined;
   children: React.ReactNode;
   wide?: boolean | undefined;
   error?: string | undefined;
@@ -898,6 +902,12 @@ function Field({
         className={cn("text-[12px] font-medium", invalid ? "text-status-block" : "text-muted-foreground")}
       >
         {label}
+        {required ? (
+          <>
+            <span aria-hidden="true" className="ml-0.5 text-status-block">*</span>
+            <span className="sr-only"> (Pflichtfeld)</span>
+          </>
+        ) : null}
       </Label>
       <div className="mt-1">{children}</div>
       {error ? (
