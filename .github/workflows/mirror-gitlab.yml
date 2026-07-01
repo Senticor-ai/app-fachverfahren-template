@@ -67,4 +67,9 @@ jobs:
           esac
 
           git remote add gitlab "$mirror_url"
-          git push gitlab "HEAD:main"
+          remote_main_sha="$(git ls-remote --heads gitlab main | awk '{print $1}')"
+          if [ -n "$remote_main_sha" ]; then
+            git push --force-with-lease=refs/heads/main:"$remote_main_sha" gitlab "HEAD:main"
+          else
+            git push gitlab "HEAD:main"
+          fi
