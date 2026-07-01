@@ -92,6 +92,19 @@
       }
     },
     "workflows": { "type": "array", "items": { "type": "string" } },
+    "fim": {
+      "type": "object",
+      "required": ["sourceId", "rootId"],
+      "properties": {
+        "sourceId": { "type": "string" },
+        "rootId": { "type": "string" },
+        "services": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
     "domainVocabulary": { "type": "array", "items": { "type": "string" } },
     "extensions": { "type": "object" }
   },
