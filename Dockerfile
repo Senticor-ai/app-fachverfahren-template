@@ -8,9 +8,10 @@ ENV CI=true
 ENV PNPM_HOME="/home/nonroot/.local/bin"
 ENV PATH="${PNPM_HOME}:${PATH}"
 
-COPY package.json pnpm-workspace.yaml .npmrc ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY scripts/setup-husky.mjs scripts/setup-husky.mjs
 COPY apps/fachverfahren-template/package.json apps/fachverfahren-template/package.json
+COPY packages/fachverfahren-kit/package.json packages/fachverfahren-kit/package.json
 COPY packages/platform-contracts/package.json packages/platform-contracts/package.json
 COPY packages/public-sector-sdk/package.json packages/public-sector-sdk/package.json
 COPY packages/public-sector-ui/package.json packages/public-sector-ui/package.json
@@ -25,7 +26,8 @@ COPY jurisdictions/de/package.json jurisdictions/de/package.json
 
 RUN mkdir -p "${PNPM_HOME}" \
  && corepack enable --install-directory "${PNPM_HOME}" pnpm \
- && pnpm install --frozen-lockfile=false
+ && corepack prepare "pnpm@11.1.0" --activate \
+ && pnpm install --frozen-lockfile
 
 COPY . .
 RUN pnpm run build:packages \
