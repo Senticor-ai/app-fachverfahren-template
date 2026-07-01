@@ -84,8 +84,8 @@ werden als Domain-Module unter `modules/<domain>/` ergänzt und über ein
 `domain.module.yaml` beschrieben.
 
 `pnpm install` richtet in Git-Checkouts Husky ein. Der Pre-Commit-Hook startet
-`pnpm run precommit:check`; Details stehen in
-`docs/reference/precommit-hooks.md`.
+`pnpm run check:precommit`; vor Pushes laeuft `pnpm run check:push`. Details
+stehen in `docs/reference/precommit-hooks.md`.
 
 Designer und Fachseite starten mit:
 
@@ -145,6 +145,16 @@ GitLab-/opencode.de-Image-Builds nutzen Kaniko statt Docker-in-Docker, weil die
 Runner als unprivilegierte Kubernetes-Pods laufen. Der Dockerfile-Vertrag,
 Kaniko-Job und die pnpm-Filterreihenfolge sind in
 `docs/reference/ci-image-builds.md` beschrieben.
+
+GitHub `main` ist die kanonische Quelle. Nach erfolgreicher GitHub-CI wird der
+validierte Commit automatisch nach GitLab/openCode gespiegelt:
+
+```text
+https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-platform/senticor/senticor-app-fachverfahren-template
+```
+
+Der Mirror-Workflow nutzt `GITLAB_MIRROR_TOKEN`; optional kann
+`GITLAB_MIRROR_URL` das Ziel ueberschreiben.
 
 Vollständige neue App-Repositories werden über den Template-Lifecycle erzeugt:
 

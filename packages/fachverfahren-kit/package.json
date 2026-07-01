@@ -6,7 +6,7 @@
   "main": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./styles.css": "./src/styles.css",
+    "./styles.css": "./styles.css",
     "./tailwind-preset.cjs": "./tailwind-preset.cjs"
   },
   "scripts": {

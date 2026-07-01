@@ -259,7 +259,8 @@ erweitert; keine verstreuten Rollenbedingungen im UI-Code.
 Vor Abschluss einer Änderung nach Möglichkeit ausführen:
 
 ```bash
-pnpm run precommit:check
+pnpm run check:precommit
+pnpm run check:push
 pnpm run format:check
 pnpm run check:esm
 pnpm run check:typescript-policy
