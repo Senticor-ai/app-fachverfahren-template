@@ -1,4 +1,4 @@
-import { cp, mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -54,18 +54,16 @@ describe("agent platform contract", () => {
   it("scaffolds an app spec idempotently", async () => {
     const temp = await mkdtemp(join(tmpdir(), "agent-app-new-"));
     try {
-      await cp(root, temp, {
+      const specPath = "docs/examples/hundesteuer/app.spec.yaml";
+      await mkdir(join(temp, "docs/examples/hundesteuer"), {
         recursive: true,
-        filter: (path) =>
-          !path
-            .split("/")
-            .some((part) => part === ".git" || part === "node_modules"),
       });
+      await cp(join(root, specPath), join(temp, specPath));
       const first = await appNew(temp, {
-        specPath: "docs/examples/hundesteuer/app.spec.yaml",
+        specPath,
       });
       const second = await appNew(temp, {
-        specPath: "docs/examples/hundesteuer/app.spec.yaml",
+        specPath,
       });
       expect(first.status).toBe("ok");
       expect(second.status).toBe("ok");
