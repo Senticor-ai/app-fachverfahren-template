@@ -58,6 +58,19 @@ jobs:
         run: |
           host_uid="$(id -u)"
           host_gid="$(id -g)"
+          image="registry.opencode.de/open-code/oci/nodejs:24"
+
+          for attempt in 1 2 3; do
+            if docker pull "$image"; then
+              break
+            fi
+
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+
+            sleep "$((attempt * 15))"
+          done
 
           docker run --rm \
             --user root \
@@ -65,7 +78,7 @@ jobs:
             -e HOST_GID="$host_gid" \
             -v "$PWD:/work" \
             -w /work \
-            registry.opencode.de/open-code/oci/nodejs:24 \
+            "$image" \
             sh -lc '
               cleanup() {
                 chown -R "${HOST_UID}:${HOST_GID}" /work || true
