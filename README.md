@@ -42,6 +42,9 @@ Capability-Ports modelliert.
 - `packages/public-sector-sdk`: administrativer Domain-Kernel,
   Domain-Module-Manifeste, Runtime-Konfiguration, Authorization und Audit.
 - `packages/public-sector-ui`: KERN-orientierte UI-Fassade auf ShadCN-Primitiven.
+- `packages/fachverfahren-kit`: wiederverwendbare Fachverfahren-Bausteine
+  auf Tailwind/shadcn-Basis; der Katalog fuer Build-Agenten steht in
+  `docs/reference/fachverfahren-kit-components.md`.
 - `packages/provider-*`: lokale, Codesphere- und DVC-Providerprofile.
 - `packages/conformance-kit`: Compliance-Profile und Evidence-Bundle-Planung.
 - `packages/migration-kit`: Migrationsprofile für Legacy-Fachverfahren.
@@ -81,8 +84,8 @@ werden als Domain-Module unter `modules/<domain>/` ergänzt und über ein
 `domain.module.yaml` beschrieben.
 
 `pnpm install` richtet in Git-Checkouts Husky ein. Der Pre-Commit-Hook startet
-`pnpm run precommit:check`; Details stehen in
-`docs/reference/precommit-hooks.md`.
+`pnpm run check:precommit`; vor Pushes laeuft `pnpm run check:push`. Details
+stehen in `docs/reference/precommit-hooks.md`.
 
 Designer und Fachseite starten mit:
 
@@ -92,7 +95,9 @@ pnpm run storybook
 
 Die UX/UI-Regeln stehen in `docs/ux-ui/fachverfahren-ux-contract.md`, die
 TDD-Regeln in `docs/reference/test-driven-development.md` und die
-Storybook-Nutzung in `docs/reference/storybook.md`. Mockdaten und MSW sind in
+Storybook-Nutzung in `docs/reference/storybook.md`. Der wiederverwendbare
+Komponenten-Katalog fuer Coding Agents steht in
+`docs/reference/fachverfahren-kit-components.md`. Mockdaten und MSW sind in
 `docs/reference/mock-data-msw.md` beschrieben.
 
 Der erste E2E-Pfad prüft Anmeldung, Rollenwechsel, Benutzereinstellungen,
@@ -128,8 +133,7 @@ pnpm run dev:all
 und leitet Vite-API-Aufrufe an `http://127.0.0.1:8080` weiter.
 
 Coding Agents nutzen `agent.discovery.json`, `docs/agents/bootstrap.md` und die
-repo-lokalen Skills unter `.agents/skills`. Tool-spezifische Verzeichnisse wie
-`.claude/skills` sind nur Kompatibilitätsshims. Die Agent-Readiness und der
+repo-lokalen Skills unter `.agents/skills`. Die Agent-Readiness und der
 Standalone-Export sind in `docs/reference/opencode-agent-readiness.md`
 beschrieben.
 
@@ -141,6 +145,18 @@ GitLab-/opencode.de-Image-Builds nutzen Kaniko statt Docker-in-Docker, weil die
 Runner als unprivilegierte Kubernetes-Pods laufen. Der Dockerfile-Vertrag,
 Kaniko-Job und die pnpm-Filterreihenfolge sind in
 `docs/reference/ci-image-builds.md` beschrieben.
+
+GitHub `main` ist die kanonische Quelle. Nach erfolgreicher GitHub-CI wird der
+validierte Commit automatisch nach GitLab/openCode gespiegelt:
+
+```text
+https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-platform/senticor/senticor-app-fachverfahren-template
+```
+
+Der Mirror-Workflow nutzt `GITLAB_MIRROR_TOKEN`; optional kann
+`GITLAB_MIRROR_URL` das Ziel ueberschreiben. Ohne Token wird der Mirror-Schritt
+mit Notice uebersprungen, damit die eigentliche Validierungs-CI nicht wegen
+fehlender Repository-Secrets rot wird.
 
 Vollständige neue App-Repositories werden über den Template-Lifecycle erzeugt:
 

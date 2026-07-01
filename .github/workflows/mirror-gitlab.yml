@@ -1,0 +1,90 @@
+name: Mirror GitLab
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    branches:
+      - main
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mirror-gitlab-main
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    name: Push main to GitLab
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout validated commit
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Configure Git identity
+        run: |
+          git config user.name "app-fachverfahren-template mirror"
+          git config user.email "app-fachverfahren-template-mirror@users.noreply.github.com"
+
+      - name: Check mirror configuration
+        id: mirror-config
+        env:
+          GITLAB_MIRROR_TOKEN: ${{ secrets.GITLAB_MIRROR_TOKEN }}
+        run: |
+          if [ -n "$GITLAB_MIRROR_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=GitLab mirror skipped::Set the GITLAB_MIRROR_TOKEN repository secret to enable mirroring."
+          fi
+
+      - name: Push to GitLab
+        if: ${{ steps.mirror-config.outputs.enabled == 'true' }}
+        env:
+          GITLAB_MIRROR_URL: ${{ secrets.GITLAB_MIRROR_URL || 'https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-platform/senticor/senticor-app-fachverfahren-template.git' }}
+          GITLAB_MIRROR_TOKEN: ${{ secrets.GITLAB_MIRROR_TOKEN }}
+        run: |
+          test -n "$GITLAB_MIRROR_URL"
+          test -n "$GITLAB_MIRROR_TOKEN"
+
+          case "$GITLAB_MIRROR_URL" in
+            https://*)
+              mirror_url="${GITLAB_MIRROR_URL/https:\/\//https:\/\/oauth2:${GITLAB_MIRROR_TOKEN}@}"
+              ;;
+            *)
+              echo "GITLAB_MIRROR_URL must be an HTTPS GitLab repository URL." >&2
+              exit 1
+              ;;
+          esac
+
+          validated_sha="$(git rev-parse HEAD)"
+          git remote add gitlab "$mirror_url"
+          remote_main_sha="$(git ls-remote --heads gitlab main | awk '{print $1}')"
+          if [ -z "$remote_main_sha" ]; then
+            git push gitlab "HEAD:main"
+            exit 0
+          fi
+
+          git fetch gitlab main
+          if git merge-base --is-ancestor refs/remotes/gitlab/main "$validated_sha"; then
+            git push gitlab "$validated_sha:main"
+          else
+            git checkout -B gitlab-main refs/remotes/gitlab/main
+            git rm -r --ignore-unmatch --quiet .
+            git checkout "$validated_sha" -- .
+            if git diff --cached --quiet; then
+              echo "GitLab main already matches the validated GitHub tree."
+              exit 0
+            fi
+            git commit -m "Mirror GitHub main ${validated_sha}"
+            git push gitlab "HEAD:main"
+          fi

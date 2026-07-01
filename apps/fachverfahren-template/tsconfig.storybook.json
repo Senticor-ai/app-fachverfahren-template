@@ -7,6 +7,7 @@
   },
   "references": [
     { "path": "../../packages/public-sector-sdk" },
+    { "path": "../../packages/fachverfahren-kit" },
     { "path": "../../packages/public-sector-ui" },
     { "path": "../../jurisdictions/de" }
   ],
@@ -14,6 +15,7 @@
     "../../.storybook/**/*.ts",
     "../../modules/**/ui/**/*.stories.ts",
     "../../modules/**/ui/**/*.stories.tsx",
+    "../../modules/**/ui/**/screens.tsx",
     "../../packages/public-sector-ui/src/**/*.stories.ts",
     "../../packages/public-sector-ui/src/**/*.stories.tsx",
     "src/**/*.stories.ts",

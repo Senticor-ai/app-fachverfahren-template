@@ -55,6 +55,7 @@
     "docs/agents/bootstrap.md",
     "docs/reference/template-lifecycle.md",
     "docs/reference/test-driven-development.md",
+    "docs/reference/fachverfahren-kit-components.md",
     "docs/reference/storybook.md",
     "docs/ux-ui/fachverfahren-ux-contract.md",
     "platform/capabilities.json",
@@ -104,12 +105,36 @@
       "path": ".agents/skills/backend-fastify/SKILL.md"
     }
   ],
+  "componentLibraries": [
+    {
+      "id": "component-library:fachverfahren-kit",
+      "path": "packages/fachverfahren-kit/src/components",
+      "entrypoint": "packages/fachverfahren-kit/src/index.ts",
+      "catalog": "docs/reference/fachverfahren-kit-components.md",
+      "count": 57,
+      "purpose": "Complete reusable Fachverfahren building blocks for citizen, caseworker and audit surfaces."
+    },
+    {
+      "id": "component-library:fachverfahren-kit-primitives",
+      "path": "packages/fachverfahren-kit/src/ui",
+      "entrypoint": "packages/fachverfahren-kit/src/index.ts",
+      "catalog": "docs/reference/fachverfahren-kit-components.md",
+      "count": 44,
+      "purpose": "shadcn/Radix/Tailwind primitive layer used below the Fachverfahren building blocks."
+    },
+    {
+      "id": "component-library:public-sector-ui",
+      "path": "packages/public-sector-ui/src",
+      "entrypoint": "packages/public-sector-ui/src/index.ts",
+      "purpose": "Lower-level public-sector UI facade and Storybook-backed patterns."
+    }
+  ],
   "workflows": [
     {
       "id": "workflow:new-domain-module",
       "description": "Build a Fachverfahren domain module from an app spec.",
       "command": "app:new",
-      "defaultTask": "docs/examples/veranstaltungsanzeige/app.spec.yaml"
+      "defaultTask": "docs/examples/hundesteuer/app.spec.yaml"
     },
     {
       "id": "workflow:agent-context",

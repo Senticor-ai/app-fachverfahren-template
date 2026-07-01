@@ -143,6 +143,13 @@ Domain-Modul, nicht in die Basis-App.
 verwaltungsspezifische Komponenten stehen vor ShadCN. ShadCN bleibt
 Implementierungsdetail für Primitive.
 
+Die wiederverwendbaren Fachverfahren-Bausteine liegen in
+`packages/fachverfahren-kit/src/components/`; die shadcn/Radix/Tailwind-
+Primitive liegen in `packages/fachverfahren-kit/src/ui/`. Coding Agents lesen
+vor UI-Arbeit `docs/reference/fachverfahren-kit-components.md` und importieren
+moeglichst ueber `@senticor/fachverfahren-kit`, statt Bausteine in
+`modules/<domain>/` zu kopieren.
+
 Der verbindliche UX/UI-Vertrag steht in
 `docs/ux-ui/fachverfahren-ux-contract.md`. Generische Guidance wird dort in
 Repository-Regeln übersetzt; Hundesteuer bleibt nur ein externes Beispiel.
@@ -152,8 +159,7 @@ Der aktuelle Abgleich zur generischen UX-Methodik steht in
 `docs/ux-ui/ux-methodik-public-sector-audit.md`; offene Abweichungen müssen als
 RC-Gap sichtbar bleiben, nicht in der App versteckt werden.
 Bei UI-, Storybook- oder Screen-Contract-Änderungen ist zusätzlich
-`.agents/skills/ux-ui/SKILL.md` anzuwenden. `.claude/skills` enthält nur
-Kompatibilitätsshims.
+`.agents/skills/ux-ui/SKILL.md` anzuwenden.
 
 Design-Tokens haben zwei Ebenen: rohe HSL-Komponenten wie `--foreground` sind
 nur Token-Quelle; Komponenten, Stories und generierter Code nutzen die
@@ -253,7 +259,8 @@ erweitert; keine verstreuten Rollenbedingungen im UI-Code.
 Vor Abschluss einer Änderung nach Möglichkeit ausführen:
 
 ```bash
-pnpm run precommit:check
+pnpm run check:precommit
+pnpm run check:push
 pnpm run format:check
 pnpm run check:esm
 pnpm run check:typescript-policy

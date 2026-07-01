@@ -47,11 +47,15 @@ werden.
 
 ## Vorlagen und Beispiele
 
-- `modules/_template/` ist die kopierbare Skeleton-Struktur für neue
-  Fachverfahren.
-- `modules/neutral-example/` ist ein neutrales Beispielverfahren mit Manifest,
-  Screen Contracts, Storybook, Tests, Permissions, Events, Migrationen und
-  Compliance-Profil.
+Dieses Verzeichnis ist der Zielort fuer generierte Fachverfahren-Module, nicht
+die Quelle fuer wiederverwendbare Komponenten. Coding Agents erzeugen hier nur
+das konkrete `modules/<domain>/` aus App-Spezifikation, Screen Contracts,
+Permissions, Events, Tests und Compliance-Profil.
+
+Wiederverwendbare UI-Bausteine liegen im GitHub-Template unter
+`packages/fachverfahren-kit/src/components/`; shadcn/Radix/Tailwind-Primitive
+unter `packages/fachverfahren-kit/src/ui/`. Der Katalog steht in
+`docs/reference/fachverfahren-kit-components.md`.
 
 Prüfung:
 

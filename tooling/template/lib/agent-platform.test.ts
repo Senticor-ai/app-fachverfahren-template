@@ -1,4 +1,4 @@
-import { cp, mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -14,17 +14,6 @@ import {
 } from "./agent-platform.ts";
 
 const root = process.cwd();
-const ignoredCopyParts = new Set([
-  ".git",
-  ".pnpm",
-  ".pnpm-store",
-  "coverage",
-  "dist",
-  "dist-server",
-  "dist-types",
-  "node_modules",
-  "storybook-static",
-]);
 
 describe("agent platform contract", () => {
   it("emits deterministic discovery without local paths by default", async () => {
@@ -65,20 +54,20 @@ describe("agent platform contract", () => {
   it("scaffolds an app spec idempotently", async () => {
     const temp = await mkdtemp(join(tmpdir(), "agent-app-new-"));
     try {
-      await cp(root, temp, {
+      const specPath = "docs/examples/hundesteuer/app.spec.yaml";
+      await mkdir(join(temp, "docs/examples/hundesteuer"), {
         recursive: true,
-        filter: (path) =>
-          !path.split("/").some((part) => ignoredCopyParts.has(part)),
       });
+      await cp(join(root, specPath), join(temp, specPath));
       const first = await appNew(temp, {
-        specPath: "docs/examples/veranstaltungsanzeige/app.spec.yaml",
+        specPath,
       });
       const second = await appNew(temp, {
-        specPath: "docs/examples/veranstaltungsanzeige/app.spec.yaml",
+        specPath,
       });
       expect(first.status).toBe("ok");
       expect(second.status).toBe("ok");
-      expect(second.preserved).toContain("modules/event-notice");
+      expect(second.preserved).toContain("modules/dog-tax");
     } finally {
       await rm(temp, { recursive: true, force: true });
     }

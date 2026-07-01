@@ -1,13 +1,12 @@
 import { createHash } from "node:crypto";
-import { access, cp, mkdir, readFile, readdir, stat } from "node:fs/promises";
+import { access, mkdir, readFile, readdir, stat } from "node:fs/promises";
 import { dirname, extname, join, relative, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { readJson, writeFileAtomic } from "./structured-edit.ts";
 import type { PackageJson } from "./structured-edit.ts";
 
 export const discoveryPath = "agent.discovery.json";
-export const defaultTaskSpecPath =
-  "docs/examples/veranstaltungsanzeige/app.spec.yaml";
+export const defaultTaskSpecPath = "docs/examples/hundesteuer/app.spec.yaml";
 
 export interface AppSpec {
   schemaVersion: string;
@@ -163,6 +162,11 @@ export async function buildAgentContext(
       "docs/reference/test-driven-development.md",
       "TDD workflow",
     ),
+    selectContextItem(
+      root,
+      "docs/reference/fachverfahren-kit-components.md",
+      "component catalog",
+    ),
   ];
   const capabilityDocs = selectedCapabilities.map((capability) =>
     selectContextItem(
@@ -253,11 +257,30 @@ export async function validateAgentDiscovery(root: string) {
     ...(discovery.requiredFiles ?? []),
     ...(discovery.skills ?? []).map((skill) => skill.path),
     ...(discovery.schemas ?? []).map((schema) => schema.path),
+    ...(discovery.componentLibraries ?? []).flatMap((library) =>
+      [library.entrypoint, library.catalog].filter(Boolean),
+    ),
   ].filter(Boolean);
   for (const path of referencedFiles) {
     if (isAbsoluteOrEscaping(path)) {
       failures.push(`${discoveryPath} references non-relative path ${path}`);
     } else if (!(await exists(join(root, path)))) {
+      failures.push(`${discoveryPath} references missing path ${path}`);
+    }
+  }
+  const referencedDirectories = (discovery.componentLibraries ?? [])
+    .map((library) => library.path)
+    .filter(Boolean);
+  for (const path of referencedDirectories) {
+    if (isAbsoluteOrEscaping(path)) {
+      failures.push(`${discoveryPath} references non-relative path ${path}`);
+      continue;
+    }
+    try {
+      if (!(await stat(join(root, path))).isDirectory()) {
+        failures.push(`${discoveryPath} references non-directory path ${path}`);
+      }
+    } catch {
       failures.push(`${discoveryPath} references missing path ${path}`);
     }
   }
@@ -436,18 +459,25 @@ export async function appNew(
     return { status: "failed", spec, generated: [], preserved: [], failures };
   }
   const destination = join(root, spec.module.destination);
-  const template = join(root, "modules/_template");
   const contract = deriveModuleContract(spec);
   const generated = [
     `${spec.module.destination}/AGENTS.md`,
     `${spec.module.destination}/module.contract.yaml`,
     `${spec.module.destination}/domain.module.yaml`,
+    `${spec.module.destination}/contracts/citizen-intake.screen.yaml`,
+    `${spec.module.destination}/contracts/caseworker-workspace.screen.yaml`,
+    `${spec.module.destination}/events/events.yaml`,
+    `${spec.module.destination}/forms/intake.form.schema.json`,
+    `${spec.module.destination}/i18n/de.json`,
+    `${spec.module.destination}/permissions/permissions.yaml`,
+    `${spec.module.destination}/tests/${spec.module.id}.test.ts`,
+    `${spec.module.destination}/ui/screens.tsx`,
   ];
   const preserved: string[] = [];
   if (!dryRun) {
     await mkdir(dirname(destination), { recursive: true });
     if (!(await exists(destination))) {
-      await cp(template, destination, { recursive: true });
+      await createDomainModuleSkeleton(destination);
     } else {
       preserved.push(spec.module.destination);
     }
@@ -466,6 +496,54 @@ export async function appNew(
     } else {
       preserved.push(`${spec.module.destination}/domain.module.yaml`);
     }
+    await writeIfMissing(
+      join(destination, "contracts", "citizen-intake.screen.yaml"),
+      screenContractYaml(spec, "citizen"),
+      preserved,
+      `${spec.module.destination}/contracts/citizen-intake.screen.yaml`,
+    );
+    await writeIfMissing(
+      join(destination, "contracts", "caseworker-workspace.screen.yaml"),
+      screenContractYaml(spec, "caseworker"),
+      preserved,
+      `${spec.module.destination}/contracts/caseworker-workspace.screen.yaml`,
+    );
+    await writeIfMissing(
+      join(destination, "events", "events.yaml"),
+      eventsYaml(spec),
+      preserved,
+      `${spec.module.destination}/events/events.yaml`,
+    );
+    await writeIfMissing(
+      join(destination, "forms", "intake.form.schema.json"),
+      intakeFormSchema(spec),
+      preserved,
+      `${spec.module.destination}/forms/intake.form.schema.json`,
+    );
+    await writeIfMissing(
+      join(destination, "i18n", "de.json"),
+      i18nJson(spec),
+      preserved,
+      `${spec.module.destination}/i18n/de.json`,
+    );
+    await writeIfMissing(
+      join(destination, "permissions", "permissions.yaml"),
+      permissionsYaml(spec),
+      preserved,
+      `${spec.module.destination}/permissions/permissions.yaml`,
+    );
+    await writeIfMissing(
+      join(destination, "tests", `${spec.module.id}.test.ts`),
+      moduleTestTs(spec),
+      preserved,
+      `${spec.module.destination}/tests/${spec.module.id}.test.ts`,
+    );
+    await writeIfMissing(
+      join(destination, "ui", "screens.tsx"),
+      screensTsx(spec),
+      preserved,
+      `${spec.module.destination}/ui/screens.tsx`,
+    );
   }
   return {
     status: "ok",
@@ -686,6 +764,9 @@ async function hashFiles(root: string, paths: string[]) {
 async function validateSkillShims(root: string) {
   const failures: string[] = [];
   const canonicalSkills = await listSkillNames(join(root, ".agents/skills"));
+  if (!(await exists(join(root, ".claude/skills")))) {
+    return failures;
+  }
   const shimSkills = await listSkillNames(join(root, ".claude/skills"));
   for (const skill of canonicalSkills) {
     if (!shimSkills.includes(skill)) {
@@ -842,6 +923,205 @@ function domainModuleYaml(spec: AppSpec) {
     "  database: migrations/database/",
     "  documents: migrations/documents/",
     "  externalSystems: []",
+    "",
+  ].join("\n");
+}
+
+async function createDomainModuleSkeleton(destination: string) {
+  await Promise.all(
+    [
+      "contracts",
+      "ui",
+      "forms",
+      "permissions",
+      "events",
+      "migrations/database",
+      "migrations/documents",
+      "i18n",
+      "tests",
+      "compliance",
+    ].map((dir) => mkdir(join(destination, dir), { recursive: true })),
+  );
+  await writeFileAtomic(join(destination, "migrations/database/.gitkeep"), "");
+  await writeFileAtomic(join(destination, "migrations/documents/.gitkeep"), "");
+  await writeFileAtomic(
+    join(destination, "compliance/profile.example.json"),
+    stableStringify({
+      accessibility: { bitv: "planned" },
+      dataProtection: { dsfa: "planned", vvt: "planned" },
+      module: "replace-with-domain-id",
+    }),
+  );
+}
+
+async function writeIfMissing(
+  path: string,
+  content: string,
+  preserved: string[],
+  relativePath: string,
+) {
+  if (await exists(path)) {
+    preserved.push(relativePath);
+    return;
+  }
+  await writeFileAtomic(path, content);
+}
+
+function screenContractYaml(spec: AppSpec, persona: "citizen" | "caseworker") {
+  const route =
+    spec.routes.find((entry) => entry.surface === persona)?.path ??
+    spec.routes[0]?.path ??
+    `/${spec.module.id}`;
+  const title =
+    spec.journeys.find((journey) => journey.surface === persona)?.title ??
+    spec.displayName;
+  return [
+    `id: ${spec.module.id}-${persona}`,
+    `route: ${route}`,
+    `owner: ${spec.module.owner}`,
+    `persona: ${persona}`,
+    "",
+    "inputs:",
+    "  - app-spec",
+    "  - domain-contract",
+    "",
+    "outputs:",
+    "  - screen",
+    "  - validation-feedback",
+    "",
+    "states:",
+    "  - loading",
+    "  - empty",
+    "  - error",
+    "  - ready",
+    "  - success",
+    "",
+    "ia:",
+    `  pattern: ${persona === "citizen" ? "guided-flow" : "dense-list-detail"}`,
+    "  navigation: persona-local",
+    "  profile: public-sector",
+    "  scroll: stable",
+    "",
+    "content:",
+    "  language: de",
+    "  architectureTerms: hidden-from-users",
+    `  title: ${title}`,
+    "",
+    "hcai:",
+    "  mode: human-in-control",
+    "  controls:",
+    "    - review",
+    "    - correction",
+    "",
+    "a11y:",
+    "  landmarks: required",
+    "  keyboard: required",
+    "  focusOrder: deterministic",
+    "  zoom: 200-percent",
+    "  statusSemantics: text-and-color",
+    "",
+    "tests:",
+    "  unit: required",
+    "  integration: required",
+    "  storybook: required",
+    "",
+    "evidence:",
+    "  - screen-contract",
+    "  - storybook-state",
+    "",
+  ].join("\n");
+}
+
+function eventsYaml(spec: AppSpec) {
+  return [
+    "publishes:",
+    ...spec.workflows.map((workflow) => `  - ${spec.module.id}.${workflow}`),
+    "consumes: []",
+    "",
+  ].join("\n");
+}
+
+function intakeFormSchema(spec: AppSpec) {
+  return stableStringify({
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    additionalProperties: true,
+    properties: {
+      reference: { minLength: 1, title: "Referenz", type: "string" },
+    },
+    required: ["reference"],
+    title: `${spec.displayName} Intake`,
+    type: "object",
+  });
+}
+
+function i18nJson(spec: AppSpec) {
+  return stableStringify({
+    [`${spec.module.id}.empty`]: "Noch keine Vorgaenge vorhanden.",
+    [`${spec.module.id}.title`]: spec.displayName,
+  });
+}
+
+function permissionsYaml(spec: AppSpec) {
+  return [
+    "permissions:",
+    ...spec.roles.map(
+      (role) => `  - id: ${spec.module.id}.${role}\n    role: ${role}`,
+    ),
+    "",
+  ].join("\n");
+}
+
+function moduleTestTs(spec: AppSpec) {
+  return [
+    'import { describe, expect, it } from "vitest";',
+    "",
+    `describe("${spec.module.id} module contract", () => {`,
+    '  it("keeps generated module boundaries explicit", () => {',
+    `    expect("${spec.module.destination}").toMatch(/^modules\\//);`,
+    `    expect(${JSON.stringify(spec.requiredCapabilities)}.length).toBeGreaterThan(0);`,
+    "  });",
+    "});",
+    "",
+  ].join("\n");
+}
+
+function screensTsx(spec: AppSpec) {
+  const displayName = JSON.stringify(spec.displayName);
+  const domain = JSON.stringify(spec.module.id);
+  return [
+    'import { Badge, EmptyState, PageHeader } from "@senticor/fachverfahren-kit";',
+    "",
+    "export const moduleMeta = {",
+    `  domain: ${domain},`,
+    `  label: ${displayName},`,
+    "};",
+    "",
+    "export function CitizenScreen() {",
+    "  return (",
+    '    <main className="mx-auto max-w-5xl p-6">',
+    `      <PageHeader title={${displayName}} description="Buergerleistung" />`,
+    '      <EmptyState title="Noch kein Antrag" description="Der Antrag wird aus der Leistungskonfiguration aufgebaut." />',
+    "    </main>",
+    "  );",
+    "}",
+    "",
+    "export function CaseworkerScreen() {",
+    "  return (",
+    '    <main className="mx-auto max-w-6xl p-6">',
+    `      <PageHeader title={${displayName}} description="Sachbearbeitung" actions={<Badge tone="info">Bereit</Badge>} />`,
+    '      <EmptyState title="Noch kein Vorgang" description="Vorgaenge erscheinen nach Eingang oder Migration." />',
+    "    </main>",
+    "  );",
+    "}",
+    "",
+    "export function AuditScreen() {",
+    "  return (",
+    '    <main className="mx-auto max-w-6xl p-6">',
+    `      <PageHeader title={${displayName}} description="Audit" />`,
+    '      <EmptyState title="Noch kein Audit-Nachweis" description="Nachweise werden vom Build- und Laufprotokoll verknuepft." />',
+    "    </main>",
+    "  );",
+    "}",
     "",
   ].join("\n");
 }

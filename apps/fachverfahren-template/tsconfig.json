@@ -11,6 +11,7 @@
   "references": [
     { "path": "../../packages/public-sector-sdk" },
     { "path": "../../packages/app-store-postgres" },
+    { "path": "../../packages/fachverfahren-kit" },
     { "path": "../../packages/public-sector-ui" },
     { "path": "../../jurisdictions/de" }
   ],

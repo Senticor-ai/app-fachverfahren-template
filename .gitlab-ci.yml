@@ -9,10 +9,9 @@ variables:
 .node-base:
   image: registry.opencode.de/open-code/oci/nodejs:24
   before_script:
-    - export PNPM_HOME="$(dirname "${CI_PROJECT_DIR}")/.pnpm-${CI_PROJECT_NAME}"
-    - export TMPDIR="$(dirname "${CI_PROJECT_DIR}")/.tmp-${CI_PROJECT_NAME}"
+    - export PNPM_HOME="${CI_PROJECT_DIR}/.pnpm"
     - export PATH="${PNPM_HOME}:${PATH}"
-    - mkdir -p "${PNPM_HOME}" "${TMPDIR}"
+    - mkdir -p "${PNPM_HOME}"
     - corepack enable --install-directory "${PNPM_HOME}" pnpm
     - pnpm install --frozen-lockfile=false
 
@@ -32,22 +31,14 @@ validate:
     - pnpm run build:packages
     - pnpm run build:app
     - pnpm run build:server
+    - pnpm run test:k8s:render
     - pnpm run evidence:build
-
-k8s-render:
-  image:
-    name: bitnami/kubectl:latest
-    entrypoint: [""]
-  stage: validate
-  script:
-    - scripts/validate-k8s-render.sh
 
 pages:
   extends: .node-base
   stage: pages
   needs:
     - validate
-    - k8s-render
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
@@ -63,7 +54,6 @@ container-image:
   stage: image
   needs:
     - validate
-    - k8s-render
   rules:
     - if: $CI_COMMIT_BRANCH
     - if: $CI_COMMIT_TAG

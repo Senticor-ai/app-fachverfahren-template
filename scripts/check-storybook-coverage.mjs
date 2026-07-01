@@ -11,7 +11,7 @@ const requiredFiles = [
   "apps/fachverfahren-template/src/stories/UxMethodikPublicSector.stories.tsx",
   "apps/fachverfahren-template/src/stories/FachverfahrenDesignManual.stories.tsx",
   "apps/fachverfahren-template/src/stories/MdfilesUxUiSkill.stories.tsx",
-  "modules/neutral-example/ui/NeutralExample.stories.tsx",
+  "docs/reference/fachverfahren-kit-components.md",
   "docs/reference/storybook.md",
   "docs/reference/test-driven-development.md",
   "docs/ux-ui/fachverfahren-ux-contract.md",
@@ -22,6 +22,7 @@ const requiredFiles = [
 const storyRoots = [
   "apps/fachverfahren-template/src",
   "modules",
+  "packages/fachverfahren-kit/src",
   "packages/public-sector-ui/src",
 ];
 

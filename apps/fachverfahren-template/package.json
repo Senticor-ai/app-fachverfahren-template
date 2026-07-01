@@ -32,6 +32,7 @@
     "@fastify/swagger": "catalog:",
     "@fastify/swagger-ui": "catalog:",
     "@senticor/app-store-postgres": "workspace:*",
+    "@senticor/fachverfahren-kit": "workspace:*",
     "@senticor/jurisdiction-de": "workspace:*",
     "@senticor/public-sector-sdk": "workspace:*",
     "@senticor/public-sector-ui": "workspace:*",

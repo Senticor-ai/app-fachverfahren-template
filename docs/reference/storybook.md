@@ -24,6 +24,8 @@ pnpm run check:storybook
 - `apps/fachverfahren-template/src/stories/` enthält App- und
   Pattern-Stories.
 - `modules/<domain>/ui/` enthält Domain-Modul-Stories.
+- `packages/fachverfahren-kit` enthält wiederverwendbare Fachverfahren-
+  Bausteine und shadcn/Radix/Tailwind-Primitive.
 - `packages/public-sector-ui` enthält wiederverwendbare Komponenten, die durch
   Stories abgedeckt sein müssen.
 

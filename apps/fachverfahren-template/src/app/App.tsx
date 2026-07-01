@@ -9,6 +9,7 @@ import {
   PaymentStatus,
   ServiceHeader,
 } from "@senticor/public-sector-ui";
+import { ModuleHost, hasMountedModule } from "./ModuleHost.js";
 import {
   ArrowUpDown,
   Bell,
@@ -84,10 +85,18 @@ interface CapabilityMenuItem {
 const citizenMockUserId = "citizen-anna-muster";
 const caseworkerMockUserId = "caseworker-max-beispiel";
 
+// Navigations-Eintrag für das gemountete Fachverfahren-Modul — erscheint NUR, wenn der Build ein Modul mit
+// App-Surface erzeugt hat (generisch: ModuleHost entdeckt modules/<domain>/ui/screens.tsx automatisch).
+const moduleNavItem: NavigationItem = {
+  href: "#fachverfahren",
+  label: "Fachverfahren",
+};
+
 const citizenNavigation: NavigationItem[] = [
   { href: "#overview", label: "Übersicht" },
   { href: "#cases", label: "Meine Vorgänge" },
   { href: "#messages", label: "Nachrichten" },
+  ...(hasMountedModule ? [moduleNavItem] : []),
 ];
 
 const caseworkerNavigation: NavigationItem[] = [
@@ -96,6 +105,7 @@ const caseworkerNavigation: NavigationItem[] = [
   { href: "#deadlines", label: "Fristen" },
   { href: "#decisions", label: "Entscheidungen" },
   { href: "#search", label: "Suche" },
+  ...(hasMountedModule ? [moduleNavItem] : []),
 ];
 
 const globalNavigation: NavigationItem[] = [
@@ -880,6 +890,8 @@ function AuthenticatedShell({
                 appName={config.application.displayName}
                 authorityName={config.authority.displayName}
               />
+            ) : activeHash === "#fachverfahren" ? (
+              <ModuleHost surface="caseworker" />
             ) : (
               <EmployeeWorkspace
                 activeSection={activeSection}
@@ -959,6 +971,8 @@ function AuthenticatedShell({
             appName={config.application.displayName}
             authorityName={config.authority.displayName}
           />
+        ) : activeHash === "#fachverfahren" ? (
+          <ModuleHost surface="citizen" />
         ) : (
           <CitizenWorkspace
             activeSection={citizenSectionFromHash(activeHash)}

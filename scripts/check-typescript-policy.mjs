@@ -16,6 +16,8 @@ const ignoredDirectories = new Set([
 ]);
 const generatedJavaScriptAssets = new Set([
   "apps/fachverfahren-template/public/mockServiceWorker.js",
+  // legitimer CommonJS-Interop (kein TS): Tailwind-v3-Preset, oeffentlicher package.json-Export, von Consumer-Apps eingebunden
+  "packages/fachverfahren-kit/tailwind-preset.cjs",
 ]);
 const forbiddenJavaScriptExtensions = new Set([".js", ".jsx", ".cjs", ".mjs"]);
 

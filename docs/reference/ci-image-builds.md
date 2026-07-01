@@ -9,19 +9,6 @@ opencode.de-Runner sind unprivilegierte Kubernetes-Pods. Sie haben keinen
 Docker-Socket und dürfen keine privilegierten Sidecars starten. `docker:dind`
 und `docker build` sind deshalb kein belastbarer Standard.
 
-Node-Validierungsjobs nutzen Build-Workspace-lokale `PNPM_HOME`- und
-`TMPDIR`-Verzeichnisse außerhalb des Repository-Checkouts, weil
-Kubernetes-Runner je nach Image- und SecurityContext-Konfiguration `/tmp` nicht
-beschreibbar bereitstellen und Full-Repo-Scaffold-Tests keine
-Toolchain-Artefakte aus dem Checkout kopieren sollen. Vitest, Vite, Corepack
-und pnpm schreiben damit in Geschwisterverzeichnisse von `${CI_PROJECT_DIR}`.
-Shell-Skripte im Validierungspfad müssen mit POSIX `sh` laufen und dürfen kein
-installiertes Bash voraussetzen.
-
-Kubernetes-Renderchecks laufen als eigener `k8s-render`-Job mit einem
-`kubectl`-Image. Das hält die Node-Validierung unabhängig vom Kubernetes-CLI und
-bewahrt den Manifest-Rendercheck als verpflichtendes CI-Gate.
-
 Container-Images werden mit Kaniko gebaut. Die Vorlage nutzt:
 
 ```yaml

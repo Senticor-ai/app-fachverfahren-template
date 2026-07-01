@@ -1,5 +1,9 @@
-@import "tailwindcss";
-@import "tw-animate-css";
+@import "@senticor/fachverfahren-kit/styles.css";
+
+/* Domain modules compose @senticor/fachverfahren-kit. Tailwind v4 needs the
+   workspace package as explicit source, otherwise generated module classes can
+   be purged. */
+@source "../../../../packages/fachverfahren-kit/src/**/*.tsx";
 
 :root {
   color-scheme: light;

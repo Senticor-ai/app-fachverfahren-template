@@ -1,6 +1,0 @@
-publishes:
-  - eventType: replace-with-domain-id.case-created
-    version: v1
-  - eventType: replace-with-domain-id.decision-prepared
-    version: v1
-consumes: []

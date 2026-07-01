@@ -2,9 +2,16 @@
 
 Nutze diese Anleitung für Backend-Änderungen an der Vorlage.
 
+> **GELTUNGSBEREICH — NUR Plattform-/App-Routen.** Diese Anleitung gilt ausschließlich für die
+> App-Factory unter `apps/<app>/server/routes/`. **Domain-Module (`modules/<domain>/`) sind
+> FRAMEWORK-AGNOSTISCH und importieren NIEMALS fastify** (kein `FastifyPluginAsync`/`FastifyRequest`/
+> `FastifyReply`, kein `declare module "fastify"`). Ein Modul exportiert einen deklarativen Routen-
+> Descriptor + reine Handler über Ports (siehe `docs/architecture/domain-modules.md`); die App-Factory
+> mountet sie. Schreibst du gerade in `modules/…`, ignoriere fastify komplett.
+
 ## Backend-Vertrag
 
-- Fastify ist der BFF-/Backend-Standard.
+- Fastify ist der BFF-/Backend-Standard **der App-Factory** (nicht der Module).
 - Route-Schemas sind die OpenAPI-Quelle.
 - OpenAPI JSON liegt unter `/api/openapi.json`.
 - Swagger UI liegt unter `/api/v1/docs`.

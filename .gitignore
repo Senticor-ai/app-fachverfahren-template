@@ -1,5 +1,4 @@
 node_modules/
-.pnpm/
 .pnpm-store/
 dist/
 dist-server/
@@ -20,3 +19,8 @@ test-results/
 !.chos/build-manifest.json
 !.chos/gold-checklist.json
 !.chos/governance.md
+
+# Governance/Steuerung lebt IP-geschützt in CHOS-Code (packages/journeys/templates/<id>/governance.yaml)
+# und wird beim Provisionieren über den Klon gelegt — NICHT in dieses offene Template aufnehmen.
+governance.yaml
+dist-types/
