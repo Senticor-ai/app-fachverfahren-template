@@ -1,6 +1,10 @@
 node_modules
+**/node_modules
 dist
+**/dist
 dist-server
+**/dist-server
+storybook-static
 coverage
 playwright-report
 test-results
@@ -8,3 +12,4 @@ test-results
 .env
 .env.local
 *.tsbuildinfo
+**/*.tsbuildinfo
