@@ -67,4 +67,4 @@ jobs:
           esac
 
           git remote add gitlab "$mirror_url"
-          git push gitlab "+HEAD:main"
+          git push gitlab "HEAD:main"
