@@ -55,6 +55,8 @@ describe("template CLI", () => {
         "Antragsservice",
         "--target",
         target,
+        "--allow-existing-empty",
+        "--allow-dirty",
         "--json",
       ]);
       const report = JSON.parse(output);
@@ -75,6 +77,18 @@ describe("template CLI", () => {
     expect(JSON.stringify(report.discovery)).not.toContain(process.cwd());
   });
 
+  it("bootstraps agent readiness as JSON", async () => {
+    const output = await runTemplate(["agent:bootstrap", "--json"]);
+    const report = JSON.parse(output);
+    expect(report.title).toBe("Agent Bootstrap");
+    expect(report.bootstrap.installCommand).toBe(
+      "pnpm install --frozen-lockfile",
+    );
+    expect(
+      report.bootstrap.validationProfiles.map((profile) => profile.id),
+    ).toContain("agent-release");
+  });
+
   it("returns task-specific agent context", async () => {
     const output = await runTemplate([
       "agent:context",
@@ -88,6 +102,12 @@ describe("template CLI", () => {
     expect(report.status).toBe("ok");
     expect(report.context.selectedSources).toEqual(["fimportal"]);
     expect(report.context.writeBoundaries).toContain("modules/dog-tax");
+    expect(report.context.nextCommands.map((command) => command.id)).toContain(
+      "generate-domain-module",
+    );
+    expect(
+      report.context.validationProfiles.map((profile) => profile.id),
+    ).toContain("agent-domain");
   });
 
   it("preflights agent contracts", async () => {

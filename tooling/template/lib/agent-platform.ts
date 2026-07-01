@@ -1,10 +1,14 @@
 import { createHash } from "node:crypto";
+import { execFile } from "node:child_process";
 import { access, mkdir, readFile, readdir, stat } from "node:fs/promises";
 import { dirname, extname, join, relative, resolve } from "node:path";
+import { promisify } from "node:util";
 import { parse as parseYaml } from "yaml";
+import { getGitCommit, getGitShortStatus } from "./git.ts";
 import { readJson, writeFileAtomic } from "./structured-edit.ts";
 import type { PackageJson } from "./structured-edit.ts";
 
+const execFileAsync = promisify(execFile);
 export const discoveryPath = "agent.discovery.json";
 export const defaultTaskSpecPath = "docs/examples/hundesteuer/app.spec.yaml";
 
@@ -64,6 +68,15 @@ export interface ModuleContract {
   allowedDomainPaths: string[];
 }
 
+interface AgentCommandPlan {
+  id: string;
+  command: string;
+  cwd: string;
+  writes: boolean;
+  expectedArtifacts: string[];
+  followUpChecks: string[];
+}
+
 export interface SourceRegistry {
   schemaVersion: string;
   sources: {
@@ -88,6 +101,7 @@ interface AgentDiscoveryManifest {
   schemaVersion?: string;
   commands?: { id: string; script: string }[];
   workflows?: { id: string; description: string }[];
+  validationProfiles?: { id: string; script: string }[];
   provenance?: unknown;
   packageScripts?: Record<string, string>;
 }
@@ -117,6 +131,82 @@ export async function buildDiscovery(
     });
   }
   return result;
+}
+
+export async function buildAgentBootstrap(root: string) {
+  const packageJson = await readJson<PackageJson>(join(root, "package.json"));
+  const requiredCommands = [
+    "agent:bootstrap",
+    "agent:discover",
+    "agent:context",
+    "agent:preflight",
+    "agent:verify",
+    "app:new",
+  ];
+  const commandFailures = requiredCommands
+    .filter((script) => !packageJson.scripts?.[script])
+    .map((script) => `package.json missing script ${script}`);
+  const preflightFailures = await validateAgentPreflight(root);
+  const nodeMajor = Number(process.versions.node.split(".")[0] ?? 0);
+  const nodeRequirement =
+    typeof packageJson.engines === "object" && packageJson.engines !== null
+      ? String((packageJson.engines as Record<string, unknown>).node)
+      : ">=24 <25";
+  const pnpmVersion = await commandVersion("pnpm", ["--version"]);
+  const checks = [
+    {
+      id: "node",
+      status: nodeMajor === 24 ? "ok" : "failed",
+      detail: `current ${process.version}; required ${nodeRequirement}`,
+    },
+    {
+      id: "package-manager",
+      status: packageJson.packageManager?.startsWith("pnpm@") ? "ok" : "failed",
+      detail: packageJson.packageManager ?? "missing packageManager",
+    },
+    {
+      id: "pnpm-lock",
+      status: (await exists(join(root, "pnpm-lock.yaml"))) ? "ok" : "failed",
+      detail: "pnpm-lock.yaml",
+    },
+    {
+      id: "dependencies",
+      status: (await exists(join(root, "node_modules"))) ? "ok" : "failed",
+      detail: "node_modules",
+      remediation: "pnpm install --frozen-lockfile",
+    },
+    {
+      id: "pnpm",
+      status: pnpmVersion.ok ? "ok" : "failed",
+      detail: pnpmVersion.value,
+    },
+    {
+      id: "agent-contracts",
+      status:
+        preflightFailures.length === 0 && commandFailures.length === 0
+          ? "ok"
+          : "failed",
+      detail: [...preflightFailures, ...commandFailures].join("; "),
+    },
+  ];
+  const blockers = checks
+    .filter((check) => check.status !== "ok")
+    .map((check) => `${check.id}: ${check.detail}`);
+  const dirtyStatus = await getGitShortStatus(root);
+  return stableClone({
+    schemaVersion: "1.0.0",
+    ready: blockers.length === 0,
+    installCommand: "pnpm install --frozen-lockfile",
+    source: {
+      commit: await getGitCommit(root),
+      dirty: dirtyStatus !== "",
+      status: dirtyStatus,
+    },
+    checks,
+    blockers,
+    requiredCommands,
+    validationProfiles: buildValidationProfiles(),
+  });
 }
 
 export async function buildAgentContext(
@@ -216,6 +306,8 @@ export async function buildAgentContext(
     ].sort(),
     requestedPaths: [...paths].sort(),
     relevantChecks,
+    validationProfiles: buildValidationProfiles(),
+    nextCommands: buildNextCommands(spec, taskPath),
     estimatedContextBytes: contextItems.reduce(
       (sum, item) => sum + ((item as { sizeBytes?: number }).sizeBytes ?? 0),
       0,
@@ -460,17 +552,26 @@ export async function appNew(
   }
   const destination = join(root, spec.module.destination);
   const contract = deriveModuleContract(spec);
+  const migrationFile = `0001_create_${tableName(spec.module.id)}_cases.sql`;
+  const storyFile = `${pascalCase(spec.module.id)}Screens.stories.tsx`;
+  const hasAuditRoute = spec.routes.some((route) => route.surface === "audit");
   const generated = [
     `${spec.module.destination}/AGENTS.md`,
     `${spec.module.destination}/module.contract.yaml`,
     `${spec.module.destination}/domain.module.yaml`,
+    `${spec.module.destination}/compliance/profile.example.json`,
+    ...(hasAuditRoute
+      ? [`${spec.module.destination}/contracts/audit-workspace.screen.yaml`]
+      : []),
     `${spec.module.destination}/contracts/citizen-intake.screen.yaml`,
     `${spec.module.destination}/contracts/caseworker-workspace.screen.yaml`,
     `${spec.module.destination}/events/events.yaml`,
     `${spec.module.destination}/forms/intake.form.schema.json`,
     `${spec.module.destination}/i18n/de.json`,
+    `${spec.module.destination}/migrations/database/${migrationFile}`,
     `${spec.module.destination}/permissions/permissions.yaml`,
     `${spec.module.destination}/tests/${spec.module.id}.test.ts`,
+    `${spec.module.destination}/ui/${storyFile}`,
     `${spec.module.destination}/ui/screens.tsx`,
   ];
   const preserved: string[] = [];
@@ -508,6 +609,14 @@ export async function appNew(
       preserved,
       `${spec.module.destination}/contracts/caseworker-workspace.screen.yaml`,
     );
+    if (hasAuditRoute) {
+      await writeIfMissing(
+        join(destination, "contracts", "audit-workspace.screen.yaml"),
+        screenContractYaml(spec, "audit"),
+        preserved,
+        `${spec.module.destination}/contracts/audit-workspace.screen.yaml`,
+      );
+    }
     await writeIfMissing(
       join(destination, "events", "events.yaml"),
       eventsYaml(spec),
@@ -527,6 +636,12 @@ export async function appNew(
       `${spec.module.destination}/i18n/de.json`,
     );
     await writeIfMissing(
+      join(destination, "migrations", "database", migrationFile),
+      migrationSql(spec),
+      preserved,
+      `${spec.module.destination}/migrations/database/${migrationFile}`,
+    );
+    await writeIfMissing(
       join(destination, "permissions", "permissions.yaml"),
       permissionsYaml(spec),
       preserved,
@@ -539,10 +654,22 @@ export async function appNew(
       `${spec.module.destination}/tests/${spec.module.id}.test.ts`,
     );
     await writeIfMissing(
+      join(destination, "ui", storyFile),
+      screensStoryTsx(spec),
+      preserved,
+      `${spec.module.destination}/ui/${storyFile}`,
+    );
+    await writeIfMissing(
       join(destination, "ui", "screens.tsx"),
       screensTsx(spec),
       preserved,
       `${spec.module.destination}/ui/screens.tsx`,
+    );
+    await writeIfMissing(
+      join(destination, "compliance", "profile.example.json"),
+      complianceProfileJson(spec),
+      preserved,
+      `${spec.module.destination}/compliance/profile.example.json`,
     );
   }
   return {
@@ -556,12 +683,18 @@ export async function appNew(
 
 export async function verifyAgentRun(
   root: string,
-  { taskPath }: { taskPath: string },
+  { taskPath, reportPath }: { taskPath: string; reportPath?: string },
 ) {
   const context = await buildAgentContext(root, { taskPath, paths: [] });
+  const spec = await readStructuredFile<AppSpec>(join(root, taskPath));
   const taskHash = await fileSha256(join(root, taskPath));
   const runId = taskHash.slice(0, 16);
-  const reportPath = join(root, ".agent", "runs", runId, "report.json");
+  const resolvedReportPath = reportPath
+    ? resolve(root, reportPath)
+    : join(root, ".agent", "runs", runId, "report.json");
+  const existingReport = reportPath
+    ? await readJson(resolvedReportPath).catch(() => undefined)
+    : undefined;
   const report = stableClone({
     schemaVersion: "1.0.0",
     runId,
@@ -571,18 +704,37 @@ export async function verifyAgentRun(
       .filter(hasSha256)
       .map((item) => ({ path: item.path, sha256: item.sha256 }))
       .sort((a, b) => a.path.localeCompare(b.path)),
-    filesChanged: [],
-    commandsExecuted: [],
-    acceptanceCriteria: [],
-    externalSources: context.selectedSources,
+    filesChanged: await moduleFileEntries(root, spec),
+    commandsExecuted: buildNextCommands(spec, taskPath).map((command) => ({
+      id: command.id,
+      command: command.command,
+      cwd: command.cwd,
+    })),
+    acceptanceCriteria: spec.acceptanceCriteria.map((criterion) => ({
+      id: criterion.id,
+      tests: criterion.tests,
+      text: criterion.text,
+    })),
+    externalSources: await externalSourceEvidence(
+      root,
+      context.selectedSources,
+    ),
     architecturePolicyFindings: [],
     humanApprovals: [],
     deviations: [],
     residualRisks: [],
   });
-  await mkdir(dirname(reportPath), { recursive: true });
-  await writeFileAtomic(reportPath, stableStringify(report));
-  return { reportPath: relative(root, reportPath), report };
+  const validatedReport = existingReport ?? report;
+  const failures = await validateAgentRunReport(root, spec, validatedReport);
+  await mkdir(dirname(resolvedReportPath), { recursive: true });
+  if (!existingReport) {
+    await writeFileAtomic(resolvedReportPath, stableStringify(report));
+  }
+  return {
+    reportPath: relative(root, resolvedReportPath),
+    report: validatedReport,
+    failures,
+  };
 }
 
 export async function fetchGovernedSource(
@@ -646,6 +798,124 @@ export async function fetchGovernedSource(
   };
 }
 
+async function moduleFileEntries(root: string, spec: AppSpec) {
+  const directory = join(root, spec.module.destination);
+  const files = await collectFiles(directory, [
+    ".json",
+    ".sql",
+    ".ts",
+    ".tsx",
+    ".yaml",
+  ]);
+  const entries = await Promise.all(
+    files.map(async (file) => ({
+      path: relative(root, file),
+      sha256: await fileSha256(file),
+    })),
+  );
+  return entries.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+async function externalSourceEvidence(root: string, sourceIds: string[]) {
+  const entries = [];
+  for (const sourceId of sourceIds) {
+    const provenancePath = join(
+      root,
+      ".agent",
+      "sources",
+      sourceId,
+      "provenance.json",
+    );
+    const provenance = await readJson(provenancePath).catch(() => undefined);
+    entries.push({
+      sourceId,
+      provenancePath: relative(root, provenancePath),
+      sha256:
+        provenance && typeof provenance === "object"
+          ? (provenance as Record<string, unknown>).sha256
+          : undefined,
+    });
+  }
+  return entries;
+}
+
+async function validateAgentRunReport(
+  root: string,
+  spec: AppSpec,
+  report: Record<string, unknown>,
+) {
+  const failures: string[] = [];
+  if (report.schemaVersion !== "1.0.0") {
+    failures.push("report schemaVersion must be 1.0.0");
+  }
+  if (!report.runId) {
+    failures.push("report missing runId");
+  }
+  const filesChanged = Array.isArray(report.filesChanged)
+    ? report.filesChanged
+    : [];
+  if (filesChanged.length === 0) {
+    failures.push("report filesChanged must not be empty");
+  }
+  for (const entry of filesChanged) {
+    const path = reportPathEntry(entry);
+    if (!path) {
+      failures.push("report filesChanged entry missing path");
+      continue;
+    }
+    if (!(await exists(join(root, path)))) {
+      failures.push(`report references missing file ${path}`);
+    }
+  }
+  if (
+    !Array.isArray(report.commandsExecuted) ||
+    report.commandsExecuted.length === 0
+  ) {
+    failures.push("report commandsExecuted must not be empty");
+  }
+  const acceptanceCriteria = Array.isArray(report.acceptanceCriteria)
+    ? report.acceptanceCriteria
+    : [];
+  const acceptedIds = new Set(
+    acceptanceCriteria
+      .map((entry) =>
+        typeof entry === "object" && entry
+          ? String((entry as Record<string, unknown>).id ?? "")
+          : "",
+      )
+      .filter(Boolean),
+  );
+  for (const criterion of spec.acceptanceCriteria) {
+    if (!acceptedIds.has(criterion.id)) {
+      failures.push(`report missing acceptance criterion ${criterion.id}`);
+    }
+  }
+  for (const sourceId of spec.permittedExternalSources) {
+    const provenancePath = join(
+      root,
+      ".agent",
+      "sources",
+      sourceId,
+      "provenance.json",
+    );
+    if (!(await exists(provenancePath))) {
+      failures.push(`missing governed source provenance for ${sourceId}`);
+    }
+  }
+  return failures.sort();
+}
+
+function reportPathEntry(entry: unknown) {
+  if (typeof entry === "string") {
+    return entry;
+  }
+  if (entry && typeof entry === "object") {
+    const path = (entry as Record<string, unknown>).path;
+    return typeof path === "string" ? path : undefined;
+  }
+  return undefined;
+}
+
 export function deriveModuleContract(spec: AppSpec): ModuleContract {
   return stableClone({
     schemaVersion: "1.0.0",
@@ -655,11 +925,13 @@ export function deriveModuleContract(spec: AppSpec): ModuleContract {
     riskClass: spec.module.riskClass,
     publicExports: ["domain.module.yaml", "contracts/*.screen.yaml"],
     permittedDependencies: [
+      "@senticor/fachverfahren-kit",
       "@senticor/platform-contracts",
       "@senticor/public-sector-sdk",
       "@senticor/public-sector-ui",
     ],
     consumedCapabilities: spec.requiredCapabilities,
+    platformPorts: spec.requiredCapabilities.map(capabilityPortName).sort(),
     routes: spec.routes,
     roles: spec.roles,
     permissions: spec.roles.map((role) => `${spec.module.id}.${role}`),
@@ -671,9 +943,24 @@ export function deriveModuleContract(spec: AppSpec): ModuleContract {
       ),
       consumes: [],
     },
+    audit: spec.requiredCapabilities.includes("audit")
+      ? {
+          port: "AuditPort",
+          appendOnlyEvents: spec.workflows.map(
+            (workflow) => `${spec.module.id}.${workflow}`,
+          ),
+        }
+      : undefined,
+    fimReferences: spec.fim
+      ? {
+          rootId: spec.fim.rootId,
+          services: spec.fim.services,
+        }
+      : undefined,
+    humanApproval: spec.humanApproval,
     storage: {
       migrations: [`${spec.module.destination}/migrations/database/`],
-      ownsTables: [`${spec.module.id.replace(/-/g, "_")}_cases`],
+      ownsTables: [`${tableName(spec.module.id)}_cases`],
     },
     externalSources: spec.permittedExternalSources,
     requiredTests: spec.acceptanceCriteria.flatMap(
@@ -723,12 +1010,148 @@ function scriptsForDiscovery(
   packageJson: PackageJson,
 ) {
   const scripts = packageJson.scripts ?? {};
+  const commandScripts = (discovery.commands ?? []).map(
+    (command) => command.script,
+  );
+  const profileScripts = (discovery.validationProfiles ?? []).map(
+    (profile) => profile.script,
+  );
   return Object.fromEntries(
-    (discovery.commands ?? [])
-      .map((command) => [command.script, scripts[command.script]])
+    [...commandScripts, ...profileScripts]
+      .map((script) => [script, scripts[script]])
       .filter(([, value]) => Boolean(value))
       .sort(([a], [b]) => String(a).localeCompare(String(b))),
   );
+}
+
+function buildValidationProfiles() {
+  return [
+    {
+      id: "agent-smoke",
+      script: "check:agent-smoke",
+      purpose: "Fast agent contract and scaffold metadata check.",
+      checks: ["agent:preflight", "check:agent-discovery", "check:scaffold"],
+    },
+    {
+      id: "agent-domain",
+      script: "check:agent-domain",
+      purpose: "Domain module contract, boundary and source validation.",
+      checks: [
+        "check:domain-contracts",
+        "check:module-contracts",
+        "check:module-boundaries",
+        "check:capability-catalog",
+        "check:source-registry",
+        "test",
+      ],
+    },
+    {
+      id: "agent-ui",
+      script: "check:agent-ui",
+      purpose: "Screen contract, Storybook and TypeScript UI validation.",
+      checks: ["check:storybook", "typecheck:storybook", "check:css-tokens"],
+    },
+    {
+      id: "agent-release",
+      script: "check:agent-release",
+      purpose: "Release-grade template, type, test and build validation.",
+      checks: [
+        "format:check",
+        "lint",
+        "typecheck",
+        "test",
+        "test:template",
+        "check:template-invariants",
+        "check:scaffold-reproducible",
+        "build:packages",
+        "build:app",
+      ],
+    },
+  ];
+}
+
+function buildNextCommands(
+  spec: AppSpec,
+  taskPath: string,
+): AgentCommandPlan[] {
+  const sourceFetch = spec.permittedExternalSources[0];
+  return [
+    {
+      id: "install-template-dependencies",
+      command: "pnpm install --frozen-lockfile",
+      cwd: ".",
+      writes: true,
+      expectedArtifacts: ["node_modules/"],
+      followUpChecks: ["agent:bootstrap"],
+    },
+    {
+      id: "scaffold-full-repository",
+      command: `pnpm run scaffold:domain-app -- --domain <domain> --display-name <display-name> --target <target-dir> --allow-existing-empty`,
+      cwd: ".",
+      writes: true,
+      expectedArtifacts: [".template/lock.json", "agent.discovery.json"],
+      followUpChecks: ["template:status"],
+    },
+    {
+      id: "install-generated-repository",
+      command: "pnpm install --frozen-lockfile",
+      cwd: "<target-dir>",
+      writes: true,
+      expectedArtifacts: ["node_modules/"],
+      followUpChecks: ["agent:bootstrap"],
+    },
+    {
+      id: "generate-domain-module",
+      command: `pnpm run app:new -- --spec ${taskPath}`,
+      cwd: "<target-dir>",
+      writes: true,
+      expectedArtifacts: [
+        `${spec.module.destination}/domain.module.yaml`,
+        `${spec.module.destination}/module.contract.yaml`,
+        `${spec.module.destination}/contracts/citizen-intake.screen.yaml`,
+        `${spec.module.destination}/contracts/caseworker-workspace.screen.yaml`,
+        `${spec.module.destination}/contracts/audit-workspace.screen.yaml`,
+        `${spec.module.destination}/ui/${pascalCase(spec.module.id)}Screens.stories.tsx`,
+      ],
+      followUpChecks: ["check:agent-domain", "check:agent-ui"],
+    },
+    ...(sourceFetch
+      ? [
+          {
+            id: "fetch-governed-source",
+            command: `pnpm run source:fetch -- --source ${sourceFetch}`,
+            cwd: "<target-dir>",
+            writes: true,
+            expectedArtifacts: [
+              `.agent/sources/${sourceFetch}/provenance.json`,
+            ],
+            followUpChecks: ["source:verify"],
+          },
+        ]
+      : []),
+    {
+      id: "verify-agent-run",
+      command: `pnpm run agent:verify -- --task ${taskPath}`,
+      cwd: "<target-dir>",
+      writes: true,
+      expectedArtifacts: [".agent/runs/<run-id>/report.json"],
+      followUpChecks: ["check:agent-release"],
+    },
+  ];
+}
+
+async function commandVersion(command: string, args: string[]) {
+  try {
+    const result = await execFileAsync(command, args, {
+      maxBuffer: 1024 * 1024,
+    });
+    return { ok: true, value: result.stdout.trim() };
+  } catch (error) {
+    return {
+      ok: false,
+      value: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 async function selectContextItem(root: string, path: string, reason: string) {
@@ -897,6 +1320,12 @@ function domainModuleYaml(spec: AppSpec) {
     "requiredCapabilities:",
     ...spec.requiredCapabilities.map((capability) => `  - ${capability}`),
     "",
+    "platformPorts:",
+    ...spec.requiredCapabilities
+      .map(capabilityPortName)
+      .sort()
+      .map((port) => `  - ${port}`),
+    "",
     "permissions:",
     ...spec.roles.map(
       (role) =>
@@ -924,6 +1353,30 @@ function domainModuleYaml(spec: AppSpec) {
     "  documents: migrations/documents/",
     "  externalSystems: []",
     "",
+    ...(spec.fim
+      ? [
+          "fimReferences:",
+          `  sourceId: ${spec.fim.sourceId}`,
+          `  rootId: "${spec.fim.rootId}"`,
+          "  services:",
+          ...Object.entries(spec.fim.services)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([id, label]) => `    - id: "${id}"\n      label: ${label}`),
+          "",
+        ]
+      : []),
+    "humanApproval:",
+    ...(spec.humanApproval.length
+      ? spec.humanApproval.map((approval) => `  - ${approval}`)
+      : ["  - none"]),
+    "",
+    "screenContracts:",
+    "  - contracts/citizen-intake.screen.yaml",
+    "  - contracts/caseworker-workspace.screen.yaml",
+    ...(spec.routes.some((route) => route.surface === "audit")
+      ? ["  - contracts/audit-workspace.screen.yaml"]
+      : []),
+    "",
   ].join("\n");
 }
 
@@ -944,14 +1397,6 @@ async function createDomainModuleSkeleton(destination: string) {
   );
   await writeFileAtomic(join(destination, "migrations/database/.gitkeep"), "");
   await writeFileAtomic(join(destination, "migrations/documents/.gitkeep"), "");
-  await writeFileAtomic(
-    join(destination, "compliance/profile.example.json"),
-    stableStringify({
-      accessibility: { bitv: "planned" },
-      dataProtection: { dsfa: "planned", vvt: "planned" },
-      module: "replace-with-domain-id",
-    }),
-  );
 }
 
 async function writeIfMissing(
@@ -967,7 +1412,10 @@ async function writeIfMissing(
   await writeFileAtomic(path, content);
 }
 
-function screenContractYaml(spec: AppSpec, persona: "citizen" | "caseworker") {
+function screenContractYaml(
+  spec: AppSpec,
+  persona: "citizen" | "caseworker" | "audit",
+) {
   const route =
     spec.routes.find((entry) => entry.surface === persona)?.path ??
     spec.routes[0]?.path ??
@@ -997,7 +1445,7 @@ function screenContractYaml(spec: AppSpec, persona: "citizen" | "caseworker") {
     "  - success",
     "",
     "ia:",
-    `  pattern: ${persona === "citizen" ? "guided-flow" : "dense-list-detail"}`,
+    `  pattern: ${persona === "citizen" ? "guided-flow" : persona === "audit" ? "audit-timeline" : "dense-list-detail"}`,
     "  navigation: persona-local",
     "  profile: public-sector",
     "  scroll: stable",
@@ -1028,6 +1476,7 @@ function screenContractYaml(spec: AppSpec, persona: "citizen" | "caseworker") {
     "evidence:",
     "  - screen-contract",
     "  - storybook-state",
+    ...(persona === "audit" ? ["  - audit-provenance"] : []),
     "",
   ].join("\n");
 }
@@ -1071,6 +1520,85 @@ function permissionsYaml(spec: AppSpec) {
   ].join("\n");
 }
 
+function migrationSql(spec: AppSpec) {
+  const table = `${tableName(spec.module.id)}_cases`;
+  return [
+    `CREATE TABLE IF NOT EXISTS ${table} (`,
+    "  id text PRIMARY KEY,",
+    "  tenant_id text NOT NULL,",
+    "  authority_id text NOT NULL,",
+    "  status text NOT NULL DEFAULT 'draft',",
+    "  payload jsonb NOT NULL DEFAULT '{}'::jsonb,",
+    "  created_at timestamptz NOT NULL DEFAULT now(),",
+    "  updated_at timestamptz NOT NULL DEFAULT now()",
+    ");",
+    "",
+    `CREATE INDEX IF NOT EXISTS ${table}_tenant_status_idx`,
+    `  ON ${table} (tenant_id, status);`,
+    "",
+    `-- ${spec.displayName}: extend this migration with jurisdiction-approved fields before production use.`,
+    "",
+  ].join("\n");
+}
+
+function complianceProfileJson(spec: AppSpec) {
+  return stableStringify({
+    accessibility: {
+      bitv: "planned",
+      wcag: "2.2-AA",
+      evidence: ["contracts/*.screen.yaml", "ui/*.stories.tsx"],
+    },
+    audit: {
+      appendOnly: spec.requiredCapabilities.includes("audit"),
+      events: spec.workflows.map((workflow) => `${spec.module.id}.${workflow}`),
+    },
+    dataProtection: {
+      dataClassifications: spec.dataClassifications,
+      dsfa: "planned",
+      retention: [`${spec.module.id}-case-records`],
+      vvt: "planned",
+    },
+    externalSources: spec.permittedExternalSources.map((sourceId) => ({
+      sourceId,
+      citationRequired: true,
+    })),
+    humanApproval: spec.humanApproval,
+    module: spec.module.id,
+    status: "example-generated",
+  });
+}
+
+function screensStoryTsx(spec: AppSpec) {
+  const title = `${spec.displayName}/Screens`;
+  return [
+    'import type { Meta, StoryObj } from "@storybook/react";',
+    'import { AuditScreen, CaseworkerScreen, CitizenScreen } from "./screens.js";',
+    "",
+    "const meta = {",
+    `  title: ${JSON.stringify(title)},`,
+    "  parameters: {",
+    '    layout: "fullscreen",',
+    "  },",
+    "} satisfies Meta;",
+    "",
+    "export default meta;",
+    "type Story = StoryObj;",
+    "",
+    "export const CitizenReady: Story = {",
+    "  render: () => <CitizenScreen />,",
+    "};",
+    "",
+    "export const CaseworkerReady: Story = {",
+    "  render: () => <CaseworkerScreen />,",
+    "};",
+    "",
+    "export const AuditReady: Story = {",
+    "  render: () => <AuditScreen />,",
+    "};",
+    "",
+  ].join("\n");
+}
+
 function moduleTestTs(spec: AppSpec) {
   return [
     'import { describe, expect, it } from "vitest";',
@@ -1083,6 +1611,22 @@ function moduleTestTs(spec: AppSpec) {
     "});",
     "",
   ].join("\n");
+}
+
+function capabilityPortName(capability: string) {
+  return `${pascalCase(capability)}Port`;
+}
+
+function tableName(id: string) {
+  return id.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
+function pascalCase(value: string) {
+  return value
+    .split(/[^a-zA-Z0-9]+/)
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join("");
 }
 
 function screensTsx(spec: AppSpec) {

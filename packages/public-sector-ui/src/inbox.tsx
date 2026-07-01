@@ -29,7 +29,7 @@ export interface InboxFilter {
 
 export interface CaseInboxProps {
   cases: CaseRow[];
-  selectedId?: string;
+  selectedId?: string | undefined;
   onSelect: (id: string) => void;
   filters: InboxFilter[];
   /** Mehrfachauswahl: aktive Filterwerte (mind. einer bleibt bei Mehrfachauswahl bestehen). */
@@ -284,7 +284,7 @@ export function SortButton({
 }
 
 export interface CaseDetailPanelProps {
-  row?: CaseRow;
+  row?: CaseRow | undefined;
   /** Slot für Sachbearbeitungs-Aktionen (z.B. Entscheiden, Nachfordern). */
   children?: ReactNode;
 }

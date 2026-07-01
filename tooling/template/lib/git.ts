@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -54,6 +55,28 @@ export async function getGitShortStatus(cwd = process.cwd()) {
     allowFailure: true,
   });
   return result.ok ? result.stdout : "";
+}
+
+export async function getGitDiffHash(cwd = process.cwd()) {
+  const status = await getGitShortStatus(cwd);
+  const unstaged = await runGit(["diff", "--binary"], {
+    cwd,
+    allowFailure: true,
+  });
+  const staged = await runGit(["diff", "--cached", "--binary"], {
+    cwd,
+    allowFailure: true,
+  });
+  if (!status && !unstaged.stdout && !staged.stdout) {
+    return undefined;
+  }
+  return createHash("sha256")
+    .update(status)
+    .update("\n--- unstaged ---\n")
+    .update(unstaged.stdout)
+    .update("\n--- staged ---\n")
+    .update(staged.stdout)
+    .digest("hex");
 }
 
 export async function isWorktreeClean(cwd = process.cwd()) {

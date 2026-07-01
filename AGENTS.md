@@ -75,13 +75,17 @@ Neue vollständige Fachverfahren-Repositories werden über den TypeScript-CLI
 erzeugt:
 
 ```bash
-pnpm run scaffold:domain-app -- --domain beispiel --target /tmp/app-beispiel
+pnpm run scaffold:domain-app -- --domain beispiel --display-name Beispiel --target /tmp/app-beispiel --allow-existing-empty
 ```
 
 Generierte Repositories enthalten `.template/answers.json`,
 `.template/lock.json`, `.template/ownership.yaml` und `.template/README.md`.
 Diese Dateien sind reproduzierbare Provenienz und dürfen keine Zeitstempel oder
 lokalen Maschinenpfade enthalten.
+Der Full-Repo-Scaffold verweigert eine nicht saubere Template-Quelle, sofern
+kein Mensch `--allow-dirty` ausdrücklich akzeptiert. Für bereits existierende
+leere Zielverzeichnisse `--allow-existing-empty` nutzen; `--force` bleibt für
+bewusstes Ersetzen reserviert.
 
 Alle Template-Lifecycle-Befehle laufen über `tooling/template/cli.ts`:
 
@@ -214,6 +218,7 @@ Fachverfahren- oder Bürgerportal-Slices ist
 Vendor-neutrale Agenten starten mit:
 
 ```bash
+pnpm run agent:bootstrap -- --json
 pnpm run agent:discover
 pnpm run agent:context -- --task <app-spec> --paths <module-path>
 ```
@@ -221,6 +226,10 @@ pnpm run agent:context -- --task <app-spec> --paths <module-path>
 `agent.discovery.json` ist die öffentliche Discovery-API. Default-JSON enthält
 nur relative Pfade, sortierte Listen und keine Git- oder Maschinenprovenienz;
 volatile Details gibt es nur mit `--provenance`.
+`agent:context` liefert `nextCommands`, `validationProfiles` und
+`writeBoundaries`; Agenten folgen dieser Reihenfolge, sofern der Nutzer keinen
+engeren Scope vorgibt. `agent:verify` erzeugt oder validiert einen
+`schemas/agent-run-report.schema.json`-konformen Abschlussbericht.
 
 Jedes Domain-Modul braucht `module.contract.yaml`. Der Vertrag deklariert
 Capabilities, öffentliche Exports, erlaubte Abhängigkeiten, Routen, Rollen,
@@ -259,6 +268,9 @@ erweitert; keine verstreuten Rollenbedingungen im UI-Code.
 Vor Abschluss einer Änderung nach Möglichkeit ausführen:
 
 ```bash
+pnpm run check:agent-smoke
+pnpm run check:agent-domain
+pnpm run check:agent-ui
 pnpm run check:precommit
 pnpm run check:push
 pnpm run format:check

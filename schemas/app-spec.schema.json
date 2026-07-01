@@ -9,17 +9,91 @@
     "module",
     "personas",
     "roles",
+    "journeys",
     "acceptanceCriteria",
+    "dataClassifications",
     "requiredCapabilities",
-    "routes"
+    "permittedExternalSources",
+    "routes",
+    "workflows",
+    "domainVocabulary"
   ],
   "properties": {
     "schemaVersion": { "const": "1.0.0" },
     "id": { "type": "string" },
+    "displayName": { "type": "string" },
     "module": {
       "type": "object",
-      "required": ["id", "destination", "owner", "lifecycle", "riskClass"]
-    }
+      "required": ["id", "destination", "owner", "lifecycle", "riskClass"],
+      "properties": {
+        "id": { "type": "string" },
+        "destination": { "type": "string", "pattern": "^modules/" },
+        "owner": { "type": "string" },
+        "lifecycle": { "type": "string" },
+        "riskClass": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "personas": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" }
+    },
+    "roles": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+    "journeys": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "surface"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "surface": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "acceptanceCriteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "text", "tests"],
+        "properties": {
+          "id": { "type": "string" },
+          "text": { "type": "string" },
+          "tests": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": true
+      }
+    },
+    "dataClassifications": { "type": "array", "items": { "type": "string" } },
+    "requiredCapabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" }
+    },
+    "permittedExternalSources": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "routes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["path", "surface"],
+        "properties": {
+          "path": { "type": "string" },
+          "surface": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "workflows": { "type": "array", "items": { "type": "string" } },
+    "domainVocabulary": { "type": "array", "items": { "type": "string" } },
+    "extensions": { "type": "object" }
   },
   "additionalProperties": true
 }

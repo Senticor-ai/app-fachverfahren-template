@@ -6,14 +6,18 @@ Workflow-Skills; tool-spezifische Verzeichnisse sind nur Kompatibilität.
 
 ## Start
 
+- Nutze Package-Script `agent:bootstrap`, um Node, pnpm, Lockfile,
+  Abhängigkeiten, Git-Quelle und Agent-Verträge als JSON zu prüfen.
 - Nutze Package-Script `agent:discover`, um Workflows, Skills, Schemas und
   Checks zu finden.
 - Nutze Package-Script `agent:context` mit einer App-Spezifikation, bevor du
   Dateien änderst.
+- Folge `agent:context.nextCommands` in der angegebenen Reihenfolge, sofern der
+  Nutzer keinen engeren Scope vorgibt.
 - Nutze Package-Script `app:new`, wenn aus einer App-Spezifikation ein
   Domain-Modul entstehen soll.
 - Nutze Package-Script `agent:verify`, um die Evidenz zu einer Agentenänderung
-  zu erzeugen.
+  zu erzeugen oder einen vorhandenen Report mit `--report <path>` zu prüfen.
 
 ## Regeln
 
@@ -27,8 +31,17 @@ Workflow-Skills; tool-spezifische Verzeichnisse sind nur Kompatibilität.
   Netzwerkzugriffe.
 - Melde Abweichungen und offene Validierungsfragen im Agentenbericht, nicht als
   versteckte Annahmen im Code.
+- Übergib `--allow-dirty` beim Full-Repo-Scaffold nur, wenn ein Mensch die
+  nicht saubere Template-Quelle ausdrücklich akzeptiert hat.
+- Nutze `--allow-existing-empty` statt `--force`, wenn das Zielverzeichnis
+  bereits existiert, aber leer ist.
 
 ## Checks
 
 Verwende die im Discovery-Manifest referenzierten Package-Scripts. Die
 Command-Strings werden aus `package.json` aufgelöst.
+
+- `check:agent-smoke` für schnelle Agent-/Scaffold-Verträge.
+- `check:agent-domain` für Domain-, Modul-, Quellen- und Capability-Verträge.
+- `check:agent-ui` für Screen Contracts, Storybook und UI-Typen.
+- `check:agent-release` für release-nahe Validierung.

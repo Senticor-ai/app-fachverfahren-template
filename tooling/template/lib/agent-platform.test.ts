@@ -36,6 +36,9 @@ describe("agent platform contract", () => {
     expect(context.selectedCapabilities).toContain("identity-and-trust");
     expect(context.selectedSources).toEqual(["fimportal"]);
     expect(context.writeBoundaries).toContain("modules/dog-tax");
+    expect(context.nextCommands.map((command) => command.id)).toContain(
+      "fetch-governed-source",
+    );
     expect(
       context.selectedContext.some((item) => item.reason === "UX contract"),
     ).toBe(true);
@@ -49,6 +52,8 @@ describe("agent platform contract", () => {
     expect(contract.moduleId).toBe("dog-tax");
     expect(contract.consumedCapabilities).toContain("payment");
     expect(contract.allowedDomainPaths).toContain("modules/dog-tax");
+    expect(contract.permissions).toContain("dog-tax.auditor");
+    expect(JSON.stringify(contract)).toContain("AuditPort");
   });
 
   it("scaffolds an app spec idempotently", async () => {
@@ -66,6 +71,18 @@ describe("agent platform contract", () => {
         specPath,
       });
       expect(first.status).toBe("ok");
+      expect(first.generated).toContain(
+        "modules/dog-tax/contracts/audit-workspace.screen.yaml",
+      );
+      expect(first.generated).toContain(
+        "modules/dog-tax/ui/DogTaxScreens.stories.tsx",
+      );
+      expect(first.generated).toContain(
+        "modules/dog-tax/migrations/database/0001_create_dog_tax_cases.sql",
+      );
+      expect(first.generated).toContain(
+        "modules/dog-tax/compliance/profile.example.json",
+      );
       expect(second.status).toBe("ok");
       expect(second.preserved).toContain("modules/dog-tax");
     } finally {

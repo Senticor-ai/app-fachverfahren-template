@@ -9,8 +9,13 @@ Eigentumsregeln und eine updatefähige Template-CLI.
 Für opencode.de-fähige Apps ist der Full-Repo-Scaffold der Standard:
 
 ```bash
-pnpm run scaffold:domain-app -- --domain antragsservice --display-name Antragsservice --target /tmp/app-antragsservice
+pnpm run scaffold:domain-app -- --domain antragsservice --display-name Antragsservice --target /tmp/app-antragsservice --allow-existing-empty
 ```
+
+Der Scaffold verweigert eine nicht saubere Template-Quelle. `--allow-dirty`
+darf nur nach bewusster Freigabe verwendet werden und schreibt Dirty-Provenienz
+in `.template/lock.json`. `--force` ersetzt ein Zielverzeichnis vollständig;
+für existierende leere Zielverzeichnisse `--allow-existing-empty` verwenden.
 
 Der app-only Export bleibt separat:
 

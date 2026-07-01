@@ -14,6 +14,7 @@ describe("domain app rendering", () => {
         domain: "antragsservice",
         displayName: "Antragsservice",
         force: true,
+        allowDirty: true,
       };
 
       await renderDomainApp(process.cwd(), first, options);

@@ -18,7 +18,7 @@ export interface FormFieldProps {
   /** Hilfetext (z.B. Format), immer sichtbar. */
   hint?: string;
   /** Validierungsmeldung (mit Korrekturpfad in Klartext). */
-  message?: string;
+  message?: string | undefined;
   state?: FieldState;
   autoComplete?: string;
 }
