@@ -32,7 +32,7 @@
     "check:husky": "node scripts/verify-husky.mjs",
     "check:commit-msg": "sh scripts/git-hooks/validate-commit-msg.sh",
     "check:precommit": "pnpm run check:git-hygiene && pnpm run precommit:check",
-    "check:ci": "pnpm run check:precommit && pnpm run build && pnpm run test:k8s:render && pnpm run evidence:build",
+    "check:ci": "scripts/ci-validate.sh",
     "check:push": "pnpm run check:ci",
     "typecheck": "tsc -b",
     "typecheck:all": "pnpm typecheck",

@@ -18,6 +18,11 @@ jobs:
     name: Validate
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    env:
+      CI_PROJECT_DIR: ${{ github.workspace }}
+      KUBECTL_VERSION: v1.34.9
+      NODE_ENV: test
+      TMPDIR: ${{ runner.temp }}/app-fachverfahren-template
     steps:
       - name: Checkout
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
@@ -30,42 +35,57 @@ jobs:
           node-version: 24
           package-manager-cache: false
 
-      - name: Setup pnpm
-        run: |
-          corepack enable
-          corepack prepare "pnpm@11.1.0" --activate
+      - name: Setup CI tools
+        run: scripts/ci-setup-node.sh
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Format
-        run: pnpm run format:check
-      - name: Lint
-        run: pnpm run lint
-      - name: Strict ESM
-        run: pnpm run check:esm
-      - name: TypeScript source policy
-        run: pnpm run check:typescript-policy
-      - name: Storybook coverage
-        run: pnpm run check:storybook
-      - name: CSS token aliases
-        run: pnpm run check:css-tokens
-      - name: Template lifecycle tests
-        run: pnpm run test:template
-      - name: Agent platform checks
-        run: pnpm run check:agent-discovery && pnpm run check:module-contracts && pnpm run check:module-boundaries && pnpm run check:capability-catalog && pnpm run check:source-registry
-      - name: Agent readiness
-        run: pnpm run test:agent-readiness
-      - name: Template invariants
-        run: pnpm run check:template-invariants
-      - name: Scaffold output
-        run: pnpm run check:scaffold
-      - name: Typecheck
-        run: pnpm run typecheck
-      - name: Test
-        run: pnpm run test
-      - name: Build
-        run: pnpm run build
-      - name: Render Kubernetes
-        run: pnpm run test:k8s:render
-      - name: Build evidence plan
-        run: pnpm run evidence:build
+      - name: Validate
+        run: scripts/ci-validate.sh
+
+  gitlab-validate-parity:
+    name: GitLab Validate Parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          fetch-depth: 0
+
+      - name: Run validate in GitLab Node image
+        run: |
+          host_uid="$(id -u)"
+          host_gid="$(id -g)"
+
+          docker run --rm \
+            --user root \
+            -e HOST_UID="$host_uid" \
+            -e HOST_GID="$host_gid" \
+            -v "$PWD:/work" \
+            -w /work \
+            registry.opencode.de/open-code/oci/nodejs:24 \
+            sh -lc '
+              cleanup() {
+                chown -R "${HOST_UID}:${HOST_GID}" /work || true
+              }
+              trap cleanup EXIT
+
+              chown -R nonroot:nonroot /work
+              mkdir -p /ci-tmp
+              chown nonroot:nonroot /ci-tmp
+              su nonroot -s /bin/sh -c '"'"'
+                set -eu
+                export CI=true
+                export CI_PROJECT_DIR=/work
+                export KUBECTL_VERSION=v1.34.9
+                export NODE_ENV=test
+                export TMPDIR=/ci-tmp
+                export PNPM_HOME=/work/.pnpm
+                export PATH="$PNPM_HOME:$PATH"
+
+                . scripts/ci-setup-node.sh
+                pnpm install --frozen-lockfile
+                scripts/ci-validate.sh
+              '"'"'
+            '

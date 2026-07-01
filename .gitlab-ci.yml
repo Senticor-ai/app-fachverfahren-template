@@ -4,16 +4,15 @@ stages:
   - image
 
 variables:
+  KUBECTL_VERSION: v1.34.9
   NODE_ENV: test
 
 .node-base:
   image: registry.opencode.de/open-code/oci/nodejs:24
   before_script:
+    - export TMPDIR="${CI_PROJECT_DIR}/../.tmp-senticor-app-fachverfahren-template"
     - export PNPM_HOME="${CI_PROJECT_DIR}/.pnpm"
-    - export PATH="${PNPM_HOME}:${PATH}"
-    - mkdir -p "${PNPM_HOME}"
-    - corepack enable --install-directory "${PNPM_HOME}" pnpm
-    - corepack prepare "pnpm@11.1.0" --activate
+    - . scripts/ci-setup-node.sh
     - pnpm install --frozen-lockfile
 
 .kaniko-base:
@@ -28,12 +27,7 @@ validate:
   extends: .node-base
   stage: validate
   script:
-    - pnpm run precommit:check
-    - pnpm run build:packages
-    - pnpm run build:app
-    - pnpm run build:server
-    - pnpm run test:k8s:render
-    - pnpm run evidence:build
+    - scripts/ci-validate.sh
 
 pages:
   extends: .node-base

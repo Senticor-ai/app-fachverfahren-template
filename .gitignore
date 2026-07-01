@@ -1,5 +1,7 @@
 node_modules/
+.pnpm/
 .pnpm-store/
+.tmp/
 dist/
 dist-server/
 storybook-static/
