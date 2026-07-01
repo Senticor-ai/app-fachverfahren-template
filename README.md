@@ -154,7 +154,9 @@ https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-pl
 ```
 
 Der Mirror-Workflow nutzt `GITLAB_MIRROR_TOKEN`; optional kann
-`GITLAB_MIRROR_URL` das Ziel ueberschreiben.
+`GITLAB_MIRROR_URL` das Ziel ueberschreiben. Ohne Token wird der Mirror-Schritt
+mit Notice uebersprungen, damit die eigentliche Validierungs-CI nicht wegen
+fehlender Repository-Secrets rot wird.
 
 Vollständige neue App-Repositories werden über den Template-Lifecycle erzeugt:
 

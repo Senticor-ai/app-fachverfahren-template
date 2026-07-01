@@ -35,7 +35,20 @@ jobs:
           git config user.name "app-fachverfahren-template mirror"
           git config user.email "app-fachverfahren-template-mirror@users.noreply.github.com"
 
+      - name: Check mirror configuration
+        id: mirror-config
+        env:
+          GITLAB_MIRROR_TOKEN: ${{ secrets.GITLAB_MIRROR_TOKEN }}
+        run: |
+          if [ -n "$GITLAB_MIRROR_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=GitLab mirror skipped::Set the GITLAB_MIRROR_TOKEN repository secret to enable mirroring."
+          fi
+
       - name: Push to GitLab
+        if: ${{ steps.mirror-config.outputs.enabled == 'true' }}
         env:
           GITLAB_MIRROR_URL: ${{ secrets.GITLAB_MIRROR_URL || 'https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-platform/senticor/senticor-app-fachverfahren-template.git' }}
           GITLAB_MIRROR_TOKEN: ${{ secrets.GITLAB_MIRROR_TOKEN }}
