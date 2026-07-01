@@ -69,7 +69,8 @@
             "type": "array",
             "items": { "type": "string" }
           },
-          "followUpChecks": { "type": "array", "items": { "type": "string" } }
+          "followUpChecks": { "type": "array", "items": { "type": "string" } },
+          "followUpCwd": { "type": "string" }
         },
         "additionalProperties": true
       }
@@ -96,6 +97,7 @@
         "properties": {
           "sourceId": { "type": "string" },
           "provenancePath": { "type": "string" },
+          "status": { "type": "number" },
           "sha256": { "type": "string" }
         },
         "additionalProperties": true

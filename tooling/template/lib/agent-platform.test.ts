@@ -8,6 +8,7 @@ import {
   buildDiscovery,
   deriveModuleContract,
   readStructuredFile,
+  validateAgentRunReport,
   validateAgentPreflight,
   validateSourceRegistry,
   type AppSpec,
@@ -36,9 +37,17 @@ describe("agent platform contract", () => {
     expect(context.selectedCapabilities).toContain("identity-and-trust");
     expect(context.selectedSources).toEqual(["fimportal"]);
     expect(context.writeBoundaries).toContain("modules/dog-tax");
+    expect(context.writeBoundaries).toContain(".agent/sources/");
     expect(context.nextCommands.map((command) => command.id)).toContain(
       "fetch-governed-source:fimportal",
     );
+    const scaffoldCommand = context.nextCommands.find(
+      (command) => command.id === "scaffold-full-repository",
+    );
+    expect(scaffoldCommand?.expectedArtifacts).toContain(
+      "<target-dir>/.template/lock.json",
+    );
+    expect(scaffoldCommand?.followUpCwd).toBe("<target-dir>");
     expect(
       context.selectedContext.some((item) => item.reason === "UX contract"),
     ).toBe(true);
@@ -100,6 +109,12 @@ describe("agent platform contract", () => {
       const spec = {
         ...source,
         id: "custom",
+        fim: source.fim
+          ? {
+              sourceId: source.fim.sourceId,
+              rootId: source.fim.rootId,
+            }
+          : undefined,
         module: {
           ...source.module,
           id: "123-service",
@@ -123,10 +138,89 @@ describe("agent platform contract", () => {
         ),
         "utf8",
       );
+      const domainModule = await readFile(
+        join(temp, "modules/123-service/domain.module.yaml"),
+        "utf8",
+      );
 
       expect(result.status).toBe("ok");
       expect(migration).toContain(
         "CREATE TABLE IF NOT EXISTS m_123_service_cases",
+      );
+      expect(domainModule).toContain("  services: []");
+    } finally {
+      await rm(temp, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects stale report task hashes", async () => {
+    const spec = await readStructuredFile<AppSpec>(
+      join(root, "docs/examples/hundesteuer/app.spec.yaml"),
+    );
+    const report = validReportForSpec({
+      spec: { ...spec, permittedExternalSources: [] },
+      task: "docs/examples/hundesteuer/app.spec.yaml",
+      taskHash: "stale",
+      filesChanged: ["AGENTS.md"],
+    });
+
+    const failures = await validateAgentRunReport(
+      root,
+      { ...spec, permittedExternalSources: [] },
+      report,
+      {
+        taskPath: "docs/examples/hundesteuer/app.spec.yaml",
+        taskHash: "fresh",
+      },
+    );
+
+    expect(failures).toContain("report taskHash does not match current task");
+  });
+
+  it("validates governed source provenance status and digest", async () => {
+    const temp = await mkdtemp(join(tmpdir(), "agent-source-proof-"));
+    try {
+      await writeFile(
+        join(temp, "changed.ts"),
+        "export const changed = true;\n",
+      );
+      await mkdir(join(temp, ".agent/sources/bad-source"), {
+        recursive: true,
+      });
+      await writeFile(
+        join(temp, ".agent/sources/bad-source/provenance.json"),
+        `${JSON.stringify(
+          {
+            sourceId: "bad-source",
+            status: 500,
+            sha256: "a".repeat(64),
+          },
+          null,
+          2,
+        )}\n`,
+      );
+      const source = await readStructuredFile<AppSpec>(
+        join(root, "docs/examples/hundesteuer/app.spec.yaml"),
+      );
+      const spec = {
+        ...source,
+        permittedExternalSources: ["bad-source"],
+      };
+
+      const failures = await validateAgentRunReport(
+        temp,
+        spec,
+        validReportForSpec({
+          spec,
+          task: "app.spec.yaml",
+          taskHash: "hash",
+          filesChanged: ["changed.ts"],
+        }),
+        { taskPath: "app.spec.yaml", taskHash: "hash" },
+      );
+
+      expect(failures).toContain(
+        "governed source bad-source returned unsuccessful status 500",
       );
     } finally {
       await rm(temp, { recursive: true, force: true });
@@ -138,3 +232,35 @@ describe("agent platform contract", () => {
     expect(await validateAgentPreflight(root)).toEqual([]);
   });
 });
+
+function validReportForSpec({
+  spec,
+  task,
+  taskHash,
+  filesChanged,
+}: {
+  spec: AppSpec;
+  task: string;
+  taskHash: string;
+  filesChanged: string[];
+}) {
+  return {
+    schemaVersion: "1.0.0",
+    runId: "test-run",
+    task,
+    taskHash,
+    selectedInstructionHashes: [],
+    filesChanged: filesChanged.map((path) => ({ path })),
+    commandsExecuted: [
+      {
+        id: "test",
+        command: "pnpm test",
+        cwd: ".",
+      },
+    ],
+    acceptanceCriteria: spec.acceptanceCriteria.map((criterion) => ({
+      id: criterion.id,
+      tests: criterion.tests,
+    })),
+  };
+}

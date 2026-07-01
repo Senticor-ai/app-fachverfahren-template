@@ -29,7 +29,7 @@ export interface AppSpec {
   acceptanceCriteria: { id: string; text: string; tests: string[] }[];
   assumptions: string[];
   nonGoals: string[];
-  fim?: { sourceId: string; rootId: string; services: Record<string, string> };
+  fim?: { sourceId: string; rootId: string; services?: Record<string, string> };
   dataClassifications: string[];
   requiredCapabilities: string[];
   permittedExternalSources: string[];
@@ -75,6 +75,7 @@ interface AgentCommandPlan {
   writes: boolean;
   expectedArtifacts: string[];
   followUpChecks: string[];
+  followUpCwd?: string;
 }
 
 export interface SourceRegistry {
@@ -303,6 +304,7 @@ export async function buildAgentContext(
       spec.module.destination,
       `${dirname(taskPath)}/`,
       ".agent/runs/",
+      ...(spec.permittedExternalSources.length ? [".agent/sources/"] : []),
     ].sort(),
     requestedPaths: [...paths].sort(),
     relevantChecks,
@@ -722,7 +724,10 @@ export async function verifyAgentRun(
     residualRisks: [],
   });
   const validatedReport = existingReport ?? report;
-  const failures = await validateAgentRunReport(root, spec, validatedReport);
+  const failures = await validateAgentRunReport(root, spec, validatedReport, {
+    taskPath,
+    taskHash,
+  });
   await mkdir(dirname(resolvedReportPath), { recursive: true });
   if (!existingReport) {
     await writeFileAtomic(resolvedReportPath, stableStringify(report));
@@ -772,6 +777,11 @@ export async function fetchGovernedSource(
   if (!source.expectedContentTypes.some((type) => contentType.includes(type))) {
     throw new Error(
       `source ${sourceId} returned unexpected content type ${contentType}`,
+    );
+  }
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(
+      `source ${sourceId} returned unsuccessful status ${response.status}`,
     );
   }
   const body = await response.text();
@@ -827,6 +837,10 @@ async function externalSourceEvidence(root: string, sourceIds: string[]) {
     entries.push({
       sourceId,
       provenancePath: relative(root, provenancePath),
+      status:
+        provenance && typeof provenance === "object"
+          ? (provenance as Record<string, unknown>).status
+          : undefined,
       sha256:
         provenance && typeof provenance === "object"
           ? (provenance as Record<string, unknown>).sha256
@@ -836,10 +850,11 @@ async function externalSourceEvidence(root: string, sourceIds: string[]) {
   return entries;
 }
 
-async function validateAgentRunReport(
+export async function validateAgentRunReport(
   root: string,
   spec: AppSpec,
   report: Record<string, unknown>,
+  expected?: { taskPath: string; taskHash: string },
 ) {
   const failures: string[] = [];
   if (report.schemaVersion !== "1.0.0") {
@@ -847,6 +862,14 @@ async function validateAgentRunReport(
   }
   if (!report.runId) {
     failures.push("report missing runId");
+  }
+  if (expected) {
+    if (report.task !== expected.taskPath) {
+      failures.push("report task does not match current task");
+    }
+    if (report.taskHash !== expected.taskHash) {
+      failures.push("report taskHash does not match current task");
+    }
   }
   const filesChanged = Array.isArray(report.filesChanged)
     ? report.filesChanged
@@ -897,6 +920,22 @@ async function validateAgentRunReport(
     );
     if (!(await exists(provenancePath))) {
       failures.push(`missing governed source provenance for ${sourceId}`);
+      continue;
+    }
+    const provenance = await readJson(provenancePath).catch(() => undefined);
+    if (!provenance || typeof provenance !== "object") {
+      failures.push(`invalid governed source provenance for ${sourceId}`);
+      continue;
+    }
+    const status = (provenance as Record<string, unknown>).status;
+    if (typeof status !== "number" || status < 200 || status >= 300) {
+      failures.push(
+        `governed source ${sourceId} returned unsuccessful status ${String(status)}`,
+      );
+    }
+    const digest = (provenance as Record<string, unknown>).sha256;
+    if (typeof digest !== "string" || !/^[a-f0-9]{64}$/.test(digest)) {
+      failures.push(`governed source ${sourceId} missing valid sha256 digest`);
     }
   }
   return failures.sort();
@@ -951,7 +990,7 @@ export function deriveModuleContract(spec: AppSpec): ModuleContract {
     fimReferences: spec.fim
       ? {
           rootId: spec.fim.rootId,
-          services: spec.fim.services,
+          services: fimServices(spec),
         }
       : undefined,
     humanApproval: humanApprovals(spec),
@@ -1089,8 +1128,12 @@ function buildNextCommands(
       command: `pnpm run scaffold:domain-app -- --domain <domain> --display-name <display-name> --target <target-dir> --allow-existing-empty`,
       cwd: ".",
       writes: true,
-      expectedArtifacts: [".template/lock.json", "agent.discovery.json"],
+      expectedArtifacts: [
+        "<target-dir>/.template/lock.json",
+        "<target-dir>/agent.discovery.json",
+      ],
       followUpChecks: ["template:status"],
+      followUpCwd: "<target-dir>",
     },
     {
       id: "install-generated-repository",
@@ -1283,6 +1326,15 @@ function validateAppSpecShape(spec: AppSpec) {
   if (!spec.requiredCapabilities?.length) {
     failures.push("app spec must consume platform capabilities");
   }
+  if (spec.fim && (!spec.fim.sourceId || !spec.fim.rootId)) {
+    failures.push("app spec fim references require sourceId and rootId");
+  }
+  if (
+    spec.fim?.services &&
+    (typeof spec.fim.services !== "object" || Array.isArray(spec.fim.services))
+  ) {
+    failures.push("app spec fim services must be an object when provided");
+  }
   return failures;
 }
 
@@ -1352,10 +1404,7 @@ function domainModuleYaml(spec: AppSpec) {
           "fimReferences:",
           `  sourceId: ${spec.fim.sourceId}`,
           `  rootId: "${spec.fim.rootId}"`,
-          "  services:",
-          ...Object.entries(spec.fim.services)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([id, label]) => `    - id: "${id}"\n      label: ${label}`),
+          ...fimServiceYaml(spec),
           "",
         ]
       : []),
@@ -1613,6 +1662,29 @@ function capabilityPortName(capability: string) {
 
 function humanApprovals(spec: AppSpec) {
   return spec.humanApproval ?? [];
+}
+
+function fimServices(spec: AppSpec): Record<string, string> {
+  const services = spec.fim?.services;
+  if (!services || typeof services !== "object" || Array.isArray(services)) {
+    return {};
+  }
+  return services;
+}
+
+function fimServiceYaml(spec: AppSpec) {
+  const services = Object.entries(fimServices(spec)).sort(([a], [b]) =>
+    a.localeCompare(b),
+  );
+  if (!services.length) {
+    return ["  services: []"];
+  }
+  return [
+    "  services:",
+    ...services.map(
+      ([id, label]) => `    - id: "${id}"\n      label: ${label}`,
+    ),
+  ];
 }
 
 function tableName(id: string) {
