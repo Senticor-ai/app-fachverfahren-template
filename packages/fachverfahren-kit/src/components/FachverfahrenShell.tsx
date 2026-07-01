@@ -155,7 +155,6 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
     const valid: Persona[] = ["buerger", "sachbearbeitung", "aufsicht"];
     if (raw && (valid as string[]).includes(raw) && raw !== persona)
       onPersonaChange(raw as Persona);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const nav = navFor(persona, config);
   const activeKey = activeNavKey ?? nav[0]?.key;

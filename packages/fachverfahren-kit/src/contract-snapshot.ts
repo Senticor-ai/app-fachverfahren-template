@@ -23,16 +23,28 @@ export interface LeistungContractSnapshot {
 }
 
 /** Erzeugt den JSON-sicheren Struktur-Snapshot einer LeistungConfig (für `leistung.contract.json`). Rein. */
-export function toContractSnapshot<T = Record<string, unknown>>(config: LeistungConfig<T>): LeistungContractSnapshot {
-  let seedCount = 0;
-  try { seedCount = config.seed?.({ vorgangsnummer: () => "FV-SNAP-0000" }).length ?? 0; } catch { seedCount = 0; }
+export function toContractSnapshot<T = Record<string, unknown>>(
+  config: LeistungConfig<T>,
+): LeistungContractSnapshot {
+  let seedCount: number;
+  try {
+    seedCount =
+      config.seed?.({ vorgangsnummer: () => "FV-SNAP-0000" }).length ?? 0;
+  } catch {
+    seedCount = 0;
+  }
   return {
     id: config.id,
     label: config.label,
     kommune: config.kommune,
     rechtsgrundlagen: config.rechtsgrundlagen,
     ...(config.fimLeistung ? { fimLeistung: config.fimLeistung } : {}),
-    antrag: { steps: config.antrag.steps, ...(config.antrag.einleitung ? { einleitung: config.antrag.einleitung } : {}) },
+    antrag: {
+      steps: config.antrag.steps,
+      ...(config.antrag.einleitung
+        ? { einleitung: config.antrag.einleitung }
+        : {}),
+    },
     statusMachine: config.statusMachine,
     register: config.register,
     detailSektionen: config.detailSektionen,

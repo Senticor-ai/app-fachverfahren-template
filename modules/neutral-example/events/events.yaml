@@ -1,8 +1,0 @@
-publishes:
-  - eventType: neutral-example.case-created
-    version: v1
-  - eventType: neutral-example.decision-prepared
-    version: v1
-consumes:
-  - eventType: mailbox.message-received
-    version: v1

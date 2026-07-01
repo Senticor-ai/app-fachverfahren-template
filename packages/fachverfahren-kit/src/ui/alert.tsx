@@ -3,7 +3,13 @@
 // (default = neutral/Card, destructive = block/err, warn = warn, success = ok). Keine Ad-hoc-Farben.
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
-import { AlertCircle, AlertTriangle, CheckCircle2, Info, type LucideIcon } from "lucide-react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  Info,
+  type LucideIcon,
+} from "lucide-react";
 
 import { cn } from "../lib/utils.js";
 
@@ -12,7 +18,8 @@ const alertVariants = cva(
   {
     variants: {
       variant: {
-        default: "border-border bg-card text-card-foreground [&>svg]:text-muted-foreground",
+        default:
+          "border-border bg-card text-card-foreground [&>svg]:text-muted-foreground",
         destructive:
           "border-status-block/30 bg-status-block-soft text-foreground [&>svg]:text-status-block",
         warn: "border-status-warn/40 bg-status-warn-soft text-foreground [&>svg]:text-status-warn",
@@ -35,7 +42,8 @@ const defaultIconFor: Record<NonNullable<AlertVariant>, LucideIcon> = {
 type AlertVariant = VariantProps<typeof alertVariants>["variant"];
 
 export interface AlertProps
-  extends Omit<React.HTMLAttributes<HTMLDivElement>, "title">,
+  extends
+    Omit<React.HTMLAttributes<HTMLDivElement>, "title">,
     VariantProps<typeof alertVariants> {
   /** Überschrift der Box (optional). */
   title?: React.ReactNode;
@@ -54,21 +62,32 @@ export interface AlertProps
  * Bedeutung wird nie allein über Farbe transportiert — Icon + Text tragen sie mit.
  */
 export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
-  ({ className, variant, title, description, icon, children, role, ...props }, ref) => {
+  (
+    { className, variant, title, description, icon, children, role, ...props },
+    ref,
+  ) => {
     const effectiveVariant: NonNullable<AlertVariant> = variant ?? "default";
-    const Icon = icon === null ? null : (icon ?? defaultIconFor[effectiveVariant]);
+    const Icon =
+      icon === null ? null : (icon ?? defaultIconFor[effectiveVariant]);
     const computedRole =
       role ??
-      (effectiveVariant === "destructive" || effectiveVariant === "warn" ? "alert" : "status");
+      (effectiveVariant === "destructive" || effectiveVariant === "warn"
+        ? "alert"
+        : "status");
 
     return (
-      <div ref={ref} role={computedRole} className={cn(alertVariants({ variant }), className)} {...props}>
+      <div
+        ref={ref}
+        role={computedRole}
+        className={cn(alertVariants({ variant }), className)}
+        {...props}
+      >
         {Icon ? <Icon aria-hidden="true" /> : null}
         <div className="flex min-w-0 flex-col gap-1">
-          {title ? (
-            <AlertTitle>{title}</AlertTitle>
+          {title ? <AlertTitle>{title}</AlertTitle> : null}
+          {description ? (
+            <AlertDescription>{description}</AlertDescription>
           ) : null}
-          {description ? <AlertDescription>{description}</AlertDescription> : null}
           {children}
         </div>
       </div>
@@ -78,15 +97,19 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
 Alert.displayName = "Alert";
 
 /** Überschrift einer Alert-Box — text-base/semibold, ruhig. */
-export const AlertTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(
-  ({ className, ...props }, ref) => (
-    <h5
-      ref={ref}
-      className={cn("text-base font-semibold leading-none tracking-tight", className)}
-      {...props}
-    />
-  ),
-);
+export const AlertTitle = React.forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLHeadingElement>
+>(({ className, ...props }, ref) => (
+  <h5
+    ref={ref}
+    className={cn(
+      "text-base font-semibold leading-none tracking-tight",
+      className,
+    )}
+    {...props}
+  />
+));
 AlertTitle.displayName = "AlertTitle";
 
 /** Beschreibungstext einer Alert-Box — text-sm, gedämpfter Ton bei neutraler Variante. */
@@ -94,7 +117,11 @@ export const AlertDescription = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("text-sm leading-relaxed [&_p]:leading-relaxed", className)} {...props} />
+  <div
+    ref={ref}
+    className={cn("text-sm leading-relaxed [&_p]:leading-relaxed", className)}
+    {...props}
+  />
 ));
 AlertDescription.displayName = "AlertDescription";
 

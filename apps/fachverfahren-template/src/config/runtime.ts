@@ -27,8 +27,14 @@ export async function loadPublicRuntimeConfig(): Promise<PublicRuntimeConfig> {
     const merged = {
       ...defaultPublicRuntimeConfig,
       ...raw,
-      application: { ...defaultPublicRuntimeConfig.application, ...(raw.application ?? {}) },
-      authority: { ...defaultPublicRuntimeConfig.authority, ...(raw.authority ?? {}) },
+      application: {
+        ...defaultPublicRuntimeConfig.application,
+        ...(raw.application ?? {}),
+      },
+      authority: {
+        ...defaultPublicRuntimeConfig.authority,
+        ...(raw.authority ?? {}),
+      },
     };
     return assertPublicRuntimeConfig(merged);
   } catch {

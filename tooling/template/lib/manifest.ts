@@ -45,7 +45,6 @@ export const defaultOwnership: TemplateOwnership = {
     "pnpm-workspace.yaml": "structured-merge",
     "agent.discovery.json": "replace",
     ".agents/skills/**": "replace",
-    ".claude/skills/**": "replace",
     "docs/agents/**": "replace",
     "docs/assets/**": "replace",
     "schemas/**": "replace",

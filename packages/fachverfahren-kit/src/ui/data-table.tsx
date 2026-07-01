@@ -47,11 +47,7 @@ import { Button } from "../ui/button.js";
 import { Checkbox } from "../ui/checkbox.js";
 import { Input } from "../ui/input.js";
 import { Label } from "../ui/label.js";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "../ui/popover.js";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover.js";
 import {
   Table,
   TableBody,
@@ -166,8 +162,11 @@ export function DataTable<TData, TValue>({
   );
 
   const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    [],
+  );
+  const [columnVisibility, setColumnVisibility] =
+    React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
   const [globalFilter, setGlobalFilter] = React.useState("");
 
@@ -181,7 +180,9 @@ export function DataTable<TData, TValue>({
       header: ({ table }) => (
         <HeaderSelectCheckbox table={table} label={labels.selectAll} />
       ),
-      cell: ({ row }) => <RowSelectCheckbox row={row} label={labels.selectRow} />,
+      cell: ({ row }) => (
+        <RowSelectCheckbox row={row} label={labels.selectRow} />
+      ),
     };
     return [selectColumn, ...columns];
   }, [columns, enableRowSelection, labels.selectAll, labels.selectRow]);
@@ -189,7 +190,13 @@ export function DataTable<TData, TValue>({
   const table = useReactTable<TData>({
     data,
     columns: resolvedColumns,
-    state: { sorting, columnFilters, columnVisibility, rowSelection, globalFilter },
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      rowSelection,
+      globalFilter,
+    },
     enableRowSelection,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
@@ -199,19 +206,22 @@ export function DataTable<TData, TValue>({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    ...(enablePagination ? { getPaginationRowModel: getPaginationRowModel() } : {}),
+    ...(enablePagination
+      ? { getPaginationRowModel: getPaginationRowModel() }
+      : {}),
     initialState: { pagination: { pageSize } },
   });
 
   // Auswahl nach außen spiegeln — die ORIGINALEN Datenzeilen, nicht die internen Row-Objekte.
-  const selectedOriginals = table.getSelectedRowModel().rows.map((r) => r.original);
+  const selectedOriginals = table
+    .getSelectedRowModel()
+    .rows.map((r) => r.original);
   const selectedKey = JSON.stringify(rowSelection);
   React.useEffect(() => {
     if (!enableRowSelection || !onRowSelectionChange) return;
     onRowSelectionChange(selectedOriginals);
     // selectedKey kapselt die Auswahl stabil; selectedOriginals/onRowSelectionChange absichtlich nicht in deps,
     // um Endlosschleifen bei inline-Callbacks/neuen Array-Referenzen zu vermeiden.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedKey, enableRowSelection]);
 
   const filteredCount = table.getFilteredRowModel().rows.length;
@@ -224,7 +234,9 @@ export function DataTable<TData, TValue>({
   // Eine zusammenhängende Live-Meldung — wird nach Filter/Sortierung/Pagination/Auswahl aktualisiert.
   const liveStatus = [
     labels.countStatus(filteredCount, totalCount),
-    enableRowSelection ? labels.selectionStatus(selectedCount, totalCount) : null,
+    enableRowSelection
+      ? labels.selectionStatus(selectedCount, totalCount)
+      : null,
     enablePagination ? labels.pageStatus(pageIndex + 1, pageCount) : null,
   ]
     .filter(Boolean)
@@ -256,7 +268,9 @@ export function DataTable<TData, TValue>({
           <TableCaption
             className={cn(
               "text-left text-muted-foreground",
-              captionVisible ? "mt-0 border-b border-border px-3 py-2 caption-top" : "sr-only",
+              captionVisible
+                ? "mt-0 border-b border-border px-3 py-2 caption-top"
+                : "sr-only",
             )}
           >
             {caption}
@@ -284,10 +298,16 @@ export function DataTable<TData, TValue>({
                     >
                       {header.isPlaceholder ? null : canSort ? (
                         <SortToggle column={header.column}>
-                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          {flexRender(
+                            header.column.columnDef.header,
+                            header.getContext(),
+                          )}
                         </SortToggle>
                       ) : (
-                        flexRender(header.column.columnDef.header, header.getContext())
+                        flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )
                       )}
                     </TableHead>
                   );
@@ -305,7 +325,10 @@ export function DataTable<TData, TValue>({
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className="align-middle">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -392,7 +415,8 @@ function SortToggle<TData, TValue>({
   children: React.ReactNode;
 }): React.ReactElement {
   const sorted = column.getIsSorted();
-  const Icon = sorted === "asc" ? ArrowUp : sorted === "desc" ? ArrowDown : ChevronsUpDown;
+  const Icon =
+    sorted === "asc" ? ArrowUp : sorted === "desc" ? ArrowDown : ChevronsUpDown;
   return (
     <button
       type="button"
@@ -472,7 +496,9 @@ function ColumnVisibilityItem<TData, TValue>({
         <Checkbox
           id={id}
           checked={column.getIsVisible()}
-          onCheckedChange={(checked) => column.toggleVisibility(checked === true)}
+          onCheckedChange={(checked) =>
+            column.toggleVisibility(checked === true)
+          }
           className="focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         />
         <span className="truncate">{columnLabel(column)}</span>
@@ -484,7 +510,8 @@ function ColumnVisibilityItem<TData, TValue>({
 /** Lesbares Spalten-Label: bevorzugt `meta.label`, dann String-Header, sonst die id. Generisch. */
 function columnLabel<TData, TValue>(column: Column<TData, TValue>): string {
   const meta = column.columnDef.meta as { label?: unknown } | undefined;
-  if (meta && typeof meta.label === "string" && meta.label.length > 0) return meta.label;
+  if (meta && typeof meta.label === "string" && meta.label.length > 0)
+    return meta.label;
   const header = column.columnDef.header;
   if (typeof header === "string" && header.length > 0) return header;
   return column.id;
@@ -506,7 +533,9 @@ function HeaderSelectCheckbox<TData>({
       <Checkbox
         id={id}
         checked={allSelected ? true : someSelected ? "indeterminate" : false}
-        onCheckedChange={(checked) => table.toggleAllPageRowsSelected(checked === true)}
+        onCheckedChange={(checked) =>
+          table.toggleAllPageRowsSelected(checked === true)
+        }
         aria-label={label}
         className={cn(
           // ≥24px Zielgröße (WCAG 2.2 SC 2.5.8): unsichtbares 24px-Trefferfeld um die 16px-Box, ohne Layout-Versatz.
@@ -569,7 +598,10 @@ function Pagination<TData>({
   return (
     <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
       <div className="flex items-center gap-2">
-        <Label htmlFor={selectId} className="text-sm font-medium text-muted-foreground">
+        <Label
+          htmlFor={selectId}
+          className="text-sm font-medium text-muted-foreground"
+        >
           {labels.rowsPerPage}
         </Label>
         <select

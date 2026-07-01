@@ -7,6 +7,7 @@
   },
   "references": [
     { "path": "../../packages/public-sector-sdk" },
+    { "path": "../../packages/fachverfahren-kit" },
     { "path": "../../packages/public-sector-ui" },
     { "path": "../../jurisdictions/de" }
   ],

@@ -14,7 +14,13 @@
 // über die zentrale Ansage (StatusRegion), Icons dekorativ (aria-hidden), Information nie nur über Farbe,
 // Ziel-Größe >=24px, motion-reduce respektiert.
 import * as React from "react";
-import { CheckCircle2, ListChecks, MapPin, SearchCheck, ShieldCheck } from "lucide-react";
+import {
+  CheckCircle2,
+  ListChecks,
+  MapPin,
+  SearchCheck,
+  ShieldCheck,
+} from "lucide-react";
 
 import { cn } from "../lib/utils.js";
 import { Badge } from "../ui/badge.js";
@@ -74,10 +80,30 @@ export interface AdressValidierungProps {
   className?: string;
 }
 
-const FELDER: ReadonlyArray<{ key: keyof AdressWert; label: string; autoComplete: string; placeholder: string }> = [
-  { key: "strasse", label: "Straße und Hausnummer", autoComplete: "street-address", placeholder: "Straße Nr." },
-  { key: "plz", label: "Postleitzahl", autoComplete: "postal-code", placeholder: "PLZ" },
-  { key: "ort", label: "Ort", autoComplete: "address-level2", placeholder: "Ort" },
+const FELDER: ReadonlyArray<{
+  key: keyof AdressWert;
+  label: string;
+  autoComplete: string;
+  placeholder: string;
+}> = [
+  {
+    key: "strasse",
+    label: "Straße und Hausnummer",
+    autoComplete: "street-address",
+    placeholder: "Straße Nr.",
+  },
+  {
+    key: "plz",
+    label: "Postleitzahl",
+    autoComplete: "postal-code",
+    placeholder: "PLZ",
+  },
+  {
+    key: "ort",
+    label: "Ort",
+    autoComplete: "address-level2",
+    placeholder: "Ort",
+  },
 ];
 
 function formatTreffer(t: AdressTreffer): string {
@@ -132,7 +158,11 @@ export function AdressValidierung({
     try {
       const treffer = await onValidieren(eingabe);
       const art: ErgebnisArt =
-        treffer.length === 0 ? "keinTreffer" : treffer.length === 1 ? "treffer" : "mehrdeutig";
+        treffer.length === 0
+          ? "keinTreffer"
+          : treffer.length === 1
+            ? "treffer"
+            : "mehrdeutig";
       setAuswahlIndex(0);
       const message =
         art === "treffer"
@@ -151,17 +181,23 @@ export function AdressValidierung({
     (treffer: AdressTreffer) => {
       setEingabe(treffer);
       onUebernehmen?.(treffer);
-      view.set("success", { message: "Anschrift aus dem Register übernommen." });
+      view.set("success", {
+        message: "Anschrift aus dem Register übernommen.",
+      });
       announce("Anschrift aus dem Register übernommen.", "polite");
     },
     [onUebernehmen, view, announce],
   );
 
   const zuruecksetzen = React.useCallback(() => {
-    view.set("idle", { data: undefined, message: "Eingabe kann erneut geprüft werden." });
+    view.set("idle", {
+      data: undefined,
+      message: "Eingabe kann erneut geprüft werden.",
+    });
   }, [view]);
 
-  const ergebnis = (status === "ready" || status === "success") ? view.state.data : undefined;
+  const ergebnis =
+    status === "ready" || status === "success" ? view.state.data : undefined;
   const istPruefend = status === "loading";
   const istUebernommen = status === "success";
   const eingabeLeer = istLeer(eingabe);
@@ -170,12 +206,16 @@ export function AdressValidierung({
     <Card className={cn("w-full", className)}>
       <CardHeader>
         <div className="flex items-start gap-2">
-          <ShieldCheck aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-status-info" />
+          <ShieldCheck
+            aria-hidden="true"
+            className="mt-0.5 size-5 shrink-0 text-status-info"
+          />
           <div className="space-y-1">
             <CardTitle>Anschrift gegen das Melderegister prüfen</CardTitle>
             <CardDescription>
-              Deterministischer Abgleich (XÖV/XMeld) – keine KI-Schätzung. Treffer werden markiert und
-              bleiben von Ihnen editierbar; nichts wird automatisch überschrieben.
+              Deterministischer Abgleich (XÖV/XMeld) – keine KI-Schätzung.
+              Treffer werden markiert und bleiben von Ihnen editierbar; nichts
+              wird automatisch überschrieben.
             </CardDescription>
           </div>
         </div>
@@ -185,7 +225,10 @@ export function AdressValidierung({
         {/* Eingabe — bleibt jederzeit von Hand editierbar (keine Auto-Überschreibung). */}
         <div className="grid gap-4 sm:grid-cols-3">
           {FELDER.map((feld) => (
-            <FormField key={feld.key} className={feld.key === "strasse" ? "sm:col-span-3" : undefined}>
+            <FormField
+              key={feld.key}
+              className={feld.key === "strasse" ? "sm:col-span-3" : undefined}
+            >
               <FormLabel>{feld.label}</FormLabel>
               <FormControl>
                 <Input
@@ -203,8 +246,9 @@ export function AdressValidierung({
 
         <FormField>
           <FormDescription>
-            Die Prüfung gleicht die Eingabe regelbasiert mit der amtlichen Registerquelle ab. Das Ergebnis
-            ist nachvollziehbar und unterscheidet sich bewusst von einer KI-Vorbefüllung.
+            Die Prüfung gleicht die Eingabe regelbasiert mit der amtlichen
+            Registerquelle ab. Das Ergebnis ist nachvollziehbar und
+            unterscheidet sich bewusst von einer KI-Vorbefüllung.
           </FormDescription>
         </FormField>
 
@@ -216,7 +260,10 @@ export function AdressValidierung({
         status === "conflict" ? (
           <ErrorState
             inline
-            title={view.state.message ?? "Die Prüfung konnte nicht abgeschlossen werden"}
+            title={
+              view.state.message ??
+              "Die Prüfung konnte nicht abgeschlossen werden"
+            }
             description="Sie können die Prüfung erneut anstoßen oder die Anschrift manuell weiterführen."
             onRetry={() => {
               void pruefen();
@@ -247,12 +294,17 @@ export function AdressValidierung({
             role="status"
             className="flex items-start gap-3 rounded-lg border border-status-warn/40 bg-status-warn-soft p-4"
           >
-            <MapPin aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-status-warn" />
+            <MapPin
+              aria-hidden="true"
+              className="mt-0.5 size-5 shrink-0 text-status-warn"
+            />
             <div className="space-y-1 text-sm">
-              <p className="font-medium text-foreground">Keine passende Anschrift im Register gefunden</p>
+              <p className="font-medium text-foreground">
+                Keine passende Anschrift im Register gefunden
+              </p>
               <p className="text-muted-foreground">
-                Bitte prüfen Sie Ihre Eingabe auf Tippfehler oder führen Sie den Vorgang mit der von Ihnen
-                erfassten Anschrift manuell weiter.
+                Bitte prüfen Sie Ihre Eingabe auf Tippfehler oder führen Sie den
+                Vorgang mit der von Ihnen erfassten Anschrift manuell weiter.
               </p>
             </div>
           </div>
@@ -267,7 +319,12 @@ export function AdressValidierung({
         </p>
         <div className="flex flex-wrap gap-2">
           {ergebnis != null ? (
-            <Button type="button" variant="ghost" size="sm" onClick={zuruecksetzen}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={zuruecksetzen}
+            >
               Erneut prüfen
             </Button>
           ) : null}
@@ -286,7 +343,11 @@ export function AdressValidierung({
       </CardFooter>
 
       {/* Zentrale Ansage des aktuellen Zustands (aria-live). */}
-      <StatusAnsage message={view.state.message} status={status} busy={istPruefend} />
+      <StatusAnsage
+        message={view.state.message}
+        status={status}
+        busy={istPruefend}
+      />
     </Card>
   );
 }
@@ -331,19 +392,31 @@ function TrefferKarte({
     <div
       className={cn(
         "flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-start sm:justify-between",
-        uebernommen ? "border-status-ok/40 bg-status-ok-soft" : "border-status-info/40 bg-status-info-soft",
+        uebernommen
+          ? "border-status-ok/40 bg-status-ok-soft"
+          : "border-status-info/40 bg-status-info-soft",
       )}
     >
       <div className="flex items-start gap-3">
-        <CheckCircle2 aria-hidden="true" className={cn("mt-0.5 size-5 shrink-0", uebernommen ? "text-status-ok" : "text-status-info")} />
+        <CheckCircle2
+          aria-hidden="true"
+          className={cn(
+            "mt-0.5 size-5 shrink-0",
+            uebernommen ? "text-status-ok" : "text-status-info",
+          )}
+        />
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={uebernommen ? "ok" : "info"}>
               {uebernommen ? "Übernommen" : "Eindeutiger Treffer"}
             </Badge>
-            <span className="text-xs text-muted-foreground">Registerabgleich</span>
+            <span className="text-xs text-muted-foreground">
+              Registerabgleich
+            </span>
           </div>
-          <p className="text-sm font-medium text-foreground">{formatTreffer(treffer)}</p>
+          <p className="text-sm font-medium text-foreground">
+            {formatTreffer(treffer)}
+          </p>
           <p className="text-xs text-muted-foreground">
             {uebernommen
               ? "Diese Anschrift wurde übernommen. Sie können die Felder oben weiterhin anpassen."
@@ -352,7 +425,12 @@ function TrefferKarte({
         </div>
       </div>
       {!uebernommen ? (
-        <Button type="button" size="sm" className="shrink-0" onClick={() => onUebernehmen(treffer)}>
+        <Button
+          type="button"
+          size="sm"
+          className="shrink-0"
+          onClick={() => onUebernehmen(treffer)}
+        >
           <CheckCircle2 aria-hidden="true" />
           Treffer übernehmen
         </Button>
@@ -375,10 +453,15 @@ function MehrdeutigAuswahl({
 }) {
   const groupLabelId = React.useId();
 
-  const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, index: number) => {
+  const onKeyDown = (
+    event: React.KeyboardEvent<HTMLDivElement>,
+    index: number,
+  ) => {
     let next: number;
-    if (event.key === "ArrowDown" || event.key === "ArrowRight") next = (index + 1) % treffer.length;
-    else if (event.key === "ArrowUp" || event.key === "ArrowLeft") next = (index - 1 + treffer.length) % treffer.length;
+    if (event.key === "ArrowDown" || event.key === "ArrowRight")
+      next = (index + 1) % treffer.length;
+    else if (event.key === "ArrowUp" || event.key === "ArrowLeft")
+      next = (index - 1 + treffer.length) % treffer.length;
     else return;
     event.preventDefault();
     onAuswahl(next);
@@ -387,18 +470,26 @@ function MehrdeutigAuswahl({
   return (
     <div className="space-y-3 rounded-lg border border-status-info/40 bg-surface p-4">
       <div className="flex items-start gap-3">
-        <ListChecks aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-status-info" />
+        <ListChecks
+          aria-hidden="true"
+          className="mt-0.5 size-5 shrink-0 text-status-info"
+        />
         <div className="space-y-1">
           <p id={groupLabelId} className="text-sm font-medium text-foreground">
             Mehrere mögliche Anschriften – bitte die zutreffende auswählen
           </p>
           <p className="text-xs text-muted-foreground">
-            Der Registerabgleich ist nicht eindeutig. Wählen Sie den passenden Eintrag und übernehmen Sie ihn.
+            Der Registerabgleich ist nicht eindeutig. Wählen Sie den passenden
+            Eintrag und übernehmen Sie ihn.
           </p>
         </div>
       </div>
 
-      <div role="radiogroup" aria-labelledby={groupLabelId} className="space-y-2">
+      <div
+        role="radiogroup"
+        aria-labelledby={groupLabelId}
+        className="space-y-2"
+      >
         {treffer.map((t, index) => {
           const selected = index === auswahlIndex;
           return (
@@ -431,7 +522,9 @@ function MehrdeutigAuswahl({
                   selected ? "border-primary" : "border-muted-foreground",
                 )}
               >
-                {selected ? <span className="size-2 rounded-full bg-primary" /> : null}
+                {selected ? (
+                  <span className="size-2 rounded-full bg-primary" />
+                ) : null}
               </span>
               <span className="flex-1">{formatTreffer(t)}</span>
               {selected ? <Badge tone="info">Ausgewählt</Badge> : null}

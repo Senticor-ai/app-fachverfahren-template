@@ -25,7 +25,10 @@ export interface SaveIndicatorProps {
   className?: string;
 }
 
-const RTF = typeof Intl !== "undefined" ? new Intl.RelativeTimeFormat("de", { numeric: "auto" }) : null;
+const RTF =
+  typeof Intl !== "undefined"
+    ? new Intl.RelativeTimeFormat("de", { numeric: "auto" })
+    : null;
 
 /** „vor X" dep-frei über Intl.RelativeTimeFormat (Sekunden→Minuten→Stunden→Tage). */
 function relativeDe(from: Date): string {
@@ -39,8 +42,19 @@ function relativeDe(from: Date): string {
   return RTF.format(Math.round(sec / 86400), "day");
 }
 
-export function SaveIndicator({ status, savedAt, onRetry, onSaveNow, className }: SaveIndicatorProps) {
-  const saved = savedAt != null ? (typeof savedAt === "string" ? new Date(savedAt) : savedAt) : null;
+export function SaveIndicator({
+  status,
+  savedAt,
+  onRetry,
+  onSaveNow,
+  className,
+}: SaveIndicatorProps) {
+  const saved =
+    savedAt != null
+      ? typeof savedAt === "string"
+        ? new Date(savedAt)
+        : savedAt
+      : null;
   // Periodisch neu rendern, damit „vor X" mitläuft (nur im saved-Zustand).
   const [, force] = React.useReducer((n: number) => n + 1, 0);
   React.useEffect(() => {
@@ -50,10 +64,20 @@ export function SaveIndicator({ status, savedAt, onRetry, onSaveNow, className }
   }, [status, saved]);
 
   return (
-    <div role="status" aria-live="polite" className={cn("flex items-center gap-2 text-sm text-muted-foreground", className)}>
+    <div
+      role="status"
+      aria-live="polite"
+      className={cn(
+        "flex items-center gap-2 text-sm text-muted-foreground",
+        className,
+      )}
+    >
       {status === "saving" && (
         <>
-          <Loader2 aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" />
+          <Loader2
+            aria-hidden="true"
+            className="size-4 animate-spin motion-reduce:animate-none"
+          />
           <span>Speichert …</span>
         </>
       )}
@@ -61,13 +85,17 @@ export function SaveIndicator({ status, savedAt, onRetry, onSaveNow, className }
         <>
           <Check aria-hidden="true" className="size-4 text-status-ok" />
           <span>
-            Gespeichert <time dateTime={saved.toISOString()}>{relativeDe(saved)}</time>
+            Gespeichert{" "}
+            <time dateTime={saved.toISOString()}>{relativeDe(saved)}</time>
           </span>
         </>
       )}
       {status === "error" && (
         <>
-          <TriangleAlert aria-hidden="true" className="size-4 text-status-block" />
+          <TriangleAlert
+            aria-hidden="true"
+            className="size-4 text-status-block"
+          />
           <span className="text-status-block">Nicht gespeichert.</span>
           {onRetry != null && (
             <Button type="button" size="sm" variant="outline" onClick={onRetry}>

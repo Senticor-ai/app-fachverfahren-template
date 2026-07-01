@@ -22,9 +22,15 @@ function parseColor(c: string): [number, number, number] | null {
   const s = c.trim();
   const hex = s.replace(/^#/, "");
   const m3 = /^([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/.exec(hex);
-  if (m3) return [parseInt(m3[1]! + m3[1]!, 16), parseInt(m3[2]! + m3[2]!, 16), parseInt(m3[3]! + m3[3]!, 16)];
+  if (m3)
+    return [
+      parseInt(m3[1]! + m3[1]!, 16),
+      parseInt(m3[2]! + m3[2]!, 16),
+      parseInt(m3[3]! + m3[3]!, 16),
+    ];
   const m6 = /^([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})$/.exec(hex);
-  if (m6) return [parseInt(m6[1]!, 16), parseInt(m6[2]!, 16), parseInt(m6[3]!, 16)];
+  if (m6)
+    return [parseInt(m6[1]!, 16), parseInt(m6[2]!, 16), parseInt(m6[3]!, 16)];
   const m = s.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i);
   return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
 }
@@ -37,12 +43,15 @@ function pickForeground(bg: string): string | null {
     const x = v / 255;
     return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
   };
-  const luminance = 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
+  const luminance =
+    0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
   return luminance > 0.4 ? "#0b0b0b" : "#ffffff";
 }
 
 /** Setzt die Markenfarben als CSS-Custom-Properties (resolved `--color-*`). No-op ohne brand/Document. */
-export function applyKommuneTheme(theme: RuntimeKommuneTheme | null | undefined): void {
+export function applyKommuneTheme(
+  theme: RuntimeKommuneTheme | null | undefined,
+): void {
   if (!theme?.brand || typeof document === "undefined") return;
   const root = document.documentElement;
   const b = theme.brand;
@@ -64,7 +73,10 @@ export function applyKommuneTheme(theme: RuntimeKommuneTheme | null | undefined)
  */
 export async function bootKommuneTheme(): Promise<void> {
   try {
-    const r = await fetch("/runtime-config.json", { cache: "no-store", headers: { accept: "application/json" } });
+    const r = await fetch("/runtime-config.json", {
+      cache: "no-store",
+      headers: { accept: "application/json" },
+    });
     if (!r.ok) return;
     const raw = (await r.json()) as { theme?: RuntimeKommuneTheme };
     applyKommuneTheme(raw.theme ?? null);

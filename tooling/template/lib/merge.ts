@@ -16,9 +16,6 @@ const managedCandidateFiles = [
   "sources/source-lock.json",
   ".agents/skills/fachverfahren-app/SKILL.md",
   ".agents/skills/ux-ui/SKILL.md",
-  ".claude/skills/fachverfahren-app/SKILL.md",
-  ".claude/skills/testing/SKILL.md",
-  ".claude/skills/backend-fastify/SKILL.md",
   "tooling/template/cli.ts",
 ];
 

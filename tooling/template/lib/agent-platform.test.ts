@@ -62,14 +62,14 @@ describe("agent platform contract", () => {
             .some((part) => part === ".git" || part === "node_modules"),
       });
       const first = await appNew(temp, {
-        specPath: "docs/examples/veranstaltungsanzeige/app.spec.yaml",
+        specPath: "docs/examples/hundesteuer/app.spec.yaml",
       });
       const second = await appNew(temp, {
-        specPath: "docs/examples/veranstaltungsanzeige/app.spec.yaml",
+        specPath: "docs/examples/hundesteuer/app.spec.yaml",
       });
       expect(first.status).toBe("ok");
       expect(second.status).toBe("ok");
-      expect(second.preserved).toContain("modules/event-notice");
+      expect(second.preserved).toContain("modules/dog-tax");
     } finally {
       await rm(temp, { recursive: true, force: true });
     }

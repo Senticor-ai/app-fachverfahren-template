@@ -10,7 +10,14 @@
 // Daten stets als <time dateTime>, Icons dekorativ (aria-hidden), echte <button>/<a>, sichtbarer Fokus,
 // Ziel-Größe >=24px, motion-reduce respektiert. Die Zeitzone (Europe/Berlin) ist explizit ausgewiesen.
 import * as React from "react";
-import { AlarmClock, CalendarPlus, CheckCircle2, Clock, Download, TriangleAlert } from "lucide-react";
+import {
+  AlarmClock,
+  CalendarPlus,
+  CheckCircle2,
+  Clock,
+  Download,
+  TriangleAlert,
+} from "lucide-react";
 
 import { cn } from "../lib/utils.js";
 import { Button } from "../ui/button.js";
@@ -84,8 +91,10 @@ function tageBis(zielMs: number, jetztMs: number): number {
 function relativ(zielMs: number, jetztMs: number): string {
   const diffMs = zielMs - jetztMs;
   const absMs = Math.abs(diffMs);
-  if (absMs >= MS_PRO_TAG) return relFmt.format(tageBis(zielMs, jetztMs), "day");
-  if (absMs >= 60 * 60 * 1000) return relFmt.format(Math.round(diffMs / (60 * 60 * 1000)), "hour");
+  if (absMs >= MS_PRO_TAG)
+    return relFmt.format(tageBis(zielMs, jetztMs), "day");
+  if (absMs >= 60 * 60 * 1000)
+    return relFmt.format(Math.round(diffMs / (60 * 60 * 1000)), "hour");
   return relFmt.format(Math.round(diffMs / (60 * 1000)), "minute");
 }
 
@@ -113,12 +122,19 @@ const TON_META: Record<
 function icsZeit(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  return d
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}/, "");
 }
 
 /** Maskiert Zeichen mit Sonderbedeutung im ICS-Textwert (RFC 5545). */
 function icsText(value: string): string {
-  return value.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\n/g, "\\n");
 }
 
 /** Baut eine ICS-data-URL für einen Slot. Leerer String, wenn der Slot nicht datierbar ist. */
@@ -150,7 +166,11 @@ function icsDataUrl(slot: TerminSlot, titel: string): string {
 
 /** Lesbarer Dateiname für den ICS-Download. */
 function icsDateiname(titel: string): string {
-  const base = titel.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const base = titel
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
   return `${base || "termin"}.ics`;
 }
 
@@ -193,7 +213,10 @@ export function TerminFristPanel({
   const angesagteUeberfaellige = React.useRef<Set<string>>(new Set());
   React.useEffect(() => {
     for (const frist of fristen) {
-      if (tonFuer(frist, jetztMs) === "ueberfaellig" && !angesagteUeberfaellige.current.has(frist.id)) {
+      if (
+        tonFuer(frist, jetztMs) === "ueberfaellig" &&
+        !angesagteUeberfaellige.current.has(frist.id)
+      ) {
         angesagteUeberfaellige.current.add(frist.id);
         announce(`Frist überfällig: ${frist.titel}.`, "assertive");
       }
@@ -208,11 +231,20 @@ export function TerminFristPanel({
       announce(`Termin wird gebucht: ${slotTitel}.`, "polite");
       try {
         await onBuchen(slot.id);
-        setBuchung((b) => ({ ...b, [slot.id]: { phase: "gebucht", titel: slotTitel } }));
-        announce(`Termin gebucht: ${slotTitel}. Kalender-Export verfügbar.`, "polite");
+        setBuchung((b) => ({
+          ...b,
+          [slot.id]: { phase: "gebucht", titel: slotTitel },
+        }));
+        announce(
+          `Termin gebucht: ${slotTitel}. Kalender-Export verfügbar.`,
+          "polite",
+        );
       } catch {
         setBuchung((b) => ({ ...b, [slot.id]: { phase: "fehler" } }));
-        announce(`Termin konnte nicht gebucht werden: ${slotTitel}.`, "assertive");
+        announce(
+          `Termin konnte nicht gebucht werden: ${slotTitel}.`,
+          "assertive",
+        );
       }
     },
     [onBuchen, announce],
@@ -235,7 +267,9 @@ export function TerminFristPanel({
         {/* ── Fristen ────────────────────────────────────────────────────────────────────────── */}
         {hatFristen && (
           <section aria-label="Fristen">
-            <h3 className="mb-3 text-sm font-semibold text-foreground">Fristen</h3>
+            <h3 className="mb-3 text-sm font-semibold text-foreground">
+              Fristen
+            </h3>
             <ul className="space-y-2">
               {fristen.map((frist) => {
                 const ton = tonFuer(frist, jetztMs);
@@ -251,26 +285,39 @@ export function TerminFristPanel({
                     role={istUeberfaellig ? "alert" : undefined}
                     className={cn(
                       "flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-md border p-3",
-                      istUeberfaellig ? "border-status-block/40 bg-status-block-soft" : "border-border bg-surface",
+                      istUeberfaellig
+                        ? "border-status-block/40 bg-status-block-soft"
+                        : "border-border bg-surface",
                     )}
                   >
                     <div className="min-w-0">
-                      <p className="truncate font-medium text-foreground">{frist.titel}</p>
+                      <p className="truncate font-medium text-foreground">
+                        {frist.titel}
+                      </p>
                       {datierbar ? (
                         <p className="text-sm text-muted-foreground">
                           Fällig{" "}
-                          <time dateTime={frist.faelligIso}>{datumFmt.format(zielMs)}</time>
+                          <time dateTime={frist.faelligIso}>
+                            {datumFmt.format(zielMs)}
+                          </time>
                           {ton !== "gewahrt" && (
                             <>
                               {" · "}
-                              <span className={cn(istUeberfaellig && "font-medium text-foreground")}>
+                              <span
+                                className={cn(
+                                  istUeberfaellig &&
+                                    "font-medium text-foreground",
+                                )}
+                              >
                                 {relativ(zielMs, jetztMs)}
                               </span>
                             </>
                           )}
                         </p>
                       ) : (
-                        <p className="text-sm text-muted-foreground">Kein gültiges Fälligkeitsdatum.</p>
+                        <p className="text-sm text-muted-foreground">
+                          Kein gültiges Fälligkeitsdatum.
+                        </p>
                       )}
                     </div>
                     {/* Status MIT Text + Icon — Information nie nur über die Farbe. */}
@@ -288,7 +335,9 @@ export function TerminFristPanel({
         {/* ── Termine buchen ─────────────────────────────────────────────────────────────────── */}
         {hatSlots && (
           <section aria-label="Terminbuchung">
-            <h3 className="mb-3 text-sm font-semibold text-foreground">Termin buchen</h3>
+            <h3 className="mb-3 text-sm font-semibold text-foreground">
+              Termin buchen
+            </h3>
             <ul className="space-y-2">
               {slots.map((slot) => {
                 const startMs = new Date(slot.startIso).getTime();
@@ -299,7 +348,9 @@ export function TerminFristPanel({
                 const laden = phase === "laden";
                 const gebucht = phase === "gebucht";
                 const fehler = phase === "fehler";
-                const icsUrl = gebucht ? icsDataUrl(slot, zustand?.titel ?? slotTitel) : "";
+                const icsUrl = gebucht
+                  ? icsDataUrl(slot, zustand?.titel ?? slotTitel)
+                  : "";
                 return (
                   <li
                     key={slot.id}
@@ -308,7 +359,9 @@ export function TerminFristPanel({
                     <div className="min-w-0">
                       <p className="font-medium text-foreground">
                         {datierbar ? (
-                          <time dateTime={slot.startIso}>{datumFmt.format(startMs)}</time>
+                          <time dateTime={slot.startIso}>
+                            {datumFmt.format(startMs)}
+                          </time>
                         ) : (
                           "Termin"
                         )}
@@ -317,7 +370,10 @@ export function TerminFristPanel({
                         Dauer: {slot.dauerMin}&nbsp;Minuten
                         {fehler && (
                           <span className="ml-2 inline-flex items-center gap-1 text-foreground">
-                            <TriangleAlert className="size-3.5 text-status-block" aria-hidden="true" />
+                            <TriangleAlert
+                              className="size-3.5 text-status-block"
+                              aria-hidden="true"
+                            />
                             Buchung fehlgeschlagen
                           </span>
                         )}
@@ -328,7 +384,10 @@ export function TerminFristPanel({
                       {gebucht ? (
                         <>
                           <Badge tone="ok">
-                            <CheckCircle2 className="size-3" aria-hidden="true" />
+                            <CheckCircle2
+                              className="size-3"
+                              aria-hidden="true"
+                            />
                             Gebucht
                           </Badge>
                           {icsUrl && (
@@ -356,9 +415,16 @@ export function TerminFristPanel({
                         >
                           <CalendarPlus
                             aria-hidden="true"
-                            className={cn(laden && "animate-pulse motion-reduce:animate-none")}
+                            className={cn(
+                              laden &&
+                                "animate-pulse motion-reduce:animate-none",
+                            )}
                           />
-                          {laden ? "Wird gebucht…" : fehler ? "Erneut buchen" : "Buchen"}
+                          {laden
+                            ? "Wird gebucht…"
+                            : fehler
+                              ? "Erneut buchen"
+                              : "Buchen"}
                         </Button>
                       )}
                     </div>
@@ -367,14 +433,16 @@ export function TerminFristPanel({
               })}
             </ul>
             <p className="mt-3 text-xs text-muted-foreground">
-              Alle Zeiten in der Zeitzone Europe/Berlin. Der Kalender-Export (.ics) berücksichtigt die
-              Zeitzone automatisch.
+              Alle Zeiten in der Zeitzone Europe/Berlin. Der Kalender-Export
+              (.ics) berücksichtigt die Zeitzone automatisch.
             </p>
           </section>
         )}
 
         {!hatFristen && !hatSlots && (
-          <p className="text-sm text-muted-foreground">Keine Fristen oder Termine vorhanden.</p>
+          <p className="text-sm text-muted-foreground">
+            Keine Fristen oder Termine vorhanden.
+          </p>
         )}
       </CardContent>
     </Card>

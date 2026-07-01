@@ -57,12 +57,7 @@
         "antrag.felder: jedes Pflichtfeld required:true MIT passender Validierung (pattern/min/max), damit fehlende/ungueltige Eingaben blockieren (kein stilles Durchwinken).",
         "OPTIONALE Komponenten-Signale aus dem Fachkonzept ableiten (NUR setzen, wenn das Fachkonzept es vorsieht — sonst weglassen, dann rendert die App den schlanken Standard): wenn eine GEBUEHR/Zahlung anfaellt -> config.ePayment { zahlarten:[{id,label}], positionen?:[{bezeichnung,betrag}] } (App komponiert EPaymentPanel im Buerger-Abschluss); wenn ein BESCHEID zugestellt wird (Bekanntgabe/Zustellungsfiktion §41 VwVfG) -> config.zustellung { bekanntgabeIso?, fiktion?, bescheidUrl? } (App: Postfach-Route + PdfViewer-Bescheid-Tab); wenn FRISTEN/TERMINE relevant sind -> config.termin { fristen?, slots? } (App: TerminFristPanel-Route); wenn KI-Unterstuetzung vorgesehen ist -> config.ki.vorschlag { wert, quelle, konfidenz, begruendung, funktionsName, risikoklasse } (App: KiAssistPanel mit 5 Transparenz-Elementen, statt nur KiVorschlag); wenn eine ADRESS-/Melderegisterpruefung vorgesehen ist -> config.adressValidierung { enabled:true } (App: AdressValidierung im Antrag-Review). Generisch, data-driven — kein Hardcode."
       ],
-      "groundsOn": [
-        "FACHKONZEPT.md",
-        "EPIC.md",
-        "PRD.md",
-        "ARCHITEKTUR.md"
-      ],
+      "groundsOn": ["FACHKONZEPT.md", "EPIC.md", "PRD.md", "ARCHITEKTUR.md"],
       "source": "die freigegebenen Planungs-Artefakte (Fachkonzept-Datenmodell/Regellogik, Epic-Akzeptanzkriterien, PRD-Felder, Architektur-Mapping)",
       "gate": "check:leistung-contract, check:typescript-policy, typecheck, test",
       "shapeRef": "apps/fachverfahren/src/leistung.config.ts",
@@ -77,11 +72,7 @@
     "citizen": {
       "route": "/services/<domain>",
       "pattern": "guided-stepper",
-      "primaryComponents": [
-        "AntragStepper",
-        "OnceOnlyField",
-        "BundIDLoginForm"
-      ]
+      "primaryComponents": ["AntragStepper", "OnceOnlyField", "BundIDLoginForm"]
     },
     "caseworker": {
       "route": "/cases/<domain>",
@@ -96,9 +87,7 @@
     "audit": {
       "route": "/audit/<domain>",
       "pattern": "dashboard-drilldown",
-      "primaryComponents": [
-        "AuditDashboard"
-      ]
+      "primaryComponents": ["AuditDashboard"]
     }
   },
   "verifyGates": {

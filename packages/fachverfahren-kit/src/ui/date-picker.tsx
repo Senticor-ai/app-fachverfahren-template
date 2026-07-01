@@ -86,7 +86,10 @@ function DatePicker({
             className,
           )}
         >
-          <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <CalendarDays
+            className="h-4 w-4 shrink-0 text-muted-foreground"
+            aria-hidden="true"
+          />
           <span className="truncate">
             {value ? format(value, displayFormat, { locale: de }) : placeholder}
           </span>
@@ -132,7 +135,11 @@ export interface DateRangePickerProps {
 }
 
 /** Formatiert einen Zeitraum als "von – bis"; offene Enden bleiben leer. */
-function formatRange(range: DateRange | undefined, pattern: string, separator: string): string | null {
+function formatRange(
+  range: DateRange | undefined,
+  pattern: string,
+  separator: string,
+): string | null {
   if (!range?.from) return null;
   const from = format(range.from, pattern, { locale: de });
   if (!range.to) return from;
@@ -187,7 +194,10 @@ function DateRangePicker({
             className,
           )}
         >
-          <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <CalendarDays
+            className="h-4 w-4 shrink-0 text-muted-foreground"
+            aria-hidden="true"
+          />
           <span className="truncate">{label ?? placeholder}</span>
         </Button>
       </PopoverTrigger>

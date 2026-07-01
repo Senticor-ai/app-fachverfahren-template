@@ -53,23 +53,36 @@ export function StatusRegionProvider({ children }: StatusRegionProviderProps) {
     [],
   );
 
-  const announce = React.useCallback((message: string, politeness: Politeness = "polite") => {
-    const setter = politeness === "assertive" ? setAssertive : setPolite;
-    // Clear-then-Set erzwingt die Wiederholung identischer Texte (Screenreader feuern sonst nicht).
-    setter("");
-    const t = window.setTimeout(() => setter(message), 60);
-    timers.current.push(t);
-  }, []);
+  const announce = React.useCallback(
+    (message: string, politeness: Politeness = "polite") => {
+      const setter = politeness === "assertive" ? setAssertive : setPolite;
+      // Clear-then-Set erzwingt die Wiederholung identischer Texte (Screenreader feuern sonst nicht).
+      setter("");
+      const t = window.setTimeout(() => setter(message), 60);
+      timers.current.push(t);
+    },
+    [],
+  );
 
   const value = React.useMemo<Announcer>(() => ({ announce }), [announce]);
 
   return (
     <StatusRegionContext.Provider value={value}>
       {children}
-      <div aria-live="polite" aria-atomic="true" role="status" className="sr-only">
+      <div
+        aria-live="polite"
+        aria-atomic="true"
+        role="status"
+        className="sr-only"
+      >
         {polite}
       </div>
-      <div aria-live="assertive" aria-atomic="true" role="alert" className="sr-only">
+      <div
+        aria-live="assertive"
+        aria-atomic="true"
+        role="alert"
+        className="sr-only"
+      >
         {assertive}
       </div>
     </StatusRegionContext.Provider>
@@ -78,7 +91,10 @@ export function StatusRegionProvider({ children }: StatusRegionProviderProps) {
 
 // ── 2. Standalone-Region (kontrolliert, für lokale ViewState-Meldungen) ──────────────────────────
 
-export interface StatusRegionProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "role"> {
+export interface StatusRegionProps extends Omit<
+  React.HTMLAttributes<HTMLDivElement>,
+  "role"
+> {
   /** Anzusagender Text (leer/undefined = nichts angesagt). */
   message?: string | undefined;
   /** polite (Standard) oder assertive für Fehler/Konflikt. */
@@ -96,14 +112,27 @@ export interface StatusRegionProps extends Omit<React.HTMLAttributes<HTMLDivElem
  * <StatusRegion message={view.state.message} politeness={announcePoliteness(view.state.status)} busy={view.state.status === "loading"} />
  */
 export const StatusRegion = React.forwardRef<HTMLDivElement, StatusRegionProps>(
-  ({ message, politeness = "polite", busy = false, visible = false, className, ...props }, ref) => (
+  (
+    {
+      message,
+      politeness = "polite",
+      busy = false,
+      visible = false,
+      className,
+      ...props
+    },
+    ref,
+  ) => (
     <div
       ref={ref}
       role={politeness === "assertive" ? "alert" : "status"}
       aria-live={politeness}
       aria-atomic="true"
       aria-busy={busy || undefined}
-      className={cn(visible ? "text-sm text-muted-foreground" : "sr-only", className)}
+      className={cn(
+        visible ? "text-sm text-muted-foreground" : "sr-only",
+        className,
+      )}
       {...props}
     >
       {message}

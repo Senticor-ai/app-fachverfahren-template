@@ -50,11 +50,11 @@ export interface ComboboxProps {
 function matches(option: ComboboxOption, query: string): boolean {
   if (query.trim() === "") return true;
   const norm = (s: string) =>
-    s
-      .toLocaleLowerCase("de-DE")
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "");
-  return norm(option.label).includes(norm(query)) || norm(option.value).includes(norm(query));
+    s.toLocaleLowerCase("de-DE").normalize("NFD").replace(/[̀-ͯ]/g, "");
+  return (
+    norm(option.label).includes(norm(query)) ||
+    norm(option.value).includes(norm(query))
+  );
 }
 
 /** Durchsuchbarer Single-Select nach dem ARIA-Combobox-/Listbox-Muster. */
@@ -106,7 +106,9 @@ export const Combobox: React.FC<ComboboxProps> = ({
   // Aktiven Index in Sicht halten.
   React.useEffect(() => {
     if (!open) return;
-    const el = listRef.current?.querySelector<HTMLElement>(`#${CSS.escape(optionId(activeIndex))}`);
+    const el = listRef.current?.querySelector<HTMLElement>(
+      `#${CSS.escape(optionId(activeIndex))}`,
+    );
     el?.scrollIntoView({ block: "nearest" });
   }, [activeIndex, open]);
 
@@ -179,7 +181,9 @@ export const Combobox: React.FC<ComboboxProps> = ({
   }
 
   const activeDescendant =
-    open && activeIndex >= 0 && activeIndex < filtered.length ? optionId(activeIndex) : undefined;
+    open && activeIndex >= 0 && activeIndex < filtered.length
+      ? optionId(activeIndex)
+      : undefined;
 
   return (
     <Popover
@@ -211,10 +215,15 @@ export const Combobox: React.FC<ComboboxProps> = ({
             className,
           )}
         >
-          <span className={cn("truncate", !selected && "text-muted-foreground")}>
+          <span
+            className={cn("truncate", !selected && "text-muted-foreground")}
+          >
             {selected ? selected.label : placeholder}
           </span>
-          <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <ChevronsUpDown
+            className="h-4 w-4 shrink-0 text-muted-foreground"
+            aria-hidden="true"
+          />
         </button>
       </PopoverAnchor>
 
@@ -229,7 +238,10 @@ export const Combobox: React.FC<ComboboxProps> = ({
         }}
       >
         <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-          <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <Search
+            className="h-4 w-4 shrink-0 text-muted-foreground"
+            aria-hidden="true"
+          />
           <Input
             ref={inputRef}
             id={inputId}
@@ -260,7 +272,10 @@ export const Combobox: React.FC<ComboboxProps> = ({
           className="max-h-64 overflow-y-auto p-1"
         >
           {filtered.length === 0 ? (
-            <li role="presentation" className="px-3 py-6 text-center text-sm text-muted-foreground">
+            <li
+              role="presentation"
+              className="px-3 py-6 text-center text-sm text-muted-foreground"
+            >
               {emptyText}
             </li>
           ) : (
@@ -283,12 +298,17 @@ export const Combobox: React.FC<ComboboxProps> = ({
                   className={cn(
                     "flex min-h-[2rem] cursor-pointer select-none items-center gap-2 rounded-sm px-3 py-1.5 text-sm",
                     "transition-colors duration-150 ease-out motion-reduce:transition-none",
-                    isActive && !opt.disabled && "bg-accent text-accent-foreground",
+                    isActive &&
+                      !opt.disabled &&
+                      "bg-accent text-accent-foreground",
                     opt.disabled && "cursor-not-allowed opacity-50",
                   )}
                 >
                   <Check
-                    className={cn("h-4 w-4 shrink-0", isSelected ? "opacity-100" : "opacity-0")}
+                    className={cn(
+                      "h-4 w-4 shrink-0",
+                      isSelected ? "opacity-100" : "opacity-0",
+                    )}
                     aria-hidden="true"
                   />
                   <span className="truncate">{opt.label}</span>

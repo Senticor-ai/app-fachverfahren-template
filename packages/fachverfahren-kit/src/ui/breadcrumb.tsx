@@ -36,7 +36,11 @@ const BreadcrumbItem = React.forwardRef<
   HTMLLIElement,
   React.ComponentPropsWithoutRef<"li">
 >(({ className, ...props }, ref) => (
-  <li ref={ref} className={cn("inline-flex items-center gap-2", className)} {...props} />
+  <li
+    ref={ref}
+    className={cn("inline-flex items-center gap-2", className)}
+    {...props}
+  />
 ));
 BreadcrumbItem.displayName = "BreadcrumbItem";
 
@@ -77,7 +81,10 @@ const BreadcrumbPage = React.forwardRef<
     role="link"
     aria-disabled="true"
     aria-current="page"
-    className={cn("inline-flex min-h-6 items-center font-medium text-foreground", className)}
+    className={cn(
+      "inline-flex min-h-6 items-center font-medium text-foreground",
+      className,
+    )}
     {...props}
   />
 ));
@@ -108,7 +115,10 @@ const BreadcrumbEllipsis = ({
   <span
     role="presentation"
     aria-hidden="true"
-    className={cn("flex size-6 items-center justify-center text-muted-foreground", className)}
+    className={cn(
+      "flex size-6 items-center justify-center text-muted-foreground",
+      className,
+    )}
     {...props}
   >
     <MoreHorizontal aria-hidden="true" className="size-4" />

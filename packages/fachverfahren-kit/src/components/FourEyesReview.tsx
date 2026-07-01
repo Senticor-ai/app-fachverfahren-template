@@ -86,7 +86,11 @@ type RunningAction = "vorlegen" | "freigeben" | "ablehnen" | null;
 /** Statische, generische Darstellung je Status — Wording trägt die Bedeutung (nicht die Farbe allein). */
 const STATUS_META: Record<
   FourEyesStatus,
-  { label: string; tone: "neu" | "info" | "warn" | "ok" | "block"; satz: string }
+  {
+    label: string;
+    tone: "neu" | "info" | "warn" | "ok" | "block";
+    satz: string;
+  }
 > = {
   entwurf: {
     label: "Entwurf",
@@ -173,11 +177,15 @@ export function FourEyesReview({
 
   // Status (und ggf. der Selbstfreigabe-Hinweis) wird höflich angesagt — EINE Ansage-Quelle.
   React.useEffect(() => {
-    const satz = istErsteller && offen ? `${meta.satz} ${SELBST_HINWEIS}` : meta.satz;
+    const satz =
+      istErsteller && offen ? `${meta.satz} ${SELBST_HINWEIS}` : meta.satz;
     announce(satz, "polite");
   }, [announce, meta.satz, istErsteller, offen]);
 
-  async function lauf(action: Exclude<RunningAction, null>, fn: () => Promise<void>): Promise<void> {
+  async function lauf(
+    action: Exclude<RunningAction, null>,
+    fn: () => Promise<void>,
+  ): Promise<void> {
     if (running !== null) {
       return;
     }
@@ -214,7 +222,10 @@ export function FourEyesReview({
       // Pflicht-Begründung: Validierung sichtbar + per role="alert" angesagt, Fokus auf das Feld.
       setGrundFehler("Bitte geben Sie eine Begründung für die Ablehnung an.");
       announce("Ablehnung benötigt eine Begründung.", "assertive");
-      const el = typeof document !== "undefined" ? document.getElementById(grundId) : null;
+      const el =
+        typeof document !== "undefined"
+          ? document.getElementById(grundId)
+          : null;
       if (el instanceof HTMLElement) {
         el.focus();
       }
@@ -233,7 +244,8 @@ export function FourEyesReview({
           <div className="flex flex-col gap-1.5">
             <CardTitle>Vier-Augen-Prüfung</CardTitle>
             <CardDescription>
-              Zweitprüfung einer rechtsnahen Entscheidung. Freigabe nur durch eine zweite Person.
+              Zweitprüfung einer rechtsnahen Entscheidung. Freigabe nur durch
+              eine zweite Person.
             </CardDescription>
           </div>
           {/* Badge trägt den Status redundant zur Live-Ansage; Bedeutung steht im Text, nicht in der Farbe. */}
@@ -249,7 +261,9 @@ export function FourEyesReview({
           aria-atomic="true"
           className="text-sm font-medium text-foreground"
         >
-          {status === "vorgelegt" ? "Wartet auf Zweitprüfung durch eine zweite Person." : meta.satz}
+          {status === "vorgelegt"
+            ? "Wartet auf Zweitprüfung durch eine zweite Person."
+            : meta.satz}
         </p>
 
         {/* Die vorgelegte Entscheidung (generische Inhalte aus der Vorlage). */}
@@ -259,16 +273,22 @@ export function FourEyesReview({
 
           <dt className="font-medium text-muted-foreground">Erstellt am</dt>
           <dd className="text-foreground">
-            <time dateTime={vorlage.erstelltAmIso}>{formatZeitpunkt(vorlage.erstelltAmIso)}</time>
+            <time dateTime={vorlage.erstelltAmIso}>
+              {formatZeitpunkt(vorlage.erstelltAmIso)}
+            </time>
           </dd>
 
           <dt className="font-medium text-muted-foreground">Entscheidung</dt>
-          <dd className="font-medium text-foreground">{vorlage.entscheidung}</dd>
+          <dd className="font-medium text-foreground">
+            {vorlage.entscheidung}
+          </dd>
 
           {vorlage.begruendung ? (
             <>
               <dt className="font-medium text-muted-foreground">Begründung</dt>
-              <dd className="whitespace-pre-line text-foreground">{vorlage.begruendung}</dd>
+              <dd className="whitespace-pre-line text-foreground">
+                {vorlage.begruendung}
+              </dd>
             </>
           ) : null}
         </dl>
@@ -279,7 +299,10 @@ export function FourEyesReview({
             role="note"
             className="flex items-start gap-2 rounded-lg border border-status-warn/40 bg-status-warn-soft p-3 text-sm text-foreground"
           >
-            <ShieldAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            <ShieldAlert
+              aria-hidden="true"
+              className="mt-0.5 size-4 shrink-0"
+            />
             <span>{SELBST_HINWEIS}</span>
           </div>
         ) : null}
@@ -297,7 +320,10 @@ export function FourEyesReview({
                 placeholder="Sachlicher Grund der Ablehnung"
                 onChange={(e) => {
                   setGrund(e.target.value);
-                  if (grundFehler !== null && e.target.value.trim().length > 0) {
+                  if (
+                    grundFehler !== null &&
+                    e.target.value.trim().length > 0
+                  ) {
                     setGrundFehler(null);
                   }
                 }}
@@ -305,7 +331,8 @@ export function FourEyesReview({
               />
             </FormControl>
             <FormDescription>
-              Bei Freigabe nicht erforderlich. Eine Ablehnung muss begründet werden.
+              Bei Freigabe nicht erforderlich. Eine Ablehnung muss begründet
+              werden.
             </FormDescription>
             <FormMessage>{grundFehler}</FormMessage>
           </FormField>
@@ -314,9 +341,15 @@ export function FourEyesReview({
         {istEndstatus ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             {status === "freigegeben" ? (
-              <CheckCircle2 aria-hidden="true" className="size-4 shrink-0 text-status-ok" />
+              <CheckCircle2
+                aria-hidden="true"
+                className="size-4 shrink-0 text-status-ok"
+              />
             ) : (
-              <XCircle aria-hidden="true" className="size-4 shrink-0 text-status-block" />
+              <XCircle
+                aria-hidden="true"
+                className="size-4 shrink-0 text-status-block"
+              />
             )}
             <span>{meta.satz}</span>
           </div>

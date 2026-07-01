@@ -19,7 +19,13 @@ import type { ViewState } from "../hooks/use-view-state.js";
 /** Zustände, in denen Daten vorliegen und children gerendert werden. */
 const DATA_STATES = new Set(["ready", "success", "readOnly", "partialSuccess"]);
 /** Zustände, die als Fehler-Block mit Recovery dargestellt werden. */
-const ERROR_STATES = new Set(["error", "offline", "forbidden", "sessionExpired", "conflict"]);
+const ERROR_STATES = new Set([
+  "error",
+  "offline",
+  "forbidden",
+  "sessionExpired",
+  "conflict",
+]);
 
 export interface ViewStateBoundaryProps<T, E = unknown> {
   /** Der Zustand (aus useViewState().state). */
@@ -61,14 +67,19 @@ export function ViewStateBoundary<T, E = unknown>({
   const { announce: announceFn } = useStatusRegion();
 
   React.useEffect(() => {
-    if (announce && state.message) announceFn(state.message, announcePoliteness(state.status));
+    if (announce && state.message)
+      announceFn(state.message, announcePoliteness(state.status));
   }, [announce, announceFn, state.status, state.message]);
 
   if (state.status === "idle" || state.status === "loading") {
     return <div className={className}>{loading ?? <SkeletonCard />}</div>;
   }
   if (state.status === "empty") {
-    return <div className={className}>{empty ?? <EmptyState title={emptyTitle} description={state.message} />}</div>;
+    return (
+      <div className={className}>
+        {empty ?? <EmptyState title={emptyTitle} description={state.message} />}
+      </div>
+    );
   }
   if (ERROR_STATES.has(state.status)) {
     return (

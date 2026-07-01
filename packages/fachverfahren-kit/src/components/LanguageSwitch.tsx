@@ -111,7 +111,9 @@ export function LanguageSwitch({
     (an: boolean) => {
       onLeichteSprache?.(an);
       announce(
-        an ? "Leichte Sprache eingeschaltet." : "Leichte Sprache ausgeschaltet.",
+        an
+          ? "Leichte Sprache eingeschaltet."
+          : "Leichte Sprache ausgeschaltet.",
         "polite",
       );
     },
@@ -126,7 +128,10 @@ export function LanguageSwitch({
     >
       {/* (1) Sprach-Dropdown */}
       <div className="flex items-center gap-2">
-        <Globe className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <Globe
+          className="h-4 w-4 shrink-0 text-muted-foreground"
+          aria-hidden="true"
+        />
         <Select value={aktiv} onValueChange={handleSprache}>
           <SelectTrigger
             className="h-9 min-h-[36px] w-auto min-w-[8rem] gap-2"

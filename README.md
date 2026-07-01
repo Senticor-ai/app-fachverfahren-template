@@ -42,6 +42,9 @@ Capability-Ports modelliert.
 - `packages/public-sector-sdk`: administrativer Domain-Kernel,
   Domain-Module-Manifeste, Runtime-Konfiguration, Authorization und Audit.
 - `packages/public-sector-ui`: KERN-orientierte UI-Fassade auf ShadCN-Primitiven.
+- `packages/fachverfahren-kit`: wiederverwendbare Fachverfahren-Bausteine
+  auf Tailwind/shadcn-Basis; der Katalog fuer Build-Agenten steht in
+  `docs/reference/fachverfahren-kit-components.md`.
 - `packages/provider-*`: lokale, Codesphere- und DVC-Providerprofile.
 - `packages/conformance-kit`: Compliance-Profile und Evidence-Bundle-Planung.
 - `packages/migration-kit`: Migrationsprofile für Legacy-Fachverfahren.
@@ -92,7 +95,9 @@ pnpm run storybook
 
 Die UX/UI-Regeln stehen in `docs/ux-ui/fachverfahren-ux-contract.md`, die
 TDD-Regeln in `docs/reference/test-driven-development.md` und die
-Storybook-Nutzung in `docs/reference/storybook.md`. Mockdaten und MSW sind in
+Storybook-Nutzung in `docs/reference/storybook.md`. Der wiederverwendbare
+Komponenten-Katalog fuer Coding Agents steht in
+`docs/reference/fachverfahren-kit-components.md`. Mockdaten und MSW sind in
 `docs/reference/mock-data-msw.md` beschrieben.
 
 Der erste E2E-Pfad prüft Anmeldung, Rollenwechsel, Benutzereinstellungen,
@@ -128,8 +133,7 @@ pnpm run dev:all
 und leitet Vite-API-Aufrufe an `http://127.0.0.1:8080` weiter.
 
 Coding Agents nutzen `agent.discovery.json`, `docs/agents/bootstrap.md` und die
-repo-lokalen Skills unter `.agents/skills`. Tool-spezifische Verzeichnisse wie
-`.claude/skills` sind nur Kompatibilitätsshims. Die Agent-Readiness und der
+repo-lokalen Skills unter `.agents/skills`. Die Agent-Readiness und der
 Standalone-Export sind in `docs/reference/opencode-agent-readiness.md`
 beschrieben.
 

@@ -35,19 +35,37 @@ export interface ViewState<T = unknown, E = unknown> {
 
 /** Höflichkeit der Ansage je Status: Fehler/Konflikt assertiv, der Rest höflich. */
 export function announcePoliteness(status: ViewStatus): "polite" | "assertive" {
-  return status === "error" || status === "conflict" || status === "forbidden" || status === "sessionExpired"
+  return status === "error" ||
+    status === "conflict" ||
+    status === "forbidden" ||
+    status === "sessionExpired"
     ? "assertive"
     : "polite";
 }
 
 /** Klassifiziert einen Fehler in einen Zustand (HTTP-nah, aber transport-agnostisch). */
-export function classifyError(err: unknown): Extract<ViewStatus, "forbidden" | "sessionExpired" | "conflict" | "offline" | "error"> {
-  const status = typeof err === "object" && err !== null ? (err as { status?: number; code?: string }).status : undefined;
-  const code = typeof err === "object" && err !== null ? (err as { code?: string }).code : undefined;
+export function classifyError(
+  err: unknown,
+): Extract<
+  ViewStatus,
+  "forbidden" | "sessionExpired" | "conflict" | "offline" | "error"
+> {
+  const status =
+    typeof err === "object" && err !== null
+      ? (err as { status?: number; code?: string }).status
+      : undefined;
+  const code =
+    typeof err === "object" && err !== null
+      ? (err as { code?: string }).code
+      : undefined;
   if (status === 401 || code === "session_expired") return "sessionExpired";
   if (status === 403 || code === "forbidden") return "forbidden";
   if (status === 409 || code === "conflict") return "conflict";
-  if (code === "offline" || (typeof navigator !== "undefined" && navigator.onLine === false)) return "offline";
+  if (
+    code === "offline" ||
+    (typeof navigator !== "undefined" && navigator.onLine === false)
+  )
+    return "offline";
   return "error";
 }
 
@@ -61,7 +79,8 @@ export const DEFAULT_VIEW_MESSAGES: Partial<Record<ViewStatus, string>> = {
   offline: "Keine Verbindung. Bitte später erneut versuchen.",
   forbidden: "Keine Berechtigung für diese Ansicht.",
   sessionExpired: "Ihre Sitzung ist abgelaufen. Bitte erneut anmelden.",
-  partialSuccess: "Teilweise abgeschlossen — einige Einträge benötigen Nacharbeit.",
+  partialSuccess:
+    "Teilweise abgeschlossen — einige Einträge benötigen Nacharbeit.",
   conflict: "Die Daten wurden zwischenzeitlich geändert. Bitte neu laden.",
   readOnly: "Dieser Vorgang ist abgeschlossen und schreibgeschützt.",
 };
@@ -88,7 +107,10 @@ export interface ViewStateApi<T, E> {
   /** Expliziten Status setzen (z. B. partialSuccess, readOnly, conflict). */
   set: (status: ViewStatus, patch?: Partial<ViewState<T, E>>) => void;
   /** Bequemer Promise-Wrapper: start → succeed | fail (mit Klassifizierung). */
-  run: (task: () => Promise<T>, messages?: { loading?: string; success?: string }) => Promise<void>;
+  run: (
+    task: () => Promise<T>,
+    messages?: { loading?: string; success?: string },
+  ) => Promise<void>;
 }
 
 /**
@@ -100,24 +122,42 @@ export interface ViewStateApi<T, E> {
  * useEffect(() => { view.run(() => port.list()); }, []);
  * // <StatusRegion message={view.state.message} politeness={announcePoliteness(view.state.status)} />
  */
-export function useViewState<T = unknown, E = unknown>(opts: UseViewStateOptions<T> = {}): ViewStateApi<T, E> {
+export function useViewState<T = unknown, E = unknown>(
+  opts: UseViewStateOptions<T> = {},
+): ViewStateApi<T, E> {
   const { initial = "idle", isEmpty, messages } = opts;
-  const msg = React.useMemo(() => ({ ...DEFAULT_VIEW_MESSAGES, ...messages }), [messages]);
-  const [state, setState] = React.useState<ViewState<T, E>>({ status: initial, message: msg[initial] });
+  const msg = React.useMemo(
+    () => ({ ...DEFAULT_VIEW_MESSAGES, ...messages }),
+    [messages],
+  );
+  const [state, setState] = React.useState<ViewState<T, E>>({
+    status: initial,
+    message: msg[initial],
+  });
 
   const start = React.useCallback(
-    (message?: string) => setState({ status: "loading", message: message ?? msg.loading }),
+    (message?: string) =>
+      setState({ status: "loading", message: message ?? msg.loading }),
     [msg],
   );
   const succeed = React.useCallback(
     (data: T, message?: string) => {
       const empty = isEmpty?.(data) ?? false;
-      setState({ status: empty ? "empty" : "ready", data, message: message ?? (empty ? msg.empty : msg.ready) });
+      setState({
+        status: empty ? "empty" : "ready",
+        data,
+        message: message ?? (empty ? msg.empty : msg.ready),
+      });
     },
     [isEmpty, msg],
   );
   const complete = React.useCallback(
-    (data?: T, message?: string) => setState((s) => ({ status: "success", data: data ?? s.data, message: message ?? msg.success })),
+    (data?: T, message?: string) =>
+      setState((s) => ({
+        status: "success",
+        data: data ?? s.data,
+        message: message ?? msg.success,
+      })),
     [msg],
   );
   const fail = React.useCallback(
@@ -129,11 +169,19 @@ export function useViewState<T = unknown, E = unknown>(opts: UseViewStateOptions
   );
   const set = React.useCallback(
     (status: ViewStatus, patch?: Partial<ViewState<T, E>>) =>
-      setState((s) => ({ ...s, status, message: patch?.message ?? msg[status] ?? s.message, ...patch })),
+      setState((s) => ({
+        ...s,
+        status,
+        message: patch?.message ?? msg[status] ?? s.message,
+        ...patch,
+      })),
     [msg],
   );
   const run = React.useCallback(
-    async (task: () => Promise<T>, runMessages?: { loading?: string; success?: string }) => {
+    async (
+      task: () => Promise<T>,
+      runMessages?: { loading?: string; success?: string },
+    ) => {
       start(runMessages?.loading);
       try {
         const data = await task();

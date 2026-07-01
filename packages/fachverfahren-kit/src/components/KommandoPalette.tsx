@@ -157,7 +157,6 @@ export function KommandoPalette({
     );
     el?.scrollIntoView({ block: "nearest" });
     // optionId ist über baseId stabil; aktivIdx/offen treiben den Effekt.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aktivIdx, offen, treffer.length]);
 
   const ausfuehren = useCallback(

@@ -31,7 +31,13 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "../lib/utils.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card.js";
 import {
   Dialog,
   DialogContent,
@@ -44,7 +50,11 @@ import { EmptyState } from "./EmptyState.js";
 import { useStatusRegion } from "./StatusRegion.js";
 
 /** Bearbeitungsstand eines einzelnen Nachweises. */
-export type NachweisStatus = "eingereicht" | "geprueft" | "fehlend" | "abgelehnt";
+export type NachweisStatus =
+  | "eingereicht"
+  | "geprueft"
+  | "fehlend"
+  | "abgelehnt";
 
 /** Ein einzelner Nachweis in der Dokumentenmappe. Vollständig props-getrieben. */
 export interface NachweisEintrag {
@@ -171,7 +181,11 @@ export function NachweisBrowser({
       <CardHeader className="gap-2 space-y-0">
         <div className="flex items-start justify-between gap-3">
           <CardTitle>{titel}</CardTitle>
-          <Badge tone={blockierend ? "block" : nachweise.some(istOffen) ? "warn" : "ok"}>
+          <Badge
+            tone={
+              blockierend ? "block" : nachweise.some(istOffen) ? "warn" : "ok"
+            }
+          >
             {nachweise.some(istOffen)
               ? `${nachweise.filter(istOffen).length} offen`
               : "0 offen"}
@@ -204,7 +218,11 @@ export function NachweisBrowser({
             as="h3"
           />
         ) : (
-          <ul role="list" aria-describedby={summaryId} className="flex list-none flex-col gap-2">
+          <ul
+            role="list"
+            aria-describedby={summaryId}
+            className="flex list-none flex-col gap-2"
+          >
             {nachweise.map((n) => (
               <NachweisZeile
                 key={n.id}
@@ -230,7 +248,9 @@ export function NachweisBrowser({
             <DialogHeader>
               <DialogTitle>{vorschauEintrag?.titel ?? "Vorschau"}</DialogTitle>
               {vorschauEintrag?.quelle && (
-                <DialogDescription>Quelle: {vorschauEintrag.quelle}</DialogDescription>
+                <DialogDescription>
+                  Quelle: {vorschauEintrag.quelle}
+                </DialogDescription>
               )}
             </DialogHeader>
             {vorschauEintrag && (
@@ -255,7 +275,12 @@ interface NachweisZeileProps {
 }
 
 /** Eine fokussierbare Zeile der Mappe: Icon · Titel + Provenienz · Status-Badge · Aktionen. */
-function NachweisZeile({ eintrag, onVorschau, onAnfordern, onUpload }: NachweisZeileProps) {
+function NachweisZeile({
+  eintrag,
+  onVorschau,
+  onAnfordern,
+  onUpload,
+}: NachweisZeileProps) {
   const darstellung = STATUS_DARSTELLUNG[eintrag.status];
   const StatusIcon = darstellung.icon;
   const blockierend = istBlockierend(eintrag);
@@ -286,7 +311,9 @@ function NachweisZeile({ eintrag, onVorschau, onAnfordern, onUpload }: NachweisZ
 
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="truncate text-sm font-medium text-foreground">{eintrag.titel}</span>
+          <span className="truncate text-sm font-medium text-foreground">
+            {eintrag.titel}
+          </span>
           {eintrag.pflicht && (
             <Badge tone="neu" aria-hidden="true">
               Pflicht
@@ -298,7 +325,9 @@ function NachweisZeile({ eintrag, onVorschau, onAnfordern, onUpload }: NachweisZ
           </Badge>
         </div>
         {eintrag.quelle && (
-          <span className="truncate text-xs text-muted-foreground">Quelle: {eintrag.quelle}</span>
+          <span className="truncate text-xs text-muted-foreground">
+            Quelle: {eintrag.quelle}
+          </span>
         )}
         {/* Vollständige, nicht nur farbliche Zustandsbeschreibung für assistive Technik. */}
         <span id={beschreibungId} className="sr-only">

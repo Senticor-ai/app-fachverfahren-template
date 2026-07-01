@@ -15,7 +15,14 @@
 //    Schlichtungs-Link mit rel="noreferrer" und sr-only-Hinweis „öffnet in neuem Tab"
 //  - Icons rein dekorativ (aria-hidden), Zielgröße der Links >= 24px
 import * as React from "react";
-import { CheckCircle2, AlertTriangle, XCircle, Mail, ExternalLink, Scale } from "lucide-react";
+import {
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Mail,
+  ExternalLink,
+  Scale,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { cn } from "../lib/utils.js";
@@ -23,7 +30,10 @@ import { Card, CardContent, CardHeader } from "../ui/card.js";
 import { Badge, type BadgeProps } from "../ui/badge.js";
 
 /** Konformitätsstand nach BITV 2.0 § 7 Abs. 1. */
-export type BarrierefreiheitStatus = "konform" | "teilweise-konform" | "nicht-konform";
+export type BarrierefreiheitStatus =
+  | "konform"
+  | "teilweise-konform"
+  | "nicht-konform";
 
 export interface BarrierefreiheitStand {
   /** Datum der Erstellung/letzten Überprüfung als ISO-8601-String (z. B. "2026-06-27"). */
@@ -61,7 +71,11 @@ const STATUS_META: Record<
   { label: string; tone: NonNullable<BadgeProps["tone"]>; icon: LucideIcon }
 > = {
   konform: { label: "vollständig konform", tone: "ok", icon: CheckCircle2 },
-  "teilweise-konform": { label: "teilweise konform", tone: "warn", icon: AlertTriangle },
+  "teilweise-konform": {
+    label: "teilweise konform",
+    tone: "warn",
+    icon: AlertTriangle,
+  },
   "nicht-konform": { label: "nicht konform", tone: "block", icon: XCircle },
 };
 
@@ -70,7 +84,11 @@ function formatiereDatum(datumIso: string): string {
   const d = new Date(datumIso);
   if (Number.isNaN(d.getTime())) return datumIso;
   try {
-    return d.toLocaleDateString("de-DE", { day: "numeric", month: "long", year: "numeric" });
+    return d.toLocaleDateString("de-DE", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
   } catch {
     return datumIso;
   }
@@ -107,18 +125,20 @@ export function Barrierefreiheitserklaerung({
   const StatusIcon = meta.icon;
   const datumLesbar = formatiereDatum(stand.datumIso);
   // Nur echte Einträge listen — leere Strings/Lücken werden defensiv gefiltert.
-  const inhalte = (nichtKonformeInhalte ?? []).map((s) => s.trim()).filter(Boolean);
+  const inhalte = (nichtKonformeInhalte ?? [])
+    .map((s) => s.trim())
+    .filter(Boolean);
   const mailtoLink = baueMailto(feedbackEmail, feedbackBetreff ?? titel);
 
   return (
-    <section
-      aria-labelledby={titelId}
-      className={cn("w-full", className)}
-    >
+    <section aria-labelledby={titelId} className={cn("w-full", className)}>
       <Card>
         <CardHeader>
           {/* Echtes <h2> als Sektions-Titel (CardTitle ist ein <div> ohne asChild) — semantische Hierarchie. */}
-          <h2 id={titelId} className="font-semibold leading-none tracking-tight">
+          <h2
+            id={titelId}
+            className="font-semibold leading-none tracking-tight"
+          >
             {titel}
           </h2>
         </CardHeader>
@@ -141,7 +161,10 @@ export function Barrierefreiheitserklaerung({
               </Badge>
               <span className="text-muted-foreground">
                 Stand:{" "}
-                <time dateTime={stand.datumIso} className="font-medium text-foreground">
+                <time
+                  dateTime={stand.datumIso}
+                  className="font-medium text-foreground"
+                >
                   {datumLesbar}
                 </time>
               </span>
@@ -151,10 +174,12 @@ export function Barrierefreiheitserklaerung({
           {/* Nicht barrierefreie Inhalte — nur wenn vorhanden */}
           {inhalte.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-base font-semibold text-foreground">Nicht barrierefreie Inhalte</h3>
+              <h3 className="text-base font-semibold text-foreground">
+                Nicht barrierefreie Inhalte
+              </h3>
               <p className="text-muted-foreground">
-                Die nachstehend aufgeführten Inhalte sind aus den genannten Gründen nicht oder nicht
-                vollständig barrierefrei:
+                Die nachstehend aufgeführten Inhalte sind aus den genannten
+                Gründen nicht oder nicht vollständig barrierefrei:
               </p>
               <ul className="list-disc space-y-1 pl-5 text-muted-foreground marker:text-muted-foreground">
                 {inhalte.map((eintrag, i) => (
@@ -170,8 +195,9 @@ export function Barrierefreiheitserklaerung({
               Barrieren melden: Feedback und Kontakt
             </h3>
             <p className="text-muted-foreground">
-              Sind Ihnen Mängel beim barrierefreien Zugang aufgefallen oder benötigen Sie Informationen in
-              einer barrierefreien Form? Teilen Sie uns dies gerne mit:
+              Sind Ihnen Mängel beim barrierefreien Zugang aufgefallen oder
+              benötigen Sie Informationen in einer barrierefreien Form? Teilen
+              Sie uns dies gerne mit:
             </p>
             <a
               href={mailtoLink}
@@ -189,10 +215,13 @@ export function Barrierefreiheitserklaerung({
           {/* Durchsetzungs-/Schlichtungsverfahren — optional */}
           {schlichtungsstelle && (
             <div className="space-y-2">
-              <h3 className="text-base font-semibold text-foreground">Durchsetzungsverfahren</h3>
+              <h3 className="text-base font-semibold text-foreground">
+                Durchsetzungsverfahren
+              </h3>
               <p className="text-muted-foreground">
-                Falls Sie auf Ihre Meldung keine zufriedenstellende Antwort erhalten, können Sie sich an die
-                folgende Schlichtungsstelle wenden:
+                Falls Sie auf Ihre Meldung keine zufriedenstellende Antwort
+                erhalten, können Sie sich an die folgende Schlichtungsstelle
+                wenden:
               </p>
               <a
                 href={schlichtungsstelle.url}
@@ -206,7 +235,10 @@ export function Barrierefreiheitserklaerung({
               >
                 <Scale aria-hidden="true" className="size-4 shrink-0" />
                 {schlichtungsstelle.name}
-                <ExternalLink aria-hidden="true" className="size-3.5 shrink-0" />
+                <ExternalLink
+                  aria-hidden="true"
+                  className="size-3.5 shrink-0"
+                />
                 <span className="sr-only">(öffnet in einem neuen Tab)</span>
               </a>
             </div>

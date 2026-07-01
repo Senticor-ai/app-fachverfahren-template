@@ -16,7 +16,14 @@
 // Fokus (focus-visible:ring-2), Ziel-Größe >= 24px, Icons dekorativ (aria-hidden), motion-reduce respektiert,
 // dynamische Auswahl-Meldung über die zentrale Ansage (useStatusRegion).
 import * as React from "react";
-import { CheckCheck, FileText, Inbox, Mail, ShieldCheck, Stamp } from "lucide-react";
+import {
+  CheckCheck,
+  FileText,
+  Inbox,
+  Mail,
+  ShieldCheck,
+  Stamp,
+} from "lucide-react";
 
 import { cn } from "../lib/utils.js";
 import { Badge } from "../ui/badge.js";
@@ -69,7 +76,11 @@ export interface PostfachProps {
 function formatDatum(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" });
+  return d.toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 /** ISO → de-DE Datum + Uhrzeit (für Eingangs-/Zustellzeitpunkte). */
@@ -97,7 +108,11 @@ interface PostfachDetailProps {
 }
 
 /** Zustellnachweis-Block: technische Zustellung + Bekanntgabedatum (§ 41 VwVfG) + ggf. Fiktions-Hinweis. */
-function Zustellnachweis({ zustellung }: { zustellung: PostfachZustellung }): React.ReactElement {
+function Zustellnachweis({
+  zustellung,
+}: {
+  zustellung: PostfachZustellung;
+}): React.ReactElement {
   return (
     <section
       aria-label="Zustellnachweis"
@@ -131,11 +146,17 @@ function Zustellnachweis({ zustellung }: { zustellung: PostfachZustellung }): Re
       {zustellung.fiktion && (
         // Bekanntgabe gilt KRAFT FIKTION — der Fristlauf hängt am fiktiven Datum (rechtlich relevant).
         <p className="mt-3 flex items-start gap-2 text-sm text-foreground">
-          <Stamp className="mt-0.5 size-4 shrink-0 text-status-warn" aria-hidden="true" />
+          <Stamp
+            className="mt-0.5 size-4 shrink-0 text-status-warn"
+            aria-hidden="true"
+          />
           <span>
-            <span className="font-semibold">Hinweis zur Bekanntgabefiktion (§ 41 VwVfG):</span> Der
-            Bescheid gilt am genannten Tag als bekanntgegeben. Ab diesem Datum läuft die
-            Rechtsbehelfsfrist, auch wenn Sie ihn später zur Kenntnis nehmen.
+            <span className="font-semibold">
+              Hinweis zur Bekanntgabefiktion (§ 41 VwVfG):
+            </span>{" "}
+            Der Bescheid gilt am genannten Tag als bekanntgegeben. Ab diesem
+            Datum läuft die Rechtsbehelfsfrist, auch wenn Sie ihn später zur
+            Kenntnis nehmen.
           </span>
         </p>
       )}
@@ -143,11 +164,16 @@ function Zustellnachweis({ zustellung }: { zustellung: PostfachZustellung }): Re
   );
 }
 
-function PostfachDetail({ nachricht }: PostfachDetailProps): React.ReactElement {
+function PostfachDetail({
+  nachricht,
+}: PostfachDetailProps): React.ReactElement {
   const istBescheid = nachricht.typ === "bescheid";
 
   return (
-    <article aria-labelledby="postfach-detail-betreff" className="flex flex-col gap-4">
+    <article
+      aria-labelledby="postfach-detail-betreff"
+      className="flex flex-col gap-4"
+    >
       <header className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={istBescheid ? "info" : "neu"}>
@@ -194,7 +220,11 @@ function PostfachDetail({ nachricht }: PostfachDetailProps): React.ReactElement 
       {nachricht.dokumentUrl && (
         <div>
           <Button asChild variant="outline" size="sm">
-            <a href={nachricht.dokumentUrl} target="_blank" rel="noopener noreferrer">
+            <a
+              href={nachricht.dokumentUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <FileText className="size-4" aria-hidden="true" />
               Dokument öffnen
               <span className="sr-only"> (öffnet in neuem Tab)</span>
@@ -257,14 +287,22 @@ function PostfachListItem({
       >
         <span className="flex items-center gap-2">
           {istBescheid ? (
-            <Stamp className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <Stamp
+              className="size-4 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
           ) : (
-            <Mail className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <Mail
+              className="size-4 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
           )}
           <span
             className={cn(
               "min-w-0 flex-1 truncate text-sm",
-              ungelesen ? "font-semibold text-foreground" : "font-normal text-foreground",
+              ungelesen
+                ? "font-semibold text-foreground"
+                : "font-normal text-foreground",
             )}
           >
             {nachricht.betreff}
@@ -280,7 +318,9 @@ function PostfachListItem({
         <span className="flex items-center gap-2 pl-6 text-xs text-muted-foreground">
           <span>{typLabel(nachricht.typ)}</span>
           <span aria-hidden="true">·</span>
-          <time dateTime={nachricht.eingangIso}>{formatDatum(nachricht.eingangIso)}</time>
+          <time dateTime={nachricht.eingangIso}>
+            {formatDatum(nachricht.eingangIso)}
+          </time>
         </span>
       </button>
     </li>
@@ -331,7 +371,10 @@ export function Postfach({
   const oeffne = React.useCallback(
     (nachricht: PostfachNachricht) => {
       setAktiveId(nachricht.id);
-      announce(`${typLabel(nachricht.typ)} geöffnet: ${nachricht.betreff}`, "polite");
+      announce(
+        `${typLabel(nachricht.typ)} geöffnet: ${nachricht.betreff}`,
+        "polite",
+      );
       onOeffnen?.(nachricht.id);
     },
     [announce, onOeffnen],
@@ -368,7 +411,12 @@ export function Postfach({
   );
 
   return (
-    <div className={cn("rounded-xl border border-border bg-card text-card-foreground", className)}>
+    <div
+      className={cn(
+        "rounded-xl border border-border bg-card text-card-foreground",
+        className,
+      )}
+    >
       <header className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
         <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
           <Inbox className="size-5 text-muted-foreground" aria-hidden="true" />
@@ -380,7 +428,9 @@ export function Postfach({
             {ungeleseneAnzahl} ungelesen
           </Badge>
         ) : (
-          nachrichten.length > 0 && <span className="text-xs text-muted-foreground">Alles gelesen</span>
+          nachrichten.length > 0 && (
+            <span className="text-xs text-muted-foreground">Alles gelesen</span>
+          )
         )}
       </header>
 

@@ -79,41 +79,42 @@ export interface ChartContainerProps extends React.HTMLAttributes<HTMLDivElement
  * responsiven Rahmen für ein darin gemountetes Recharts-`ResponsiveContainer`. Reines Layout —
  * der konkrete Chart kommt als `children`.
  */
-export const ChartContainer = React.forwardRef<HTMLDivElement, ChartContainerProps>(
-  ({ className, style, height = "16rem", children, ...props }, ref) => {
-    // Eine stabile CSS-Variablen-Map für bis zu CHART_TOKEN_COUNT Reihen-Farben aus den Tokens.
-    const colorVars = React.useMemo<React.CSSProperties>(() => {
-      const vars: Record<string, string> = {};
-      for (let i = 0; i < CHART_TOKEN_COUNT; i++) {
-        vars[`--chart-color-${i}`] = `var(${chartVar(i)})`;
-      }
-      return vars as React.CSSProperties;
-    }, []);
+export const ChartContainer = React.forwardRef<
+  HTMLDivElement,
+  ChartContainerProps
+>(({ className, style, height = "16rem", children, ...props }, ref) => {
+  // Eine stabile CSS-Variablen-Map für bis zu CHART_TOKEN_COUNT Reihen-Farben aus den Tokens.
+  const colorVars = React.useMemo<React.CSSProperties>(() => {
+    const vars: Record<string, string> = {};
+    for (let i = 0; i < CHART_TOKEN_COUNT; i++) {
+      vars[`--chart-color-${i}`] = `var(${chartVar(i)})`;
+    }
+    return vars as React.CSSProperties;
+  }, []);
 
-    return (
-      <div
-        ref={ref}
-        className={cn(
-          // Recharts-Innenleben token-konform tönen (Tooltip-Cursor, Grid, Achsen-Schrift).
-          "w-full text-xs text-muted-foreground",
-          "[&_.recharts-cartesian-grid_line]:stroke-border",
-          "[&_.recharts-cartesian-axis-line]:stroke-border",
-          "[&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground",
-          "[&_.recharts-tooltip-cursor]:fill-muted/40",
-          "[&_.recharts-curve.recharts-tooltip-cursor]:stroke-border",
-          // Tooltip-Elevation token-konform über die Schatten-Utility statt eines Inline-rgb()-Schattens.
-          "[&_.recharts-tooltip-wrapper]:shadow-md",
-          "[&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none",
-          className,
-        )}
-        style={{ ...colorVars, height, ...style }}
-        {...props}
-      >
-        {children}
-      </div>
-    );
-  },
-);
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        // Recharts-Innenleben token-konform tönen (Tooltip-Cursor, Grid, Achsen-Schrift).
+        "w-full text-xs text-muted-foreground",
+        "[&_.recharts-cartesian-grid_line]:stroke-border",
+        "[&_.recharts-cartesian-axis-line]:stroke-border",
+        "[&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground",
+        "[&_.recharts-tooltip-cursor]:fill-muted/40",
+        "[&_.recharts-curve.recharts-tooltip-cursor]:stroke-border",
+        // Tooltip-Elevation token-konform über die Schatten-Utility statt eines Inline-rgb()-Schattens.
+        "[&_.recharts-tooltip-wrapper]:shadow-md",
+        "[&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none",
+        className,
+      )}
+      style={{ ...colorVars, height, ...style }}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+});
 ChartContainer.displayName = "ChartContainer";
 
 // ── Zugängliche Daten-Tabelle (sr-only) ────────────────────────────────────────────────────────
@@ -253,7 +254,13 @@ function CommonAxes({ xKey }: { xKey: string }): React.ReactElement {
         tick={AXIS_TICK}
         tickMargin={8}
       />
-      <YAxis tickLine={false} axisLine={false} tick={AXIS_TICK} tickMargin={8} width={40} />
+      <YAxis
+        tickLine={false}
+        axisLine={false}
+        tick={AXIS_TICK}
+        tickMargin={8}
+        width={40}
+      />
     </>
   );
 }
@@ -268,7 +275,10 @@ export const BarChartCard: React.FC<BarChartCardProps> = (props) => {
     <ChartCardShell {...props}>
       <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
         <CommonAxes xKey={xKey} />
-        <Tooltip contentStyle={tooltipContentStyle()} cursor={{ fillOpacity: 0.4 }} />
+        <Tooltip
+          contentStyle={tooltipContentStyle()}
+          cursor={{ fillOpacity: 0.4 }}
+        />
         {series.length > 1 ? <Legend wrapperStyle={{ fontSize: 12 }} /> : null}
         {series.map((s, i) => (
           <Bar
@@ -295,7 +305,10 @@ export const LineChartCard: React.FC<LineChartCardProps> = (props) => {
     <ChartCardShell {...props}>
       <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
         <CommonAxes xKey={xKey} />
-        <Tooltip contentStyle={tooltipContentStyle()} cursor={{ strokeOpacity: 0.4 }} />
+        <Tooltip
+          contentStyle={tooltipContentStyle()}
+          cursor={{ strokeOpacity: 0.4 }}
+        />
         {series.length > 1 ? <Legend wrapperStyle={{ fontSize: 12 }} /> : null}
         {series.map((s, i) => {
           const color = seriesColor(s, i);
@@ -332,7 +345,14 @@ export const AreaChartCard: React.FC<AreaChartCardProps> = (props) => {
           {series.map((s, i) => {
             const color = seriesColor(s, i);
             return (
-              <linearGradient key={s.key} id={`chart-fill-${s.key}`} x1="0" y1="0" x2="0" y2="1">
+              <linearGradient
+                key={s.key}
+                id={`chart-fill-${s.key}`}
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
                 <stop offset="5%" stopColor={color} stopOpacity={0.3} />
                 <stop offset="95%" stopColor={color} stopOpacity={0.04} />
               </linearGradient>
@@ -340,7 +360,10 @@ export const AreaChartCard: React.FC<AreaChartCardProps> = (props) => {
           })}
         </defs>
         <CommonAxes xKey={xKey} />
-        <Tooltip contentStyle={tooltipContentStyle()} cursor={{ strokeOpacity: 0.4 }} />
+        <Tooltip
+          contentStyle={tooltipContentStyle()}
+          cursor={{ strokeOpacity: 0.4 }}
+        />
         {stacked ? <Legend wrapperStyle={{ fontSize: 12 }} /> : null}
         {series.map((s, i) => {
           const color = seriesColor(s, i);

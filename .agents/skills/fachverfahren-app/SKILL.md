@@ -10,9 +10,10 @@ domain-neutral; put Fachlogik under `modules/<domain>/`.
 
 ## Decision Path
 
-1. For a new Fachverfahren, start from `modules/_template/`.
-2. For an example or validation scenario, use `modules/neutral-example/` as the
-   shape reference.
+1. For a new Fachverfahren, start from the app spec plus
+   `docs/reference/fachverfahren-kit-components.md`.
+2. Compose UI from `@senticor/fachverfahren-kit`; keep reusable components in
+   `packages/fachverfahren-kit`, not in `modules/<domain>/`.
 3. For a full generated repository, run
    `pnpm run scaffold:domain-app -- --domain <domain> --target <target-dir>`.
 4. For an app-only export, run `pnpm run scaffold:standalone -- <target-dir>`.

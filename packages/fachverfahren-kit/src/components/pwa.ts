@@ -25,7 +25,8 @@ const DEFAULT_SW_URL = "/service-worker.js";
 export async function registerServiceWorker(
   swUrl: string = DEFAULT_SW_URL,
 ): Promise<ServiceWorkerRegistration | null> {
-  if (typeof window === "undefined" || typeof navigator === "undefined") return null;
+  if (typeof window === "undefined" || typeof navigator === "undefined")
+    return null;
   if (!("serviceWorker" in navigator)) return null;
 
   // Erst nach `load` registrieren — ist die Seite schon fertig, sofort; sonst einmalig auf das Event warten.
@@ -50,7 +51,10 @@ export async function registerServiceWorker(
 export function isAppInstalled(): boolean {
   if (typeof window === "undefined") return false;
   try {
-    if (typeof window.matchMedia === "function" && window.matchMedia("(display-mode: standalone)").matches) {
+    if (
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(display-mode: standalone)").matches
+    ) {
       return true;
     }
   } catch {

@@ -66,10 +66,14 @@ export function EmptyState({
         </span>
       )}
 
-      <Heading className="text-base font-semibold text-foreground">{title}</Heading>
+      <Heading className="text-base font-semibold text-foreground">
+        {title}
+      </Heading>
 
       {description && (
-        <p className="max-w-prose text-sm text-muted-foreground">{description}</p>
+        <p className="max-w-prose text-sm text-muted-foreground">
+          {description}
+        </p>
       )}
 
       {action && (

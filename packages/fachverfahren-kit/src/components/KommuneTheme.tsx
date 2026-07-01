@@ -58,10 +58,16 @@ function parseColor(c: string): [number, number, number] | null {
   const s = c.trim();
   const hex = s.replace(/^#/, "");
   if (/^[0-9a-fA-F]{3}$/.test(hex)) {
-    return [hex[0], hex[1], hex[2]].map((h) => parseInt(h + h, 16)) as [number, number, number];
+    return [hex[0], hex[1], hex[2]].map((h) => parseInt(h + h, 16)) as [
+      number,
+      number,
+      number,
+    ];
   }
   if (/^[0-9a-fA-F]{6}$/.test(hex)) {
-    return [hex.slice(0, 2), hex.slice(2, 4), hex.slice(4, 6)].map((h) => parseInt(h, 16)) as [number, number, number];
+    return [hex.slice(0, 2), hex.slice(2, 4), hex.slice(4, 6)].map((h) =>
+      parseInt(h, 16),
+    ) as [number, number, number];
   }
   const m = s.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i);
   if (m) return [Number(m[1]), Number(m[2]), Number(m[3])];
@@ -102,8 +108,13 @@ export function themeToCssVars(theme: KommuneTheme): Record<string, string> {
 }
 
 /** Wendet ein Theme auf ein Element an (Default: <html>) — für ganzseitiges Theming. */
-export function applyKommuneTheme(theme: KommuneTheme, target?: HTMLElement): () => void {
-  const el = target ?? (typeof document !== "undefined" ? document.documentElement : null);
+export function applyKommuneTheme(
+  theme: KommuneTheme,
+  target?: HTMLElement,
+): () => void {
+  const el =
+    target ??
+    (typeof document !== "undefined" ? document.documentElement : null);
   if (!el) return () => undefined;
   const vars = themeToCssVars(theme);
   for (const [k, v] of Object.entries(vars)) el.style.setProperty(k, v);
@@ -132,13 +143,21 @@ export interface KommuneThemeProviderProps {
  * Stellt das Theme per Context bereit und (optional) ganzseitig auf <html>. Genau einmal nahe der
  * App-Wurzel rendern. Ohne theme = neutrales Default-Kit.
  */
-export function KommuneThemeProvider({ theme, children, global = true }: KommuneThemeProviderProps) {
+export function KommuneThemeProvider({
+  theme,
+  children,
+  global = true,
+}: KommuneThemeProviderProps) {
   React.useEffect(() => {
     if (!global || !theme) return;
     return applyKommuneTheme(theme);
   }, [global, theme]);
 
-  return <KommuneThemeContext.Provider value={theme ?? null}>{children}</KommuneThemeContext.Provider>;
+  return (
+    <KommuneThemeContext.Provider value={theme ?? null}>
+      {children}
+    </KommuneThemeContext.Provider>
+  );
 }
 
 // ── Logo/Wappen ─────────────────────────────────────────────────────────────────────────────────
@@ -155,11 +174,17 @@ export interface KommuneLogoProps {
  * Rendert Wappen/Logo der Kommune mit Pflicht-alt + Provenienz (Quelle als title). Hoheitszeichen:
  * die Herkunft bleibt nachvollziehbar. Ohne Logo wird nichts gerendert (kein Platzhalter-Rauschen).
  */
-export function KommuneLogo({ logo, height = 40, className }: KommuneLogoProps) {
+export function KommuneLogo({
+  logo,
+  height = 40,
+  className,
+}: KommuneLogoProps) {
   const theme = useKommuneTheme();
   const asset = logo ?? theme?.logo;
   if (!asset) return null;
-  const provenance = theme?.quelle?.url ? `Quelle: ${theme.quelle.url}` : undefined;
+  const provenance = theme?.quelle?.url
+    ? `Quelle: ${theme.quelle.url}`
+    : undefined;
   const img = (
     <img
       src={asset.src}
@@ -171,7 +196,12 @@ export function KommuneLogo({ logo, height = 40, className }: KommuneLogoProps) 
     />
   );
   return asset.href ? (
-    <a href={asset.href} target="_blank" rel="noreferrer noopener" className="inline-flex items-center">
+    <a
+      href={asset.href}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="inline-flex items-center"
+    >
       {img}
     </a>
   ) : (

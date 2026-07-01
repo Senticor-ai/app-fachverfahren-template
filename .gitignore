@@ -23,3 +23,4 @@ test-results/
 # Governance/Steuerung lebt IP-geschützt in CHOS-Code (packages/journeys/templates/<id>/governance.yaml)
 # und wird beim Provisionieren über den Klon gelegt — NICHT in dieses offene Template aufnehmen.
 governance.yaml
+dist-types/

@@ -17,6 +17,12 @@ const sourceRoots = ["apps", "packages", "jurisdictions", "modules", "scripts"];
 const generatedJavaScriptAssets = new Set([
   "apps/fachverfahren-template/public/mockServiceWorker.js",
 ]);
+// Legitime CommonJS-Interop-Punkte, die das Kit BEWUSST als .cjs veroeffentlicht (oeffentlicher package.json-Export):
+// das Tailwind-v3-Preset wird von Consumer-Apps in ihre CommonJS-tailwind.config.cjs eingebunden — CommonJS ist hier
+// der KORREKTE, notwendige Interop-Punkt (ein ESM-Preset liesse sich dort nicht einbinden). Scoped Ausnahme.
+const allowedCommonJsAssets = new Set([
+  "packages/fachverfahren-kit/tailwind-preset.cjs",
+]);
 
 async function directoryExists(path) {
   try {
@@ -100,7 +106,9 @@ for (const sourceFile of await collectSourceFiles()) {
   const extension = extname(sourceFile);
 
   if ([".cjs", ".cts"].includes(extension)) {
-    violations.push(`${relativePath} uses a CommonJS-only extension`);
+    if (!allowedCommonJsAssets.has(relativePath)) {
+      violations.push(`${relativePath} uses a CommonJS-only extension`);
+    }
     continue;
   }
 

@@ -16,7 +16,8 @@ const Progress = React.forwardRef<
   React.ElementRef<typeof ProgressPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root>
 >(({ className, value, ...props }, ref) => {
-  const clamped = typeof value === "number" ? Math.min(100, Math.max(0, value)) : null;
+  const clamped =
+    typeof value === "number" ? Math.min(100, Math.max(0, value)) : null;
   return (
     <ProgressPrimitive.Root
       ref={ref}

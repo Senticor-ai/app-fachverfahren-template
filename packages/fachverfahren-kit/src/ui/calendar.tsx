@@ -5,7 +5,11 @@
 
 import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { DayPicker, getDefaultClassNames, type DayPickerProps } from "react-day-picker";
+import {
+  DayPicker,
+  getDefaultClassNames,
+  type DayPickerProps,
+} from "react-day-picker";
 import { de } from "date-fns/locale/de";
 
 import { cn } from "../lib/utils.js";
@@ -50,7 +54,8 @@ function Calendar({
         ),
         month_grid: "w-full border-collapse",
         weekdays: "flex",
-        weekday: "w-9 flex-1 text-center text-xs font-normal text-muted-foreground",
+        weekday:
+          "w-9 flex-1 text-center text-xs font-normal text-muted-foreground",
         week: "mt-1 flex w-full",
         day: cn(
           "relative flex-1 p-0 text-center text-sm",
@@ -90,9 +95,15 @@ function Calendar({
         ...classNames,
       }}
       components={{
+        // eslint-disable-next-line @eslint-react/no-nested-component-definitions -- intentionaler inline-Render-Helfer (Closure/Library-API)
         Chevron: ({ orientation, className: chevronClassName }) => {
           const Icon = orientation === "left" ? ChevronLeft : ChevronRight;
-          return <Icon className={cn("h-4 w-4", chevronClassName)} aria-hidden="true" />;
+          return (
+            <Icon
+              className={cn("h-4 w-4", chevronClassName)}
+              aria-hidden="true"
+            />
+          );
         },
       }}
       {...props}

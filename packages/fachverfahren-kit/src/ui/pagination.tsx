@@ -26,7 +26,11 @@ const PaginationContent = React.forwardRef<
   HTMLUListElement,
   React.ComponentPropsWithoutRef<"ul">
 >(({ className, ...props }, ref) => (
-  <ul ref={ref} className={cn("flex flex-row items-center gap-1", className)} {...props} />
+  <ul
+    ref={ref}
+    className={cn("flex flex-row items-center gap-1", className)}
+    {...props}
+  />
 ));
 PaginationContent.displayName = "PaginationContent";
 
@@ -47,7 +51,8 @@ const linkBase =
 
 const linkVariants: Record<PaginationLinkVariant, string> = {
   // aktive Seite: kräftiger Rahmen; inaktiv: dezenter Hover
-  outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+  outline:
+    "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
   ghost: "hover:bg-accent hover:text-accent-foreground",
 };
 
@@ -67,7 +72,10 @@ export interface PaginationLinkProps extends React.ComponentPropsWithoutRef<"a">
 
 /** Seiten-Link im Button-Stil aus ../ui/button.js (outline aktiv / ghost inaktiv). */
 const PaginationLink = React.forwardRef<HTMLAnchorElement, PaginationLinkProps>(
-  ({ className, isActive = false, disabled = false, size = "icon", ...props }, ref) => (
+  (
+    { className, isActive = false, disabled = false, size = "icon", ...props },
+    ref,
+  ) => (
     <a
       ref={ref}
       aria-current={isActive ? "page" : undefined}
@@ -86,8 +94,10 @@ const PaginationLink = React.forwardRef<HTMLAnchorElement, PaginationLinkProps>(
 );
 PaginationLink.displayName = "PaginationLink";
 
-export interface PaginationNavProps
-  extends Omit<PaginationLinkProps, "isActive" | "size"> {
+export interface PaginationNavProps extends Omit<
+  PaginationLinkProps,
+  "isActive" | "size"
+> {
   /** Sichtbares Label neben dem Pfeil (z. B. "Zurück"/"Weiter"). */
   label?: string;
 }
@@ -139,7 +149,10 @@ const PaginationEllipsis = ({
 }: React.ComponentPropsWithoutRef<"span">) => (
   <span
     aria-hidden="true"
-    className={cn("flex h-9 w-9 items-center justify-center text-muted-foreground", className)}
+    className={cn(
+      "flex h-9 w-9 items-center justify-center text-muted-foreground",
+      className,
+    )}
     {...props}
   >
     <MoreHorizontal aria-hidden="true" className="size-4" />

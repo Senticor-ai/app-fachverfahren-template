@@ -6,8 +6,8 @@ Nutze diese Anleitung für Backend-Änderungen an der Vorlage.
 > App-Factory unter `apps/<app>/server/routes/`. **Domain-Module (`modules/<domain>/`) sind
 > FRAMEWORK-AGNOSTISCH und importieren NIEMALS fastify** (kein `FastifyPluginAsync`/`FastifyRequest`/
 > `FastifyReply`, kein `declare module "fastify"`). Ein Modul exportiert einen deklarativen Routen-
-> Descriptor + reine Handler über Ports (siehe `modules/_template/server/routes.template.ts`); die
-> App-Factory mountet sie. Schreibst du gerade in `modules/…`, ignoriere fastify komplett.
+> Descriptor + reine Handler über Ports (siehe `docs/architecture/domain-modules.md`); die App-Factory
+> mountet sie. Schreibst du gerade in `modules/…`, ignoriere fastify komplett.
 
 ## Backend-Vertrag
 

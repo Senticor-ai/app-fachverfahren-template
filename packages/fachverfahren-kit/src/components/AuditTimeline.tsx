@@ -134,7 +134,7 @@ export function AuditTimeline({
   const onGroupKey = useCallback(
     (e: KeyboardEvent<HTMLDivElement>) => {
       const aktiv = Math.max(0, optionen.indexOf(filter));
-      let next = aktiv;
+      let next: number;
       switch (e.key) {
         case "ArrowRight":
         case "ArrowDown":

@@ -16,7 +16,12 @@ export interface FlowStep {
 }
 
 /** Globale Phase des Flows. */
-export type FlowPhase = "in-progress" | "review" | "submitting" | "confirmed" | "error";
+export type FlowPhase =
+  | "in-progress"
+  | "review"
+  | "submitting"
+  | "confirmed"
+  | "error";
 
 export interface UseStepMachineOptions {
   steps: FlowStep[];
@@ -59,7 +64,9 @@ export function useStepMachine({
 }: UseStepMachineOptions): StepMachineApi {
   const [phase, setPhase] = React.useState<FlowPhase>("in-progress");
   const [index, setIndex] = React.useState(0);
-  const [visited, setVisited] = React.useState<Set<string>>(() => new Set(steps[0] ? [steps[0].id] : []));
+  const [visited, setVisited] = React.useState<Set<string>>(
+    () => new Set(steps[0] ? [steps[0].id] : []),
+  );
 
   const markVisited = React.useCallback((id: string) => {
     setVisited((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
@@ -86,7 +93,9 @@ export function useStepMachine({
       }
       return p;
     });
-    setIndex((i) => (phase === "review" ? steps.length - 1 : Math.max(0, i - 1)));
+    setIndex((i) =>
+      phase === "review" ? steps.length - 1 : Math.max(0, i - 1),
+    );
   }, [phase, steps.length]);
 
   const goTo = React.useCallback(
@@ -127,7 +136,8 @@ export function useStepMachine({
     isFirst: index === 0,
     isLast: index === steps.length - 1,
     isReview,
-    progress: steps.length > 0 ? (isReview ? 1 : (index + 1) / (steps.length + 1)) : 0,
+    progress:
+      steps.length > 0 ? (isReview ? 1 : (index + 1) / (steps.length + 1)) : 0,
     next,
     back,
     goTo,

@@ -5,16 +5,15 @@ Artefakte beantworten die nächsten Anforderungen des OpenCode-Teams.
 
 ## Abdeckung
 
-| Anforderung                 | Status    | Artefakt                                    |
-| --------------------------- | --------- | ------------------------------------------- |
-| Vendor-neutraler Skill      | vorhanden | `.agents/skills/fachverfahren-app/SKILL.md` |
-| Discovery-Manifest          | vorhanden | `agent.discovery.json`                      |
-| App-Spezifikation           | vorhanden | `docs/examples/*/app.spec.yaml`             |
-| Domain-Modul-Skeleton       | vorhanden | `modules/_template/`                        |
-| Standalone Export           | vorhanden | `scripts/scaffold-standalone-app.mjs`       |
-| Full-Repo-Scaffold          | vorhanden | `pnpm run scaffold:domain-app`              |
-| Manifest- und Screen-Checks | vorhanden | `pnpm run check:domain-contracts`           |
-| Neutrales Beispielverfahren | vorhanden | `modules/neutral-example/`                  |
+| Anforderung                 | Status    | Artefakt                                         |
+| --------------------------- | --------- | ------------------------------------------------ |
+| Vendor-neutraler Skill      | vorhanden | `.agents/skills/fachverfahren-app/SKILL.md`      |
+| Discovery-Manifest          | vorhanden | `agent.discovery.json`                           |
+| App-Spezifikation           | vorhanden | `docs/examples/*/app.spec.yaml`                  |
+| Komponenten-Katalog         | vorhanden | `docs/reference/fachverfahren-kit-components.md` |
+| Standalone Export           | vorhanden | `scripts/scaffold-standalone-app.mjs`            |
+| Full-Repo-Scaffold          | vorhanden | `pnpm run scaffold:domain-app`                   |
+| Manifest- und Screen-Checks | vorhanden | `pnpm run check:domain-contracts`                |
 
 ## Agenten-Workflow
 
@@ -32,9 +31,11 @@ Danach:
 2. Screen Contracts unter `contracts/*.screen.yaml` schreiben.
 3. UI-Stories unter `ui/*.stories.tsx` anlegen und Formular-Constraints aus
    `forms/*.form.schema.json` clientseitig sichtbar machen.
-4. Permissions, Events, Form-Schema, Migrationen, Tests und Compliance-Profil
+4. UI aus `@senticor/fachverfahren-kit` komponieren; neue wiederverwendbare
+   Bausteine zuerst im Kit anlegen und exportieren.
+5. Permissions, Events, Form-Schema, Migrationen, Tests und Compliance-Profil
    ergänzen.
-5. Checks aus `agent:context` und `module.contract.yaml` ausführen.
+6. Checks aus `agent:context` und `module.contract.yaml` ausführen.
 
 Für vollständige neue Repositories zuerst den Full-Repo-Scaffold nutzen:
 

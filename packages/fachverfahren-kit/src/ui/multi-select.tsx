@@ -53,11 +53,11 @@ export interface MultiSelectProps {
 function matches(option: MultiSelectOption, query: string): boolean {
   if (query.trim() === "") return true;
   const norm = (s: string) =>
-    s
-      .toLocaleLowerCase("de-DE")
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "");
-  return norm(option.label).includes(norm(query)) || norm(option.value).includes(norm(query));
+    s.toLocaleLowerCase("de-DE").normalize("NFD").replace(/[̀-ͯ]/g, "");
+  return (
+    norm(option.label).includes(norm(query)) ||
+    norm(option.value).includes(norm(query))
+  );
 }
 
 /** Mehrfachauswahl mit Chips nach dem ARIA-Combobox-/Listbox-Muster. */
@@ -113,7 +113,9 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
   // Aktiven Index in Sicht halten.
   React.useEffect(() => {
     if (!open) return;
-    const el = listRef.current?.querySelector<HTMLElement>(`#${CSS.escape(optionId(activeIndex))}`);
+    const el = listRef.current?.querySelector<HTMLElement>(
+      `#${CSS.escape(optionId(activeIndex))}`,
+    );
     el?.scrollIntoView({ block: "nearest" });
   }, [activeIndex, open]);
 
@@ -209,7 +211,9 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
   }
 
   const activeDescendant =
-    open && activeIndex >= 0 && activeIndex < filtered.length ? optionId(activeIndex) : undefined;
+    open && activeIndex >= 0 && activeIndex < filtered.length
+      ? optionId(activeIndex)
+      : undefined;
 
   return (
     <Popover
@@ -307,7 +311,10 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
         }}
       >
         <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-          <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <Search
+            className="h-4 w-4 shrink-0 text-muted-foreground"
+            aria-hidden="true"
+          />
           <Input
             value={query}
             onChange={(e) => {
@@ -325,7 +332,10 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
         </div>
 
         {maxSelected !== undefined && (
-          <p className="px-3 pt-2 text-xs text-muted-foreground" aria-live="polite">
+          <p
+            className="px-3 pt-2 text-xs text-muted-foreground"
+            aria-live="polite"
+          >
             {value.length} von {maxSelected} ausgewählt
           </p>
         )}
@@ -339,7 +349,10 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
           className="max-h-64 overflow-y-auto p-1"
         >
           {filtered.length === 0 ? (
-            <li role="presentation" className="px-3 py-6 text-center text-sm text-muted-foreground">
+            <li
+              role="presentation"
+              className="px-3 py-6 text-center text-sm text-muted-foreground"
+            >
               {emptyText}
             </li>
           ) : (
@@ -363,7 +376,9 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
                   className={cn(
                     "flex min-h-[2rem] cursor-pointer select-none items-center gap-2 rounded-sm px-3 py-1.5 text-sm",
                     "transition-colors duration-150 ease-out motion-reduce:transition-none",
-                    isActive && !effectivelyDisabled && "bg-accent text-accent-foreground",
+                    isActive &&
+                      !effectivelyDisabled &&
+                      "bg-accent text-accent-foreground",
                     effectivelyDisabled && "cursor-not-allowed opacity-50",
                   )}
                 >
@@ -376,7 +391,12 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
                     )}
                     aria-hidden="true"
                   >
-                    <Check className={cn("h-3 w-3", isSelected ? "opacity-100" : "opacity-0")} />
+                    <Check
+                      className={cn(
+                        "h-3 w-3",
+                        isSelected ? "opacity-100" : "opacity-0",
+                      )}
+                    />
                   </span>
                   <span className="truncate">{opt.label}</span>
                 </li>

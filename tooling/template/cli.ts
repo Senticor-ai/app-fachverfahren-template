@@ -1070,15 +1070,15 @@ async function testAgentReadiness() {
         .some((part) => part === ".git" || part === "node_modules"),
   });
   const result = await appNew(root, {
-    specPath: "docs/examples/veranstaltungsanzeige/app.spec.yaml",
+    specPath: defaultTaskSpecPath,
     dryRun: false,
   });
-  const before = await snapshotDirectory(join(root, "modules", "event-notice"));
+  const before = await snapshotDirectory(join(root, "modules", "dog-tax"));
   const second = await appNew(root, {
-    specPath: "docs/examples/veranstaltungsanzeige/app.spec.yaml",
+    specPath: defaultTaskSpecPath,
     dryRun: false,
   });
-  const after = await snapshotDirectory(join(root, "modules", "event-notice"));
+  const after = await snapshotDirectory(join(root, "modules", "dog-tax"));
   const differences = compareSnapshots(before, after);
   const failures = [
     ...(result.status === "ok" ? [] : result.failures),
@@ -1141,12 +1141,13 @@ async function testTemplateUpgradeCustomized() {
   });
   const consumerFile = join(
     target,
-    "modules",
-    "neutral-example",
-    "i18n",
-    "de.json",
+    "apps",
+    "demo-fachverfahren",
+    "src",
+    "consumer-note.ts",
   );
-  await writeFile(consumerFile, '{\n  "consumer.custom": "bewahrt"\n}\n');
+  await mkdir(dirname(consumerFile), { recursive: true });
+  await writeFile(consumerFile, 'export const consumerCustom = "bewahrt";\n');
   const after = await readFile(consumerFile, "utf8");
   await rm(root, { recursive: true, force: true });
   const ok = after.includes("consumer.custom");
@@ -1436,7 +1437,6 @@ async function validateGeneratedScaffold(root) {
     ".template/README.md",
     "agent.discovery.json",
     ".agents/skills/fachverfahren-app/SKILL.md",
-    ".claude/skills/fachverfahren-app/SKILL.md",
     "platform/capabilities.json",
     "sources/registry.yaml",
     "tooling/template/cli.ts",

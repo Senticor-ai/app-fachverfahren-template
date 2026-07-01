@@ -77,10 +77,12 @@ export function FileBrowser({
   const toggle = (id: string) =>
     setOpen((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
 
+  // eslint-disable-next-line @eslint-react/no-nested-component-definitions -- intentionaler inline-Render-Helfer (Closure/Library-API)
   const Row = ({ node, depth }: { node: FileNode; depth: number }) => {
     const isFolder = node.type === "folder";
     const isOpen = open.has(node.id) || !!query; // bei aktiver Suche alles aufklappen

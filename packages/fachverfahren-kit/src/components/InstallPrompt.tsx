@@ -31,7 +31,10 @@ const DISMISS_KEY = "fv-pwa-install-dismissed";
  */
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: readonly string[];
-  readonly userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+  readonly userChoice: Promise<{
+    outcome: "accepted" | "dismissed";
+    platform: string;
+  }>;
   prompt: () => Promise<void>;
 }
 
@@ -158,7 +161,10 @@ export function InstallPrompt({
           <h2 id={titelId} className="text-sm font-semibold text-foreground">
             {titel}
           </h2>
-          <p id={beschreibungId} className="mt-1 text-sm leading-relaxed text-muted-foreground">
+          <p
+            id={beschreibungId}
+            className="mt-1 text-sm leading-relaxed text-muted-foreground"
+          >
             {beschreibung}
           </p>
 
@@ -167,7 +173,11 @@ export function InstallPrompt({
               <Download className="h-4 w-4" aria-hidden="true" />
               {installLabel}
             </Button>
-            <Button variant="ghost" onClick={ablehnen} className="w-full sm:w-auto">
+            <Button
+              variant="ghost"
+              onClick={ablehnen}
+              className="w-full sm:w-auto"
+            >
               {ablehnenLabel}
             </Button>
           </div>
