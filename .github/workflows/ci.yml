@@ -19,10 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
-      CI_PROJECT_DIR: ${{ github.workspace }}
       KUBECTL_VERSION: v1.34.9
       NODE_ENV: test
-      TMPDIR: ${{ runner.temp }}/app-fachverfahren-template
     steps:
       - name: Checkout
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
@@ -36,7 +34,10 @@ jobs:
           package-manager-cache: false
 
       - name: Setup CI tools
-        run: scripts/ci-setup-node.sh
+        run: |
+          export CI_PROJECT_DIR="$GITHUB_WORKSPACE"
+          export TMPDIR="$RUNNER_TEMP/app-fachverfahren-template"
+          scripts/ci-setup-node.sh
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
