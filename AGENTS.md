@@ -228,8 +228,9 @@ nur relative Pfade, sortierte Listen und keine Git- oder Maschinenprovenienz;
 volatile Details gibt es nur mit `--provenance`.
 `agent:context` liefert `nextCommands`, `validationProfiles` und
 `writeBoundaries`; Agenten folgen dieser Reihenfolge, sofern der Nutzer keinen
-engeren Scope vorgibt. `agent:verify` erzeugt oder validiert einen
-`schemas/agent-run-report.schema.json`-konformen Abschlussbericht.
+engeren Scope vorgibt. `agent:verify` erzeugt einen Report-Entwurf mit
+`plannedCommands` oder validiert mit `--report <path>` echte Evidenz. Ein
+abschließender Bericht muss tatsächliche `commandsExecuted` enthalten.
 
 Jedes Domain-Modul braucht `module.contract.yaml`. Der Vertrag deklariert
 Capabilities, öffentliche Exports, erlaubte Abhängigkeiten, Routen, Rollen,

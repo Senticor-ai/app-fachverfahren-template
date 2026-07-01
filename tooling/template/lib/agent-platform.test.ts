@@ -1,4 +1,4 @@
-import { cp, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -37,7 +37,7 @@ describe("agent platform contract", () => {
     expect(context.selectedSources).toEqual(["fimportal"]);
     expect(context.writeBoundaries).toContain("modules/dog-tax");
     expect(context.nextCommands.map((command) => command.id)).toContain(
-      "fetch-governed-source",
+      "fetch-governed-source:fimportal",
     );
     expect(
       context.selectedContext.some((item) => item.reason === "UX contract"),
@@ -85,6 +85,49 @@ describe("agent platform contract", () => {
       );
       expect(second.status).toBe("ok");
       expect(second.preserved).toContain("modules/dog-tax");
+    } finally {
+      await rm(temp, { recursive: true, force: true });
+    }
+  });
+
+  it("defaults optional approvals and normalizes generated SQL identifiers", async () => {
+    const temp = await mkdtemp(join(tmpdir(), "agent-app-new-safe-"));
+    try {
+      const specPath = "docs/examples/custom/app.spec.yaml";
+      const source = await readStructuredFile<AppSpec>(
+        join(root, "docs/examples/hundesteuer/app.spec.yaml"),
+      );
+      const spec = {
+        ...source,
+        id: "custom",
+        module: {
+          ...source.module,
+          id: "123-service",
+          destination: "modules/123-service",
+        },
+      };
+      delete spec.humanApproval;
+      await mkdir(join(temp, "docs/examples/custom"), {
+        recursive: true,
+      });
+      await writeFile(
+        join(temp, specPath),
+        `${JSON.stringify(spec, null, 2)}\n`,
+      );
+
+      const result = await appNew(temp, { specPath });
+      const migration = await readFile(
+        join(
+          temp,
+          "modules/123-service/migrations/database/0001_create_m_123_service_cases.sql",
+        ),
+        "utf8",
+      );
+
+      expect(result.status).toBe("ok");
+      expect(migration).toContain(
+        "CREATE TABLE IF NOT EXISTS m_123_service_cases",
+      );
     } finally {
       await rm(temp, { recursive: true, force: true });
     }

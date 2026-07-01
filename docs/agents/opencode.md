@@ -20,5 +20,5 @@ pnpm run agent:context -- --task <app-spec> --paths <module-path> --json
 ```
 
 Danach `context.nextCommands` und `context.validationProfiles` verwenden. Vor
-Abschluss `pnpm run agent:verify -- --task <app-spec> --json` ausführen oder
-einen vorhandenen Agentenbericht mit `--report <path>` prüfen.
+Abschluss einen Agentenbericht mit echten `commandsExecuted` erstellen und mit
+`pnpm run agent:verify -- --task <app-spec> --report <path> --json` prüfen.

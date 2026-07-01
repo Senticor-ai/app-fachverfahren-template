@@ -44,7 +44,6 @@
     },
     "commandsExecuted": {
       "type": "array",
-      "minItems": 1,
       "items": {
         "type": "object",
         "required": ["id", "command", "cwd"],
@@ -52,6 +51,25 @@
           "id": { "type": "string" },
           "command": { "type": "string" },
           "cwd": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "plannedCommands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "command", "cwd", "writes"],
+        "properties": {
+          "id": { "type": "string" },
+          "command": { "type": "string" },
+          "cwd": { "type": "string" },
+          "writes": { "type": "boolean" },
+          "expectedArtifacts": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "followUpChecks": { "type": "array", "items": { "type": "string" } }
         },
         "additionalProperties": true
       }

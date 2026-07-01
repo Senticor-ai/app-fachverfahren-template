@@ -1,5 +1,7 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -67,16 +69,37 @@ export async function getGitDiffHash(cwd = process.cwd()) {
     cwd,
     allowFailure: true,
   });
-  if (!status && !unstaged.stdout && !staged.stdout) {
+  const untrackedFiles = await listUntrackedFiles(cwd);
+  if (!status && !unstaged.stdout && !staged.stdout && !untrackedFiles.length) {
     return undefined;
   }
-  return createHash("sha256")
+  const hash = createHash("sha256")
     .update(status)
     .update("\n--- unstaged ---\n")
     .update(unstaged.stdout)
     .update("\n--- staged ---\n")
-    .update(staged.stdout)
-    .digest("hex");
+    .update(staged.stdout);
+  for (const file of untrackedFiles) {
+    hash.update("\n--- untracked ---\n");
+    hash.update(file);
+    hash.update("\0");
+    hash.update(await readFile(join(cwd, file)));
+  }
+  return hash.digest("hex");
+}
+
+async function listUntrackedFiles(cwd: string) {
+  const result = await runGit(
+    ["ls-files", "--others", "--exclude-standard", "-z"],
+    {
+      cwd,
+      allowFailure: true,
+    },
+  );
+  if (!result.ok || !result.stdout) {
+    return [];
+  }
+  return result.stdout.split("\0").filter(Boolean).sort();
 }
 
 export async function isWorktreeClean(cwd = process.cwd()) {

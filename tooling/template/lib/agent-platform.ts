@@ -36,7 +36,7 @@ export interface AppSpec {
   routes: { path: string; surface: string }[];
   workflows: string[];
   integrations: string[];
-  humanApproval: string[];
+  humanApproval?: string[];
   domainVocabulary: string[];
 }
 
@@ -693,7 +693,7 @@ export async function verifyAgentRun(
     ? resolve(root, reportPath)
     : join(root, ".agent", "runs", runId, "report.json");
   const existingReport = reportPath
-    ? await readJson(resolvedReportPath).catch(() => undefined)
+    ? await readJson(resolvedReportPath)
     : undefined;
   const report = stableClone({
     schemaVersion: "1.0.0",
@@ -705,11 +705,8 @@ export async function verifyAgentRun(
       .map((item) => ({ path: item.path, sha256: item.sha256 }))
       .sort((a, b) => a.path.localeCompare(b.path)),
     filesChanged: await moduleFileEntries(root, spec),
-    commandsExecuted: buildNextCommands(spec, taskPath).map((command) => ({
-      id: command.id,
-      command: command.command,
-      cwd: command.cwd,
-    })),
+    plannedCommands: buildNextCommands(spec, taskPath),
+    commandsExecuted: [],
     acceptanceCriteria: spec.acceptanceCriteria.map((criterion) => ({
       id: criterion.id,
       tests: criterion.tests,
@@ -957,7 +954,7 @@ export function deriveModuleContract(spec: AppSpec): ModuleContract {
           services: spec.fim.services,
         }
       : undefined,
-    humanApproval: spec.humanApproval,
+    humanApproval: humanApprovals(spec),
     storage: {
       migrations: [`${spec.module.destination}/migrations/database/`],
       ownsTables: [`${tableName(spec.module.id)}_cases`],
@@ -1065,6 +1062,7 @@ function buildValidationProfiles() {
         "check:scaffold-reproducible",
         "build:packages",
         "build:app",
+        "build:server",
       ],
     },
   ];
@@ -1074,7 +1072,9 @@ function buildNextCommands(
   spec: AppSpec,
   taskPath: string,
 ): AgentCommandPlan[] {
-  const sourceFetch = spec.permittedExternalSources[0];
+  const auditArtifacts = spec.routes.some((route) => route.surface === "audit")
+    ? [`${spec.module.destination}/contracts/audit-workspace.screen.yaml`]
+    : [];
   return [
     {
       id: "install-template-dependencies",
@@ -1110,25 +1110,19 @@ function buildNextCommands(
         `${spec.module.destination}/module.contract.yaml`,
         `${spec.module.destination}/contracts/citizen-intake.screen.yaml`,
         `${spec.module.destination}/contracts/caseworker-workspace.screen.yaml`,
-        `${spec.module.destination}/contracts/audit-workspace.screen.yaml`,
+        ...auditArtifacts,
         `${spec.module.destination}/ui/${pascalCase(spec.module.id)}Screens.stories.tsx`,
       ],
       followUpChecks: ["check:agent-domain", "check:agent-ui"],
     },
-    ...(sourceFetch
-      ? [
-          {
-            id: "fetch-governed-source",
-            command: `pnpm run source:fetch -- --source ${sourceFetch}`,
-            cwd: "<target-dir>",
-            writes: true,
-            expectedArtifacts: [
-              `.agent/sources/${sourceFetch}/provenance.json`,
-            ],
-            followUpChecks: ["source:verify"],
-          },
-        ]
-      : []),
+    ...spec.permittedExternalSources.map((sourceId) => ({
+      id: `fetch-governed-source:${sourceId}`,
+      command: `pnpm run source:fetch -- --source ${sourceId}`,
+      cwd: "<target-dir>",
+      writes: true,
+      expectedArtifacts: [`.agent/sources/${sourceId}/provenance.json`],
+      followUpChecks: ["source:verify"],
+    })),
     {
       id: "verify-agent-run",
       command: `pnpm run agent:verify -- --task ${taskPath}`,
@@ -1366,8 +1360,8 @@ function domainModuleYaml(spec: AppSpec) {
         ]
       : []),
     "humanApproval:",
-    ...(spec.humanApproval.length
-      ? spec.humanApproval.map((approval) => `  - ${approval}`)
+    ...(humanApprovals(spec).length
+      ? humanApprovals(spec).map((approval) => `  - ${approval}`)
       : ["  - none"]),
     "",
     "screenContracts:",
@@ -1562,7 +1556,7 @@ function complianceProfileJson(spec: AppSpec) {
       sourceId,
       citationRequired: true,
     })),
-    humanApproval: spec.humanApproval,
+    humanApproval: humanApprovals(spec),
     module: spec.module.id,
     status: "example-generated",
   });
@@ -1617,8 +1611,18 @@ function capabilityPortName(capability: string) {
   return `${pascalCase(capability)}Port`;
 }
 
+function humanApprovals(spec: AppSpec) {
+  return spec.humanApproval ?? [];
+}
+
 function tableName(id: string) {
-  return id.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  const normalized = id
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  const base = normalized || "module";
+  return /^[a-z_]/.test(base) ? base : `m_${base}`;
 }
 
 function pascalCase(value: string) {

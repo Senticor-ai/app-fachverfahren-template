@@ -41,8 +41,9 @@ Danach:
 5. Permissions, Events, Form-Schema, Migrationen, Tests und Compliance-Profil
    ergänzen.
 6. Checks aus `agent:context` und `module.contract.yaml` ausführen.
-7. Package-Script `agent:verify -- --task <app-spec> --json` ausführen oder
-   einen vorhandenen Report mit `--report <path>` validieren.
+7. Package-Script `agent:verify -- --task <app-spec> --json` für einen
+   Report-Entwurf ausführen oder einen vorhandenen Report mit `--report <path>`
+   validieren. Abschluss-Evidenz braucht echte `commandsExecuted`.
 
 Für vollständige neue Repositories zuerst den Full-Repo-Scaffold nutzen:
 

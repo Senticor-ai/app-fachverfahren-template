@@ -17,7 +17,8 @@ Workflow-Skills; tool-spezifische Verzeichnisse sind nur Kompatibilität.
 - Nutze Package-Script `app:new`, wenn aus einer App-Spezifikation ein
   Domain-Modul entstehen soll.
 - Nutze Package-Script `agent:verify`, um die Evidenz zu einer Agentenänderung
-  zu erzeugen oder einen vorhandenen Report mit `--report <path>` zu prüfen.
+  zu prüfen. Ohne `--report` entsteht ein Report-Entwurf mit `plannedCommands`;
+  der Abschlussbericht muss echte `commandsExecuted` enthalten.
 
 ## Regeln
 

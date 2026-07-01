@@ -11,8 +11,9 @@ pnpm run agent:discover -- --json
 pnpm run agent:context -- --task <app-spec> --paths <module-path> --json
 ```
 
-Follow `context.nextCommands` in order and record the final evidence with:
+Follow `context.nextCommands` in order. Record executed commands in an agent
+run report, then validate the final evidence with:
 
 ```bash
-pnpm run agent:verify -- --task <app-spec> --json
+pnpm run agent:verify -- --task <app-spec> --report <path> --json
 ```
