@@ -12,7 +12,13 @@
 // der Lade-Fehler wird mit role="alert" gemeldet, der leere Zustand mit role="status"/aria-live, der Download-
 // Link ist ein echter, tastaturbedienbarer Link mit Fokus-Ring und >=24px Zielgröße, Farbe ist nie alleiniges
 // Unterscheidungsmerkmal (Icon + Text begleiten jeden Zustand), Übergänge respektieren prefers-reduced-motion.
-import { useEffect, useId, useState, type ReactElement, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import {
   AlertTriangle,
   Download,
@@ -61,18 +67,25 @@ function formatGroesse(bytes: number): string {
     wert /= 1024;
     i += 1;
   }
-  const gerundet = wert >= 10 || Number.isInteger(wert) ? Math.round(wert) : Math.round(wert * 10) / 10;
+  const gerundet =
+    wert >= 10 || Number.isInteger(wert)
+      ? Math.round(wert)
+      : Math.round(wert * 10) / 10;
   return `${new Intl.NumberFormat("de-DE").format(gerundet)} ${einheiten[i]}`;
 }
 
 /** Dokumentart aus MIME-Typ + Dateiendung ableiten (MIME hat Vorrang). */
-function bestimmeArt(mimeTyp: string | undefined, dateiname: string | undefined): DokumentArt {
+function bestimmeArt(
+  mimeTyp: string | undefined,
+  dateiname: string | undefined,
+): DokumentArt {
   const mime = (mimeTyp ?? "").toLowerCase();
   if (mime.startsWith("image/")) return "bild";
   if (mime === "application/pdf") return "pdf";
   const name = (dateiname ?? "").toLowerCase();
   const ext = name.includes(".") ? name.slice(name.lastIndexOf(".") + 1) : "";
-  if (["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif"].includes(ext)) return "bild";
+  if (["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif"].includes(ext))
+    return "bild";
   if (ext === "pdf") return "pdf";
   return "andere";
 }
@@ -104,12 +117,16 @@ export function DocumentPreview({
   const hatQuelle = typeof url === "string" && url.length > 0;
   const art = bestimmeArt(mimeTyp, dateiname);
   const istFehler = fehler || (art === "bild" && bildFehler);
-  const name = dateiname && dateiname.trim().length > 0 ? dateiname : "Dokument";
+  const name =
+    dateiname && dateiname.trim().length > 0 ? dateiname : "Dokument";
   const frameTitel = `${titel}: ${name}`;
 
   return (
     <section
-      className={cn("overflow-hidden rounded-md border border-border bg-card", className)}
+      className={cn(
+        "overflow-hidden rounded-md border border-border bg-card",
+        className,
+      )}
       aria-label={titel}
     >
       {/* Kopf: Icon + Name/Größe + Download. */}
@@ -126,11 +143,16 @@ export function DocumentPreview({
             )}
           </span>
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-foreground" title={name}>
+            <div
+              className="truncate text-sm font-semibold text-foreground"
+              title={name}
+            >
               {name}
             </div>
-            <div className="text-[12px] tabular-nums text-muted-foreground">
-              {groesse !== undefined ? formatGroesse(groesse) : "Größe unbekannt"}
+            <div className="text-sm tabular-nums text-muted-foreground">
+              {groesse !== undefined
+                ? formatGroesse(groesse)
+                : "Größe unbekannt"}
               {mimeTyp && <> · {mimeTyp}</>}
             </div>
           </div>
@@ -141,7 +163,7 @@ export function DocumentPreview({
             href={url as string}
             download={name}
             className={cn(
-              "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-[13px] font-medium text-foreground",
+              "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground",
               "transition-colors duration-150 ease-out hover:bg-accent motion-reduce:transition-none",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             )}
@@ -158,7 +180,12 @@ export function DocumentPreview({
         {!hatQuelle ? (
           <LeerZustand id={statusId} hinweis={leerHinweis} hoehe={hoehe} />
         ) : istFehler ? (
-          <FehlerZustand name={name} url={url as string} download={download} hoehe={hoehe} />
+          <FehlerZustand
+            name={name}
+            url={url as string}
+            download={download}
+            hoehe={hoehe}
+          />
         ) : art === "bild" ? (
           <div
             className="flex w-full items-center justify-center overflow-auto rounded-sm border border-border bg-card"
@@ -243,10 +270,13 @@ function FehlerZustand({
         <AlertTriangle className="size-6" />
       </span>
       <div className="max-w-prose">
-        <p className="text-sm font-medium text-foreground">Vorschau nicht verfügbar</p>
+        <p className="text-sm font-medium text-foreground">
+          Vorschau nicht verfügbar
+        </p>
         <p className="mt-1 text-sm text-muted-foreground">
           Das Dokument „{name}" konnte nicht angezeigt werden.
-          {download && " Sie können es stattdessen herunterladen und lokal öffnen."}
+          {download &&
+            " Sie können es stattdessen herunterladen und lokal öffnen."}
         </p>
       </div>
       {download && (
@@ -254,7 +284,7 @@ function FehlerZustand({
           href={url}
           download={name}
           className={cn(
-            "inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-[13px] font-medium text-foreground",
+            "inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground",
             "transition-colors duration-150 ease-out hover:bg-accent motion-reduce:transition-none",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
           )}
@@ -269,7 +299,13 @@ function FehlerZustand({
 }
 
 /** Fallback für nicht inline-vorschaubare Typen (Office/ZIP/…): ruhige Karte mit Hinweis. */
-function FallbackZustand({ name, hoehe }: { name: string; hoehe: number }): ReactElement {
+function FallbackZustand({
+  name,
+  hoehe,
+}: {
+  name: string;
+  hoehe: number;
+}): ReactElement {
   return (
     <div
       className="flex flex-col items-center justify-center gap-3 rounded-sm border border-border bg-card px-6 py-12 text-center"
@@ -282,8 +318,8 @@ function FallbackZustand({ name, hoehe }: { name: string; hoehe: number }): Reac
         <FileWarning className="size-6" />
       </span>
       <p className="max-w-prose text-sm text-muted-foreground">
-        Für „{name}" steht keine Inline-Vorschau zur Verfügung. Laden Sie die Datei über den
-        Download oben herunter, um sie zu öffnen.
+        Für „{name}" steht keine Inline-Vorschau zur Verfügung. Laden Sie die
+        Datei über den Download oben herunter, um sie zu öffnen.
       </p>
     </div>
   );

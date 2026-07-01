@@ -13,7 +13,6 @@
 // motion-reduce (in den Primitiven gesetzt). Standard-Button-Höhe erfüllt die Ziel-Größe >= 24px.
 "use client";
 
-import * as React from "react";
 import { AlertTriangle } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -73,7 +72,9 @@ export function ConfirmDialog({
       {/* Ohne Beschreibung: explizit aria-describedby={undefined}, damit Radix die fehlende (zulässige)
           Description als Absicht erkennt und keine A11y-Konsolen-Warnung wirft. Mit Beschreibung verdrahtet
           Radix aria-describedby selbst über die <AlertDialogDescription>, daher kein Override. */}
-      <AlertDialogContent {...(hasDescription ? {} : { "aria-describedby": undefined })}>
+      <AlertDialogContent
+        {...(hasDescription ? {} : { "aria-describedby": undefined })}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2 sm:justify-start justify-center">
             {destructive ? (
@@ -146,9 +147,9 @@ export function SessionTimeoutDialog({
             <span>Ihre Sitzung läuft bald ab</span>
           </AlertDialogTitle>
           <AlertDialogDescription>
-            Aus Sicherheitsgründen werden Sie nach Inaktivität automatisch abgemeldet. Verlängern Sie
-            die Sitzung, um weiterzuarbeiten. Nicht gespeicherte Eingaben werden vor der Abmeldung
-            gesichert.
+            Aus Sicherheitsgründen werden Sie nach Inaktivität automatisch
+            abgemeldet. Verlängern Sie die Sitzung, um weiterzuarbeiten. Nicht
+            gespeicherte Eingaben werden vor der Abmeldung gesichert.
           </AlertDialogDescription>
         </AlertDialogHeader>
         {/* Höfliche Live-Region: sagt die Rest-Zeit an, ohne andere Ansagen zu unterbrechen. */}
@@ -157,7 +158,8 @@ export function SessionTimeoutDialog({
           aria-atomic="true"
           className="rounded-md bg-status-warn-soft px-3 py-2 text-center text-sm font-medium text-foreground"
         >
-          Verbleibende Zeit: <span className="tabular-nums">{countdownText}</span>
+          Verbleibende Zeit:{" "}
+          <span className="tabular-nums">{countdownText}</span>
         </p>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onLogout}>Abmelden</AlertDialogCancel>

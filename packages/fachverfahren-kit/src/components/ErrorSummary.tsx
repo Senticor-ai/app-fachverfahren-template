@@ -1,5 +1,5 @@
-// fachverfahren-kit/components/ErrorSummary — Fehlerzusammenfassung nach dem GOV.UK-Muster
-// (https://design-system.service.gov.uk/components/error-summary/). Steht OBEN im Formular, bündelt alle
+// fachverfahren-kit/components/ErrorSummary — WCAG-konformes Fehlerzusammenfassungs-Muster
+// (WCAG 3.3.1/3.3.3, BITV 2.0). Steht OBEN im Formular, bündelt alle
 // Validierungsfehler, ist fokussierbar (tabIndex=-1 + forwardRef → der Aufrufer setzt nach dem Absenden den
 // Fokus) und verlinkt per Anker (#feldId) direkt auf das fehlerhafte Feld. GENERISCH: kein Domänen-Literal,
 // alle Fehler kommen als props. Dep-frei (nur React + Tailwind + lucide). Barrierefrei (BITV/WCAG 2.2 AA):
@@ -20,14 +20,17 @@ export interface FieldError {
 export interface ErrorSummaryProps {
   /** Die Fehler. Ist die Liste leer, rendert die Komponente nichts. */
   errors: FieldError[];
-  /** Überschrift der Zusammenfassung. Default: GOV.UK-übliches "Es ist ein Problem aufgetreten". */
+  /** Überschrift der Zusammenfassung. Default: übliches "Es ist ein Problem aufgetreten". */
   title?: string;
   /**
    * Klick-Handler je Eintrag. Default: setzt den Fokus auf `#feldId` (sofern es fokussierbar ist) und
    * lässt den nativen Anker an die Stelle springen. Über den Handler kann der Aufrufer das Fokus-/
    * Scroll-Verhalten überschreiben (z.B. um ein Akkordeon zu öffnen).
    */
-  onErrorClick?: (feldId: string, event: React.MouseEvent<HTMLAnchorElement>) => void;
+  onErrorClick?: (
+    feldId: string,
+    event: React.MouseEvent<HTMLAnchorElement>,
+  ) => void;
   className?: string;
 }
 
@@ -42,7 +45,7 @@ function focusTarget(feldId: string): void {
 }
 
 /**
- * Fehlerzusammenfassung (GOV.UK-Muster). Wird nach einem fehlgeschlagenen Absenden oben im Formular gerendert
+ * Fehlerzusammenfassung (WCAG-konformes Fehlerzusammenfassungs-Muster, WCAG 3.3.1/3.3.3, BITV 2.0). Wird nach einem fehlgeschlagenen Absenden oben im Formular gerendert
  * und sollte fokussiert werden — dafür `tabIndex={-1}` + den weitergereichten `ref`:
  *
  *   const summaryRef = useRef<HTMLDivElement>(null);
@@ -51,7 +54,15 @@ function focusTarget(feldId: string): void {
  *   <ErrorSummary ref={summaryRef} errors={errors} />
  */
 export const ErrorSummary = React.forwardRef<HTMLDivElement, ErrorSummaryProps>(
-  ({ errors, title = "Es ist ein Problem aufgetreten", onErrorClick, className }, ref) => {
+  (
+    {
+      errors,
+      title = "Es ist ein Problem aufgetreten",
+      onErrorClick,
+      className,
+    },
+    ref,
+  ) => {
     const titleId = React.useId();
     if (errors.length === 0) return null;
 
@@ -72,12 +83,15 @@ export const ErrorSummary = React.forwardRef<HTMLDivElement, ErrorSummaryProps>(
         aria-labelledby={titleId}
         className={cn(
           "rounded-lg border-2 border-status-block bg-status-block-soft p-6 text-foreground shadow-sm",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          "outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
           className,
         )}
       >
         <div className="flex items-start gap-3">
-          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-status-block" aria-hidden="true" />
+          <AlertCircle
+            className="mt-0.5 h-5 w-5 shrink-0 text-status-block"
+            aria-hidden="true"
+          />
           <div className="min-w-0">
             <h2 id={titleId} className="text-lg font-semibold text-foreground">
               {title}
@@ -89,9 +103,10 @@ export const ErrorSummary = React.forwardRef<HTMLDivElement, ErrorSummaryProps>(
                     href={`#${err.feldId}`}
                     onClick={handleClick(err.feldId)}
                     className={cn(
-                      "rounded-sm font-medium text-status-block underline decoration-2 underline-offset-2",
-                      "transition-colors duration-150 ease-out hover:text-status-block/80 motion-reduce:transition-none",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                      // Fehler-Link == Inline-Feldfehler: 14px (fv-text-error), Signal über Farbe/Gewicht/Icon, nie Größe.
+                      "fv-text-error rounded-sm underline decoration-2 underline-offset-2",
+                      "transition-colors duration-150 ease-out hover:text-destructive/80 motion-reduce:transition-none",
+                      "outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
                     )}
                   >
                     {err.text}

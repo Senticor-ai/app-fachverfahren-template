@@ -53,7 +53,18 @@ interface RenderedDoc {
 function sanitize(html: string): string {
   return DOMPurify.sanitize(html, {
     USE_PROFILES: { html: true },
-    FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form", "input", "button", "link", "base"],
+    FORBID_TAGS: [
+      "script",
+      "style",
+      "iframe",
+      "object",
+      "embed",
+      "form",
+      "input",
+      "button",
+      "link",
+      "base",
+    ],
     FORBID_ATTR: ["style", "srcset"],
     ALLOW_DATA_ATTR: false,
   });
@@ -84,7 +95,8 @@ export function OfficeDocViewer({
   const view = useViewState<RenderedDoc>({
     messages: {
       ready: "Vorschau geladen.",
-      empty: "Für dieses Dateiformat steht keine Inline-Vorschau zur Verfügung.",
+      empty:
+        "Für dieses Dateiformat steht keine Inline-Vorschau zur Verfügung.",
       error: "Die Vorschau konnte nicht aufbereitet werden.",
     },
   });
@@ -116,7 +128,10 @@ export function OfficeDocViewer({
 
   return (
     <section
-      className={cn("overflow-hidden rounded-md border border-border bg-card", className)}
+      className={cn(
+        "overflow-hidden rounded-md border border-border bg-card",
+        className,
+      )}
       aria-label={titel}
     >
       {/* Kopf: Icon + Name/Meta + Download (Download IMMER erreichbar). */}
@@ -129,10 +144,13 @@ export function OfficeDocViewer({
             <FileSpreadsheet className="size-4" />
           </span>
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-foreground" title={name}>
+            <div
+              className="truncate text-sm font-semibold text-foreground"
+              title={name}
+            >
               {name}
             </div>
-            <div className="text-[12px] text-muted-foreground">
+            <div className="text-sm text-muted-foreground">
               {mime ? mime : "Office-Dokument"}
             </div>
           </div>
@@ -146,7 +164,9 @@ export function OfficeDocViewer({
         <ViewStateBoundary<RenderedDoc>
           state={view.state}
           emptyTitle="Keine Inline-Vorschau verfügbar"
-          empty={<UnsupportedZustand name={name} url={downloadUrl} hoehe={hoehe} />}
+          empty={
+            <UnsupportedZustand name={name} url={downloadUrl} hoehe={hoehe} />
+          }
         >
           {(doc) => (
             <article
@@ -173,13 +193,19 @@ export function OfficeDocViewer({
 }
 
 /** Echter, tastaturbedienbarer Download-Link mit sichtbarem Fokus-Ring und >=24px Zielgröße. */
-function DownloadLink({ url, name }: { url: string; name: string }): React.ReactElement {
+function DownloadLink({
+  url,
+  name,
+}: {
+  url: string;
+  name: string;
+}): React.ReactElement {
   return (
     <a
       href={url}
       download={name}
       className={cn(
-        "inline-flex h-8 min-h-[24px] shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-[13px] font-medium text-foreground",
+        "inline-flex h-8 min-h-[24px] shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground",
         "transition-colors duration-150 ease-out hover:bg-accent motion-reduce:transition-none",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
       )}
@@ -218,10 +244,13 @@ function UnsupportedZustand({
         <FileWarning className="size-6" />
       </span>
       <div className="max-w-prose space-y-1">
-        <p className="text-sm font-medium text-foreground">Keine Inline-Vorschau verfügbar</p>
+        <p className="text-sm font-medium text-foreground">
+          Keine Inline-Vorschau verfügbar
+        </p>
         <p className="text-sm text-muted-foreground">
-          Für „{name}" steht in diesem Format keine eingebettete Vorschau zur Verfügung. Laden Sie die
-          Datei herunter, um sie in Ihrer Office-Anwendung zu öffnen.
+          Für „{name}" steht in diesem Format keine eingebettete Vorschau zur
+          Verfügung. Laden Sie die Datei herunter, um sie in Ihrer
+          Office-Anwendung zu öffnen.
         </p>
       </div>
       <DownloadLink url={url} name={name} />

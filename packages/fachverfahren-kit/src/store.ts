@@ -1,11 +1,16 @@
 // fachverfahren-kit/store — die generische DEV-Datenschicht: ein Zustand-Store, der `VorgangPort` implementiert,
-// gesteuert NUR durch die `LeistungConfig`. Aus der Referenz-`store.ts` (Lovable) abgeleitet, aber leistungs-
+// gesteuert NUR durch die `LeistungConfig`. Aus etablierten Public-Sector-UX-Mustern abgeleitet, leistungs-
 // agnostisch: dieselbe Vorgang-State-Machine + History + Once-Only-Register für JEDES Fachverfahren.
 //
-// DEV (im Vite-Dev-Server, end-to-end klickbar wie die Referenz): dieser In-Memory/Zustand-Store.
+// DEV (im Vite-Dev-Server, end-to-end klickbar): dieser In-Memory/Zustand-Store.
 // PROD: dieselbe `VorgangPort`-Schnittstelle gegen das SDK/Fastify-Backend — die Bausteine merken keinen Unterschied.
 import { create, type StoreApi, type UseBoundStore } from "zustand";
-import type { LeistungConfig, Vorgang, VorgangPort, Transition } from "./types.js";
+import type {
+  LeistungConfig,
+  Vorgang,
+  VorgangPort,
+  Transition,
+} from "./types.js";
 
 let __seq = 0;
 const pad = (n: number, w: number) => String(n).padStart(w, "0");
@@ -35,11 +40,14 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
   const seed = config.seed?.({ vorgangsnummer }) ?? [];
   const use = create<{ vorgaenge: Vorgang<T>[] }>(() => ({ vorgaenge: seed }));
 
-  const setState = (fn: (s: Vorgang<T>[]) => Vorgang<T>[]) => use.setState((s) => ({ vorgaenge: fn(s.vorgaenge) }));
+  const setState = (fn: (s: Vorgang<T>[]) => Vorgang<T>[]) =>
+    use.setState((s) => ({ vorgaenge: fn(s.vorgaenge) }));
 
   const transitionsFrom = (status: string, rolle?: string): Transition[] =>
     // DEFENSIV gegen eine unvollständig generierte Config (statusMachine evtl. nicht vertragskonform).
-    (config.statusMachine?.transitions ?? []).filter((t) => t.from === status && (!rolle || t.rollen.includes(rolle)));
+    (config.statusMachine?.transitions ?? []).filter(
+      (t) => t.from === status && (!rolle || t.rollen.includes(rolle)),
+    );
 
   const store: FachverfahrenStore<T> = {
     config,
@@ -62,7 +70,9 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
         ...(berechnung ? { berechnung } : {}),
         ki,
         nachweise: config.nachweise?.(antragsdaten) ?? [],
-        history: [{ ts: now(), aktion: "Antrag eingegangen", rolle: "buerger" }],
+        history: [
+          { ts: now(), aktion: "Antrag eingegangen", rolle: "buerger" },
+        ],
       };
       setState((vs) => [v, ...vs]);
       return v;
@@ -71,10 +81,16 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
     uebergang: (id, to, rolle, detail) => {
       const v = store.get(id);
       if (!v) throw new Error(`Vorgang ${id} nicht gefunden`);
-      const t = config.statusMachine.transitions.find((x) => x.from === v.status && x.to === to);
+      const t = config.statusMachine.transitions.find(
+        (x) => x.from === v.status && x.to === to,
+      );
       if (!t) throw new Error(`Übergang ${v.status} → ${to} nicht erlaubt`);
-      if (!t.rollen.includes(rolle)) throw new Error(`Rolle ${rolle} darf ${v.status} → ${to} nicht auslösen`);
-      if (t.detailPflicht && !detail) throw new Error(`Übergang „${t.label}" erfordert eine Begründung`);
+      if (!t.rollen.includes(rolle))
+        throw new Error(
+          `Rolle ${rolle} darf ${v.status} → ${to} nicht auslösen`,
+        );
+      if (t.detailPflicht && !detail)
+        throw new Error(`Übergang „${t.label}" erfordert eine Begründung`);
       // 4-Augen wird in PROD serverseitig erzwungen (anderer Bearbeiter als der Antragsteller/Vorprüfer);
       // im DEV-Store ist es ein Vermerk in der History (revisionssicher, append-only).
       setState((vs) =>
@@ -86,7 +102,12 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
                 history: [
                   ...x.history,
                   // detail ist optional — unter exactOptionalPropertyTypes nur setzen, wenn vorhanden.
-                  { ts: now(), aktion: `${t.label} (→ ${to})`, rolle, ...(detail ? { detail } : {}) },
+                  {
+                    ts: now(),
+                    aktion: `${t.label} (→ ${to})`,
+                    rolle,
+                    ...(detail ? { detail } : {}),
+                  },
                 ],
               }
             : x,
@@ -98,7 +119,11 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
       const q = query.toLowerCase().trim();
       if (!q) return undefined;
       return config.register.mock?.find((r) =>
-        config.register.suchfelder.some((f) => String(r[f] ?? "").toLowerCase().includes(q)),
+        config.register.suchfelder.some((f) =>
+          String(r[f] ?? "")
+            .toLowerCase()
+            .includes(q),
+        ),
       );
     },
   };

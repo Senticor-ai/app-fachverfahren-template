@@ -25,7 +25,10 @@ export interface BescheidViewProps<T = Record<string, unknown>> {
 /** Betrag inkl. Einheit formatieren: Euro-Einheiten als Währung, sonst Zahl + Einheit. */
 function formatBetrag(betrag: number, einheit: string): string {
   if (/eur/i.test(einheit)) {
-    return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(betrag);
+    return new Intl.NumberFormat("de-DE", {
+      style: "currency",
+      currency: "EUR",
+    }).format(betrag);
   }
   const zahl = new Intl.NumberFormat("de-DE", {
     minimumFractionDigits: 0,
@@ -38,7 +41,11 @@ function formatBetrag(betrag: number, einheit: string): string {
 function formatDatum(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" });
+  return d.toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 export function BescheidView<T = Record<string, unknown>>({
@@ -46,7 +53,10 @@ export function BescheidView<T = Record<string, unknown>>({
   config,
 }: BescheidViewProps<T>): ReactElement {
   const berechnung: Berechnung | undefined = vorgang.berechnung;
-  const datum = useMemo(() => formatDatum(vorgang.eingangIso), [vorgang.eingangIso]);
+  const datum = useMemo(
+    () => formatDatum(vorgang.eingangIso),
+    [vorgang.eingangIso],
+  );
 
   return (
     <section className="mx-auto w-full max-w-3xl px-6 py-8 print:max-w-none print:px-0 print:py-0">
@@ -81,10 +91,12 @@ export function BescheidView<T = Record<string, unknown>>({
               <p className="text-lg font-semibold leading-tight text-foreground print:text-black">
                 {config.kommune}
               </p>
-              <p className="text-sm text-muted-foreground print:text-black">{config.label}</p>
+              <p className="text-sm text-muted-foreground print:text-black">
+                {config.label}
+              </p>
             </div>
           </div>
-          <dl className="text-right text-[12px] leading-relaxed text-muted-foreground print:text-black">
+          <dl className="text-right text-sm leading-relaxed text-muted-foreground print:text-black">
             <div className="flex justify-end gap-2">
               <dt className="uppercase tracking-wide">Aktenzeichen</dt>
               <dd className="font-mono font-medium text-foreground print:text-black">
@@ -114,7 +126,7 @@ export function BescheidView<T = Record<string, unknown>>({
         <section aria-labelledby="bescheid-tenor" className="mt-8">
           <h2
             id="bescheid-tenor"
-            className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:text-black"
+            className="text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-black"
           >
             Tenor
           </h2>
@@ -135,16 +147,20 @@ export function BescheidView<T = Record<string, unknown>>({
                 </div>
 
                 {berechnung.positionen && berechnung.positionen.length > 0 && (
-                  <table className="mt-4 w-full border-collapse text-[13px]">
+                  <table className="mt-4 w-full border-collapse text-sm">
                     <caption className="sr-only">
-                      Einzelpositionen der Festsetzung für Vorgang {vorgang.vorgangsnummer}
+                      Einzelpositionen der Festsetzung für Vorgang{" "}
+                      {vorgang.vorgangsnummer}
                     </caption>
                     <thead>
-                      <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground print:border-black/30 print:text-black">
+                      <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground print:border-black/30 print:text-black">
                         <th scope="col" className="py-1.5 font-medium">
                           Position
                         </th>
-                        <th scope="col" className="py-1.5 text-right font-medium">
+                        <th
+                          scope="col"
+                          className="py-1.5 text-right font-medium"
+                        >
                           Betrag
                         </th>
                       </tr>
@@ -155,7 +171,9 @@ export function BescheidView<T = Record<string, unknown>>({
                           key={i}
                           className="border-b border-border last:border-b-0 print:border-black/15"
                         >
-                          <td className="py-1.5 text-foreground print:text-black">{p.label}</td>
+                          <td className="py-1.5 text-foreground print:text-black">
+                            {p.label}
+                          </td>
                           <td className="py-1.5 text-right tabular-nums text-foreground print:text-black">
                             {formatBetrag(p.betrag, berechnung.einheit)}
                           </td>
@@ -169,7 +187,7 @@ export function BescheidView<T = Record<string, unknown>>({
               {/* Begründung (Tatbestand → Rechtsfolge) */}
               {berechnung.begruendung && (
                 <div className="mt-6">
-                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:text-black">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-black">
                     Begründung
                   </h3>
                   <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-foreground print:text-black">
@@ -183,8 +201,8 @@ export function BescheidView<T = Record<string, unknown>>({
               role="status"
               className="mt-3 rounded-md border border-dashed border-border bg-background p-4 text-sm text-muted-foreground print:border-black/30 print:bg-white print:text-black"
             >
-              Für diesen Vorgang liegt noch keine Festsetzung vor. Der Bescheid kann erst nach
-              abgeschlossener Bearbeitung erteilt werden.
+              Für diesen Vorgang liegt noch keine Festsetzung vor. Der Bescheid
+              kann erst nach abgeschlossener Bearbeitung erteilt werden.
             </p>
           )}
         </section>
@@ -194,18 +212,23 @@ export function BescheidView<T = Record<string, unknown>>({
           <section aria-labelledby="bescheid-rechtsgrundlagen" className="mt-8">
             <h2
               id="bescheid-rechtsgrundlagen"
-              className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:text-black"
+              className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-black"
             >
               <Scale className="h-3.5 w-3.5" aria-hidden="true" />
               Rechtsgrundlagen
             </h2>
             <ul className="mt-3 space-y-1.5 text-sm text-foreground print:text-black">
               {config.rechtsgrundlagen.map((r) => (
-                <li key={r.norm} className="flex flex-wrap items-baseline gap-x-2">
+                <li
+                  key={r.norm}
+                  className="flex flex-wrap items-baseline gap-x-2"
+                >
                   <span className="font-medium">{r.norm}</span>
-                  <span className="text-muted-foreground print:text-black">— {r.titel}</span>
+                  <span className="text-muted-foreground print:text-black">
+                    — {r.titel}
+                  </span>
                   {r.satzung && (
-                    <span className="text-[11px] uppercase tracking-wide text-muted-foreground print:text-black">
+                    <span className="text-xs uppercase tracking-wide text-muted-foreground print:text-black">
                       (Satzung)
                     </span>
                   )}
@@ -221,26 +244,30 @@ export function BescheidView<T = Record<string, unknown>>({
         <section aria-labelledby="bescheid-rechtsbehelf" className="mt-2">
           <h2
             id="bescheid-rechtsbehelf"
-            className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground print:text-black"
+            className="text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-black"
           >
             Rechtsbehelfsbelehrung
           </h2>
-          <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground print:text-black">
-            Gegen diesen Bescheid kann innerhalb eines Monats nach Bekanntgabe Widerspruch erhoben
-            werden. Der Widerspruch ist schriftlich oder zur Niederschrift bei der erlassenden Stelle
-            ({config.kommune}) einzulegen. Die Frist beginnt mit dem Tag der Bekanntgabe dieses
-            Bescheides. Erfolgt die Bekanntgabe durch die Post im Inland, gilt der Bescheid am dritten
-            Tag nach Aufgabe zur Post als bekannt gegeben. Wird der Widerspruch nicht oder nicht
-            fristgerecht erhoben, wird der Bescheid bestandskräftig.
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground print:text-black">
+            Gegen diesen Bescheid kann innerhalb eines Monats nach Bekanntgabe
+            Widerspruch erhoben werden. Der Widerspruch ist schriftlich oder zur
+            Niederschrift bei der erlassenden Stelle ({config.kommune})
+            einzulegen. Die Frist beginnt mit dem Tag der Bekanntgabe dieses
+            Bescheides. Erfolgt die Bekanntgabe durch die Post im Inland, gilt
+            der Bescheid am dritten Tag nach Aufgabe zur Post als bekannt
+            gegeben. Wird der Widerspruch nicht oder nicht fristgerecht erhoben,
+            wird der Bescheid bestandskräftig.
           </p>
         </section>
 
         {/* ── Unterschrift / Fußzeile ───────────────────────────────────────────────── */}
-        <footer className="mt-10 flex items-end justify-between gap-6 text-[12px] text-muted-foreground print:text-black">
+        <footer className="mt-10 flex items-end justify-between gap-6 text-sm text-muted-foreground print:text-black">
           <p>
             {config.kommune}
             <br />
-            <span className="text-muted-foreground print:text-black">Im Auftrag</span>
+            <span className="text-muted-foreground print:text-black">
+              Im Auftrag
+            </span>
           </p>
           <p className="text-right">
             Aktenzeichen{" "}

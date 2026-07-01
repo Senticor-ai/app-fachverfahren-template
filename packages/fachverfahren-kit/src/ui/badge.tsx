@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../lib/utils.js";
 
 const badgeVariants = cva(
-  "inline-flex items-center gap-1 rounded-sm border px-2 py-0.5 text-[11px] font-medium leading-none",
+  "inline-flex items-center gap-1 rounded-sm border px-2 py-0.5 text-xs font-medium leading-none",
   {
     variants: {
       tone: {
@@ -21,13 +21,18 @@ const badgeVariants = cva(
 );
 
 export interface BadgeProps
-  extends React.HTMLAttributes<HTMLSpanElement>,
+  extends
+    React.HTMLAttributes<HTMLSpanElement>,
     VariantProps<typeof badgeVariants> {}
 
 /** Farbiges Badge nach Ton — die Inhalte (Label/Icon) kommen ausschließlich als children. */
 export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
   ({ className, tone, ...props }, ref) => (
-    <span ref={ref} className={cn(badgeVariants({ tone }), className)} {...props} />
+    <span
+      ref={ref}
+      className={cn(badgeVariants({ tone }), className)}
+      {...props}
+    />
   ),
 );
 Badge.displayName = "Badge";

@@ -5,7 +5,7 @@
 // blockiert wird). Lädt das Dokument nicht selbst — der Browser rendert die URL. Lade-/Fehler-/Sperr-
 // Zustand laufen über den EINEN ViewState-Vertrag (useViewState) + werden zentral angesagt.
 //
-// GENERISCH: keine Domänen-Literale — Titel/Dateiname/URL kommen aus props (kein „Bescheid"/„Hund").
+// GENERISCH: keine Domänen-Literale — Titel/Dateiname/URL kommen aus props.
 // DEP-FREI: rein browser-nativ, KEIN pdfjs. Prod-Upgrade wäre ein pdfjs-Textlayer (durchsuchbarer,
 // selektierbarer Text + zuverlässige a11y/Tagging) — bewusst NICHT importiert, um die Vorlage schlank
 // und paketfrei zu halten. Der native <object>-Pfad nutzt den eingebauten PDF-Reader des Browsers,
@@ -38,7 +38,11 @@ export interface PdfViewerProps {
 }
 
 /** Leitet einen sicheren Download-Dateinamen aus filename/title/url ab (immer mit .pdf). */
-function resolveFilename(filename: string | undefined, title: string, url: string): string {
+function resolveFilename(
+  filename: string | undefined,
+  title: string,
+  url: string,
+): string {
   const base =
     filename?.trim() ||
     title.trim() ||
@@ -54,7 +58,13 @@ function resolveFilename(filename: string | undefined, title: string, url: strin
  * <PdfViewer url={nachweis.url} title={nachweis.bezeichnung} filename={nachweis.dateiname} />
  * <PdfViewer url={akte.url} title="Vorgang" restricted={!darfSehen} />
  */
-export function PdfViewer({ url, title = "Dokument", filename, restricted = false, className }: PdfViewerProps) {
+export function PdfViewer({
+  url,
+  title = "Dokument",
+  filename,
+  restricted = false,
+  className,
+}: PdfViewerProps) {
   const { announce } = useStatusRegion();
   const view = useViewState<{ url: string }>({
     initial: restricted ? "forbidden" : "loading",
@@ -84,7 +94,8 @@ export function PdfViewer({ url, title = "Dokument", filename, restricted = fals
 
   // Jede Transition zentral ansagen (loading/ready/error/forbidden).
   React.useEffect(() => {
-    if (view.state.message) announce(view.state.message, announcePoliteness(status));
+    if (view.state.message)
+      announce(view.state.message, announcePoliteness(status));
   }, [announce, status, view.state.message]);
 
   const handleLoaded = React.useCallback(() => {
@@ -101,7 +112,10 @@ export function PdfViewer({ url, title = "Dokument", filename, restricted = fals
     if (typeof window === "undefined") return;
     const printWin = window.open(url, "_blank", "noopener");
     if (!printWin) {
-      announce("Druck-Fenster wurde blockiert. Bitte das Dokument in einem neuen Tab öffnen und dort drucken.", "assertive");
+      announce(
+        "Druck-Fenster wurde blockiert. Bitte das Dokument in einem neuen Tab öffnen und dort drucken.",
+        "assertive",
+      );
       return;
     }
     const triggerPrint = () => {
@@ -121,7 +135,10 @@ export function PdfViewer({ url, title = "Dokument", filename, restricted = fals
 
   return (
     <section
-      className={cn("flex flex-col overflow-hidden rounded-xl border border-border bg-card", className)}
+      className={cn(
+        "flex flex-col overflow-hidden rounded-xl border border-border bg-card",
+        className,
+      )}
       aria-label={docLabel}
     >
       {/* ── Toolbar ────────────────────────────────────────────────────────────── */}
@@ -132,15 +149,26 @@ export function PdfViewer({ url, title = "Dokument", filename, restricted = fals
         className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-surface px-4 py-2"
       >
         <div className="flex min-w-0 items-center gap-2">
-          <FileText aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-          <span className="truncate text-sm font-medium text-foreground" title={title}>
+          <FileText
+            aria-hidden="true"
+            className="size-4 shrink-0 text-muted-foreground"
+          />
+          <span
+            className="truncate text-sm font-medium text-foreground"
+            title={title}
+          >
             {title}
           </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-1">
           {/* Download — IMMER verfügbar, auch bei Sperre/Fehler. Echtes <a download>. */}
-          <Button asChild size="sm" variant="outline" aria-label={`${title} herunterladen`}>
+          <Button
+            asChild
+            size="sm"
+            variant="outline"
+            aria-label={`${title} herunterladen`}
+          >
             <a href={url} download={downloadName}>
               <Download aria-hidden="true" />
               <span>Herunterladen</span>
@@ -148,7 +176,12 @@ export function PdfViewer({ url, title = "Dokument", filename, restricted = fals
           </Button>
 
           {/* In neuem Tab öffnen — funktioniert unabhängig vom Inline-Render. */}
-          <Button asChild size="sm" variant="ghost" aria-label={`${title} in neuem Tab öffnen`}>
+          <Button
+            asChild
+            size="sm"
+            variant="ghost"
+            aria-label={`${title} in neuem Tab öffnen`}
+          >
             <a href={url} target="_blank" rel="noopener noreferrer">
               <ExternalLink aria-hidden="true" />
               <span>Neuer Tab</span>
@@ -173,14 +206,19 @@ export function PdfViewer({ url, title = "Dokument", filename, restricted = fals
       {/* ── Inhalt: gesperrt → Hinweis · Fehler → ErrorState · sonst nativer Viewer ─ */}
       <div className="relative min-h-[28rem] flex-1 bg-surface">
         {isRestricted ? (
-          <div role="status" className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+          <div
+            role="status"
+            className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center"
+          >
             <span className="flex size-12 items-center justify-center rounded-full bg-status-warn-soft text-status-warn">
               <Lock aria-hidden="true" className="size-6" />
             </span>
             <p className="font-medium text-foreground">Dokument gesperrt</p>
             <p className="max-w-prose text-sm text-muted-foreground">
-              {view.state.message ?? "Für dieses Dokument fehlt die Berechtigung."} Sie können es bei Bedarf weiterhin
-              herunterladen oder in einem neuen Tab öffnen.
+              {view.state.message ??
+                "Für dieses Dokument fehlt die Berechtigung."}{" "}
+              Sie können es bei Bedarf weiterhin herunterladen oder in einem
+              neuen Tab öffnen.
             </p>
           </div>
         ) : isError ? (
@@ -193,13 +231,23 @@ export function PdfViewer({ url, title = "Dokument", filename, restricted = fals
               retryLabel="Erneut versuchen"
               actions={
                 <>
-                  <Button asChild size="sm" variant="outline" aria-label={`${title} herunterladen`}>
+                  <Button
+                    asChild
+                    size="sm"
+                    variant="outline"
+                    aria-label={`${title} herunterladen`}
+                  >
                     <a href={url} download={downloadName}>
                       <Download aria-hidden="true" />
                       <span>Herunterladen</span>
                     </a>
                   </Button>
-                  <Button asChild size="sm" variant="outline" aria-label={`${title} in neuem Tab öffnen`}>
+                  <Button
+                    asChild
+                    size="sm"
+                    variant="outline"
+                    aria-label={`${title} in neuem Tab öffnen`}
+                  >
                     <a href={url} target="_blank" rel="noopener noreferrer">
                       <ExternalLink aria-hidden="true" />
                       <span>In neuem Tab öffnen</span>
@@ -244,20 +292,36 @@ export function PdfViewer({ url, title = "Dokument", filename, restricted = fals
                 onError={handleError}
               />
               <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-                <FileText aria-hidden="true" className="size-8 text-muted-foreground" />
-                <p className="font-medium text-foreground">Vorschau nicht verfügbar</p>
+                <FileText
+                  aria-hidden="true"
+                  className="size-8 text-muted-foreground"
+                />
+                <p className="font-medium text-foreground">
+                  Vorschau nicht verfügbar
+                </p>
                 <p className="max-w-prose text-sm text-muted-foreground">
-                  Ihr Browser kann dieses PDF nicht direkt anzeigen. Bitte laden Sie das Dokument herunter oder öffnen
-                  Sie es in einem neuen Tab.
+                  Ihr Browser kann dieses PDF nicht direkt anzeigen. Bitte laden
+                  Sie das Dokument herunter oder öffnen Sie es in einem neuen
+                  Tab.
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-2">
-                  <Button asChild size="sm" variant="default" aria-label={`${title} herunterladen`}>
+                  <Button
+                    asChild
+                    size="sm"
+                    variant="default"
+                    aria-label={`${title} herunterladen`}
+                  >
                     <a href={url} download={downloadName}>
                       <Download aria-hidden="true" />
                       <span>Herunterladen</span>
                     </a>
                   </Button>
-                  <Button asChild size="sm" variant="outline" aria-label={`${title} in neuem Tab öffnen`}>
+                  <Button
+                    asChild
+                    size="sm"
+                    variant="outline"
+                    aria-label={`${title} in neuem Tab öffnen`}
+                  >
                     <a href={url} target="_blank" rel="noopener noreferrer">
                       <ExternalLink aria-hidden="true" />
                       <span>In neuem Tab öffnen</span>

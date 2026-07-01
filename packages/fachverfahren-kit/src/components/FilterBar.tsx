@@ -10,7 +10,7 @@
 //  - role="search" als Landmark, das Input ist über ein verstecktes <label> beschriftet (htmlFor/id)
 //  - Tastatur: Esc im Input leert die Suche; Löschen-Knopf ist ein echter Button (Tab erreichbar)
 //  - der Ergebnis-Zähler liegt in einer aria-live="polite"-Region → Screenreader hören die neue Anzahl
-//  - sichtbarer Fokus-Ring überall (focus-visible:ring-2 ring-ring ring-offset-2), Zielgröße >= 24px (h-9)
+//  - EIN kanonischer Fokus-Ring überall (Spec 3.2: focus-visible:border-ring ring-ring/50 ring-[3px])
 //  - das Icon ist rein dekorativ → aria-hidden; Farbe ist nie alleiniger Bedeutungsträger
 //  - jede Animation respektiert prefers-reduced-motion (motion-reduce:transition-none)
 import * as React from "react";
@@ -19,7 +19,10 @@ import { Search, X } from "lucide-react";
 import { cn } from "../lib/utils.js";
 import { Button } from "../ui/button.js";
 
-export interface FilterBarProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "onChange"> {
+export interface FilterBarProps extends Omit<
+  React.HTMLAttributes<HTMLDivElement>,
+  "onChange"
+> {
   /** Aktueller Suchbegriff (kontrolliert). */
   value: string;
   /** Wird mit dem neuen Suchbegriff gerufen (auch beim Leeren über das X / Esc / Zurücksetzen). */
@@ -148,9 +151,11 @@ export const FilterBar = React.forwardRef<HTMLDivElement, FilterBarProps>(
               autoComplete="off"
               spellCheck={false}
               className={cn(
-                "h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-9 text-sm text-foreground shadow-sm",
+                // Feld-Muster (Spec 4.1): h-10 default, klare Feldfläche (bg-input-bg), weiche Elevation.
+                "h-10 w-full rounded-md border border-input bg-input-bg pl-9 pr-9 text-sm text-foreground shadow-xs",
                 "placeholder:text-muted-foreground transition-colors duration-150 ease-out motion-reduce:transition-none",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                // Kanonisches Fokus-Rezept (Spec 3.2): EIN Rezept, 3px weicher Ring.
+                "outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
                 // Native Such-Lösch-Kreuze ausblenden — wir liefern einen eigenen, barrierefreien Knopf.
                 "[&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none",
               )}
@@ -161,9 +166,9 @@ export const FilterBar = React.forwardRef<HTMLDivElement, FilterBarProps>(
                 onClick={leereSuche}
                 aria-label="Suche leeren"
                 className={cn(
-                  "absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground",
+                  "absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground",
                   "transition-colors duration-150 ease-out hover:bg-accent hover:text-accent-foreground motion-reduce:transition-none",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                  "outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
                 )}
               >
                 <X className="h-4 w-4" aria-hidden="true" />
@@ -184,7 +189,9 @@ export const FilterBar = React.forwardRef<HTMLDivElement, FilterBarProps>(
               aria-atomic="true"
               className="text-xs text-muted-foreground tabular-nums"
             >
-              {zeigeZaehler ? formatResultLabel(resultCount as number, totalCount) : ""}
+              {zeigeZaehler
+                ? formatResultLabel(resultCount as number, totalCount)
+                : ""}
             </p>
             {zeigeReset && (
               <Button

@@ -53,10 +53,21 @@ export interface KiAssistPanelProps {
 }
 
 /** Konfidenz-Balken (0..1 → %) mit sichtbarem Textwert — Information nie nur über Farbe. */
-function KonfidenzBalken({ value, labelledBy }: { value: number; labelledBy: string }) {
+function KonfidenzBalken({
+  value,
+  labelledBy,
+}: {
+  value: number;
+  labelledBy: string;
+}) {
   const pct = Math.round(Math.min(1, Math.max(0, value)) * 100);
   // Ton ist rein zusätzlich — der Prozentwert daneben trägt die Information.
-  const tone = pct >= 85 ? "bg-status-ok" : pct >= 70 ? "bg-status-info" : "bg-status-warn";
+  const tone =
+    pct >= 85
+      ? "bg-status-ok"
+      : pct >= 70
+        ? "bg-status-info"
+        : "bg-status-warn";
   return (
     <div className="flex items-center gap-2">
       <div
@@ -68,9 +79,14 @@ function KonfidenzBalken({ value, labelledBy }: { value: number; labelledBy: str
         aria-labelledby={labelledBy}
         aria-valuetext={`${pct} Prozent`}
       >
-        <div className={cn("h-full motion-reduce:transition-none", tone)} style={{ width: `${pct}%` }} />
+        <div
+          className={cn("h-full motion-reduce:transition-none", tone)}
+          style={{ width: `${pct}%` }}
+        />
       </div>
-      <span className="font-mono text-xs tabular-nums text-foreground">{pct}&nbsp;%</span>
+      <span className="font-mono text-xs tabular-nums text-foreground">
+        {pct}&nbsp;%
+      </span>
     </div>
   );
 }
@@ -119,7 +135,10 @@ export function KiAssistPanel({
     <section
       role="region"
       aria-labelledby={titleId}
-      className={cn("rounded-md border border-status-info/30 bg-status-info-soft/40 p-4", className)}
+      className={cn(
+        "rounded-md border border-status-info/30 bg-status-info-soft/40 p-4",
+        className,
+      )}
     >
       {/* Kopf: Marking (sichtbar als KI gekennzeichnet) + Risiko-Badge */}
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -129,7 +148,9 @@ export function KiAssistPanel({
         >
           <Sparkles className="h-4 w-4 text-status-info" aria-hidden="true" />
           <span>KI-Vorschlag</span>
-          <span className="font-normal text-muted-foreground">· {funktionsName}</span>
+          <span className="font-normal text-muted-foreground">
+            · {funktionsName}
+          </span>
         </h3>
         <Badge tone={istHochrisiko ? "warn" : "info"}>
           {istHochrisiko ? (
@@ -147,23 +168,31 @@ export function KiAssistPanel({
           role="note"
           className="mt-2 flex items-start gap-1.5 rounded-sm bg-status-warn-soft px-2 py-1.5 text-xs text-foreground"
         >
-          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-warn" aria-hidden="true" />
-          <span>Annex-III-Prüfung erforderlich – Vorschlag vor Übernahme fachlich prüfen.</span>
+          <AlertTriangle
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-warn"
+            aria-hidden="true"
+          />
+          <span>
+            Annex-III-Prüfung erforderlich – Vorschlag vor Übernahme fachlich
+            prüfen.
+          </span>
         </p>
       )}
 
       {/* Wert: der eigentliche Vorschlag */}
       <div className="mt-3">
-        <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground/80">
+        <span className="block text-xs font-bold uppercase tracking-wide text-muted-foreground/80">
           Vorschlag
         </span>
-        <div className="mt-0.5 text-sm font-medium text-foreground">{vorschlag.wert}</div>
+        <div className="mt-0.5 text-sm font-medium text-foreground">
+          {vorschlag.wert}
+        </div>
       </div>
 
       {/* Source + Confidence */}
       <dl className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <dt className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground/80">
+          <dt className="text-xs font-bold uppercase tracking-wide text-muted-foreground/80">
             Quelle
           </dt>
           <dd className="mt-0.5 text-xs text-foreground">{vorschlag.quelle}</dd>
@@ -171,22 +200,28 @@ export function KiAssistPanel({
         <div>
           <dt
             id={konfidenzLabelId}
-            className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground/80"
+            className="text-xs font-bold uppercase tracking-wide text-muted-foreground/80"
           >
             Konfidenz
           </dt>
           <dd className="mt-1">
-            <KonfidenzBalken value={vorschlag.konfidenz} labelledBy={konfidenzLabelId} />
+            <KonfidenzBalken
+              value={vorschlag.konfidenz}
+              labelledBy={konfidenzLabelId}
+            />
           </dd>
         </div>
       </dl>
 
       {/* Why: Begründung je Vorschlag */}
       <div className="mt-3">
-        <span className="block text-[10px] font-bold uppercase tracking-wide text-muted-foreground/80">
+        <span className="block text-xs font-bold uppercase tracking-wide text-muted-foreground/80">
           Begründung
         </span>
-        <p id={begruendungId} className="mt-0.5 text-xs leading-relaxed text-foreground">
+        <p
+          id={begruendungId}
+          className="mt-0.5 text-xs leading-relaxed text-foreground"
+        >
           {vorschlag.begruendung}
         </p>
       </div>
@@ -214,7 +249,7 @@ export function KiAssistPanel({
           <X className="h-4 w-4" aria-hidden="true" />
           Verwerfen
         </Button>
-        <span className="ml-auto text-[11px] text-muted-foreground">
+        <span className="ml-auto text-xs text-muted-foreground">
           Vorschlag der KI – die Entscheidung trifft der Mensch.
         </span>
       </div>

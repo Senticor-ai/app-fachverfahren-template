@@ -89,7 +89,8 @@ export function ConsentBanner({
   useEffect(() => {
     if (sichtbar !== true) return;
 
-    vorherigerFokus.current = typeof document !== "undefined" ? document.activeElement : null;
+    vorherigerFokus.current =
+      typeof document !== "undefined" ? document.activeElement : null;
     // Fokus in den Banner setzen (auf den ersten, gleichwertigen Button).
     erstesButtonRef.current?.focus();
 
@@ -151,14 +152,21 @@ export function ConsentBanner({
     >
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:gap-6">
         <div className="flex min-w-0 flex-1 items-start gap-3">
-          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-foreground" aria-hidden="true" />
+          <ShieldCheck
+            className="mt-0.5 h-5 w-5 shrink-0 text-foreground"
+            aria-hidden="true"
+          />
           <div className="min-w-0">
             <h2 id={titelId} className="text-sm font-semibold text-foreground">
               Datenschutz-Einstellungen
             </h2>
-            <p id={beschreibungId} className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
-              Wir verwenden ausschließlich notwendige Daten, damit dieser Dienst funktioniert. Optionale Daten
-              (z. B. zur Reichweitenmessung) nutzen wir nur mit Ihrer Einwilligung. Sie können frei wählen und
+            <p
+              id={beschreibungId}
+              className="mt-1 text-sm leading-relaxed text-muted-foreground"
+            >
+              Wir verwenden ausschließlich notwendige Daten, damit dieser Dienst
+              funktioniert. Optionale Daten (z. B. zur Reichweitenmessung)
+              nutzen wir nur mit Ihrer Einwilligung. Sie können frei wählen und
               Ihre Entscheidung jederzeit ändern.
               {datenschutzUrl && (
                 <>

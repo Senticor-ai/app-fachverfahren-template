@@ -142,7 +142,9 @@ export const MobileNav: React.FC<MobileNavProps> = ({
               >
                 <SheetHeader>
                   <SheetTitle>{drawerTitle}</SheetTitle>
-                  {drawerDescription && <SheetDescription>{drawerDescription}</SheetDescription>}
+                  {drawerDescription && (
+                    <SheetDescription>{drawerDescription}</SheetDescription>
+                  )}
                 </SheetHeader>
 
                 <ul className="mt-4 grid gap-1">
@@ -160,17 +162,23 @@ export const MobileNav: React.FC<MobileNavProps> = ({
                             className={cn(
                               "flex min-h-[44px] w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm",
                               "transition-colors duration-150 ease-out motion-reduce:transition-none",
-                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                              // Kanonisches Fokus-Rezept (Spec 3.2): weicher 3px-Ring, EIN Rezept kit-weit.
+                              "outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
                               active
                                 ? "bg-accent font-semibold text-foreground"
                                 : "text-muted-foreground hover:bg-accent hover:text-foreground",
                             )}
                           >
-                            <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-                            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                            <Icon
+                              className="h-5 w-5 shrink-0"
+                              aria-hidden="true"
+                            />
+                            <span className="min-w-0 flex-1 truncate">
+                              {item.label}
+                            </span>
                             {text && (
                               <span
-                                className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-primary px-1.5 text-xs font-semibold text-primary-foreground"
+                                className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground"
                                 aria-label={`${text} neue`}
                               >
                                 {text}
@@ -193,7 +201,10 @@ export const MobileNav: React.FC<MobileNavProps> = ({
 MobileNav.displayName = "MobileNav";
 
 /** Ein einzelner Tab in der Bottom-Bar. */
-const TabButton: React.FC<{ item: MobileNavItem; active: boolean }> = ({ item, active }) => {
+const TabButton: React.FC<{ item: MobileNavItem; active: boolean }> = ({
+  item,
+  active,
+}) => {
   const text = badgeText(item.badge);
   return (
     <button
@@ -214,21 +225,23 @@ function tabClasses(active: boolean): string {
   return cn(
     "relative flex min-h-[44px] w-full select-none flex-col items-center justify-center gap-0.5 px-2 py-1.5",
     "transition-colors duration-150 ease-out motion-reduce:transition-none",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card",
+    // Kanonisches Fokus-Rezept (Spec 3.2): weicher 3px-Ring, EIN Rezept kit-weit.
+    "outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
     active ? "text-primary" : "text-muted-foreground hover:text-foreground",
   );
 }
 
 /** Icon mit optionalem Zähl-Badge (oben rechts). */
-const IconWithBadge: React.FC<{ icon: LucideIcon; active: boolean; badge: string | null }> = ({
-  icon: Icon,
-  badge,
-}) => (
+const IconWithBadge: React.FC<{
+  icon: LucideIcon;
+  active: boolean;
+  badge: string | null;
+}> = ({ icon: Icon, badge }) => (
   <span className="relative inline-flex">
     <Icon className="h-6 w-6" aria-hidden="true" />
     {badge && (
       <span
-        className="absolute -right-2 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-md bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground"
+        className="absolute -right-2 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-xs font-semibold leading-none text-primary-foreground"
         aria-label={`${badge} neue`}
       >
         {badge}
@@ -238,8 +251,16 @@ const IconWithBadge: React.FC<{ icon: LucideIcon; active: boolean; badge: string
 );
 
 /** Label unter dem Icon — aktiv = fett (Farbe ist nie alleiniger Träger). */
-const TabLabel: React.FC<{ label: string; active: boolean }> = ({ label, active }) => (
-  <span className={cn("max-w-full truncate text-[11px] leading-tight", active && "font-semibold")}>
+const TabLabel: React.FC<{ label: string; active: boolean }> = ({
+  label,
+  active,
+}) => (
+  <span
+    className={cn(
+      "max-w-full truncate text-xs leading-tight",
+      active && "font-semibold",
+    )}
+  >
     {label}
   </span>
 );
@@ -247,7 +268,10 @@ const TabLabel: React.FC<{ label: string; active: boolean }> = ({ label, active 
 /** Schmaler Indikatorbalken am oberen Tab-Rand — zweites, nicht-farbliches Aktiv-Signal. */
 const ActiveIndicator: React.FC<{ active: boolean }> = ({ active }) =>
   active ? (
-    <span aria-hidden="true" className="absolute inset-x-3 top-0 h-0.5 rounded-md bg-primary" />
+    <span
+      aria-hidden="true"
+      className="absolute inset-x-3 top-0 h-0.5 rounded-md bg-primary"
+    />
   ) : null;
 
 /** Zusammengefasstes Badge für den „Mehr"-Slot — Summe numerischer Badges der Überlauf-Punkte. */
@@ -255,7 +279,11 @@ function overflowBadge(overflow: MobileNavItem[]): string | null {
   let sum = 0;
   let hasAny = false;
   for (const item of overflow) {
-    if (typeof item.badge === "number" && Number.isFinite(item.badge) && item.badge > 0) {
+    if (
+      typeof item.badge === "number" &&
+      Number.isFinite(item.badge) &&
+      item.badge > 0
+    ) {
       sum += item.badge;
       hasAny = true;
     } else if (typeof item.badge === "string" && item.badge.trim().length > 0) {

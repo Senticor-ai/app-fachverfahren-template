@@ -72,7 +72,10 @@ function RolleIcon({ rolle }: { rolle: string }): ReactElement {
   return <User className="h-3 w-3" aria-hidden="true" />;
 }
 
-export function AuditTimeline({ history, rollenfilter }: AuditTimelineProps): ReactElement {
+export function AuditTimeline({
+  history,
+  rollenfilter,
+}: AuditTimelineProps): ReactElement {
   const labelId = useId();
   const liveId = useId();
 
@@ -110,7 +113,10 @@ export function AuditTimeline({ history, rollenfilter }: AuditTimelineProps): Re
   }, [history]);
 
   const sichtbar = useMemo(
-    () => (filter === ALLE ? chronologisch : chronologisch.filter((h) => h.rolle === filter)),
+    () =>
+      filter === ALLE
+        ? chronologisch
+        : chronologisch.filter((h) => h.rolle === filter),
     [chronologisch, filter],
   );
 
@@ -165,7 +171,7 @@ export function AuditTimeline({ history, rollenfilter }: AuditTimelineProps): Re
           </h2>
         </div>
         <span
-          className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground"
+          className="inline-flex items-center gap-1.5 rounded-sm border border-border bg-secondary px-2 py-0.5 text-xs text-muted-foreground"
           title="Diese Historie ist revisionssicher und kann nicht verändert oder gelöscht werden."
         >
           <Lock className="h-3 w-3" aria-hidden="true" />
@@ -181,7 +187,7 @@ export function AuditTimeline({ history, rollenfilter }: AuditTimelineProps): Re
           className="mt-4 flex flex-wrap items-center gap-2"
           onKeyDown={onGroupKey}
         >
-          <span className="shrink-0 text-[11px] uppercase tracking-wide text-muted-foreground">
+          <span className="shrink-0 text-xs uppercase tracking-wide text-muted-foreground">
             Rolle:
           </span>
           {optionen.map((opt, idx) => (
@@ -211,7 +217,8 @@ export function AuditTimeline({ history, rollenfilter }: AuditTimelineProps): Re
       {/* Vertikale Timeline — semantische geordnete Liste, durchgehender Zeitstrahl, KEINE Edit/Lösch-Affordanz */}
       {sichtbar.length === 0 ? (
         <p className="mt-6 rounded-md border border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
-          Keine Historien-Einträge{filter !== ALLE ? ` für die Rolle "${filter}"` : ""}.
+          Keine Historien-Einträge
+          {filter !== ALLE ? ` für die Rolle "${filter}"` : ""}.
         </p>
       ) : (
         <ol className="relative mt-6 ms-2 border-s border-border ps-6">
@@ -229,7 +236,7 @@ export function AuditTimeline({ history, rollenfilter }: AuditTimelineProps): Re
                 <div className="flex flex-wrap items-center gap-2">
                   <time
                     dateTime={tsMachine(eintrag.ts)}
-                    className="font-mono text-[12px] tabular-nums text-muted-foreground"
+                    className="font-mono text-sm tabular-nums text-muted-foreground"
                   >
                     {tsText(eintrag.ts)}
                   </time>
@@ -238,9 +245,13 @@ export function AuditTimeline({ history, rollenfilter }: AuditTimelineProps): Re
                     {eintrag.rolle}
                   </Badge>
                 </div>
-                <p className="text-sm font-medium text-foreground">{eintrag.aktion}</p>
+                <p className="text-sm font-medium text-foreground">
+                  {eintrag.aktion}
+                </p>
                 {eintrag.detail && (
-                  <p className="text-[13px] leading-relaxed text-muted-foreground">{eintrag.detail}</p>
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {eintrag.detail}
+                  </p>
                 )}
               </div>
             </li>
@@ -278,7 +289,7 @@ const FilterChip = forwardRef<
       )}
     >
       <span>{label}</span>
-      <span className="rounded-full bg-secondary px-1.5 py-px text-[10px] tabular-nums text-foreground">
+      <span className="rounded-full bg-secondary px-1.5 py-px text-xs tabular-nums text-foreground">
         {count}
       </span>
     </button>

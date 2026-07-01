@@ -114,7 +114,10 @@ function lngToTileX(lng: number, z: number): number {
 function latToTileY(lat: number, z: number): number {
   const clampedLat = clampNum(lat, -85.05112878, 85.05112878);
   const rad = (clampedLat * Math.PI) / 180;
-  return ((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2) * Math.pow(2, z);
+  return (
+    ((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2) *
+    Math.pow(2, z)
+  );
 }
 
 /** Fraktionale Kachel-X-Koordinate → Längengrad. */
@@ -143,7 +146,13 @@ function buildTileUrl(
   y: number,
   subdomains: readonly string[],
 ): string {
-  const s = subdomains.length > 0 ? subdomains[((x + y) % subdomains.length + subdomains.length) % subdomains.length]! : "";
+  const s =
+    subdomains.length > 0
+      ? subdomains[
+          (((x + y) % subdomains.length) + subdomains.length) %
+            subdomains.length
+        ]!
+      : "";
   return template
     .replace(/\{s\}/g, s)
     .replace(/\{z\}/g, String(z))
@@ -224,14 +233,18 @@ export function MapView({
   }, [center, zoom, minZoom, maxZoom]);
 
   // Gemessene Containergröße (für die Kachelabdeckung). Ohne Messung sinnvoller Startwert.
-  const [size, setSize] = useState<{ w: number; h: number }>({ w: 640, h: 320 });
+  const [size, setSize] = useState<{ w: number; h: number }>({
+    w: 640,
+    h: 320,
+  });
   useEffect(() => {
     const el = containerRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver((entries) => {
       for (const e of entries) {
         const { width, height: hgt } = e.contentRect;
-        if (width > 0 && hgt > 0) setSize({ w: Math.round(width), h: Math.round(hgt) });
+        if (width > 0 && hgt > 0)
+          setSize({ w: Math.round(width), h: Math.round(hgt) });
       }
     });
     ro.observe(el);
@@ -254,7 +267,10 @@ export function MapView({
         const nx = cx - dx / TILE_SIZE;
         const ny = cy - dy / TILE_SIZE;
         const next = {
-          center: { lat: tileYToLat(ny, prev.zoom), lng: tileXToLng(nx, prev.zoom) },
+          center: {
+            lat: tileYToLat(ny, prev.zoom),
+            lng: tileXToLng(nx, prev.zoom),
+          },
           zoom: prev.zoom,
         };
         emitChange(next);
@@ -278,15 +294,23 @@ export function MapView({
   );
 
   // ── Drag-Pan (Pointer Events; funktioniert für Maus + Touch + Stift) ────────────────────────
-  const dragState = useRef<{ active: boolean; lastX: number; lastY: number; moved: boolean } | null>(
-    null,
-  );
+  const dragState = useRef<{
+    active: boolean;
+    lastX: number;
+    lastY: number;
+    moved: boolean;
+  } | null>(null);
   const [dragging, setDragging] = useState(false);
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     // Nur primäre Taste / Touch; Klicks auf Bedienelemente nicht als Pan werten.
     if (e.button !== 0) return;
-    dragState.current = { active: true, lastX: e.clientX, lastY: e.clientY, moved: false };
+    dragState.current = {
+      active: true,
+      lastX: e.clientX,
+      lastY: e.clientY,
+      moved: false,
+    };
     setDragging(true);
     e.currentTarget.setPointerCapture(e.pointerId);
   };
@@ -375,12 +399,30 @@ export function MapView({
         const wrappedX = ((tx % worldTiles) + worldTiles) % worldTiles;
         const left = halfW + (tx - centerX) * TILE_SIZE;
         const top = halfH + (ty - centerY) * TILE_SIZE;
-        const url = tileUrl ? buildTileUrl(tileUrl, z, wrappedX, ty, tileSubdomains) : null;
-        out.push({ key: `${z}/${tx}/${ty}`, z, x: wrappedX, y: ty, left, top, url });
+        const url = tileUrl
+          ? buildTileUrl(tileUrl, z, wrappedX, ty, tileSubdomains)
+          : null;
+        out.push({
+          key: `${z}/${tx}/${ty}`,
+          z,
+          x: wrappedX,
+          y: ty,
+          left,
+          top,
+          url,
+        });
       }
     }
     return out;
-  }, [view.center.lat, view.center.lng, view.zoom, size.w, size.h, tileUrl, tileSubdomains]);
+  }, [
+    view.center.lat,
+    view.center.lng,
+    view.zoom,
+    size.w,
+    size.h,
+    tileUrl,
+    tileSubdomains,
+  ]);
 
   // Marker-Pixelposition relativ zum Container.
   const markerPos = useMemo<{ left: number; top: number } | null>(() => {
@@ -459,7 +501,12 @@ export function MapView({
                   ev.currentTarget.style.visibility = "hidden";
                 }}
                 className="pointer-events-none absolute"
-                style={{ left: t.left, top: t.top, width: TILE_SIZE, height: TILE_SIZE }}
+                style={{
+                  left: t.left,
+                  top: t.top,
+                  width: TILE_SIZE,
+                  height: TILE_SIZE,
+                }}
               />
             ) : null,
           )}
@@ -501,7 +548,9 @@ export function MapView({
                   aria-hidden="true"
                   strokeWidth={2.25}
                 />
-                {marker?.label && <span className="sr-only">{marker.label}</span>}
+                {marker?.label && (
+                  <span className="sr-only">{marker.label}</span>
+                )}
               </div>
             ))}
 
@@ -518,7 +567,7 @@ export function MapView({
             <div className="pointer-events-none absolute inset-x-3 bottom-3 flex justify-center">
               <p
                 role="status"
-                className="pointer-events-auto max-w-md rounded-md border border-border bg-card/95 px-3 py-2 text-[12px] leading-snug text-muted-foreground shadow-md"
+                className="pointer-events-auto max-w-md rounded-md border border-border bg-card/95 px-3 py-2 text-sm leading-snug text-muted-foreground shadow-md"
               >
                 {hint}
               </p>
@@ -542,7 +591,9 @@ export function MapView({
           source.state.status !== "idle" && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-card/95 p-4">
               <ErrorState
-                title={errorTitle ?? "Kartenmaterial konnte nicht geladen werden"}
+                title={
+                  errorTitle ?? "Kartenmaterial konnte nicht geladen werden"
+                }
                 description={
                   errorDescription ??
                   source.state.message ??
@@ -583,7 +634,7 @@ export function MapView({
       </div>
 
       {/* Text-Alternative + Lizenz — macht den Karteninhalt ohne Sehkraft nutzbar (Farbe nicht allein) */}
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1 border-t border-border bg-card px-4 py-2 text-[12px]">
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1 border-t border-border bg-card px-4 py-2 text-sm">
         <dl className="min-w-0 space-y-0.5">
           <div className="flex flex-wrap gap-x-2">
             <dt id={titleId} className="text-muted-foreground">
@@ -599,7 +650,9 @@ export function MapView({
               <dt className="text-muted-foreground">
                 {marker.label ? marker.label : "Markierung"}
               </dt>
-              <dd className="font-mono text-foreground">{formatLatLng(marker)}</dd>
+              <dd className="font-mono text-foreground">
+                {formatLatLng(marker)}
+              </dd>
             </div>
           )}
         </dl>
@@ -610,9 +663,9 @@ export function MapView({
 
       {/* Bedienhinweis für Screenreader/Tastatur */}
       <p id={descId} className="sr-only">
-        Pfeiltasten verschieben den Kartenausschnitt, Plus und Minus ändern die Zoomstufe. Mit
-        gedrückter Maustaste lässt sich die Karte ziehen. Die aktuellen Koordinaten stehen als Text
-        unter der Karte.
+        Pfeiltasten verschieben den Kartenausschnitt, Plus und Minus ändern die
+        Zoomstufe. Mit gedrückter Maustaste lässt sich die Karte ziehen. Die
+        aktuellen Koordinaten stehen als Text unter der Karte.
       </p>
 
       {/* Dynamische Ansage des Kartenquellen-Zustands (laden/Fehler) über die zentrale Live-Region. */}

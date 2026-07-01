@@ -46,7 +46,12 @@ export interface CaptureResult {
 }
 
 /** Grund eines Fehlschlags — für gezielte, handlungsleitende Hinweistexte. */
-type KameraFehler = "nicht-unterstuetzt" | "verweigert" | "keine-kamera" | "belegt" | "unbekannt";
+type KameraFehler =
+  | "nicht-unterstuetzt"
+  | "verweigert"
+  | "keine-kamera"
+  | "belegt"
+  | "unbekannt";
 
 export interface CameraCaptureProps {
   /** Gewünschte Auflösung als [breite, hoehe]. Default [720, 720]. Wird als „ideal" an getUserMedia gereicht. */
@@ -232,7 +237,8 @@ export function CameraCapture({
   // Jede Statusmeldung zusätzlich über die ZENTRALE Ansage feuern (eine Wahrheit, BITV 2.2 AA).
   // Fehler-Phase = assertive (unterbricht), sonst polite (reiht ein). Die lokale sr-only-Region bleibt.
   useEffect(() => {
-    if (statusMeldung) announce(statusMeldung, phase === "fehler" ? "assertive" : "polite");
+    if (statusMeldung)
+      announce(statusMeldung, phase === "fehler" ? "assertive" : "polite");
     // Absichtlich nur auf statusMeldung lauschen — eine Meldung = eine Ansage.
   }, [statusMeldung]);
 
@@ -250,7 +256,9 @@ export function CameraCapture({
     canvas.height = hoehe;
     const ctx = canvas.getContext("2d");
     if (!ctx) {
-      setStatusMeldung("Die Aufnahme wird von diesem Browser nicht unterstützt.");
+      setStatusMeldung(
+        "Die Aufnahme wird von diesem Browser nicht unterstützt.",
+      );
       return;
     }
     // Frontkamera spiegeln, damit das Standbild der Live-Vorschau (gespiegelt) entspricht.
@@ -277,13 +285,23 @@ export function CameraCapture({
       canvas.height = img.naturalHeight;
       const ctx = canvas.getContext("2d");
       if (!ctx) {
-        onCapture?.({ blob: null, dataURL: foto, breite: img.naturalWidth, hoehe: img.naturalHeight });
+        onCapture?.({
+          blob: null,
+          dataURL: foto,
+          breite: img.naturalWidth,
+          hoehe: img.naturalHeight,
+        });
         setStatusMeldung("Foto übernommen.");
         return;
       }
       ctx.drawImage(img, 0, 0);
       const liefern = (blob: Blob | null) => {
-        onCapture?.({ blob, dataURL: foto, breite: img.naturalWidth, hoehe: img.naturalHeight });
+        onCapture?.({
+          blob,
+          dataURL: foto,
+          breite: img.naturalWidth,
+          hoehe: img.naturalHeight,
+        });
         setStatusMeldung("Foto übernommen.");
       };
       if (typeof canvas.toBlob === "function") {
@@ -334,13 +352,22 @@ export function CameraCapture({
 
   return (
     <section
-      className={cn("rounded-lg border border-border bg-card p-4 sm:p-6", className)}
+      className={cn(
+        "rounded-lg border border-border bg-card p-4 sm:p-6",
+        className,
+      )}
       aria-labelledby={titelId}
     >
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 id={titelId} className="flex items-center gap-2 text-base font-semibold text-foreground">
-            <Camera className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          <h2
+            id={titelId}
+            className="flex items-center gap-2 text-base font-semibold text-foreground"
+          >
+            <Camera
+              className="h-4 w-4 text-muted-foreground"
+              aria-hidden="true"
+            />
             {titel}
           </h2>
           <p id={hinweisId} className="mt-1 text-sm text-muted-foreground">
@@ -348,8 +375,11 @@ export function CameraCapture({
           </p>
         </div>
         {phase === "live" && (
-          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-sm border border-border bg-background px-2 py-1 text-[11px] font-medium text-status-ok">
-            <span className="h-1.5 w-1.5 rounded-full bg-status-ok" aria-hidden="true" />
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-sm border border-border bg-background px-2 py-1 text-xs font-medium text-status-ok">
+            <span
+              className="h-1.5 w-1.5 rounded-full bg-status-ok"
+              aria-hidden="true"
+            />
             Kamera aktiv
           </span>
         )}
@@ -382,12 +412,19 @@ export function CameraCapture({
 
             {/* Aufgenommenes Standbild */}
             {phase === "aufgenommen" && foto && (
-              <img src={foto} alt="Aufgenommenes Foto – Vorschau" className="absolute inset-0 h-full w-full object-cover" />
+              <img
+                src={foto}
+                alt="Aufgenommenes Foto – Vorschau"
+                className="absolute inset-0 h-full w-full object-cover"
+              />
             )}
 
             {/* Hilfslinien über der Live-Vorschau */}
             {guide && phase === "live" && (
-              <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+              <div
+                className="pointer-events-none absolute inset-0"
+                aria-hidden="true"
+              >
                 <div className="absolute left-1/2 top-[10%] h-[80%] w-[58%] -translate-x-1/2 rounded-[50%] border border-primary-foreground/60 mix-blend-difference" />
                 <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-primary-foreground/40 mix-blend-difference" />
               </div>
@@ -399,12 +436,15 @@ export function CameraCapture({
                 <Video
                   className={cn(
                     "h-7 w-7 text-muted-foreground",
-                    phase === "startet" && "animate-pulse motion-reduce:animate-none",
+                    phase === "startet" &&
+                      "animate-pulse motion-reduce:animate-none",
                   )}
                   aria-hidden="true"
                 />
                 <p className="text-sm text-muted-foreground">
-                  {phase === "startet" ? "Kamera wird gestartet …" : "Die Kamera ist noch nicht aktiv."}
+                  {phase === "startet"
+                    ? "Kamera wird gestartet …"
+                    : "Die Kamera ist noch nicht aktiv."}
                 </p>
               </div>
             )}
@@ -412,8 +452,13 @@ export function CameraCapture({
             {/* Fehler-Platzhalter in der Fläche (zusätzlich zum role=alert-Block unten) */}
             {phase === "fehler" && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center">
-                <CameraOff className="h-7 w-7 text-muted-foreground" aria-hidden="true" />
-                <p className="text-sm text-muted-foreground">{fehlerInfo?.titel}</p>
+                <CameraOff
+                  className="h-7 w-7 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <p className="text-sm text-muted-foreground">
+                  {fehlerInfo?.titel}
+                </p>
               </div>
             )}
           </div>
@@ -421,11 +466,16 @@ export function CameraCapture({
 
         {/* ── Berechtigungs-Hinweis (vor dem ersten Start) ───────────────────────────────────────── */}
         {phase === "leer" && unterstuetzt && (
-          <div className="flex items-start gap-2 rounded-md border border-border bg-background p-3 text-[12px] text-muted-foreground">
-            <ShieldQuestion className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <div className="flex items-start gap-2 rounded-md border border-border bg-background p-3 text-sm text-muted-foreground">
+            <ShieldQuestion
+              className="mt-0.5 h-4 w-4 shrink-0"
+              aria-hidden="true"
+            />
             <span>
-              Beim Start fragt der Browser nach der Erlaubnis für den Kamerazugriff. Bitte bestätigen Sie die
-              Abfrage. Es wird kein Ton aufgenommen, und die Aufnahme verlässt erst mit dem Übernehmen Ihr Gerät.
+              Beim Start fragt der Browser nach der Erlaubnis für den
+              Kamerazugriff. Bitte bestätigen Sie die Abfrage. Es wird kein Ton
+              aufgenommen, und die Aufnahme verlässt erst mit dem Übernehmen Ihr
+              Gerät.
             </span>
           </div>
         )}
@@ -441,7 +491,9 @@ export function CameraCapture({
               description={fehlerInfo.text}
               onRetry={() => void starteKamera()}
               retryLabel="Erneut versuchen"
-              {...(fallbackUploadButton ? { actions: fallbackUploadButton } : {})}
+              {...(fallbackUploadButton
+                ? { actions: fallbackUploadButton }
+                : {})}
             />
           </div>
         )}
@@ -474,22 +526,30 @@ export function CameraCapture({
           )}
 
           {/* Datei-Upload-Alternative in der Aktionsleiste (additiv, nur wenn angeboten). */}
-          {(phase === "leer" || phase === "fehler") && onFallbackFile != null && (
-            <Button type="button" variant="outline" onClick={waehleDatei}>
-              <Upload className="h-4 w-4" aria-hidden="true" />
-              {fallbackUploadLabel}
-            </Button>
-          )}
+          {(phase === "leer" || phase === "fehler") &&
+            onFallbackFile != null && (
+              <Button type="button" variant="outline" onClick={waehleDatei}>
+                <Upload className="h-4 w-4" aria-hidden="true" />
+                {fallbackUploadLabel}
+              </Button>
+            )}
 
           {phase === "startet" && (
             <Button type="button" disabled aria-busy="true">
-              <Video className="h-4 w-4 animate-pulse motion-reduce:animate-none" aria-hidden="true" />
+              <Video
+                className="h-4 w-4 animate-pulse motion-reduce:animate-none"
+                aria-hidden="true"
+              />
               Startet …
             </Button>
           )}
 
           {phase === "live" && (
-            <Button type="button" onClick={ausloesen} aria-label="Foto auslösen">
+            <Button
+              type="button"
+              onClick={ausloesen}
+              aria-label="Foto auslösen"
+            >
               <Camera className="h-4 w-4" aria-hidden="true" />
               Auslösen
             </Button>

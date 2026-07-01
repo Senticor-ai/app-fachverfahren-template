@@ -1,11 +1,16 @@
 // fachverfahren-kit/components/EntscheidungPanel — die GENERISCHE Entscheidungs-Aktion (Festsetzen/Ablehnen/Zur
-// Prüfung …). Abgeleitet 1:1 aus dem Entscheidungs-Flow der Referenz `amt.vorgang.$id.tsx` (lovable): Aktions-Karte
+// Prüfung …). Abgeleitet aus etablierten Public-Sector-UX-Mustern für die interne Fallbearbeitung: Aktions-Karte
 // mit Override-Hinweis + Audit-Protokollierung. ABER streng config-getrieben: die Buttons entstehen aus den ERLAUBTEN
 // Übergängen für (`vorgang.status`, `rolle`) — `config.statusMachine.transitions`. 4-Augen-Hinweis bei `vierAugen`,
 // Begründungs-Pflichtfeld bei `detailPflicht`. Kein Domänen-Literal — ein zweites Verfahren läuft unverändert.
 import { useState } from "react";
 import { AlertTriangle, Check, ShieldCheck, X } from "lucide-react";
-import type { LeistungConfig, Transition, Vorgang, VorgangPort } from "../types.js";
+import type {
+  LeistungConfig,
+  Transition,
+  Vorgang,
+  VorgangPort,
+} from "../types.js";
 import { cn } from "../lib/cn.js";
 import { Button } from "../ui/button.js";
 import { Textarea } from "../ui/textarea.js";
@@ -55,9 +60,11 @@ export function EntscheidungPanel<T = Record<string, unknown>>({
   // Terminalstatus oder keine erlaubten Übergänge: keine Aktionen — nur Hinweis (Referenz blendet die Karte aus).
   if (aktuellerStatus?.terminal || transitions.length === 0) {
     return (
-      <section className={cn("rounded-md border border-border bg-card p-5", className)}>
+      <section
+        className={cn("rounded-md border border-border bg-card p-5", className)}
+      >
         <h2 className="text-sm font-semibold text-foreground">Entscheidung</h2>
-        <p className="mt-1 text-[12px] text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           {aktuellerStatus?.terminal
             ? `Vorgang abgeschlossen (${aktuellerStatus.label}) — keine weiteren Übergänge.`
             : "Für Ihre Rolle sind in diesem Status keine Aktionen verfügbar."}
@@ -83,9 +90,11 @@ export function EntscheidungPanel<T = Record<string, unknown>>({
   }
 
   return (
-    <section className={cn("rounded-md border border-border bg-card p-5", className)}>
+    <section
+      className={cn("rounded-md border border-border bg-card p-5", className)}
+    >
       <h2 className="text-sm font-semibold text-foreground">Entscheidung</h2>
-      <p className="mt-1 text-[12px] text-muted-foreground">
+      <p className="mt-1 text-sm text-muted-foreground">
         Ein Override des KI-Vorschlags wird im Audit-Trail protokolliert.
       </p>
 
@@ -94,7 +103,12 @@ export function EntscheidungPanel<T = Record<string, unknown>>({
           const Icon = transitionIcon(toneOf(t.to));
           const tone = toneOf(t.to);
           // Primär = positive/terminal-ok-Aktion; Ablehnung (block) = outline; sonst sekundär.
-          const variant = tone === "ok" ? "default" : tone === "block" ? "outline" : "secondary";
+          const variant =
+            tone === "ok"
+              ? "default"
+              : tone === "block"
+                ? "outline"
+                : "secondary";
 
           return (
             <div key={`${t.from}-${t.to}`} className="space-y-2">
@@ -108,7 +122,9 @@ export function EntscheidungPanel<T = Record<string, unknown>>({
                     rows={3}
                     placeholder={`Begründung für "${t.label}" …`}
                     value={detail[t.to] ?? ""}
-                    onChange={(e) => setDetail((d) => ({ ...d, [t.to]: e.target.value }))}
+                    onChange={(e) =>
+                      setDetail((d) => ({ ...d, [t.to]: e.target.value }))
+                    }
                     className="text-sm"
                   />
                 </div>
@@ -124,9 +140,13 @@ export function EntscheidungPanel<T = Record<string, unknown>>({
               </Button>
 
               {t.vierAugen && (
-                <p className="flex items-center gap-1.5 text-[11px] text-status-warn">
-                  <ShieldCheck className="h-3 w-3 shrink-0" aria-hidden="true" />
-                  4-Augen-Prinzip: Bestätigung durch eine zweite berechtigte Person erforderlich.
+                <p className="flex items-center gap-1.5 text-xs text-status-warn">
+                  <ShieldCheck
+                    className="h-3 w-3 shrink-0"
+                    aria-hidden="true"
+                  />
+                  4-Augen-Prinzip: Bestätigung durch eine zweite berechtigte
+                  Person erforderlich.
                 </p>
               )}
             </div>
@@ -137,9 +157,12 @@ export function EntscheidungPanel<T = Record<string, unknown>>({
       {fehler && (
         <p
           role="alert"
-          className="mt-4 flex items-center gap-1.5 rounded-md border border-status-block/30 bg-status-block-soft px-3 py-2 text-[12px] text-foreground"
+          className="mt-4 flex items-center gap-1.5 rounded-md border border-status-block/30 bg-status-block-soft px-3 py-2 text-sm text-foreground"
         >
-          <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-status-block" aria-hidden="true" />
+          <AlertTriangle
+            className="h-3.5 w-3.5 shrink-0 text-status-block"
+            aria-hidden="true"
+          />
           {fehler}
         </p>
       )}

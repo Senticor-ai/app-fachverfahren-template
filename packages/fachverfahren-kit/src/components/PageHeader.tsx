@@ -37,27 +37,41 @@ export function PageHeader({
   const Heading = as;
 
   return (
-    <header className={cn("flex flex-col gap-2 border-b border-border pb-4", className)}>
+    <header
+      className={cn(
+        "flex flex-col gap-3 border-b border-border pb-4",
+        className,
+      )}
+    >
       {breadcrumb}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <Heading
-          className={cn(
-            "min-w-0 font-semibold tracking-tight text-foreground",
-            as === "h1" ? "text-lg" : "text-base",
+        {/* Titel + Beschreibung als enger interner Block (space-y-1); der äußere
+            Bottom-Rhythmus (mb-6) liegt beim Aufrufer, damit der Kopf einheitlich sitzt. */}
+        <div className="min-w-0 space-y-1">
+          <Heading
+            className={cn(
+              "min-w-0 font-semibold tracking-tight text-foreground",
+              // Spec-Typo-Skala: h1 = Seitentitel (24px), h2 = Sektionstitel (18px).
+              as === "h1" ? "text-2xl" : "text-lg",
+            )}
+          >
+            {title}
+          </Heading>
+
+          {description && (
+            <p className="max-w-prose text-sm text-muted-foreground">
+              {description}
+            </p>
           )}
-        >
-          {title}
-        </Heading>
+        </div>
 
         {actions && (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {actions}
+          </div>
         )}
       </div>
-
-      {description && (
-        <p className="max-w-prose text-sm text-muted-foreground">{description}</p>
-      )}
     </header>
   );
 }

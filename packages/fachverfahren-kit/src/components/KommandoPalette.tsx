@@ -47,11 +47,7 @@ export interface KommandoPaletteProps {
 // ── Such-Filter (akzentschonend, dep-frei) ─────────────────────────────────────────────────────
 /** Diakritika entfernen + lower-case, damit „Übergang" auch bei Eingabe „ubergang" matcht. */
 function normalisieren(text: string): string {
-  return text
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .trim();
+  return text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 }
 
 /** Filtert die Aktionen anhand der Eingabe (Treffer in Label ODER Hinweis). Leere Eingabe → alle. */
@@ -124,7 +120,9 @@ export function KommandoPalette({
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const istPalettenTaste =
-        (e.metaKey || e.ctrlKey) && !e.altKey && (e.key === "k" || e.key === "K");
+        (e.metaKey || e.ctrlKey) &&
+        !e.altKey &&
+        (e.key === "k" || e.key === "K");
       if (istPalettenTaste) {
         e.preventDefault();
         // Toggle: erneutes ⌘K schließt die offene Palette wieder.
@@ -154,7 +152,9 @@ export function KommandoPalette({
     if (!offen) return;
     const list = listRef.current;
     if (!list) return;
-    const el = list.querySelector<HTMLElement>(`#${CSS.escape(optionId(aktivIdx))}`);
+    const el = list.querySelector<HTMLElement>(
+      `#${CSS.escape(optionId(aktivIdx))}`,
+    );
     el?.scrollIntoView({ block: "nearest" });
     // optionId ist über baseId stabil; aktivIdx/offen treiben den Effekt.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -177,11 +177,17 @@ export function KommandoPalette({
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
-          setAktivIdx((i) => (treffer.length === 0 ? 0 : (i + 1) % treffer.length));
+          setAktivIdx((i) =>
+            treffer.length === 0 ? 0 : (i + 1) % treffer.length,
+          );
           break;
         case "ArrowUp":
           e.preventDefault();
-          setAktivIdx((i) => (treffer.length === 0 ? 0 : (i - 1 + treffer.length) % treffer.length));
+          setAktivIdx((i) =>
+            treffer.length === 0
+              ? 0
+              : (i - 1 + treffer.length) % treffer.length,
+          );
           break;
         case "Home":
           e.preventDefault();
@@ -247,7 +253,10 @@ export function KommandoPalette({
 
         {/* Such-Zeile */}
         <div className="flex items-center gap-2 border-b border-border px-4">
-          <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <Search
+            className="h-4 w-4 shrink-0 text-muted-foreground"
+            aria-hidden="true"
+          />
           <input
             ref={inputRef}
             id={inputId}
@@ -272,7 +281,7 @@ export function KommandoPalette({
               "placeholder:text-muted-foreground",
             )}
           />
-          <kbd className="hidden shrink-0 select-none rounded border border-border bg-secondary px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline-block">
+          <kbd className="hidden shrink-0 select-none rounded border border-border bg-secondary px-1.5 py-0.5 font-mono text-xs text-muted-foreground sm:inline-block">
             Esc
           </kbd>
         </div>
@@ -312,19 +321,23 @@ export function KommandoPalette({
                   }}
                   className={cn(
                     "flex min-h-[2.5rem] cursor-pointer items-center justify-between gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                    aktiv ? "bg-accent/15 text-foreground ring-1 ring-inset ring-accent/50" : "text-foreground",
+                    aktiv
+                      ? "bg-accent/15 text-foreground ring-1 ring-inset ring-accent/50"
+                      : "text-foreground",
                   )}
                 >
                   <span className="min-w-0">
-                    <span className="block truncate font-medium">{aktion.label}</span>
+                    <span className="block truncate font-medium">
+                      {aktion.label}
+                    </span>
                     {aktion.hinweis && (
-                      <span className="block truncate text-[12px] text-muted-foreground">
+                      <span className="block truncate text-sm text-muted-foreground">
                         {aktion.hinweis}
                       </span>
                     )}
                   </span>
                   {aktiv && (
-                    <span className="inline-flex shrink-0 items-center gap-1 text-[10px] text-muted-foreground">
+                    <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
                       <CornerDownLeft className="h-3 w-3" aria-hidden="true" />
                       <span className="hidden sm:inline">Enter</span>
                     </span>
@@ -336,13 +349,19 @@ export function KommandoPalette({
         </ul>
 
         {/* Fußzeile mit Tastatur-Hinweisen */}
-        <div className="flex items-center justify-between gap-3 border-t border-border bg-secondary/40 px-4 py-2 text-[11px] text-muted-foreground">
+        <div className="flex items-center justify-between gap-3 border-t border-border bg-secondary/40 px-4 py-2 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
-            <kbd className="rounded border border-border bg-card px-1 py-0.5 font-mono text-[10px]">↑</kbd>
-            <kbd className="rounded border border-border bg-card px-1 py-0.5 font-mono text-[10px]">↓</kbd>
+            <kbd className="rounded border border-border bg-card px-1 py-0.5 font-mono text-xs">
+              ↑
+            </kbd>
+            <kbd className="rounded border border-border bg-card px-1 py-0.5 font-mono text-xs">
+              ↓
+            </kbd>
             <span>Navigieren</span>
             <span aria-hidden="true">·</span>
-            <kbd className="rounded border border-border bg-card px-1 py-0.5 font-mono text-[10px]">↵</kbd>
+            <kbd className="rounded border border-border bg-card px-1 py-0.5 font-mono text-xs">
+              ↵
+            </kbd>
             <span>Ausführen</span>
           </span>
           <span aria-hidden="true">{trefferText}</span>

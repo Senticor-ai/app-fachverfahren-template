@@ -1,4 +1,4 @@
-// shadcn/ui Resizable (react-resizable-panels) — 1:1 aus der verifizierten Referenz-UX (sift ReviewWorkspace).
+// shadcn/ui Resizable (react-resizable-panels) — aus etablierten Public-Sector-UX-Mustern abgeleitet.
 // Master-Detail-Evidence-Layout: links Antragsdaten, rechts getabte Belege — frei ziehbar (a11y über den Handle-Griff).
 import * as React from "react";
 import { GripVertical } from "lucide-react";

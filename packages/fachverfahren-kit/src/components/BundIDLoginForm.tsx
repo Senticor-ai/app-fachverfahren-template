@@ -9,7 +9,13 @@
 // Vorbefüllung des optionalen Demo-Logins aus `vorbefuellung`. KEINE echten Secrets/Endpunkte/Client-IDs
 // im Code — der synthetische `sub` wird lokal erzeugt. Barrierefrei (BITV 2.0 / WCAG 2.2 AA).
 import { useEffect, useId, useRef, useState } from "react";
-import { BadgeCheck, Fingerprint, Info, Loader2, ShieldCheck } from "lucide-react";
+import {
+  BadgeCheck,
+  Fingerprint,
+  Info,
+  Loader2,
+  ShieldCheck,
+} from "lucide-react";
 
 import { cn } from "../lib/utils.js";
 import { Button } from "../ui/button.js";
@@ -86,7 +92,10 @@ export function BundIDLoginForm({
 
   /** Simuliert den OIDC-Redirect → Callback und liefert am Ende ein synthetisches Profil an `onLogin`.
    *  In PROD ersetzt `react-oidc-context` diesen Ablauf (signinRedirect → onSigninCallback). */
-  function starteBundIDLogin(profilTeil?: { vorname?: string; nachname?: string }): void {
+  function starteBundIDLogin(profilTeil?: {
+    vorname?: string;
+    nachname?: string;
+  }): void {
     if (beschaeftigt) return;
     setDemoFehler(null);
     setPhase("redirect");
@@ -99,9 +108,15 @@ export function BundIDLoginForm({
 
     const t2 = setTimeout(() => {
       const profil: BundIDProfil = {
-        sub: syntheticSub(`${profilTeil?.vorname ?? ""}${profilTeil?.nachname ?? ""}`),
-        ...(profilTeil?.vorname?.trim() ? { vorname: profilTeil.vorname.trim() } : {}),
-        ...(profilTeil?.nachname?.trim() ? { nachname: profilTeil.nachname.trim() } : {}),
+        sub: syntheticSub(
+          `${profilTeil?.vorname ?? ""}${profilTeil?.nachname ?? ""}`,
+        ),
+        ...(profilTeil?.vorname?.trim()
+          ? { vorname: profilTeil.vorname.trim() }
+          : {}),
+        ...(profilTeil?.nachname?.trim()
+          ? { nachname: profilTeil.nachname.trim() }
+          : {}),
       };
       setStatusText("Anmeldung erfolgreich.");
       onLogin(profil);
@@ -138,8 +153,8 @@ export function BundIDLoginForm({
           </div>
           <CardDescription>
             Melden Sie sich sicher mit Ihrem BundID-Konto an
-            {kommune ? <> bei {kommune}</> : null}. Ihre Identität wird über das BundID-Servicekonto
-            bestätigt.
+            {kommune ? <> bei {kommune}</> : null}. Ihre Identität wird über das
+            BundID-Servicekonto bestätigt.
           </CardDescription>
         </CardHeader>
 
@@ -155,7 +170,10 @@ export function BundIDLoginForm({
               aria-describedby={statusId}
             >
               {beschaeftigt ? (
-                <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                <Loader2
+                  className="h-4 w-4 animate-spin motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
               ) : (
                 <Fingerprint className="h-4 w-4" aria-hidden="true" />
               )}
@@ -166,11 +184,15 @@ export function BundIDLoginForm({
                   : "Mit BundID anmelden"}
             </Button>
 
-            <p className="flex items-start gap-1.5 text-[12px] text-muted-foreground">
-              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
+              <Info
+                className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                aria-hidden="true"
+              />
               <span>
-                Anmeldung mit Online-Ausweis (eID), ELSTER oder Ihrem BundID-Servicekonto. Es werden
-                nur die für den Vorgang erforderlichen Angaben übermittelt.
+                Anmeldung mit Online-Ausweis (eID), ELSTER oder Ihrem
+                BundID-Servicekonto. Es werden nur die für den Vorgang
+                erforderlichen Angaben übermittelt.
               </span>
             </p>
           </div>
@@ -184,7 +206,7 @@ export function BundIDLoginForm({
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <Separator className="flex-1" />
-              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              <span className="text-xs uppercase tracking-wide text-muted-foreground">
                 oder
               </span>
               <Separator className="flex-1" />
@@ -210,14 +232,17 @@ export function BundIDLoginForm({
                 aria-label="Demo-Anmeldung mit Namenseingabe"
                 className="space-y-4 rounded-md border border-border bg-background p-4"
               >
-                <p className="text-[12px] text-muted-foreground">
-                  Nur zum Ausprobieren ohne BundID-Konto. Es wird ein synthetisches Profil erzeugt —
-                  keine echte Identitätsprüfung.
+                <p className="text-sm text-muted-foreground">
+                  Nur zum Ausprobieren ohne BundID-Konto. Es wird ein
+                  synthetisches Profil erzeugt — keine echte Identitätsprüfung.
                 </p>
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <Label htmlFor={vornameId} className="text-[12px] font-medium text-muted-foreground">
+                    <Label
+                      htmlFor={vornameId}
+                      className="text-sm font-medium text-muted-foreground"
+                    >
                       Vorname
                     </Label>
                     <Input
@@ -230,7 +255,10 @@ export function BundIDLoginForm({
                     />
                   </div>
                   <div>
-                    <Label htmlFor={nachnameId} className="text-[12px] font-medium text-muted-foreground">
+                    <Label
+                      htmlFor={nachnameId}
+                      className="text-sm font-medium text-muted-foreground"
+                    >
                       Nachname
                     </Label>
                     <Input
@@ -245,7 +273,11 @@ export function BundIDLoginForm({
                       aria-required="true"
                       aria-invalid={demoFehler ? true : undefined}
                       aria-describedby={demoFehler ? demoErrorId : undefined}
-                      className={cn("mt-1", demoFehler && "border-status-block focus-visible:ring-status-block")}
+                      className={cn(
+                        "mt-1",
+                        demoFehler &&
+                          "border-status-block focus-visible:ring-status-block",
+                      )}
                       disabled={beschaeftigt}
                     />
                   </div>
@@ -255,7 +287,7 @@ export function BundIDLoginForm({
                   <p
                     id={demoErrorId}
                     role="alert"
-                    className="flex items-center gap-1.5 text-[12px] text-status-block"
+                    className="flex items-center gap-1.5 text-sm text-status-block"
                   >
                     {demoFehler}
                   </p>
@@ -275,7 +307,10 @@ export function BundIDLoginForm({
                   </Button>
                   <Button type="submit" disabled={beschaeftigt}>
                     {beschaeftigt ? (
-                      <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                      <Loader2
+                        className="h-4 w-4 animate-spin motion-reduce:animate-none"
+                        aria-hidden="true"
+                      />
                     ) : (
                       <BadgeCheck className="h-4 w-4" aria-hidden="true" />
                     )}
@@ -288,8 +323,9 @@ export function BundIDLoginForm({
         </CardContent>
       </Card>
 
-      <p className="mt-4 max-w-sm text-center text-[11px] text-muted-foreground">
-        Ihre Anmeldedaten werden ausschließlich zur Bearbeitung Ihres Anliegens verwendet
+      <p className="mt-4 max-w-sm text-center text-xs text-muted-foreground">
+        Ihre Anmeldedaten werden ausschließlich zur Bearbeitung Ihres Anliegens
+        verwendet
         {kommune ? <> ({kommune})</> : null}.
       </p>
     </section>

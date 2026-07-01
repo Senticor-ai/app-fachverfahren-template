@@ -60,7 +60,8 @@ const variantIcon: Record<NonNullable<BannerVariant>, LucideIcon> = {
 type BannerVariant = VariantProps<typeof bannerVariants>["variant"];
 
 export interface BannerProps
-  extends Omit<React.HTMLAttributes<HTMLDivElement>, "title">,
+  extends
+    Omit<React.HTMLAttributes<HTMLDivElement>, "title">,
     VariantProps<typeof bannerVariants> {
   /** Optionaler fettgedruckter Titel über dem Fließtext. */
   title?: React.ReactNode;
@@ -99,7 +100,8 @@ export const Banner = React.forwardRef<HTMLDivElement, BannerProps>(
     const aktiveVariante = (variant ?? "info") as NonNullable<BannerVariant>;
     // error/warn = dringlich → assertive/alert; info/success = ruhig → polite/status.
     const dringlich = aktiveVariante === "error" || aktiveVariante === "warn";
-    const IconComp = icon === null ? null : icon ?? variantIcon[aktiveVariante];
+    const IconComp =
+      icon === null ? null : (icon ?? variantIcon[aktiveVariante]);
 
     return (
       <div
@@ -111,7 +113,10 @@ export const Banner = React.forwardRef<HTMLDivElement, BannerProps>(
       >
         {IconComp && (
           <IconComp
-            className={cn("mt-0.5 h-5 w-5 shrink-0", iconToneClass[aktiveVariante])}
+            className={cn(
+              "mt-0.5 h-5 w-5 shrink-0",
+              iconToneClass[aktiveVariante],
+            )}
             aria-hidden="true"
           />
         )}
@@ -131,7 +136,9 @@ export const Banner = React.forwardRef<HTMLDivElement, BannerProps>(
             </div>
           )}
           {actions && (
-            <div className="mt-3 flex flex-wrap items-center gap-2">{actions}</div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {actions}
+            </div>
           )}
         </div>
 
@@ -143,7 +150,8 @@ export const Banner = React.forwardRef<HTMLDivElement, BannerProps>(
             className={cn(
               "-mr-1 -mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground",
               "transition-colors duration-150 ease-out hover:bg-accent hover:text-accent-foreground motion-reduce:transition-none",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+              // Kanonisches Fokus-Rezept (Spec 3.2): 3px weicher Ring, EINE Quelle über alle interaktiven Elemente.
+              "outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
             )}
           >
             <X className="h-4 w-4" aria-hidden="true" />

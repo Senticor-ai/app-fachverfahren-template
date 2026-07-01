@@ -31,7 +31,10 @@ export interface ReportingPanelProps<T = Record<string, unknown>> {
 // ── Aggregat-Helfer (rein, deterministisch — kein Date.now()/Random) ─────────────────────────────
 
 /** Zählt Vorgänge je StatusDef-Schlüssel über den GESAMTEN Bestand (auch leere Status werden mit 0 geführt). */
-function zaehleJeStatus<T>(vorgaenge: Vorgang<T>[], states: StatusDef[]): Record<string, number> {
+function zaehleJeStatus<T>(
+  vorgaenge: Vorgang<T>[],
+  states: StatusDef[],
+): Record<string, number> {
   const m: Record<string, number> = {};
   for (const s of states) m[s.key] = 0;
   for (const v of vorgaenge) m[v.status] = (m[v.status] ?? 0) + 1;
@@ -39,7 +42,11 @@ function zaehleJeStatus<T>(vorgaenge: Vorgang<T>[], states: StatusDef[]): Record
 }
 
 /** Summiert alle gesetzten Festsetzungs-Beträge. Einheit aus der ersten vorhandenen Berechnung (generisch). */
-function summiereBetraege<T>(vorgaenge: Vorgang<T>[]): { summe: number; einheit: string; anzahl: number } {
+function summiereBetraege<T>(vorgaenge: Vorgang<T>[]): {
+  summe: number;
+  einheit: string;
+  anzahl: number;
+} {
   let summe = 0;
   let einheit = "";
   let anzahl = 0;
@@ -53,7 +60,10 @@ function summiereBetraege<T>(vorgaenge: Vorgang<T>[]): { summe: number; einheit:
 }
 
 /** KI-autonom-Quote: Anteil der Vorgänge mit Konfidenz >= Schwelle UND ohne Flags am Gesamtbestand. */
-function kiAutonomQuote<T>(vorgaenge: Vorgang<T>[], schwelle: number): { autonom: number; quote: number } {
+function kiAutonomQuote<T>(
+  vorgaenge: Vorgang<T>[],
+  schwelle: number,
+): { autonom: number; quote: number } {
   if (vorgaenge.length === 0) return { autonom: 0, quote: 0 };
   let autonom = 0;
   for (const v of vorgaenge) {
@@ -67,12 +77,17 @@ function kiAutonomQuote<T>(vorgaenge: Vorgang<T>[], schwelle: number): { autonom
 /** Betrag inkl. Einheit formatieren (Euro-Einheiten als Währung, sonst Zahl + Einheit) — leistungs-agnostisch. */
 function formatBetrag(betrag: number, einheit: string): string {
   if (einheit && /eur/i.test(einheit)) {
-    const wert = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(betrag);
+    const wert = new Intl.NumberFormat("de-DE", {
+      style: "currency",
+      currency: "EUR",
+    }).format(betrag);
     // Periodizität (z.B. "EUR/Jahr") als Suffix erhalten, ohne sie zu erfinden.
     const suffix = einheit.replace(/^\s*eur\s*\/?\s*/i, "");
     return suffix ? `${wert} / ${suffix}` : wert;
   }
-  const zahl = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2 }).format(betrag);
+  const zahl = new Intl.NumberFormat("de-DE", {
+    maximumFractionDigits: 2,
+  }).format(betrag);
   return einheit ? `${zahl} ${einheit}` : zahl;
 }
 
@@ -101,7 +116,10 @@ function csvZelle(wert: string): string {
 }
 
 /** Baut den CSV-Text aus den Vorgängen (Spalten: vorgangsnummer/status/betrag/eingang) — Semikolon-getrennt (DE-Excel). */
-function baueCsv<T>(vorgaenge: Vorgang<T>[], statusLabel: Record<string, string>): string {
+function baueCsv<T>(
+  vorgaenge: Vorgang<T>[],
+  statusLabel: Record<string, string>,
+): string {
   const kopf = ["vorgangsnummer", "status", "betrag", "eingang"];
   const zeilen = vorgaenge.map((v) => {
     const betrag = v.berechnung ? String(v.berechnung.betrag) : "";
@@ -110,15 +128,26 @@ function baueCsv<T>(vorgaenge: Vorgang<T>[], statusLabel: Record<string, string>
       statusLabel[v.status] ?? v.status,
       betrag,
       v.eingangIso,
-    ].map(csvZelle).join(";");
+    ]
+      .map(csvZelle)
+      .join(";");
   });
   // Voranstehendes BOM, damit Excel UTF-8 (Umlaute) korrekt erkennt.
   return "﻿" + [kopf.join(";"), ...zeilen].join("\r\n");
 }
 
 /** Erzeugt den CSV-Blob und löst den Download aus — vollständig dep-frei, ohne Seiteneffekt im SSR. */
-function exportiereCsv<T>(vorgaenge: Vorgang<T>[], statusLabel: Record<string, string>, dateibasis: string): void {
-  if (typeof document === "undefined" || typeof URL === "undefined" || typeof Blob === "undefined") return;
+function exportiereCsv<T>(
+  vorgaenge: Vorgang<T>[],
+  statusLabel: Record<string, string>,
+  dateibasis: string,
+): void {
+  if (
+    typeof document === "undefined" ||
+    typeof URL === "undefined" ||
+    typeof Blob === "undefined"
+  )
+    return;
   const csv = baueCsv(vorgaenge, statusLabel);
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -145,8 +174,13 @@ export function ReportingPanel<T = Record<string, unknown>>({
   const { announce } = useStatusRegion();
   React.useEffect(() => {
     if (loading) announce("Reporting wird geladen.", "polite");
-    else if (gesamt === 0) announce("Reporting geladen. Noch keine Vorgänge im Bestand.", "polite");
-    else announce(`Reporting geladen. ${gesamt} ${gesamt === 1 ? "Vorgang" : "Vorgänge"} ausgewertet.`, "polite");
+    else if (gesamt === 0)
+      announce("Reporting geladen. Noch keine Vorgänge im Bestand.", "polite");
+    else
+      announce(
+        `Reporting geladen. ${gesamt} ${gesamt === 1 ? "Vorgang" : "Vorgänge"} ausgewertet.`,
+        "polite",
+      );
   }, [announce, loading, gesamt]);
 
   const statusLabel = useMemo(() => {
@@ -155,16 +189,23 @@ export function ReportingPanel<T = Record<string, unknown>>({
     return m;
   }, [states]);
 
-  const countByStatus = useMemo(() => zaehleJeStatus(vorgaenge, states), [vorgaenge, states]);
+  const countByStatus = useMemo(
+    () => zaehleJeStatus(vorgaenge, states),
+    [vorgaenge, states],
+  );
   const maxCount = useMemo(
-    () => states.reduce((max, s) => Math.max(max, countByStatus[s.key] ?? 0), 0),
+    () =>
+      states.reduce((max, s) => Math.max(max, countByStatus[s.key] ?? 0), 0),
     [states, countByStatus],
   );
 
   const betraege = useMemo(() => summiereBetraege(vorgaenge), [vorgaenge]);
 
   const schwelle = config.ki?.schwelleAutonom ?? 1;
-  const ki = useMemo(() => kiAutonomQuote(vorgaenge, schwelle), [vorgaenge, schwelle]);
+  const ki = useMemo(
+    () => kiAutonomQuote(vorgaenge, schwelle),
+    [vorgaenge, schwelle],
+  );
 
   // Ton → Balkenfarbe (rein visuell über die vorhandenen Status-Tokens, kein Fach-Inhalt).
   const toneClass: Record<StatusDef["tone"], string> = {
@@ -178,10 +219,17 @@ export function ReportingPanel<T = Record<string, unknown>>({
   // ── Ladezustand: layout-treue Skeletons (kein Layout-Shift), Ansage via StatusRegion ──────────────
   if (loading) {
     return (
-      <section aria-labelledby="reporting-titel" aria-busy="true" className="mx-auto w-full max-w-5xl px-6 py-8">
+      <section
+        aria-labelledby="reporting-titel"
+        aria-busy="true"
+        className="mx-auto w-full max-w-5xl px-6 py-8"
+      >
         <div className="flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-foreground" aria-hidden="true" />
-          <h1 id="reporting-titel" className="text-2xl font-semibold text-foreground">
+          <h1
+            id="reporting-titel"
+            className="text-2xl font-semibold text-foreground"
+          >
             Reporting für die Aufsicht
           </h1>
         </div>
@@ -199,10 +247,16 @@ export function ReportingPanel<T = Record<string, unknown>>({
   // ── Leerzustand: ein ruhiger EmptyState tritt an die Stelle der gesamten Auswertung ───────────────
   if (gesamt === 0) {
     return (
-      <section aria-labelledby="reporting-titel" className="mx-auto w-full max-w-5xl px-6 py-8">
+      <section
+        aria-labelledby="reporting-titel"
+        className="mx-auto w-full max-w-5xl px-6 py-8"
+      >
         <div className="flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-foreground" aria-hidden="true" />
-          <h1 id="reporting-titel" className="text-2xl font-semibold text-foreground">
+          <h1
+            id="reporting-titel"
+            className="text-2xl font-semibold text-foreground"
+          >
             Reporting für die Aufsicht
           </h1>
         </div>
@@ -219,18 +273,25 @@ export function ReportingPanel<T = Record<string, unknown>>({
   return (
     // Root ist eine `section` (KEIN `main`): die FachverfahrenShell stellt bereits den `main`-Landmark
     // bereit — ein zweites `main` wäre ein verschachtelter Landmark (ungültiges HTML, WCAG 1.3.1/BITV).
-    <section aria-labelledby="reporting-titel" className="mx-auto w-full max-w-5xl px-6 py-8">
+    <section
+      aria-labelledby="reporting-titel"
+      className="mx-auto w-full max-w-5xl px-6 py-8"
+    >
       {/* Kopf */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-foreground" aria-hidden="true" />
-            <h1 id="reporting-titel" className="text-2xl font-semibold text-foreground">
+            <h1
+              id="reporting-titel"
+              className="text-2xl font-semibold text-foreground"
+            >
               Reporting für die Aufsicht
             </h1>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            {gesamt} {gesamt === 1 ? "Vorgang" : "Vorgänge"} · {config.label} · {config.kommune}
+            {gesamt} {gesamt === 1 ? "Vorgang" : "Vorgänge"} · {config.label} ·{" "}
+            {config.kommune}
           </p>
         </div>
         <Button
@@ -247,7 +308,10 @@ export function ReportingPanel<T = Record<string, unknown>>({
       </div>
 
       {/* KPI-Karten */}
-      <section aria-label="Kennzahlen" className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <section
+        aria-label="Kennzahlen"
+        className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+      >
         <KpiKarte
           titel="Vorgänge gesamt"
           wert={new Intl.NumberFormat("de-DE").format(gesamt)}
@@ -255,7 +319,11 @@ export function ReportingPanel<T = Record<string, unknown>>({
         />
         <KpiKarte
           titel="Summe Festsetzungen"
-          wert={betraege.anzahl > 0 ? formatBetrag(betraege.summe, betraege.einheit) : "—"}
+          wert={
+            betraege.anzahl > 0
+              ? formatBetrag(betraege.summe, betraege.einheit)
+              : "—"
+          }
           sub={
             betraege.anzahl > 0
               ? `aus ${betraege.anzahl} ${betraege.anzahl === 1 ? "Festsetzung" : "Festsetzungen"}`
@@ -270,7 +338,9 @@ export function ReportingPanel<T = Record<string, unknown>>({
               ? `${ki.autonom} von ${gesamt} · Konfidenz ≥ ${prozent(schwelle)} %, ohne Hinweise`
               : "kein Bestand"
           }
-          icon={<Sparkles className="h-4 w-4 text-status-info" aria-hidden="true" />}
+          icon={
+            <Sparkles className="h-4 w-4 text-status-info" aria-hidden="true" />
+          }
         />
       </section>
 
@@ -281,23 +351,33 @@ export function ReportingPanel<T = Record<string, unknown>>({
         </CardHeader>
         <CardContent>
           {gesamt === 0 ? (
-            <p className="text-sm text-muted-foreground">Noch keine Vorgänge im Bestand.</p>
+            <p className="text-sm text-muted-foreground">
+              Noch keine Vorgänge im Bestand.
+            </p>
           ) : (
             <>
               {/* Textalternative zum Diagramm: Hinweis auf den tabellarischen Fallback (WCAG 1.1.1).
                   Sichtbar UND nicht nur über Farbe — assistive Technik erhält dieselben Daten als Tabelle. */}
               <p className="mb-3 text-xs text-muted-foreground">
-                Balkendiagramm der Statusverteilung. Eine gleichwertige Datentabelle steht für Screenreader zur Verfügung.
+                Balkendiagramm der Statusverteilung. Eine gleichwertige
+                Datentabelle steht für Screenreader zur Verfügung.
               </p>
               {/* Visuelle Balken — pro Balken eine Text-Alternative (aria-hidden auf der Grafik, Text sichtbar). */}
               <ul className="grid gap-3" aria-hidden="true">
                 {states.map((s) => {
                   const count = countByStatus[s.key] ?? 0;
-                  const breite = maxCount > 0 ? Math.round((count / maxCount) * 100) : 0;
+                  const breite =
+                    maxCount > 0 ? Math.round((count / maxCount) * 100) : 0;
                   const anteil = gesamt > 0 ? prozent(count / gesamt) : 0;
                   return (
-                    <li key={s.key} className="grid grid-cols-[10rem_1fr_auto] items-center gap-3">
-                      <span className="truncate text-sm text-foreground" title={s.label}>
+                    <li
+                      key={s.key}
+                      className="grid grid-cols-[10rem_1fr_auto] items-center gap-3"
+                    >
+                      <span
+                        className="truncate text-sm text-foreground"
+                        title={s.label}
+                      >
                         {s.label}
                       </span>
                       <span className="relative block h-2.5 overflow-hidden rounded-full bg-secondary">
@@ -320,7 +400,8 @@ export function ReportingPanel<T = Record<string, unknown>>({
               {/* Zugänglicher Fallback: dieselben Daten als echte Tabelle, nur für Screenreader. */}
               <table className="sr-only">
                 <caption>
-                  Verteilung der {gesamt} Vorgänge je Status, mit absoluter Anzahl und Anteil am Gesamtbestand.
+                  Verteilung der {gesamt} Vorgänge je Status, mit absoluter
+                  Anzahl und Anteil am Gesamtbestand.
                 </caption>
                 <thead>
                   <tr>
@@ -349,9 +430,9 @@ export function ReportingPanel<T = Record<string, unknown>>({
       </Card>
 
       {/* Export-Hinweis (Begründung der Spalten — für die Aufsicht nachvollziehbar) */}
-      <p className="mt-4 text-[11px] text-muted-foreground">
-        Der CSV-Export enthält je Vorgang die Spalten Vorgangsnummer, Status, Betrag und Eingang
-        (Semikolon-getrennt, UTF-8). Stand der Auswertung:{" "}
+      <p className="mt-4 text-xs text-muted-foreground">
+        Der CSV-Export enthält je Vorgang die Spalten Vorgangsnummer, Status,
+        Betrag und Eingang (Semikolon-getrennt, UTF-8). Stand der Auswertung:{" "}
         {gesamt > 0 ? eingangText(neuesterEingang(vorgaenge)) : "—"}.
       </p>
     </section>
@@ -381,10 +462,14 @@ function KpiKarte({
     <Card>
       <CardContent className="p-5">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{titel}</span>
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">
+            {titel}
+          </span>
           {icon}
         </div>
-        <div className="mt-2 text-2xl font-semibold tabular-nums text-foreground">{wert}</div>
+        <div className="mt-2 text-2xl font-semibold tabular-nums text-foreground">
+          {wert}
+        </div>
         <div className="mt-1 text-xs text-muted-foreground">{sub}</div>
       </CardContent>
     </Card>

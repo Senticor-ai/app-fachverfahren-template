@@ -79,6 +79,16 @@
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-ring: var(--ring);
+
+  /* Dedizierte Feld-Fläche — hebt Inputs klar von bg-card/bg-background ab. */
+  --color-input-bg: var(--input-bg);
+
+  /* Elevation / Shadow — seriös-flache, abgestufte Skala (Spec 3.1).
+     Zuordnung: Card/Antragscontainer = sm, Popover/Dropdown/Dialog = md, Toast/Sheet = lg. */
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
 }
 
 :root {
@@ -116,6 +126,23 @@
   --border: hsl(220 15% 88%);
   --input: hsl(220 15% 88%);
   --ring: hsl(215 60% 32%);
+
+  /* Feld-Fläche: weiß im Light-Modus → hebt Inputs von bg-background/bg-card ab. */
+  --input-bg: hsl(0 0% 100%);
+
+  /* Elevation — weiche, flache Schatten (warmer Blau-Schwarz-Ton, niedrige Alpha). */
+  --shadow-xs: 0 1px 2px 0 hsl(220 25% 10% / 0.04);
+  --shadow-sm:
+    0 1px 3px 0 hsl(220 25% 10% / 0.06), 0 1px 2px -1px hsl(220 25% 10% / 0.06);
+  --shadow-md:
+    0 4px 8px -2px hsl(220 25% 10% / 0.08),
+    0 2px 4px -2px hsl(220 25% 10% / 0.05);
+  --shadow-lg:
+    0 12px 20px -6px hsl(220 25% 10% / 0.1),
+    0 4px 8px -4px hsl(220 25% 10% / 0.06);
+
+  /* Kanonischer Fokus-Ring — EINE Quelle (Spec 3.2). Farbe abgeleitet aus --ring. */
+  --fv-focus-ring-color: hsl(215 60% 32% / 0.5);
 
   /* Status — Signalfarben mit Soft-Variante */
   --status-ok: hsl(152 55% 38%);
@@ -163,6 +190,22 @@
   --border: hsl(220 15% 28%);
   --input: hsl(220 15% 28%);
   --ring: hsl(215 55% 55%);
+
+  /* Feld-Fläche dunkler als Card (= surface-2) → Feld bleibt sichtbar. */
+  --input-bg: hsl(220 20% 13%);
+
+  /* Elevation im Dark-Modus: gleiche Hue, höhere Alpha für sichtbare Tiefe. */
+  --shadow-xs: 0 1px 2px 0 hsl(220 25% 4% / 0.3);
+  --shadow-sm:
+    0 1px 3px 0 hsl(220 25% 4% / 0.35), 0 1px 2px -1px hsl(220 25% 4% / 0.35);
+  --shadow-md:
+    0 4px 8px -2px hsl(220 25% 4% / 0.4), 0 2px 4px -2px hsl(220 25% 4% / 0.35);
+  --shadow-lg:
+    0 12px 20px -6px hsl(220 25% 4% / 0.45),
+    0 4px 8px -4px hsl(220 25% 4% / 0.4);
+
+  --fv-focus-ring-color: hsl(215 55% 55% / 0.5);
+
   --status-ok: hsl(152 50% 50%);
   --status-ok-soft: hsl(152 40% 18%);
   --status-warn: hsl(38 85% 60%);
@@ -191,7 +234,12 @@
   }
 
   /* Überschriften: semibold, tight tracking, ausbalancierter Umbruch */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-sans);
     font-weight: 600;
     letter-spacing: -0.015em;
@@ -200,7 +248,9 @@
 
   /* Reduced motion — Pflicht (a11y) */
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
+    *,
+    *::before,
+    *::after {
       animation-duration: 0.001ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.001ms !important;
@@ -209,18 +259,46 @@
   }
 
   @media print {
-    .no-print { display: none !important; }
-    body { background: #fff; color: #000; }
+    .no-print {
+      display: none !important;
+    }
+    body {
+      background: #fff;
+      color: #000;
+    }
   }
+}
+
+/* ── Kanonische Utilities (EINE Quelle der Wahrheit, Spec 3.2 / 3.4) ── */
+
+/* Fokus-Ring: 3px weicher Ring im shadcn-Stil, WCAG 2.2 (2.4.11/2.4.13).
+   GENAU EIN Rezept für Input/Select/Textarea/Button/Checkbox/Radio/Tabs/Stepper/Links.
+   Alternativ als Tailwind-Kette:
+   outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] */
+@utility fv-focus {
+  outline: none;
+  &:focus-visible {
+    border-color: var(--color-ring);
+    box-shadow: 0 0 0 3px var(--fv-focus-ring-color);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+/* Fehler-Text: identische Größe wie Label/Hilfetext (14px), Signal über Farbe+Gewicht, nie Größe.
+   Von ErrorSummary UND FormMessage/Inline-Feldfehler geteilt → nie divergent. */
+@utility fv-text-error {
+  @apply text-sm font-medium text-destructive;
 }
 
 /* ── A11y-Nutzer-Schalter (opt-in, nicht standardmäßig aktiv) ── */
 .large-text {
   font-size: 112.5%;
 }
-.large-text [class*="text-[10px]"],
-.large-text [class*="text-[11px]"] {
-  font-size: 12px !important;
+/* Kleinste Skalen-Stufe (text-xs = 12px) im Groß-Text-Modus komfortabel anheben. */
+.large-text [class*="text-xs"] {
+  font-size: 0.8125rem !important; /* 13px */
   line-height: 1.4 !important;
 }
 
@@ -254,6 +332,17 @@
   --border: oklch(0.35 0 0);
   --input: oklch(0.35 0 0);
   --ring: oklch(0.35 0.18 230);
+
+  /* Feld-Fläche = reines Weiß (Card), maximaler Kontrast zum Border. */
+  --input-bg: oklch(1 0 0);
+
+  /* High-Contrast: Schatten unzuverlässig → Elevation über Border definieren. */
+  --shadow-xs: 0 0 0 1px oklch(0.35 0 0);
+  --shadow-sm: 0 0 0 1px oklch(0.35 0 0);
+  --shadow-md: 0 0 0 1px oklch(0.35 0 0);
+  --shadow-lg: 0 0 0 1px oklch(0.35 0 0);
+
+  --fv-focus-ring-color: oklch(0.35 0.18 230 / 0.6);
   --accent: oklch(0.4 0.2 230);
   --accent-foreground: oklch(1 0 0);
   --primary: oklch(0.12 0 0);

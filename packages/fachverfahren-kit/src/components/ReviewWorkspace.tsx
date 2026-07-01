@@ -1,16 +1,25 @@
 // fachverfahren-kit/components/ReviewWorkspace — die GENERISCHE interne Prüf-/Entscheidungs-Sicht. Abgeleitet 1:1
-// aus der Referenz-UX `ReviewWorkspace.tsx` (sift): RESIZABLE Master-Detail-Evidence-Layout (ResizablePanelGroup) —
+// aus etablierten Public-Sector-UX-Mustern für die Belegprüfung: RESIZABLE Master-Detail-Evidence-Layout (ResizablePanelGroup) —
 // links die Antragsdaten (aus `config.detailSektionen`), Mitte/rechts ein getabter Belege-Panel (Dokumente/Formular/
 // Prüfschema), darüber KI-Vorschlag + Status + Audit-Trail. ABER streng config-getrieben: NICHTS Domänen-spezifisches
-// ist hartkodiert (kein "Hund"/"Halter"). Der Entscheidungs-Flow stammt aus `amt.vorgang.$id.tsx` und läuft über
-// `EntscheidungPanel` → `port.uebergang`. Ein zweites Verfahren (Gewerbe/Parkausweis/Bauantrag) läuft unverändert.
+// ist hartkodiert. Der Entscheidungs-Flow läuft über `EntscheidungPanel` → `port.uebergang`.
 import { useMemo, useState } from "react";
-import { ArrowLeft, FileText, ListChecks, ScrollText, Stamp } from "lucide-react";
+import {
+  ArrowLeft,
+  FileText,
+  ListChecks,
+  ScrollText,
+  Stamp,
+} from "lucide-react";
 import type { LeistungConfig, Vorgang, VorgangPort } from "../types.js";
 import { cn } from "../lib/cn.js";
 import { Button } from "../ui/button.js";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs.js";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "../ui/resizable.js";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "../ui/resizable.js";
 import { StatusPill } from "./StatusPill.js";
 import { EvidenceCard } from "./EvidenceCard.js";
 import { VorgangDetail, formatWert, getPfad } from "./VorgangDetail.js";
@@ -85,7 +94,11 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
         id: n.id,
         titel: n.label,
         pflicht: n.erforderlich ?? false,
-        status: n.hochgeladen ? "eingereicht" : n.erforderlich ? "fehlend" : "fehlend",
+        status: n.hochgeladen
+          ? "eingereicht"
+          : n.erforderlich
+            ? "fehlend"
+            : "fehlend",
       })),
     [nachweise],
   );
@@ -98,7 +111,10 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
     () =>
       vorgang
         ? (config.statusMachine?.transitions ?? []).find(
-            (t) => t.from === vorgang.status && t.rollen.includes(rolle) && t.vierAugen === true,
+            (t) =>
+              t.from === vorgang.status &&
+              t.rollen.includes(rolle) &&
+              t.vierAugen === true,
           )
         : undefined,
     [config.statusMachine, vorgang, rolle],
@@ -106,7 +122,12 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
 
   if (!vorgang) {
     return (
-      <div className={cn("flex h-full flex-col items-center justify-center gap-4", className)}>
+      <div
+        className={cn(
+          "flex h-full flex-col items-center justify-center gap-4",
+          className,
+        )}
+      >
         <p className="text-sm text-muted-foreground">Vorgang nicht gefunden.</p>
         <Button variant="outline" onClick={onClose}>
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
@@ -131,9 +152,12 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
           </button>
           <span className="shrink-0 text-muted-foreground/40">/</span>
           <div className="flex min-w-0 items-center gap-2">
-            <FileText className="h-5 w-5 shrink-0 text-foreground" aria-hidden="true" />
+            <FileText
+              className="h-5 w-5 shrink-0 text-foreground"
+              aria-hidden="true"
+            />
             <div className="min-w-0">
-              <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground leading-none">
+              <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground leading-none">
                 {config.label} · {config.kommune}
               </div>
               <h1 className="truncate font-mono text-lg font-semibold tabular-nums text-foreground leading-tight">
@@ -142,7 +166,10 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
             </div>
           </div>
         </div>
-        <StatusPill status={vorgang.status} states={config.statusMachine.states} />
+        <StatusPill
+          status={vorgang.status}
+          states={config.statusMachine.states}
+        />
       </div>
 
       {/* Resizable Master-Detail-Evidence-Layout — Referenz: ResizablePanelGroup (links Daten, rechts Belege). */}
@@ -194,7 +221,10 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
                 <TabsContent value="dokumente">
                   {nachweise.length > 0 ? (
                     hatNachweisVertrag ? (
-                      <NachweisBrowser nachweise={nachweisEintraege} titel="Nachweise" />
+                      <NachweisBrowser
+                        nachweise={nachweisEintraege}
+                        titel="Nachweise"
+                      />
                     ) : (
                       <ul className="space-y-2">
                         {nachweise.map((n) => (
@@ -207,11 +237,13 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
                                 className="h-4 w-4 shrink-0 text-muted-foreground"
                                 aria-hidden="true"
                               />
-                              <span className="truncate text-foreground">{n.label}</span>
+                              <span className="truncate text-foreground">
+                                {n.label}
+                              </span>
                             </span>
                             <span
                               className={cn(
-                                "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold",
+                                "shrink-0 rounded px-1.5 py-0.5 text-xs font-bold",
                                 n.hochgeladen
                                   ? "bg-status-ok-soft text-status-ok"
                                   : n.erforderlich
@@ -219,7 +251,11 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
                                     : "bg-muted text-muted-foreground",
                               )}
                             >
-                              {n.hochgeladen ? "Hochgeladen" : n.erforderlich ? "Fehlt" : "Optional"}
+                              {n.hochgeladen
+                                ? "Hochgeladen"
+                                : n.erforderlich
+                                  ? "Fehlt"
+                                  : "Optional"}
                             </span>
                           </li>
                         ))}
@@ -239,8 +275,12 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
                           key={f.pfad}
                           className="flex items-baseline justify-between gap-4 px-3 py-2"
                         >
-                          <dt className="text-[12px] text-muted-foreground">{f.label}</dt>
-                          <dd className="text-right text-sm text-foreground">{f.wert}</dd>
+                          <dt className="text-sm text-muted-foreground">
+                            {f.label}
+                          </dt>
+                          <dd className="text-right text-sm text-foreground">
+                            {f.wert}
+                          </dd>
                         </div>
                       ))}
                     </dl>
@@ -263,7 +303,9 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
                           }}
                           // Die belegte Herleitung als Zitat am ersten (führenden) Beleg; sonst der Norm-Titel.
                           zitat={i === 0 && begruendung ? begruendung : r.titel}
-                          {...(i === 0 && begruendung ? { staerke: "ok" as const } : {})}
+                          {...(i === 0 && begruendung
+                            ? { staerke: "ok" as const }
+                            : {})}
                         />
                       ))}
                     </div>
@@ -275,7 +317,10 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
                 {/* Bescheid: das hinterlegte Bescheid-PDF im barrierearmen Viewer (nur wenn config.zustellung.bescheidUrl). */}
                 {bescheidUrl ? (
                   <TabsContent value="bescheid">
-                    <PdfViewer url={bescheidUrl} title={`Bescheid · ${vorgang.vorgangsnummer}`} />
+                    <PdfViewer
+                      url={bescheidUrl}
+                      title={`Bescheid · ${vorgang.vorgangsnummer}`}
+                    />
                   </TabsContent>
                 ) : null}
               </Tabs>
@@ -325,8 +370,13 @@ function erstellerVon<T>(vorgang: Vorgang<T>): string {
 
 /** Bildet den Vorgangs-Status auf den FourEyes-Lebenszyklus ab: terminaler Status → freigegeben/abgelehnt,
  *  sonst „vorgelegt" (wartet auf Zweitprüfung). Generisch über den Ziel-Ton der Status-Machine. */
-function fourEyesStatusFuer<T>(status: string, config: LeistungConfig<T>): FourEyesStatus {
-  const def = (config.statusMachine?.states ?? []).find((s) => s.key === status);
+function fourEyesStatusFuer<T>(
+  status: string,
+  config: LeistungConfig<T>,
+): FourEyesStatus {
+  const def = (config.statusMachine?.states ?? []).find(
+    (s) => s.key === status,
+  );
   if (def?.terminal) return def.tone === "block" ? "abgelehnt" : "freigegeben";
   return "vorgelegt";
 }

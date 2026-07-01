@@ -11,7 +11,14 @@
 // Zustandsänderung wird über die zentrale Ansage (aria-live) angesagt, Information nie nur über Farbe
 // (Icon + Text), Icons dekorativ (aria-hidden), Ziel-Größe der Aktionen ≥ 24px, motion-reduce respektiert.
 import * as React from "react";
-import { CheckCircle2, CreditCard, Loader2, RefreshCw, ShieldCheck, XCircle } from "lucide-react";
+import {
+  CheckCircle2,
+  CreditCard,
+  Loader2,
+  RefreshCw,
+  ShieldCheck,
+  XCircle,
+} from "lucide-react";
 
 import { cn } from "../lib/utils.js";
 import { Button } from "../ui/button.js";
@@ -79,10 +86,16 @@ interface Beleg {
  */
 function formatBetrag(value: number, waehrung: string): string {
   try {
-    return new Intl.NumberFormat("de-DE", { style: "currency", currency: waehrung }).format(value);
+    return new Intl.NumberFormat("de-DE", {
+      style: "currency",
+      currency: waehrung,
+    }).format(value);
   } catch {
     // Ungültiger Währungscode: defensiv auf EUR, damit nie eine rohe Zahl ohne Einheit erscheint.
-    return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(value);
+    return new Intl.NumberFormat("de-DE", {
+      style: "currency",
+      currency: "EUR",
+    }).format(value);
   }
 }
 
@@ -115,14 +128,17 @@ export function EPaymentPanel({
       ready: "Bitte prüfen Sie die Gebühr und wählen Sie eine Zahlart.",
       loading: "Zahlung wird verarbeitet …",
       success: "Zahlung erfolgreich. Ein Beleg liegt vor.",
-      error: "Die Zahlung ist fehlgeschlagen. Der Betrag ist erhalten — bitte erneut versuchen.",
+      error:
+        "Die Zahlung ist fehlgeschlagen. Der Betrag ist erhalten — bitte erneut versuchen.",
     },
   });
   const status = view.state.status;
   const submitting = status === "loading";
   const bezahlt = status === "success";
 
-  const [zahlartId, setZahlartId] = React.useState<string>(() => zahlarten[0]?.id ?? "");
+  const [zahlartId, setZahlartId] = React.useState<string>(
+    () => zahlarten[0]?.id ?? "",
+  );
   const [fehlerHinweis, setFehlerHinweis] = React.useState<string | null>(null);
 
   // Eindeutige IDs für a11y-Verdrahtung (legend, Fehlertext) — stabil pro Instanz.
@@ -186,7 +202,8 @@ export function EPaymentPanel({
               {titel}
             </CardTitle>
             <CardDescription>
-              Bitte prüfen Sie die Gebühr und wählen Sie eine Zahlart. Die Zahlung ist verbindlich.
+              Bitte prüfen Sie die Gebühr und wählen Sie eine Zahlart. Die
+              Zahlung ist verbindlich.
             </CardDescription>
           </CardHeader>
 
@@ -194,7 +211,10 @@ export function EPaymentPanel({
             {/* ── Aufschlüsselung / Check-Your-Answers ─────────────────────────────────────────── */}
             {positionen && positionen.length > 0 && (
               <section aria-labelledby={summeId}>
-                <h3 id={summeId} className="text-sm font-medium text-foreground">
+                <h3
+                  id={summeId}
+                  className="text-sm font-medium text-foreground"
+                >
                   Gebührenaufschlüsselung
                 </h3>
                 <dl className="mt-2 divide-y divide-border rounded-md border border-border bg-surface">
@@ -203,7 +223,9 @@ export function EPaymentPanel({
                       key={`${p.bezeichnung}-${i}`}
                       className="flex items-baseline justify-between gap-4 px-3 py-2"
                     >
-                      <dt className="text-sm text-muted-foreground">{p.bezeichnung}</dt>
+                      <dt className="text-sm text-muted-foreground">
+                        {p.bezeichnung}
+                      </dt>
                       <dd className="text-sm font-medium tabular-nums text-foreground">
                         {formatBetrag(p.betrag, waehrung)}
                       </dd>
@@ -215,15 +237,25 @@ export function EPaymentPanel({
 
             {/* Gesamtbetrag — prominent, mit Einheit (nie nur Zahl). */}
             <div className="flex items-baseline justify-between gap-4 rounded-md bg-status-info-soft px-3 py-3">
-              <span className="text-sm font-medium text-foreground">Zu zahlender Betrag</span>
-              <span className="text-lg font-semibold tabular-nums text-foreground">{betragText}</span>
+              <span className="text-sm font-medium text-foreground">
+                Zu zahlender Betrag
+              </span>
+              <span className="text-lg font-semibold tabular-nums text-foreground">
+                {betragText}
+              </span>
             </div>
 
             <Separator />
 
             {/* ── Zahlart-Auswahl: fieldset/legend + RadioGroup (native role=radio) ────────────── */}
-            <fieldset className="space-y-3" aria-describedby={fehlerHinweis ? fehlerId : undefined}>
-              <legend id={legendId} className="text-sm font-medium text-foreground">
+            <fieldset
+              className="space-y-3"
+              aria-describedby={fehlerHinweis ? fehlerId : undefined}
+            >
+              <legend
+                id={legendId}
+                className="text-sm font-medium text-foreground"
+              >
                 Zahlart wählen
               </legend>
               <RadioGroup
@@ -247,7 +279,8 @@ export function EPaymentPanel({
                       className={cn(
                         "flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm transition-colors duration-150 ease-out motion-reduce:transition-none",
                         "hover:bg-accent has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-background",
-                        zahlartId === z.id && "border-primary bg-status-info-soft",
+                        zahlartId === z.id &&
+                          "border-primary bg-status-info-soft",
                         submitting && "cursor-not-allowed opacity-60",
                       )}
                     >
@@ -262,9 +295,12 @@ export function EPaymentPanel({
                 <p
                   id={fehlerId}
                   role="alert"
-                  className="flex items-center gap-1.5 text-[12px] text-status-block"
+                  className="flex items-center gap-1.5 text-sm text-status-block"
                 >
-                  <XCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <XCircle
+                    className="h-3.5 w-3.5 shrink-0"
+                    aria-hidden="true"
+                  />
                   {fehlerHinweis}
                 </p>
               )}
@@ -274,9 +310,12 @@ export function EPaymentPanel({
             {status === "error" && (
               <p
                 role="alert"
-                className="flex items-start gap-2 rounded-md border border-status-block/30 bg-status-block-soft px-3 py-2 text-[12px] text-foreground"
+                className="flex items-start gap-2 rounded-md border border-status-block/30 bg-status-block-soft px-3 py-2 text-sm text-foreground"
               >
-                <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-status-block" aria-hidden="true" />
+                <XCircle
+                  className="mt-0.5 h-4 w-4 shrink-0 text-status-block"
+                  aria-hidden="true"
+                />
                 <span>
                   {view.state.message ??
                     "Die Zahlung ist fehlgeschlagen. Der Betrag ist erhalten — bitte erneut versuchen."}
@@ -313,7 +352,7 @@ export function EPaymentPanel({
                 </>
               )}
             </Button>
-            <p className="text-center text-[11px] text-muted-foreground">
+            <p className="text-center text-xs text-muted-foreground">
               Mit dem Klick lösen Sie eine verbindliche Zahlung aus.
             </p>
           </CardFooter>
@@ -336,11 +375,18 @@ interface BelegAnsichtProps {
 }
 
 /** Verbindlicher Beleg nach erfolgreicher Server-Zahlung. */
-function BelegAnsicht({ beleg, waehrung, titel, onFertig, formatBetrag: fmt }: BelegAnsichtProps) {
+function BelegAnsicht({
+  beleg,
+  waehrung,
+  titel,
+  onFertig,
+  formatBetrag: fmt,
+}: BelegAnsichtProps) {
   const zeitText = beleg
-    ? new Intl.DateTimeFormat("de-DE", { dateStyle: "long", timeStyle: "short" }).format(
-        new Date(beleg.zeitpunkt),
-      )
+    ? new Intl.DateTimeFormat("de-DE", {
+        dateStyle: "long",
+        timeStyle: "short",
+      }).format(new Date(beleg.zeitpunkt))
     : "";
 
   return (
@@ -364,13 +410,17 @@ function BelegAnsicht({ beleg, waehrung, titel, onFertig, formatBetrag: fmt }: B
           {beleg && (
             <div className="flex items-baseline justify-between gap-4 px-3 py-2">
               <dt className="text-sm text-muted-foreground">Zahlart</dt>
-              <dd className="text-sm font-medium text-foreground">{beleg.zahlartLabel}</dd>
+              <dd className="text-sm font-medium text-foreground">
+                {beleg.zahlartLabel}
+              </dd>
             </div>
           )}
           {beleg && (
             <div className="flex items-baseline justify-between gap-4 px-3 py-2">
               <dt className="text-sm text-muted-foreground">Zeitpunkt</dt>
-              <dd className="text-sm font-medium text-foreground">{zeitText}</dd>
+              <dd className="text-sm font-medium text-foreground">
+                {zeitText}
+              </dd>
             </div>
           )}
         </dl>

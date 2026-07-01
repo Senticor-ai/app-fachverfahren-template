@@ -23,7 +23,15 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactElement,
 } from "react";
-import { Crop, ImageOff, Maximize2, Minus, Plus, RotateCcw, Upload } from "lucide-react";
+import {
+  Crop,
+  ImageOff,
+  Maximize2,
+  Minus,
+  Plus,
+  RotateCcw,
+  Upload,
+} from "lucide-react";
 
 import { cn } from "../lib/utils.js";
 import { Button } from "../ui/button.js";
@@ -129,7 +137,9 @@ export function ImageCropper({
   const imgRef = useRef<HTMLImageElement | null>(null);
 
   const [imageSrc, setImageSrc] = useState<string>(src ?? "");
-  const [imgNatur, setImgNatur] = useState<{ w: number; h: number } | null>(null);
+  const [imgNatur, setImgNatur] = useState<{ w: number; h: number } | null>(
+    null,
+  );
   const [zoom, setZoom] = useState(MIN_ZOOM);
   const [offset, setOffset] = useState({ x: 0, y: 0 }); // Versatz in Bildschirm-Pixel der Vorschau
   const [stageBreite, setStageBreite] = useState(0);
@@ -192,7 +202,9 @@ export function ImageCropper({
       if (abgebrochen) return;
       imgRef.current = null;
       setImgNatur(null);
-      setFehler("Das Bild konnte nicht geladen werden. Bitte ein anderes Bild wählen.");
+      setFehler(
+        "Das Bild konnte nicht geladen werden. Bitte ein anderes Bild wählen.",
+      );
     };
     img.src = imageSrc;
     return () => {
@@ -215,7 +227,10 @@ export function ImageCropper({
    */
   const gerendert = useMemo(() => {
     if (!imgNatur || stageBreite <= 0) return null;
-    const skalaCover = Math.max(stageBreite / imgNatur.w, stageHoehe / imgNatur.h);
+    const skalaCover = Math.max(
+      stageBreite / imgNatur.w,
+      stageHoehe / imgNatur.h,
+    );
     const breite = imgNatur.w * skalaCover * zoom;
     const hoehe = imgNatur.h * skalaCover * zoom;
     return { breite, hoehe, skalaCover };
@@ -276,12 +291,24 @@ export function ImageCropper({
   }, [fehler, announce]);
 
   // ── Pointer-Pan (Maus + Touch über Pointer-Events) ─────────────────────────────────────────────
-  const dragRef = useRef<{ id: number; startX: number; startY: number; offX: number; offY: number } | null>(null);
+  const dragRef = useRef<{
+    id: number;
+    startX: number;
+    startY: number;
+    offX: number;
+    offY: number;
+  } | null>(null);
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!imgNatur) return;
     (e.target as Element).setPointerCapture?.(e.pointerId);
-    dragRef.current = { id: e.pointerId, startX: e.clientX, startY: e.clientY, offX: offset.x, offY: offset.y };
+    dragRef.current = {
+      id: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      offX: offset.x,
+      offY: offset.y,
+    };
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -351,7 +378,9 @@ export function ImageCropper({
   const dateiLaden = (file: File | undefined | null) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      setFehler("Die gewählte Datei ist kein Bild. Bitte ein Bildformat (z.B. JPG oder PNG) wählen.");
+      setFehler(
+        "Die gewählte Datei ist kein Bild. Bitte ein Bildformat (z.B. JPG oder PNG) wählen.",
+      );
       return;
     }
     const reader = new FileReader();
@@ -365,7 +394,8 @@ export function ImageCropper({
       setImageSrc(result);
       onImageLoad?.(result);
     };
-    reader.onerror = () => setFehler("Die Bilddatei konnte nicht gelesen werden.");
+    reader.onerror = () =>
+      setFehler("Die Bilddatei konnte nicht gelesen werden.");
     reader.readAsDataURL(file);
   };
 
@@ -382,8 +412,8 @@ export function ImageCropper({
     // Linke obere Ecke des Rahmens, ausgedrückt in Render-Koordinaten (Bild zentriert + Versatz).
     const bildLinks = (stageBreite - gerendert.breite) / 2 + offset.x;
     const bildOben = (stageHoehe - gerendert.hoehe) / 2 + offset.y;
-    const quelleX = (-bildLinks) / renderSkala;
-    const quelleY = (-bildOben) / renderSkala;
+    const quelleX = -bildLinks / renderSkala;
+    const quelleY = -bildOben / renderSkala;
     const quelleB = stageBreite / renderSkala;
     const quelleH = stageHoehe / renderSkala;
 
@@ -418,20 +448,40 @@ export function ImageCropper({
     } else {
       liefern(null);
     }
-  }, [gerendert, offset.x, offset.y, outBreite, outHoehe, outputMime, outputQuality, onCrop, stageBreite, stageHoehe]);
+  }, [
+    gerendert,
+    offset.x,
+    offset.y,
+    outBreite,
+    outHoehe,
+    outputMime,
+    outputQuality,
+    onCrop,
+    stageBreite,
+    stageHoehe,
+  ]);
 
   const hatBild = !!imgNatur;
   const zoomProzent = Math.round(zoom * 100);
 
   return (
     <section
-      className={cn("rounded-lg border border-border bg-card p-4 sm:p-6", className)}
+      className={cn(
+        "rounded-lg border border-border bg-card p-4 sm:p-6",
+        className,
+      )}
       aria-labelledby={titelId}
     >
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 id={titelId} className="flex items-center gap-2 text-base font-semibold text-foreground">
-            <Crop className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          <h2
+            id={titelId}
+            className="flex items-center gap-2 text-base font-semibold text-foreground"
+          >
+            <Crop
+              className="h-4 w-4 text-muted-foreground"
+              aria-hidden="true"
+            />
             {titel}
           </h2>
           <p id={hinweisId} className="mt-1 text-sm text-muted-foreground">
@@ -512,17 +562,28 @@ export function ImageCropper({
             ) : initialisiert ? (
               // Init-Loading: layout-treuer Platzhalter, während das Bild dekodiert wird (kein irreführendes
               // „kein Bild"). Rein dekorativ (aria-hidden); die Ansage übernimmt die StatusRegion.
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4" aria-hidden="true">
+              <div
+                className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4"
+                aria-hidden="true"
+              >
                 <Skeleton className="h-full w-full motion-reduce:animate-none" />
               </div>
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center">
-                <ImageOff className="h-7 w-7 text-muted-foreground" aria-hidden="true" />
+                <ImageOff
+                  className="h-7 w-7 text-muted-foreground"
+                  aria-hidden="true"
+                />
                 <p className="text-sm text-muted-foreground">
                   {fehler ? "Kein Bild geladen." : "Noch kein Bild geladen."}
                 </p>
                 {allowUpload && (
-                  <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
                     <Upload className="h-3.5 w-3.5" aria-hidden="true" />
                     Bild wählen
                   </Button>
@@ -564,10 +625,15 @@ export function ImageCropper({
         <div className="flex w-full flex-col gap-4 md:w-56">
           <div>
             <div className="flex items-center justify-between">
-              <Label htmlFor={zoomId} className="text-[12px] font-medium text-muted-foreground">
+              <Label
+                htmlFor={zoomId}
+                className="text-sm font-medium text-muted-foreground"
+              >
                 Zoom
               </Label>
-              <span className="text-[12px] tabular-nums text-muted-foreground">{zoomProzent}%</span>
+              <span className="text-sm tabular-nums text-muted-foreground">
+                {zoomProzent}%
+              </span>
             </div>
             <div className="mt-2 flex items-center gap-2">
               <Button
@@ -611,7 +677,7 @@ export function ImageCropper({
             </div>
           </div>
 
-          <dl className="grid gap-1 rounded-md border border-border bg-background p-3 text-[12px]">
+          <dl className="grid gap-1 rounded-md border border-border bg-background p-3 text-sm">
             <div className="flex items-baseline justify-between">
               <dt className="text-muted-foreground">Seitenverhältnis</dt>
               <dd className="tabular-nums text-foreground">
@@ -643,10 +709,13 @@ export function ImageCropper({
             </Button>
           </div>
 
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
-            Tastatur: Pfeiltasten verschieben, <kbd className="rounded-sm border border-border px-1">+</kbd> /{" "}
-            <kbd className="rounded-sm border border-border px-1">−</kbd> zoomen,{" "}
-            <kbd className="rounded-sm border border-border px-1">0</kbd> setzt zurück.
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Tastatur: Pfeiltasten verschieben,{" "}
+            <kbd className="rounded-sm border border-border px-1">+</kbd> /{" "}
+            <kbd className="rounded-sm border border-border px-1">−</kbd>{" "}
+            zoomen,{" "}
+            <kbd className="rounded-sm border border-border px-1">0</kbd> setzt
+            zurück.
           </p>
         </div>
       </div>

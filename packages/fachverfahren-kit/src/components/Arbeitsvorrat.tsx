@@ -1,8 +1,8 @@
 // components/Arbeitsvorrat — der GENERISCHE Eingangskorb/Arbeitsvorrat der internen Sicht (Sachbearbeitung).
 //
-// UX 1:1 aus der Referenz (Lovable amt.index = Inbox: Schnellfilter-Chips mit Counts, sortierbare sticky-Table,
-// Klick/Enter öffnet den Vorgang, KI-Flag-Indikatoren, StatusPill) — aber data-driven über die `LeistungConfig`
-// statt fest verdrahtet. Tabellen-Container nach dem sift-Pattern (maskierter Card-Rahmen, innen-scrollender Body,
+// UX aus etablierten Public-Sector-UX-Mustern abgeleitet (Inbox: Schnellfilter-Chips mit Counts, sortierbare
+// sticky-Table, Klick/Enter öffnet den Vorgang, KI-Flag-Indikatoren, StatusPill) — aber data-driven über die
+// `LeistungConfig` statt fest verdrahtet. Tabellen-Container als maskierter Card-Rahmen (innen-scrollender Body,
 // sticky Header). KEIN domänen-Literal: Spalten/Status/Flags/Felder kommen ausschliesslich aus props.
 import * as React from "react";
 import { useMemo, useState, type ReactElement } from "react";
@@ -15,9 +15,13 @@ import {
   Inbox as InboxIcon,
   Sparkles,
 } from "lucide-react";
-import type { Berechnung, LeistungConfig, StatusDef, Vorgang, VorgangPort } from "../types.js";
+import type {
+  Berechnung,
+  LeistungConfig,
+  Vorgang,
+  VorgangPort,
+} from "../types.js";
 import { cn } from "../lib/cn.js";
-import { Badge } from "../ui/badge.js";
 import {
   Table,
   TableBody,
@@ -28,6 +32,7 @@ import {
 } from "../ui/table.js";
 import { SkeletonTable } from "../ui/skeleton.js";
 import { EmptyState } from "./EmptyState.js";
+import { StatusPill } from "./StatusPill.js";
 import { useStatusRegion } from "./StatusRegion.js";
 
 export interface ArbeitsvorratProps<T = Record<string, unknown>> {
@@ -47,20 +52,24 @@ export interface ArbeitsvorratProps<T = Record<string, unknown>> {
   onReload?: (() => void) | undefined;
 }
 
-/** StatusPill — generisch über StatusDef; Ton mappt 1:1 auf die Token-getriebene Badge (status-ok/warn/info/block/neu). */
-export function StatusPill({ status }: { status: StatusDef }): ReactElement {
-  return <Badge tone={status.tone}>{status.label}</Badge>;
-}
-
 // ── Sort-State (inlined, generisch — keine externe Util-Abhängigkeit) ────────
 type SortDir = "asc" | "desc" | null;
-type ColKey = "vorgang" | "eingang" | "berechnung" | "status" | `feld:${string}`;
+type ColKey =
+  | "vorgang"
+  | "eingang"
+  | "berechnung"
+  | "status"
+  | `feld:${string}`;
 
 /** Liefert einen verschachtelten Wert (Pfad wie "person.nachname") aus den Antragsdaten als String. */
 function readPfad(antragsdaten: unknown, pfad: string): string {
   let cur: unknown = antragsdaten;
   for (const teil of pfad.split(".")) {
-    if (cur && typeof cur === "object" && teil in (cur as Record<string, unknown>)) {
+    if (
+      cur &&
+      typeof cur === "object" &&
+      teil in (cur as Record<string, unknown>)
+    ) {
       cur = (cur as Record<string, unknown>)[teil];
     } else {
       return "";
@@ -81,7 +90,9 @@ function eingangText(iso: string): string {
 }
 
 /** Betrag generisch über die Berechnung formatieren (Einheit aus der Berechnung) — leistungs-agnostisch. */
-function berechnungText(berechnung: Berechnung | undefined): { betrag: string; sub: string } | null {
+function berechnungText(
+  berechnung: Berechnung | undefined,
+): { betrag: string; sub: string } | null {
   if (!berechnung) return null;
   const betrag = new Intl.NumberFormat("de-DE", {
     style: "decimal",
@@ -115,7 +126,9 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
 
   // Aktive Status-Filter — default: alle. Der letzte aktive Chip kann nicht abgewählt werden.
   const alleStatusKeys = useMemo(() => states.map((s) => s.key), [states]);
-  const [active, setActive] = useState<Set<string>>(() => new Set(alleStatusKeys));
+  const [active, setActive] = useState<Set<string>>(
+    () => new Set(alleStatusKeys),
+  );
 
   const toggle = (key: string) =>
     setActive((prev) => {
@@ -137,7 +150,10 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
     return m;
   }, [alle, states]);
 
-  const sichtbar = useMemo(() => alle.filter((v) => active.has(v.status)), [alle, active]);
+  const sichtbar = useMemo(
+    () => alle.filter((v) => active.has(v.status)),
+    [alle, active],
+  );
 
   // Sortierung — generische Getter je Spalte.
   const [sortKey, setSortKey] = useState<ColKey | null>(null);
@@ -185,7 +201,9 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
 
   // Aktive Zeile gültig halten, wenn sich Filter/Sortierung die Zeilenzahl ändern.
   React.useEffect(() => {
-    setActiveRow((cur) => (rows.length === 0 ? 0 : Math.min(cur, rows.length - 1)));
+    setActiveRow((cur) =>
+      rows.length === 0 ? 0 : Math.min(cur, rows.length - 1),
+    );
   }, [rows.length]);
 
   // Lade-/Ergebnis-Zustand zentral ansagen (eine Ansage-Wahrheit, nicht je Widget).
@@ -196,12 +214,19 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
   }, [loading, announce]);
   React.useEffect(() => {
     if (loading) return;
-    announce(`${sichtbar.length} von ${alle.length} Vorgängen angezeigt`, "polite");
+    announce(
+      `${sichtbar.length} von ${alle.length} Vorgängen angezeigt`,
+      "polite",
+    );
   }, [loading, sichtbar.length, alle.length, announce]);
 
   // Pfeiltasten-Navigation der Tabellenzeilen (Roving-Tabindex). Enter/Space öffnen bleiben erhalten.
   const handleRowKeyDown = React.useCallback(
-    (event: React.KeyboardEvent<HTMLTableRowElement>, index: number, id: string) => {
+    (
+      event: React.KeyboardEvent<HTMLTableRowElement>,
+      index: number,
+      id: string,
+    ) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         onOpen(id);
@@ -231,15 +256,12 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
     [onOpen, rows.length],
   );
 
-  const statusByKey = useMemo(() => {
-    const m: Record<string, StatusDef> = {};
-    for (const s of states) m[s.key] = s;
-    return m;
-  }, [states]);
-
   const allActive = active.size === alleStatusKeys.length;
   // Hinweis-Zähler: Vorgänge mit KI-Flags (Aufmerksamkeit nötig).
-  const flaggedCount = useMemo(() => alle.filter((v) => v.ki.flags.length > 0).length, [alle]);
+  const flaggedCount = useMemo(
+    () => alle.filter((v) => v.ki.flags.length > 0).length,
+    [alle],
+  );
 
   return (
     <section className="flex h-full min-h-0 flex-col">
@@ -248,12 +270,18 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
         <div className="mx-auto flex w-full max-w-6xl items-end justify-between gap-6 px-6 py-5">
           <div>
             <div className="flex items-center gap-2">
-              <InboxIcon className="h-5 w-5 text-foreground" aria-hidden="true" />
-              <h1 className="text-2xl font-semibold text-foreground">Arbeitsvorrat</h1>
+              <InboxIcon
+                className="h-5 w-5 text-foreground"
+                aria-hidden="true"
+              />
+              <h1 className="text-2xl font-semibold text-foreground">
+                Arbeitsvorrat
+              </h1>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {sichtbar.length} von {alle.length} Vorgängen
-              {flaggedCount > 0 && <> · {flaggedCount} mit KI-Hinweis</>} · {config.label}
+              {flaggedCount > 0 && <> · {flaggedCount} mit KI-Hinweis</>} ·{" "}
+              {config.label}
             </p>
           </div>
         </div>
@@ -263,7 +291,7 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
         {loading ? (
           // Ladezustand: layout-treuer Tabellen-Platzhalter statt Spinner (kein Layout-Shift).
           // Ansage übernimmt zentral useStatusRegion; das Skeleton selbst ist dekorativ (aria-hidden).
-          <div className="mt-1 flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card p-4">
+          <div className="mt-1 flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card p-4 shadow-sm">
             <SkeletonTable rows={6} cols={4 + schluesselFelder.length} />
           </div>
         ) : alle.length === 0 ? (
@@ -281,167 +309,204 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
           </div>
         ) : (
           <>
-        {/* Schnellfilter-Chips je StatusDef (mit Counts) */}
-        <div className="flex items-center gap-3">
-          <span className="shrink-0 text-[11px] uppercase tracking-wide text-muted-foreground">
-            Schnellfilter:
-          </span>
-          <div className="flex flex-1 items-center gap-2 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:thin]">
-            {states.map((s) => {
-              const on = active.has(s.key);
-              const isLastOn = on && active.size === 1;
-              return (
-                <button
-                  key={s.key}
-                  type="button"
-                  onClick={() => toggle(s.key)}
-                  aria-pressed={on}
-                  aria-label={`Filter ${s.label}, ${countByStatus[s.key] ?? 0} Vorgänge`}
-                  disabled={isLastOn}
-                  title={isLastOn ? "Mindestens ein Filter muss aktiv sein" : undefined}
-                  className={cn(
-                    "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
-                    on
-                      ? "border-accent bg-accent/15 text-foreground"
-                      : "border-border bg-card text-muted-foreground hover:text-foreground",
-                    isLastOn && "cursor-not-allowed opacity-80",
-                  )}
-                >
-                  <span>{s.label}</span>
-                  <span className="rounded-full bg-secondary px-1.5 py-px text-[10px] tabular-nums text-foreground">
-                    {countByStatus[s.key] ?? 0}
-                  </span>
-                </button>
-              );
-            })}
-            {!allActive && (
-              <button
-                type="button"
-                onClick={() => setActive(new Set(alleStatusKeys))}
-                className="shrink-0 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:underline"
-              >
-                Alle anzeigen
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Tabellen-Container (sift-Pattern): maskierter Card-Rahmen, innen-scrollend, sticky Header */}
-        <div className="mt-4 flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card">
-          <div className="min-h-0 flex-1 overflow-auto">
-            <Table className="min-w-[760px] text-sm">
-              <TableHeader className="sticky top-0 z-20 bg-secondary text-left text-[11px] uppercase tracking-wide text-muted-foreground">
-                <TableRow>
-                  <Th label="Vorgangsnummer" cKey="vorgang" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  <Th label="Eingang" cKey="eingang" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  {schluesselFelder.map((f) => (
-                    <Th
-                      key={f.pfad}
-                      label={f.label}
-                      cKey={`feld:${f.pfad}`}
-                      sortKey={sortKey}
-                      sortDir={sortDir}
-                      onSort={toggleSort}
-                    />
-                  ))}
-                  <Th label="Berechnung" cKey="berechnung" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                  <Th label="Status" cKey="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((v, index) => {
-                  const ber = berechnungText(v.berechnung);
-                  const st = statusByKey[v.status];
+            {/* Schnellfilter-Chips je StatusDef (mit Counts) */}
+            <div className="flex items-center gap-3">
+              <span className="shrink-0 text-xs uppercase tracking-wide text-muted-foreground">
+                Schnellfilter:
+              </span>
+              <div className="flex flex-1 items-center gap-2 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:thin]">
+                {states.map((s) => {
+                  const on = active.has(s.key);
+                  const isLastOn = on && active.size === 1;
                   return (
-                    <TableRow
-                      key={v.id}
-                      ref={(el: HTMLTableRowElement | null) => {
-                        rowRefs.current[index] = el;
-                      }}
-                      // Roving-Tabindex: nur die aktive Zeile ist im Tab-Fokus; Pfeiltasten wandern
-                      // (statt jede Zeile einzeln in die Tab-Reihenfolge zu legen).
-                      tabIndex={index === activeRow ? 0 : -1}
-                      role="link"
-                      aria-label={`Vorgang ${v.vorgangsnummer} öffnen`}
-                      onClick={() => {
-                        setActiveRow(index);
-                        onOpen(v.id);
-                      }}
-                      onFocus={() => setActiveRow(index)}
-                      onKeyDown={(e) => handleRowKeyDown(e, index, v.id)}
-                      className="group cursor-pointer border-t border-border transition-colors hover:bg-secondary/40 focus:bg-secondary/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 motion-reduce:transition-none"
+                    <button
+                      key={s.key}
+                      type="button"
+                      onClick={() => toggle(s.key)}
+                      aria-pressed={on}
+                      aria-label={`Filter ${s.label}, ${countByStatus[s.key] ?? 0} Vorgänge`}
+                      disabled={isLastOn}
+                      title={
+                        isLastOn
+                          ? "Mindestens ein Filter muss aktiv sein"
+                          : undefined
+                      }
+                      className={cn(
+                        // Chip = rounded-full, text-xs Minimum; kanonisches Fokus-Rezept (Spec 3.2).
+                        "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors duration-150 ease-out motion-reduce:transition-none",
+                        "outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+                        on
+                          ? "border-accent bg-accent/15 text-foreground"
+                          : "border-border bg-card text-muted-foreground hover:text-foreground",
+                        isLastOn && "cursor-not-allowed opacity-80",
+                      )}
                     >
-                      <TableCell className="align-top">
-                        <span className="font-mono text-[12px] font-medium text-primary group-hover:underline">
-                          {v.vorgangsnummer}
-                        </span>
-                        {v.ki.flags.length > 0 && (
-                          <div className="mt-1 flex flex-wrap gap-1.5">
-                            {v.ki.flags.map((flag) => (
-                              <FlagIndikator key={flag} flag={flag} />
-                            ))}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="align-top text-[12px] text-muted-foreground">
-                        <span className="inline-flex items-center gap-1">
-                          <Clock className="h-3 w-3" aria-hidden="true" />
-                          {eingangText(v.eingangIso)}
-                        </span>
-                      </TableCell>
-                      {schluesselFelder.map((f) => (
-                        <TableCell key={f.pfad} className="align-top text-foreground">
-                          {readPfad(v.antragsdaten, f.pfad) || (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                      ))}
-                      <TableCell className="align-top">
-                        {ber ? (
-                          <>
-                            <div className="font-mono tabular-nums text-foreground">{ber.betrag}</div>
-                            <div className="text-[10px] text-muted-foreground">{ber.sub}</div>
-                          </>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="align-top">
-                        {st ? <StatusPill status={st} /> : <span className="text-muted-foreground">{v.status}</span>}
-                      </TableCell>
-                    </TableRow>
+                      <span>{s.label}</span>
+                      <span className="rounded-full bg-secondary px-1.5 py-px text-xs tabular-nums text-foreground">
+                        {countByStatus[s.key] ?? 0}
+                      </span>
+                    </button>
                   );
                 })}
-                {rows.length === 0 && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={4 + schluesselFelder.length}
-                      className="p-6"
-                    >
-                      {/* Leerer FILTER (Bestand ist nicht leer) — mit Recovery „Filter zurücksetzen". */}
-                      <EmptyState
-                        as="p"
-                        icon={InboxIcon}
-                        title="Keine Vorgänge im aktuellen Filter"
-                        description="Für die gewählten Statusfilter gibt es keine Treffer. Setzen Sie die Filter zurück, um alle Vorgänge zu sehen."
-                        className="border-0 bg-transparent py-4"
-                        {...(allActive
-                          ? {}
-                          : {
-                              action: {
-                                label: "Alle anzeigen",
-                                onClick: () => setActive(new Set(alleStatusKeys)),
-                                variant: "outline",
-                              },
-                            })}
-                      />
-                    </TableCell>
-                  </TableRow>
+                {!allActive && (
+                  <button
+                    type="button"
+                    onClick={() => setActive(new Set(alleStatusKeys))}
+                    className="shrink-0 rounded-md px-1 text-xs text-muted-foreground underline-offset-2 outline-none transition-colors duration-150 ease-out hover:text-foreground hover:underline focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] motion-reduce:transition-none"
+                  >
+                    Alle anzeigen
+                  </button>
                 )}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
+              </div>
+            </div>
+
+            {/* Tabellen-Container: Card-Ebene (border + shadow-sm), innen-scrollend, sticky Header */}
+            <div className="mt-4 flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+              <div className="min-h-0 flex-1 overflow-auto">
+                <Table className="min-w-[760px] text-sm">
+                  <TableHeader className="sticky top-0 z-20 bg-secondary text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <TableRow>
+                      <Th
+                        label="Vorgangsnummer"
+                        cKey="vorgang"
+                        sortKey={sortKey}
+                        sortDir={sortDir}
+                        onSort={toggleSort}
+                      />
+                      <Th
+                        label="Eingang"
+                        cKey="eingang"
+                        sortKey={sortKey}
+                        sortDir={sortDir}
+                        onSort={toggleSort}
+                      />
+                      {schluesselFelder.map((f) => (
+                        <Th
+                          key={f.pfad}
+                          label={f.label}
+                          cKey={`feld:${f.pfad}`}
+                          sortKey={sortKey}
+                          sortDir={sortDir}
+                          onSort={toggleSort}
+                        />
+                      ))}
+                      <Th
+                        label="Berechnung"
+                        cKey="berechnung"
+                        sortKey={sortKey}
+                        sortDir={sortDir}
+                        onSort={toggleSort}
+                      />
+                      <Th
+                        label="Status"
+                        cKey="status"
+                        sortKey={sortKey}
+                        sortDir={sortDir}
+                        onSort={toggleSort}
+                      />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((v, index) => {
+                      const ber = berechnungText(v.berechnung);
+                      return (
+                        <TableRow
+                          key={v.id}
+                          ref={(el: HTMLTableRowElement | null) => {
+                            rowRefs.current[index] = el;
+                          }}
+                          // Roving-Tabindex: nur die aktive Zeile ist im Tab-Fokus; Pfeiltasten wandern
+                          // (statt jede Zeile einzeln in die Tab-Reihenfolge zu legen).
+                          tabIndex={index === activeRow ? 0 : -1}
+                          role="link"
+                          aria-label={`Vorgang ${v.vorgangsnummer} öffnen`}
+                          onClick={() => {
+                            setActiveRow(index);
+                            onOpen(v.id);
+                          }}
+                          onFocus={() => setActiveRow(index)}
+                          onKeyDown={(e) => handleRowKeyDown(e, index, v.id)}
+                          className="group cursor-pointer border-t border-border outline-none transition-colors duration-150 ease-out hover:bg-secondary/40 focus:bg-secondary/40 focus-visible:ring-inset focus-visible:ring-ring/50 focus-visible:ring-[3px] motion-reduce:transition-none"
+                        >
+                          <TableCell className="align-top">
+                            <span className="font-mono text-xs font-medium text-primary group-hover:underline">
+                              {v.vorgangsnummer}
+                            </span>
+                            {v.ki.flags.length > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-1.5">
+                                {v.ki.flags.map((flag) => (
+                                  <FlagIndikator key={flag} flag={flag} />
+                                ))}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell className="align-top text-xs text-muted-foreground">
+                            <span className="inline-flex items-center gap-1">
+                              <Clock className="h-3 w-3" aria-hidden="true" />
+                              {eingangText(v.eingangIso)}
+                            </span>
+                          </TableCell>
+                          {schluesselFelder.map((f) => (
+                            <TableCell
+                              key={f.pfad}
+                              className="align-top text-foreground"
+                            >
+                              {readPfad(v.antragsdaten, f.pfad) || (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                          ))}
+                          <TableCell className="align-top">
+                            {ber ? (
+                              <>
+                                <div className="font-mono text-sm tabular-nums text-foreground">
+                                  {ber.betrag}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {ber.sub}
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="align-top">
+                            <StatusPill status={v.status} states={states} />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {rows.length === 0 && (
+                      <TableRow>
+                        <TableCell
+                          colSpan={4 + schluesselFelder.length}
+                          className="p-6"
+                        >
+                          {/* Leerer FILTER (Bestand ist nicht leer) — mit Recovery „Filter zurücksetzen". */}
+                          <EmptyState
+                            as="p"
+                            icon={InboxIcon}
+                            title="Keine Vorgänge im aktuellen Filter"
+                            description="Für die gewählten Statusfilter gibt es keine Treffer. Setzen Sie die Filter zurück, um alle Vorgänge zu sehen."
+                            className="border-0 bg-transparent py-4"
+                            {...(allActive
+                              ? {}
+                              : {
+                                  action: {
+                                    label: "Alle anzeigen",
+                                    onClick: () =>
+                                      setActive(new Set(alleStatusKeys)),
+                                    variant: "outline",
+                                  },
+                                })}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
           </>
         )}
       </div>
@@ -464,18 +529,30 @@ function Th({
   onSort: (key: ColKey) => void;
 }): ReactElement {
   const active = sortKey === cKey;
-  const SortIcon = active && sortDir === "asc" ? ArrowUp : active && sortDir === "desc" ? ArrowDown : ArrowUpDown;
-  const ariaSort = active ? (sortDir === "asc" ? "ascending" : "descending") : "none";
+  const SortIcon =
+    active && sortDir === "asc"
+      ? ArrowUp
+      : active && sortDir === "desc"
+        ? ArrowDown
+        : ArrowUpDown;
+  const ariaSort = active
+    ? sortDir === "asc"
+      ? "ascending"
+      : "descending"
+    : "none";
   return (
     <TableHead aria-sort={ariaSort} className="px-4 py-2 font-medium">
       <button
         type="button"
         onClick={() => onSort(cKey)}
-        className="inline-flex items-center gap-1 uppercase tracking-wide hover:text-foreground focus-visible:outline-none focus-visible:text-foreground"
+        className="inline-flex items-center gap-1 rounded-md px-1 uppercase tracking-wide outline-none transition-colors duration-150 ease-out hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:text-foreground motion-reduce:transition-none"
         aria-label={`${label} sortieren`}
       >
         {label}
-        <SortIcon className={cn("h-3 w-3", active ? "text-accent" : "opacity-60")} aria-hidden="true" />
+        <SortIcon
+          className={cn("h-3 w-3", active ? "text-accent" : "opacity-60")}
+          aria-hidden="true"
+        />
       </button>
     </TableHead>
   );
@@ -489,12 +566,12 @@ function FlagIndikator({ flag }: { flag: string }): ReactElement {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 text-[10px]",
+        "inline-flex items-center gap-1 text-xs",
         istWarnung ? "text-status-warn" : "text-status-info",
       )}
       title={`KI-Hinweis: ${flag}`}
     >
-      <Icon className="h-2.5 w-2.5" aria-hidden="true" />
+      <Icon className="h-3 w-3" aria-hidden="true" />
       {flagLabel(flag)}
     </span>
   );

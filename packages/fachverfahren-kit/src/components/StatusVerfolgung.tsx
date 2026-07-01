@@ -19,7 +19,12 @@ import {
   XCircle,
 } from "lucide-react";
 
-import type { LeistungConfig, StatusDef, StatusTone, Vorgang } from "../types.js";
+import type {
+  LeistungConfig,
+  StatusDef,
+  StatusTone,
+  Vorgang,
+} from "../types.js";
 import { cn } from "../lib/utils.js";
 
 // ── Icon je Status-Ton — generisch über JEDES Fachverfahren (kein status-spezifisches Mapping) ──
@@ -45,7 +50,11 @@ export interface StatusVerfolgungProps<T = Record<string, unknown>> {
  * haben). Stationen ohne erreichbaren Pfad (defensive Config) werden in ihrer Config-Reihenfolge ergänzt, damit
  * KEINE Station verloren geht. Rein strukturell — keine fachliche Annahme.
  */
-function ordneStationen(states: StatusDef[], initial: string, transitions: { from: string; to: string }[]): StatusDef[] {
+function ordneStationen(
+  states: StatusDef[],
+  initial: string,
+  transitions: { from: string; to: string }[],
+): StatusDef[] {
   const byKey = new Map<string, StatusDef>();
   for (const s of states) byKey.set(s.key, s);
 
@@ -132,10 +141,14 @@ export function StatusVerfolgung<T = Record<string, unknown>>({
     [stationen, vorgang.status],
   );
 
-  const aktuelleDef = aktuellerIndex >= 0 ? stationen[aktuellerIndex] : undefined;
+  const aktuelleDef =
+    aktuellerIndex >= 0 ? stationen[aktuellerIndex] : undefined;
 
   // Verlauf neuester-zuerst, ohne das Original zu mutieren.
-  const verlauf = useMemo(() => [...vorgang.history].reverse(), [vorgang.history]);
+  const verlauf = useMemo(
+    () => [...vorgang.history].reverse(),
+    [vorgang.history],
+  );
 
   return (
     <section
@@ -144,10 +157,13 @@ export function StatusVerfolgung<T = Record<string, unknown>>({
     >
       {/* Kopf */}
       <header className="border-b border-border pb-5">
-        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">
           {config.label} · {config.kommune}
         </div>
-        <h1 id="statusverfolgung-titel" className="mt-1 text-2xl font-semibold text-foreground">
+        <h1
+          id="statusverfolgung-titel"
+          className="mt-1 text-2xl font-semibold text-foreground"
+        >
           Status Ihres Vorgangs
         </h1>
         <p className="mt-1 font-mono text-sm text-muted-foreground">
@@ -169,7 +185,10 @@ export function StatusVerfolgung<T = Record<string, unknown>>({
       </header>
 
       {/* Vertikaler Fortschritt der Stationen */}
-      <ol className="relative mt-6 space-y-0" aria-label="Bearbeitungsschritte Ihres Vorgangs">
+      <ol
+        className="relative mt-6 space-y-0"
+        aria-label="Bearbeitungsschritte Ihres Vorgangs"
+      >
         {stationen.map((s, i) => {
           const istAktuell = i === aktuellerIndex;
           // Vor dem aktuellen Status (oder, falls Status unbekannt, keine Station) = erledigt.
@@ -200,10 +219,13 @@ export function StatusVerfolgung<T = Record<string, unknown>>({
                 aria-hidden="true"
                 className={cn(
                   "relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 transition-colors motion-reduce:transition-none",
-                  istErledigt && "border-status-ok/50 bg-status-ok-soft text-status-ok",
+                  istErledigt &&
+                    "border-status-ok/50 bg-status-ok-soft text-status-ok",
                   istAktuell && TONE_RING[s.tone],
-                  istAktuell && "ring-2 ring-offset-2 ring-offset-background ring-current",
-                  istZukuenftig && "border-border bg-background text-muted-foreground",
+                  istAktuell &&
+                    "ring-2 ring-offset-2 ring-offset-background ring-current",
+                  istZukuenftig &&
+                    "border-border bg-background text-muted-foreground",
                 )}
               >
                 {istErledigt ? (
@@ -224,24 +246,30 @@ export function StatusVerfolgung<T = Record<string, unknown>>({
                   <span
                     className={cn(
                       "text-sm",
-                      istAktuell ? "font-semibold text-foreground" : "font-medium text-foreground",
+                      istAktuell
+                        ? "font-semibold text-foreground"
+                        : "font-medium text-foreground",
                     )}
                   >
                     {s.label}
                   </span>
                   {istAktuell && (
-                    <span className="rounded-sm border border-accent/40 bg-accent/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-foreground">
+                    <span className="rounded-sm border border-accent/40 bg-accent/10 px-1.5 py-px text-xs font-medium uppercase tracking-wide text-foreground">
                       Aktuell
                     </span>
                   )}
                   {s.terminal && (
-                    <span className="rounded-sm border border-border bg-secondary px-1.5 py-px text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <span className="rounded-sm border border-border bg-secondary px-1.5 py-px text-xs uppercase tracking-wide text-muted-foreground">
                       Abschluss
                     </span>
                   )}
                 </div>
-                <div className="mt-0.5 text-[12px] text-muted-foreground">
-                  {istErledigt ? "Erledigt" : istAktuell ? "In Bearbeitung" : "Ausstehend"}
+                <div className="mt-0.5 text-sm text-muted-foreground">
+                  {istErledigt
+                    ? "Erledigt"
+                    : istAktuell
+                      ? "In Bearbeitung"
+                      : "Ausstehend"}
                 </div>
               </div>
             </li>
@@ -253,32 +281,39 @@ export function StatusVerfolgung<T = Record<string, unknown>>({
       <div className="mt-8 border-t border-border pt-6">
         <h2 className="text-sm font-semibold text-foreground">Verlauf</h2>
         {verlauf.length === 0 ? (
-          <p className="mt-2 text-[13px] text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground">
             Noch keine Aktivitäten erfasst.
           </p>
         ) : (
-          <ul className="mt-3 space-y-3" aria-label="Verlaufseinträge zu Ihrem Vorgang, neuester zuerst">
+          <ul
+            className="mt-3 space-y-3"
+            aria-label="Verlaufseinträge zu Ihrem Vorgang, neuester zuerst"
+          >
             {verlauf.map((h, i) => (
-              <li key={`${h.ts}-${i}`} className="flex gap-3 text-[13px]">
+              <li key={`${h.ts}-${i}`} className="flex gap-3 text-sm">
                 <span
                   aria-hidden="true"
                   className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/50"
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-                    <span className="font-medium text-foreground">{aktionLabel(h.aktion)}</span>
+                    <span className="font-medium text-foreground">
+                      {aktionLabel(h.aktion)}
+                    </span>
                     <time
                       dateTime={h.ts}
-                      className="shrink-0 font-mono text-[11px] text-muted-foreground"
+                      className="shrink-0 font-mono text-xs text-muted-foreground"
                     >
                       {zeitText(h.ts)}
                     </time>
                   </div>
                   {h.detail && (
-                    <p className="mt-0.5 text-[12px] text-muted-foreground">{h.detail}</p>
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      {h.detail}
+                    </p>
                   )}
                   {h.rolle && (
-                    <p className="mt-0.5 text-[11px] uppercase tracking-wide text-muted-foreground/80">
+                    <p className="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground/80">
                       {h.rolle}
                     </p>
                   )}

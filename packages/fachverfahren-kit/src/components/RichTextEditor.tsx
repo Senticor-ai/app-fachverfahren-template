@@ -26,7 +26,15 @@ import {
   type ReactElement,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
-import { Bold, Italic, Underline, List, ListOrdered, Heading2, Eraser } from "lucide-react";
+import {
+  Bold,
+  Italic,
+  Underline,
+  List,
+  ListOrdered,
+  Heading2,
+  Eraser,
+} from "lucide-react";
 
 import { cn } from "../lib/utils.js";
 import { SaveIndicator, type SaveStatus } from "./SaveIndicator.js";
@@ -84,7 +92,10 @@ function sanitizeHtml(dirty: string): string {
     // SSR/Test ohne DOM: konservativ alle Tags entfernen, nur Text behalten.
     return dirty.replace(/<[^>]*>/g, "").trim();
   }
-  const doc = new DOMParser().parseFromString(`<body>${dirty}</body>`, "text/html");
+  const doc = new DOMParser().parseFromString(
+    `<body>${dirty}</body>`,
+    "text/html",
+  );
   const body = doc.body;
 
   const walk = (node: Node): void => {
@@ -136,8 +147,13 @@ function sanitizeHtml(dirty: string): string {
 
 /** True, wenn der (bereits sanitisierte) Inhalt sichtbar leer ist. */
 function isEmptyHtml(html: string): boolean {
-  return html.replace(/<br\s*\/?>/gi, "").replace(/<[^>]*>/g, "").replace(/\u00A0/g, "").trim()
-    .length === 0;
+  return (
+    html
+      .replace(/<br\s*\/?>/gi, "")
+      .replace(/<[^>]*>/g, "")
+      .replace(/\u00A0/g, "")
+      .trim().length === 0
+  );
 }
 
 // ── Toolbar-Definition (data-driven) ─────────────────────────────────────────────────────────────
@@ -269,7 +285,8 @@ export function RichTextEditor({
   // `document.execCommand` verfügbar? (In manchen Umgebungen entfernt.)
   useEffect(() => {
     setExecAvailable(
-      typeof document !== "undefined" && typeof document.execCommand === "function",
+      typeof document !== "undefined" &&
+        typeof document.execCommand === "function",
     );
   }, []);
 
@@ -280,7 +297,8 @@ export function RichTextEditor({
     if (saveStatus == null) return;
     if (saveStatus === "saving") announce("Speichert …");
     else if (saveStatus === "saved") announce("Entwurf gespeichert.");
-    else if (saveStatus === "error") announce("Entwurf nicht gespeichert.", "assertive");
+    else if (saveStatus === "error")
+      announce("Entwurf nicht gespeichert.", "assertive");
   }, [saveStatus, announce]);
 
   // Initialen/extern geänderten Wert sanitisiert ins Feld setzen — nur wenn er vom aktuellen DOM abweicht,
@@ -312,8 +330,13 @@ export function RichTextEditor({
       try {
         if (item.command === "formatBlock") {
           // Toggle: ist der Block bereits eine H2, zurück auf Absatz.
-          const isHeading = document.queryCommandValue?.("formatBlock")?.toLowerCase() === "h2";
-          document.execCommand("formatBlock", false, isHeading ? "P" : (item.value ?? "P"));
+          const isHeading =
+            document.queryCommandValue?.("formatBlock")?.toLowerCase() === "h2";
+          document.execCommand(
+            "formatBlock",
+            false,
+            isHeading ? "P" : (item.value ?? "P"),
+          );
         } else {
           document.execCommand(item.command, false, item.value);
         }
@@ -330,7 +353,9 @@ export function RichTextEditor({
     if (typeof document === "undefined" || !execAvailable) return false;
     try {
       if (item.command === "formatBlock") {
-        return document.queryCommandValue?.("formatBlock")?.toLowerCase() === "h2";
+        return (
+          document.queryCommandValue?.("formatBlock")?.toLowerCase() === "h2"
+        );
       }
       if (item.kind === "inline" || item.kind === "list") {
         return document.queryCommandState?.(item.command) === true;
@@ -344,7 +369,9 @@ export function RichTextEditor({
   // Tastatur-Kürzel im Editierbereich (Strg/Cmd + B/I/U).
   const onEditorKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     if (!(e.ctrlKey || e.metaKey)) return;
-    const item = TOOLBAR.find((t) => t.shortcut && t.shortcut === e.key.toLowerCase());
+    const item = TOOLBAR.find(
+      (t) => t.shortcut && t.shortcut === e.key.toLowerCase(),
+    );
     if (item) {
       e.preventDefault();
       runCommand(item);
@@ -375,7 +402,8 @@ export function RichTextEditor({
     }
     e.preventDefault();
     setActiveTool(next);
-    const btns = e.currentTarget.querySelectorAll<HTMLButtonElement>("button[data-tool]");
+    const btns =
+      e.currentTarget.querySelectorAll<HTMLButtonElement>("button[data-tool]");
     btns[next]?.focus();
   };
 
@@ -402,7 +430,10 @@ export function RichTextEditor({
         className="flex flex-wrap items-center gap-1 border-b border-border bg-muted/40 p-1.5"
       >
         {TOOLBAR.map((item, i) => {
-          const pressed = item.kind === "inline" || item.kind === "block" || item.kind === "list";
+          const pressed =
+            item.kind === "inline" ||
+            item.kind === "block" ||
+            item.kind === "list";
           const active = pressed && isActive(item);
           return (
             <button
@@ -478,10 +509,10 @@ export function RichTextEditor({
       {!execAvailable && !readOnly && (
         <p
           role="status"
-          className="border-t border-border px-4 py-2 text-[12px] text-status-warn"
+          className="border-t border-border px-4 py-2 text-sm text-status-warn"
         >
-          Formatierung wird in dieser Umgebung nicht unterstützt — der Text lässt sich weiterhin
-          eingeben und wird unformatiert gespeichert.
+          Formatierung wird in dieser Umgebung nicht unterstützt — der Text
+          lässt sich weiterhin eingeben und wird unformatiert gespeichert.
         </p>
       )}
 

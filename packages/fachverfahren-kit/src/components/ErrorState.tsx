@@ -58,14 +58,19 @@ export function ErrorState({
       role="alert"
       className={cn(
         "flex gap-3 rounded-lg border border-status-block/40 bg-status-block-soft p-4 text-status-block",
-        inline ? "items-start" : "flex-col items-center text-center sm:flex-row sm:items-start sm:text-left",
+        inline
+          ? "items-start"
+          : "flex-col items-center text-center sm:flex-row sm:items-start sm:text-left",
         className,
       )}
     >
-      <Icon aria-hidden="true" className="size-5 shrink-0" />
+      <Icon aria-hidden="true" className="size-5 shrink-0 text-status-block" />
       <div className="flex-1 space-y-2">
-        <p className="font-medium text-foreground">{title}</p>
-        {description != null && <div className="text-sm text-muted-foreground">{description}</div>}
+        {/* Titel und Body teilen dieselbe Größe (text-sm) — Signal über Farbe/Gewicht/Icon, nie Größe. */}
+        <p className="text-sm font-medium text-foreground">{title}</p>
+        {description != null && (
+          <div className="text-sm text-muted-foreground">{description}</div>
+        )}
         <div className="flex flex-wrap gap-2 pt-1">
           {onRetry != null && (
             <Button type="button" size="sm" variant="outline" onClick={onRetry}>
@@ -75,7 +80,12 @@ export function ErrorState({
           )}
           {actions}
           {!hasExplicitRecovery && (
-            <Button type="button" size="sm" variant="outline" onClick={handleReload}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleReload}
+            >
               <RotateCcw aria-hidden="true" className="size-4" />
               Seite neu laden
             </Button>

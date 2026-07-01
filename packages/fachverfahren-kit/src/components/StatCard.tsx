@@ -6,6 +6,7 @@
 import * as React from "react";
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import { cn } from "../lib/utils.js";
+import { Skeleton } from "../ui/skeleton.js";
 
 /**
  * Bedeutung des Deltas (NICHT die Richtung): bestimmt die semantische Farbe.
@@ -42,6 +43,11 @@ export interface StatCardProps {
   icon?: React.ReactNode;
   /** Optionaler erläuternder Zusatz unter dem Wert (Caption-Stil). */
   hint?: string;
+  /**
+   * Zeigt einen layout-treuen Platzhalter statt Wert/Trend (Ladezustand). Beschriftung + Icon bleiben
+   * sichtbar, damit der Kontext erhalten bleibt und kein Layout-Shift entsteht. Default: false.
+   */
+  loading?: boolean;
   className?: string;
 }
 
@@ -77,23 +83,29 @@ const DIRECTION_SR: Record<TrendDirection, string> = {
  * Card-Stil (Border + dezenter Schatten), ruhig und seriös — keine verspielten Effekte.
  */
 export const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
-  ({ label, value, trend, icon, hint, className }, ref) => {
+  ({ label, value, trend, icon, hint, loading = false, className }, ref) => {
     const tone: TrendTone = trend?.tone ?? "neutral";
-    const direction: TrendDirection = trend?.direction ?? TONE_TO_DIRECTION[tone];
+    const direction: TrendDirection =
+      trend?.direction ?? TONE_TO_DIRECTION[tone];
     const TrendIcon = DIRECTION_ICON[direction];
     const srLabel =
       trend?.srLabel ??
-      (trend ? `${DIRECTION_SR[direction]} ${trend.value}${trend.label ? `, ${trend.label}` : ""}` : "");
+      (trend
+        ? `${DIRECTION_SR[direction]} ${trend.value}${trend.label ? `, ${trend.label}` : ""}`
+        : "");
 
     return (
       <div
         ref={ref}
+        // Card-Ebene: einheitliche Elevation (Spec 4.2) — border + shadow-sm, ruhig und seriös.
         className={cn(
           "flex flex-col gap-2 rounded-lg border border-border bg-card p-6 text-card-foreground shadow-sm",
           className,
         )}
+        aria-busy={loading || undefined}
       >
         <div className="flex items-start justify-between gap-3">
+          {/* Label = Caption/Meta-Rolle: text-xs muted (Spec 2). */}
           <p className="text-xs font-medium text-muted-foreground">{label}</p>
           {icon != null && (
             <span
@@ -105,20 +117,45 @@ export const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
           )}
         </div>
 
-        <p className="text-3xl font-semibold leading-none tabular-nums text-foreground">{value}</p>
+        {loading ? (
+          // Layout-treuer Platzhalter (dekorativ, aria-hidden) — der Ladezustand wird über aria-busy getragen.
+          <>
+            <Skeleton className="h-8 w-24" aria-hidden="true" />
+            {(trend || hint) && (
+              <Skeleton className="h-4 w-32" aria-hidden="true" />
+            )}
+            <span className="sr-only">Kennzahl wird geladen</span>
+          </>
+        ) : (
+          <>
+            {/* Kennzahl = großer Betrag: text-2xl semibold tabular-nums (Spec 2). */}
+            <p className="text-2xl font-semibold leading-none tabular-nums text-foreground">
+              {value}
+            </p>
 
-        {trend && (
-          <p className="flex flex-wrap items-center gap-1.5 text-sm">
-            <span className={cn("inline-flex items-center gap-1 font-medium", TREND_TONE[tone])}>
-              <TrendIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span className="tabular-nums">{trend.value}</span>
-            </span>
-            {trend.label && <span className="text-xs text-muted-foreground">{trend.label}</span>}
-            {srLabel && <span className="sr-only">{srLabel}</span>}
-          </p>
+            {trend && (
+              <p className="flex flex-wrap items-center gap-1.5 text-sm">
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 font-medium",
+                    TREND_TONE[tone],
+                  )}
+                >
+                  <TrendIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="tabular-nums">{trend.value}</span>
+                </span>
+                {trend.label && (
+                  <span className="text-xs text-muted-foreground">
+                    {trend.label}
+                  </span>
+                )}
+                {srLabel && <span className="sr-only">{srLabel}</span>}
+              </p>
+            )}
+
+            {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+          </>
         )}
-
-        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
       </div>
     );
   },

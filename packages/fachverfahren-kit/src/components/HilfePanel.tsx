@@ -41,11 +41,13 @@ export function HilfePanel({
   className,
 }: HilfePanelProps): ReactElement {
   const baseId = useId();
-  const hatLeichteSprache = Array.isArray(leichteSprache) && leichteSprache.length > 0;
+  const hatLeichteSprache =
+    Array.isArray(leichteSprache) && leichteSprache.length > 0;
   const [leicht, setLeicht] = useState(false);
 
   // Aktiver Einträge-Satz — Leichte Sprache nur, wenn vorhanden UND angewählt.
-  const aktiveEintraege = leicht && hatLeichteSprache ? leichteSprache! : eintraege;
+  const aktiveEintraege =
+    leicht && hatLeichteSprache ? leichteSprache! : eintraege;
 
   // Offene Indizes als Set (deckt single + multiple generisch ab).
   const [offen, setOffen] = useState<Set<number>>(() => new Set());
@@ -79,7 +81,10 @@ export function HilfePanel({
           id={`${baseId}-titel`}
           className="flex items-center gap-2 text-base font-semibold text-foreground"
         >
-          <HelpCircle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          <HelpCircle
+            className="h-4 w-4 text-muted-foreground"
+            aria-hidden="true"
+          />
           {titel}
         </h2>
 
@@ -158,7 +163,10 @@ function SpracheUmschalter({
   onChange: (wert: boolean) => void;
 }): ReactElement {
   return (
-    <label htmlFor={id} className="inline-flex cursor-pointer items-center gap-2 text-[12px]">
+    <label
+      htmlFor={id}
+      className="inline-flex cursor-pointer items-center gap-2 text-sm"
+    >
       <span className="text-muted-foreground">Leichte Sprache</span>
       <button
         type="button"

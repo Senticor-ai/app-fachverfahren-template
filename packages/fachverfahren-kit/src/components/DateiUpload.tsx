@@ -9,7 +9,14 @@
 // fokussier-/auslösbarer Button (Enter/Space triggert den File-Dialog), trägt aria-describedby auf die Anforderung,
 // Status wird in einer aria-live-Region gemeldet, Fehler tragen role="alert", Fokus-Ring sichtbar, Ziele >=24px,
 // Animationen respektieren prefers-reduced-motion.
-import { useEffect, useId, useRef, useState, type DragEvent, type ReactElement } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type DragEvent,
+  type ReactElement,
+} from "react";
 import {
   CheckCircle2,
   FileUp,
@@ -38,10 +45,18 @@ import { useStatusRegion } from "./StatusRegion.js";
  * - `scanning` — Übertragung fertig, Virenscan/serverseitige Prüfung läuft.
  * - `rejected` — serverseitig abgelehnt; `grund` (Format/Größe/Virus/…) als Klartext für Anzeige + Ansage.
  */
-export type NachweisUploadPhase = "idle" | "uploading" | "scanning" | "rejected";
+export type NachweisUploadPhase =
+  | "idle"
+  | "uploading"
+  | "scanning"
+  | "rejected";
 
 /** Grund-Kategorie einer Ablehnung (nur für Icon/Wording; der Klartext kommt in `meldung`). */
-export type NachweisAblehnungsGrund = "format" | "groesse" | "virus" | "sonstiges";
+export type NachweisAblehnungsGrund =
+  | "format"
+  | "groesse"
+  | "virus"
+  | "sonstiges";
 
 export interface NachweisUploadStatus {
   /** Aktuelle Phase dieser Position (server-autoritativ). */
@@ -61,7 +76,10 @@ export interface DateiUploadProps {
    * Wird bei jeder Änderung einer Position gerufen: `datei` = die gewählte Datei (Name + Größe in Bytes),
    * oder `null`, wenn die Position geleert/entfernt wurde.
    */
-  onChange: (id: string, datei: { name: string; groesse: number } | null) => void;
+  onChange: (
+    id: string,
+    datei: { name: string; groesse: number } | null,
+  ) => void;
   /** Optionale Überschrift (generisch, ohne Domänen-Bezug). */
   titel?: string;
   /**
@@ -83,7 +101,10 @@ function formatGroesse(bytes: number): string {
     wert /= 1024;
     i += 1;
   }
-  const gerundet = wert >= 10 || Number.isInteger(wert) ? Math.round(wert) : Math.round(wert * 10) / 10;
+  const gerundet =
+    wert >= 10 || Number.isInteger(wert)
+      ? Math.round(wert)
+      : Math.round(wert * 10) / 10;
   return `${new Intl.NumberFormat("de-DE").format(gerundet)} ${einheiten[i]}`;
 }
 
@@ -119,9 +140,13 @@ export function DateiUpload({
     );
   };
 
-  const offenePflicht = nachweise.filter((n) => n.erforderlich && !dateien[n.id] && !n.hochgeladen).length;
+  const offenePflicht = nachweise.filter(
+    (n) => n.erforderlich && !dateien[n.id] && !n.hochgeladen,
+  ).length;
   const gesamt = nachweise.length;
-  const erledigt = nachweise.filter((n) => !!dateien[n.id] || n.hochgeladen).length;
+  const erledigt = nachweise.filter(
+    (n) => !!dateien[n.id] || n.hochgeladen,
+  ).length;
 
   return (
     <section
@@ -131,14 +156,22 @@ export function DateiUpload({
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
-            <Paperclip className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <Paperclip
+              className="h-4 w-4 text-muted-foreground"
+              aria-hidden="true"
+            />
             {titel}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {erledigt} von {gesamt} {gesamt === 1 ? "Nachweis" : "Nachweisen"} hinzugefügt
+            {erledigt} von {gesamt} {gesamt === 1 ? "Nachweis" : "Nachweisen"}{" "}
+            hinzugefügt
             {offenePflicht > 0 && (
               <>
-                {" "}· <span className="text-status-block">{offenePflicht} erforderlich offen</span>
+                {" "}
+                ·{" "}
+                <span className="text-status-block">
+                  {offenePflicht} erforderlich offen
+                </span>
               </>
             )}
           </p>
@@ -175,7 +208,10 @@ export function DateiUpload({
 }
 
 /** Übersetzt eine server-autoritative Phase in eine sprechende Ansage (Screenreader, zentral). */
-function ansageFuerPhase(label: string, status: NachweisUploadStatus): string | null {
+function ansageFuerPhase(
+  label: string,
+  status: NachweisUploadStatus,
+): string | null {
   switch (status.phase) {
     case "uploading":
       return typeof status.fortschritt === "number"
@@ -256,7 +292,9 @@ function NachweisZeile({
     setDragOver(false);
     const file = e.dataTransfer?.files?.[0];
     if (!file) {
-      setFehler("Es konnte keine Datei aus dem abgelegten Inhalt gelesen werden.");
+      setFehler(
+        "Es konnte keine Datei aus dem abgelegten Inhalt gelesen werden.",
+      );
       return;
     }
     verarbeiteDatei(file);
@@ -287,18 +325,20 @@ function NachweisZeile({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-foreground">{nachweis.label}</span>
+            <span className="text-sm font-medium text-foreground">
+              {nachweis.label}
+            </span>
             {erforderlich ? (
-              <span className="rounded-sm border border-status-block/30 bg-status-block-soft px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-status-block">
+              <span className="rounded-sm border border-status-block/30 bg-status-block-soft px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide text-status-block">
                 Erforderlich
               </span>
             ) : (
-              <span className="rounded-sm border border-border bg-secondary px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              <span className="rounded-sm border border-border bg-secondary px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Optional
               </span>
             )}
           </div>
-          <p id={anforderungId} className="mt-1 text-[12px] text-muted-foreground">
+          <p id={anforderungId} className="mt-1 text-sm text-muted-foreground">
             {istHochgeladen
               ? "Beleg hinzugefügt — Sie können ihn ersetzen oder entfernen."
               : "Ziehen Sie eine Datei hierher oder wählen Sie eine Datei aus, um diesen Nachweis zu erbringen."}
@@ -307,23 +347,29 @@ function NachweisZeile({
 
         {/* Status-Badge: laufend/abgelehnt haben Vorrang vor „Hochgeladen" (server-autoritativ). */}
         {phase === "uploading" ? (
-          <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-status-info">
-            <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          <span className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-status-info">
+            <Loader2
+              className="h-4 w-4 animate-spin motion-reduce:animate-none"
+              aria-hidden="true"
+            />
             Wird hochgeladen
           </span>
         ) : phase === "scanning" ? (
-          <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-status-info">
-            <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          <span className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-status-info">
+            <Loader2
+              className="h-4 w-4 animate-spin motion-reduce:animate-none"
+              aria-hidden="true"
+            />
             Virenscan läuft
           </span>
         ) : abgelehnt ? (
-          <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-status-block">
+          <span className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-status-block">
             <XCircle className="h-4 w-4" aria-hidden="true" />
             Abgelehnt
           </span>
         ) : (
           istHochgeladen && (
-            <span className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-status-ok">
+            <span className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-status-ok">
               <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
               Hochgeladen
             </span>
@@ -348,11 +394,16 @@ function NachweisZeile({
       {/* ── Server-autoritativer Detail-Zustand: Übertragung läuft (mit/ohne Fortschritt) ── */}
       {phase === "uploading" && (
         <div className="mt-3 rounded-sm border border-status-info/40 bg-status-info-soft/40 p-3">
-          <div className="flex items-center gap-2 text-[13px] font-medium text-foreground">
-            <Loader2 className="h-4 w-4 shrink-0 text-status-info animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <Loader2
+              className="h-4 w-4 shrink-0 text-status-info animate-spin motion-reduce:animate-none"
+              aria-hidden="true"
+            />
             <span>
               Datei wird hochgeladen
-              {typeof fortschritt === "number" ? ` — ${Math.round(fortschritt)} %` : "…"}
+              {typeof fortschritt === "number"
+                ? ` — ${Math.round(fortschritt)} %`
+                : "…"}
             </span>
           </div>
           {typeof fortschritt === "number" && (
@@ -367,9 +418,15 @@ function NachweisZeile({
 
       {/* ── Server-autoritativer Detail-Zustand: Virenscan / serverseitige Prüfung läuft ── */}
       {phase === "scanning" && (
-        <div className="mt-3 flex items-center gap-2 rounded-sm border border-status-info/40 bg-status-info-soft/40 p-3 text-[13px] font-medium text-foreground">
-          <ShieldCheck className="h-4 w-4 shrink-0 text-status-info" aria-hidden="true" />
-          <Loader2 className="h-4 w-4 shrink-0 text-status-info animate-spin motion-reduce:animate-none" aria-hidden="true" />
+        <div className="mt-3 flex items-center gap-2 rounded-sm border border-status-info/40 bg-status-info-soft/40 p-3 text-sm font-medium text-foreground">
+          <ShieldCheck
+            className="h-4 w-4 shrink-0 text-status-info"
+            aria-hidden="true"
+          />
+          <Loader2
+            className="h-4 w-4 shrink-0 text-status-info animate-spin motion-reduce:animate-none"
+            aria-hidden="true"
+          />
           <span>Datei wird auf Viren geprüft…</span>
         </div>
       )}
@@ -382,12 +439,18 @@ function NachweisZeile({
           className="mt-3 flex items-start gap-2.5 rounded-sm border border-status-block/40 bg-status-block-soft/50 p-3"
         >
           {status?.grund === "virus" ? (
-            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-status-block" aria-hidden="true" />
+            <ShieldAlert
+              className="mt-0.5 h-4 w-4 shrink-0 text-status-block"
+              aria-hidden="true"
+            />
           ) : (
-            <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-status-block" aria-hidden="true" />
+            <XCircle
+              className="mt-0.5 h-4 w-4 shrink-0 text-status-block"
+              aria-hidden="true"
+            />
           )}
           <div className="min-w-0">
-            <p className="text-[13px] font-medium text-status-block">
+            <p className="text-sm font-medium text-status-block">
               {status?.grund === "virus"
                 ? "Sicherheitsprüfung fehlgeschlagen — Datei abgelehnt"
                 : status?.grund === "format"
@@ -396,8 +459,9 @@ function NachweisZeile({
                     ? "Datei zu groß — Datei abgelehnt"
                     : "Datei abgelehnt"}
             </p>
-            <p className="mt-0.5 text-[12px] text-foreground">
-              {status?.meldung ?? "Bitte wählen Sie eine andere Datei und versuchen Sie es erneut."}
+            <p className="mt-0.5 text-sm text-foreground">
+              {status?.meldung ??
+                "Bitte wählen Sie eine andere Datei und versuchen Sie es erneut."}
             </p>
           </div>
         </div>
@@ -407,12 +471,18 @@ function NachweisZeile({
         // ── Befüllte Position: Datei-Karte mit Name/Größe + Ersetzen/Entfernen ──
         <div className="mt-3 flex items-center justify-between gap-3 rounded-sm border border-border bg-card p-2.5">
           <div className="flex min-w-0 items-center gap-2.5">
-            <FileUp className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <FileUp
+              className="h-4 w-4 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
             <div className="min-w-0">
-              <div className="truncate text-[13px] font-medium text-foreground" title={datei.name}>
+              <div
+                className="truncate text-sm font-medium text-foreground"
+                title={datei.name}
+              >
                 {datei.name}
               </div>
-              <div className="text-[11px] tabular-nums text-muted-foreground">
+              <div className="text-xs tabular-nums text-muted-foreground">
                 {formatGroesse(datei.groesse)}
               </div>
             </div>
@@ -444,7 +514,7 @@ function NachweisZeile({
       ) : istHochgeladen ? (
         // ── Bereits serverseitig hochgeladen (kein lokales File-Objekt): nur Ersetzen anbieten ──
         <div className="mt-3 flex items-center justify-between gap-3 rounded-sm border border-border bg-card p-2.5">
-          <span className="flex items-center gap-2.5 text-[13px] text-muted-foreground">
+          <span className="flex items-center gap-2.5 text-sm text-muted-foreground">
             <FileUp className="h-4 w-4 shrink-0" aria-hidden="true" />
             Beleg liegt bereits vor.
           </span>
@@ -486,17 +556,21 @@ function NachweisZeile({
           )}
         >
           <UploadCloud className="h-5 w-5" aria-hidden="true" />
-          <span className="text-[13px] font-medium text-foreground">
+          <span className="text-sm font-medium text-foreground">
             Datei hierher ziehen oder auswählen
           </span>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             Per Klick oder Eingabetaste den Datei-Dialog öffnen
           </span>
         </button>
       )}
 
       {fehler && (
-        <p id={fehlerId} role="alert" className="mt-2 text-[12px] text-status-block">
+        <p
+          id={fehlerId}
+          role="alert"
+          className="mt-2 text-sm text-status-block"
+        >
           {fehler}
         </p>
       )}

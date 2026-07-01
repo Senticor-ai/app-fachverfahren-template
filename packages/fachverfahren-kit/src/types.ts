@@ -1,12 +1,12 @@
 // fachverfahren-kit/types — Der GENERISCHE Vertrag eines kommunalen Fachverfahrens.
 //
-// Abgeleitet aus der VERIFIZIERTEN Referenz-UX (Lovable Hundesteuer = Bürger-Antrag + 3 Personen + Zustand-Store;
-// sift-assist-pro = interne Review-/Entscheidungs-UX). Die fertigen Bausteine (AntragStepper · Arbeitsvorrat ·
+// Abgeleitet aus verifizierten Public-Sector-Referenzmustern: gefuehrter Antrag, 3 Personen, Zustand-Store
+// und interne Review-/Entscheidungs-UX. Die fertigen Bausteine (AntragStepper · Arbeitsvorrat ·
 // ReviewWorkspace · EntscheidungPanel · AufsichtDashboard) konsumieren EINE `LeistungConfig`. Die Generierung füllt
 // nur diese Config aus dem Fachkonzept — die UX entsteht IMMER identisch + geprüft. So ist ein Stub unmöglich:
 // die Bausteine SIND die funktionierende UX, der Agent liefert nur die Leistungs-Daten.
 //
-// Architektur: DEV-Datenschicht = Zustand-Store im Browser (end-to-end klickbar, wie die Referenz). PROD = dieselbe
+// Architektur: DEV-Datenschicht = Zustand-Store im Browser (end-to-end klickbar). PROD = dieselbe
 // `VorgangPort`-Schnittstelle gegen das SDK/Fastify-Backend. EINE Schnittstelle, zwei Laufzeiten.
 
 /** Audit-/Historien-Eintrag eines Vorgangs (revisionssicher, append-only). */
@@ -20,7 +20,7 @@ export interface VorgangHistorie {
 /** KI-Einschätzung mit Transparenz (Konfidenz + Flags + Begründung) — KI assistiert, Mensch entscheidet. */
 export interface KiEinschaetzung {
   confidence: number; // 0..1
-  flags: string[]; // z.B. "rasse_unklar", "nachweis_fehlt"
+  flags: string[]; // z.B. "angabe_unklar", "nachweis_fehlt"
   begruendung?: string;
 }
 
@@ -30,6 +30,10 @@ export interface Berechnung {
   einheit: string; // "EUR/Jahr", "EUR", …
   label: string; // kurzer Ergebnis-Titel
   begruendung: string; // die belegte fachliche Herleitung
+  // ANZEIGE-STATUS (Pflicht): "provisional", solange für die Berechnung nötige Eingaben fehlen (Teil-/Vorschau-Ergebnis),
+  // "final", wenn alle nötigen Felder vorliegen. Erzwingt, dass ein vorläufiger Betrag NIE wie ein endgültiger erscheint —
+  // der Typ verlangt das Feld, sodass jede berechne-Funktion es liefern MUSS (kein nachgelagerter Repair-Zyklus).
+  status: "provisional" | "final";
   positionen?: { label: string; betrag: number }[];
 }
 
@@ -41,8 +45,8 @@ export interface Nachweis {
   erforderlich?: boolean;
 }
 
-/** Der generische Vorgang — `TAntragsdaten` ist der LEISTUNGS-spezifische Antragsinhalt (Hundesteuer:
- *  {halter, hund, …}; Gewerbe: {betrieb, taetigkeit, …}). Alles andere ist generisch über JEDES Fachverfahren. */
+/** Der generische Vorgang — `TAntragsdaten` ist der LEISTUNGS-spezifische Antragsinhalt
+ *  (z. B. {person, objekt, nachweise} oder {betrieb, taetigkeit}). Alles andere ist generisch über JEDES Fachverfahren. */
 export interface Vorgang<TAntragsdaten = Record<string, unknown>> {
   id: string;
   vorgangsnummer: string;
@@ -79,7 +83,16 @@ export interface StatusMachine {
 }
 
 // ── Antrag (geführter Stepper) ──────────────────────────────────────────────
-export type FeldTyp = "text" | "plz" | "date" | "select" | "checkbox" | "number" | "tel" | "email" | "textarea";
+export type FeldTyp =
+  | "text"
+  | "plz"
+  | "date"
+  | "select"
+  | "checkbox"
+  | "number"
+  | "tel"
+  | "email"
+  | "textarea";
 export interface FeldDef {
   name: string; // Pfad in den Antragsdaten, z.B. "halter.nachname"
   label: string;
@@ -114,8 +127,8 @@ export interface DetailSektion {
 }
 
 // ── OPTIONALE Kit-Komponenten-Signale (additiv) ─────────────────────────────
-// Jedes Feld ist OPTIONAL: trägt die Config das Signal NICHT, rendert die App unverändert (Hundesteuer-
-// Fallback bleibt). Die Strukturen spiegeln EXAKT die Prop-Typen der jeweiligen Komponente — definiert hier
+// Jedes Feld ist OPTIONAL: trägt die Config das Signal NICHT, rendert die App unverändert. Die Strukturen spiegeln
+// EXAKT die Prop-Typen der jeweiligen Komponente — definiert hier
 // lokal (kein Import aus components/, sonst Zyklus types↔components). Die Generierung füllt diese Felder aus
 // dem Fachkonzept; ist keines gesetzt, ist die neue UX schlicht abwesend.
 
@@ -202,8 +215,8 @@ export interface AdressValidierungConfig {
 
 /** Die EINE Config, die ein Fachverfahren vollständig beschreibt — von der Generierung aus dem Fachkonzept gefüllt. */
 export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
-  id: string; // slug, z.B. "hundesteuer"
-  label: string; // "Hundesteuer"
+  id: string; // slug, z.B. "leistung"
+  label: string; // Anzeigename der Leistung
   kommune: string; // "Stadt Musterstadt"
   rechtsgrundlagen: { norm: string; titel: string; satzung?: boolean }[];
   fimLeistung?: { id: string; status: "belegt" | "annahme-zu-validieren" }; // GROUNDED — nie erfinden
@@ -230,7 +243,13 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   /** `enabled` ⇒ AdressValidierung (deterministischer Registerabgleich) im Bürger-Antrag. */
   adressValidierung?: AdressValidierungConfig | undefined;
   /** Seed-Fälle (Demo-Arbeitsvorrat), damit die SB-Sicht sofort echte Vorgänge zeigt. */
-  seed?: (helpers: { vorgangsnummer: () => string }) => Vorgang<TAntragsdaten>[];
+  seed?: (helpers: {
+    vorgangsnummer: () => string;
+  }) => Vorgang<TAntragsdaten>[];
+  /** VERFAHRENSSPEZIFISCHE Rollen für den PersonaSwitcher (aus dem Fachkonzept, z.B. Bauherr:in/Entwurfsverfasser:in/
+   *  Bauaufsicht statt generisch). Fehlt es, nutzt die Shell die generischen DEFAULT_PERSONAS. Die `key`s bleiben die
+   *  drei kanonischen Rollen (buerger/sachbearbeitung/aufsicht) — nur Label/Untertitel sind verfahrensspezifisch. */
+  personas?: readonly import("./components/PersonaSwitcher.js").PersonaDescriptor[];
 }
 
 /** DATENSCHICHT-PORT — die EINE Schnittstelle, die der Kit nutzt. DEV: Zustand-Store. PROD: SDK/Fastify. */

@@ -9,7 +9,10 @@ export * from "./ui/badge.js";
 export * from "./components/AntragStepper.js";
 // Arbeitsvorrat re-exportiert selektiv: seine interne `StatusPill`-Variante kollidiert sonst mit dem
 // kanonischen `./components/StatusPill.js`-Export (gleicher Name) → ambige Star-Re-Exports.
-export { Arbeitsvorrat, type ArbeitsvorratProps } from "./components/Arbeitsvorrat.js";
+export {
+  Arbeitsvorrat,
+  type ArbeitsvorratProps,
+} from "./components/Arbeitsvorrat.js";
 export * from "./components/AufsichtDashboard.js";
 export * from "./components/StatusPill.js";
 export * from "./components/StatusVerfolgung.js";
@@ -118,3 +121,9 @@ export * from "./components/MarkdownView.js";
 export * from "./components/MermaidView.js";
 export * from "./components/MarkdownEditor.js";
 export * from "./components/FileBrowser.js";
+// ── Generische Struktur-/Anzeige-Bausteine (Formular-Fortschritt, Fakten-Listen, Verlauf, Hinweise) ──
+export * from "./components/Stepper.js";
+export * from "./components/DescriptionList.js";
+export * from "./components/SummaryList.js";
+export * from "./components/Timeline.js";
+export * from "./components/Callout.js";

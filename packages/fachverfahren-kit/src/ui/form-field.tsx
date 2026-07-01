@@ -9,6 +9,7 @@
 // Generisch — alle Inhalte kommen als children/props, keine Domänen-Literale.
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
+import { AlertCircle } from "lucide-react";
 
 import { cn } from "../lib/utils.js";
 import { Label } from "./label.js";
@@ -25,12 +26,16 @@ interface FormFieldContextValue {
   readonly invalid: boolean;
 }
 
-const FormFieldContext = React.createContext<FormFieldContextValue | null>(null);
+const FormFieldContext = React.createContext<FormFieldContextValue | null>(
+  null,
+);
 
 function useFormField(): FormFieldContextValue {
   const ctx = React.useContext(FormFieldContext);
   if (ctx === null) {
-    throw new Error("useFormField muss innerhalb von <FormField> verwendet werden.");
+    throw new Error(
+      "useFormField muss innerhalb von <FormField> verwendet werden.",
+    );
   }
   return ctx;
 }
@@ -61,15 +66,20 @@ const FormField = React.forwardRef<HTMLDivElement, FormFieldProps>(
     );
     return (
       <FormFieldContext.Provider value={value}>
-        <div ref={ref} className={cn("flex flex-col gap-2", className)} {...props} />
+        <div
+          ref={ref}
+          className={cn("flex flex-col gap-2", className)}
+          {...props}
+        />
       </FormFieldContext.Provider>
     );
   },
 );
 FormField.displayName = "FormField";
 
-export interface FormLabelProps
-  extends React.ComponentPropsWithoutRef<typeof Label> {
+export interface FormLabelProps extends React.ComponentPropsWithoutRef<
+  typeof Label
+> {
   /** Hängt ein „* "-Pflichtkennzeichen an (zusätzlich zu aria-required am Control). */
   required?: boolean;
 }
@@ -87,7 +97,11 @@ const FormLabel = React.forwardRef<
     <Label
       ref={ref}
       htmlFor={id}
-      className={cn("text-foreground", invalid && "text-destructive", className)}
+      className={cn(
+        "text-foreground",
+        invalid && "text-destructive",
+        className,
+      )}
       {...props}
     >
       {children}
@@ -114,7 +128,9 @@ const FormControl = React.forwardRef<
     <Slot
       ref={ref}
       id={id}
-      aria-describedby={invalid ? `${formDescriptionId} ${formMessageId}` : formDescriptionId}
+      aria-describedby={
+        invalid ? `${formDescriptionId} ${formMessageId}` : formDescriptionId
+      }
       aria-invalid={invalid || undefined}
       {...props}
     />
@@ -132,7 +148,7 @@ const FormDescription = React.forwardRef<
     <p
       ref={ref}
       id={formDescriptionId}
-      className={cn("text-xs text-muted-foreground", className)}
+      className={cn("text-sm text-muted-foreground", className)}
       {...props}
     />
   );
@@ -140,9 +156,10 @@ const FormDescription = React.forwardRef<
 FormDescription.displayName = "FormDescription";
 
 /**
- * Fehlermeldung in destructive-Farbe, role="alert" für sofortige SR-Ansage. Rendert nur, wenn es
- * Inhalt gibt (children oder ctx.invalid) — sonst null, damit kein leeres Alert im DOM steht.
- * Farbe ist NIE die einzige Bedeutung: das Wording im Text trägt die Information.
+ * Fehlermeldung, mehrkanalig (Spec 4.5): identische Größe wie Label/Hilfetext (`.fv-text-error` =
+ * text-sm), Signal über Farbe + Gewicht + Warn-Icon — NIE über Größe. role="alert" für sofortige
+ * SR-Ansage, `sr-only`-Präfix „Fehler:" vor dem Text. Rendert nur bei Inhalt (children oder
+ * ctx.invalid) — sonst null, damit kein leeres Alert im DOM steht.
  */
 const FormMessage = React.forwardRef<
   HTMLParagraphElement,
@@ -158,10 +175,14 @@ const FormMessage = React.forwardRef<
       ref={ref}
       id={formMessageId}
       role="alert"
-      className={cn("text-xs font-medium text-destructive", className)}
+      className={cn("fv-text-error flex items-start gap-1.5", className)}
       {...props}
     >
-      {body}
+      <AlertCircle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>
+        <span className="sr-only">Fehler: </span>
+        {body}
+      </span>
     </p>
   );
 });
