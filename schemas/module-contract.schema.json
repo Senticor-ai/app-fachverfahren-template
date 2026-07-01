@@ -9,13 +9,55 @@
     "owner",
     "riskClass",
     "consumedCapabilities",
+    "routes",
+    "roles",
+    "permissions",
+    "dataClassifications",
+    "events",
+    "storage",
+    "requiredTests",
     "allowedDomainPaths"
   ],
   "properties": {
     "schemaVersion": { "const": "1.0.0" },
     "moduleId": { "type": "string" },
     "consumedCapabilities": { "type": "array", "items": { "type": "string" } },
-    "allowedDomainPaths": { "type": "array", "items": { "type": "string" } }
+    "routes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "surface"],
+        "properties": {
+          "path": { "type": "string" },
+          "surface": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "roles": { "type": "array", "items": { "type": "string" } },
+    "permissions": { "type": "array", "items": { "type": "string" } },
+    "dataClassifications": { "type": "array", "items": { "type": "string" } },
+    "events": {
+      "type": "object",
+      "required": ["produces", "consumes"],
+      "properties": {
+        "produces": { "type": "array", "items": { "type": "string" } },
+        "consumes": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "storage": {
+      "type": "object",
+      "required": ["migrations", "ownsTables"],
+      "properties": {
+        "migrations": { "type": "array", "items": { "type": "string" } },
+        "ownsTables": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "requiredTests": { "type": "array", "items": { "type": "string" } },
+    "allowedDomainPaths": { "type": "array", "items": { "type": "string" } },
+    "extensions": { "type": "object" }
   },
   "additionalProperties": true
 }

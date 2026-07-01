@@ -6,10 +6,11 @@ import {
   readdir,
   rename,
   rm,
+  stat,
   writeFile,
 } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
-import { getGitCommit, getGitShortStatus } from "./git.ts";
+import { getGitCommit, getGitDiffHash, getGitShortStatus } from "./git.ts";
 import {
   createAnswers,
   createLock,
@@ -22,6 +23,8 @@ interface RenderDomainAppOptions {
   domain: string;
   displayName: string;
   force?: boolean;
+  allowDirty?: boolean;
+  allowExistingEmpty?: boolean;
   features?: {
     postgres?: boolean;
     mockAuth?: boolean;
@@ -88,12 +91,22 @@ export async function renderDomainApp(
     );
   }
 
-  if ((await exists(target)) && !options.force) {
+  const targetExists = await exists(target);
+  if (targetExists && options.force) {
+    await rm(target, { recursive: true, force: true });
+  } else if (targetExists && options.allowExistingEmpty) {
+    if (!(await isEmptyDirectory(target))) {
+      throw new Error(`target already exists and is not empty: ${target}`);
+    }
+  } else if (targetExists) {
     throw new Error(`target already exists: ${target}`);
   }
 
-  if (options.force) {
-    await rm(target, { recursive: true, force: true });
+  const dirtyStatus = await getGitShortStatus(source);
+  if (dirtyStatus && !options.allowDirty) {
+    throw new Error(
+      "refusing to scaffold from a dirty template source; commit or stash changes, or pass --allow-dirty",
+    );
   }
 
   await mkdir(dirname(target), { recursive: true });
@@ -115,7 +128,7 @@ export async function renderDomainApp(
 
   const rootPackage = await readJson<PackageJson>(join(source, "package.json"));
   const commit = await getGitCommit(source);
-  const dirty = (await getGitShortStatus(source)) !== "";
+  const dirty = dirtyStatus !== "";
   const appliedMigrations = await listMigrationIds(source);
   await writeTemplateMetadata(target, {
     answers,
@@ -125,6 +138,8 @@ export async function renderDomainApp(
       templateVersion: rootPackage.version,
       generatorVersion: rootPackage.version,
       templateCommit: dirty ? "working-tree" : commit,
+      templateDirty: dirty ? true : undefined,
+      templateDiffHash: dirty ? await getGitDiffHash(source) : undefined,
       appliedMigrations,
     }),
   });
@@ -243,6 +258,15 @@ async function exists(path: string) {
   try {
     await access(path);
     return true;
+  } catch {
+    return false;
+  }
+}
+
+async function isEmptyDirectory(path: string) {
+  try {
+    const entry = await stat(path);
+    return entry.isDirectory() && (await readdir(path)).length === 0;
   } catch {
     return false;
   }

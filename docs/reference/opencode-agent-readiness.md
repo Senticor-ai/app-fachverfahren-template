@@ -14,15 +14,20 @@ Artefakte beantworten die nächsten Anforderungen des OpenCode-Teams.
 | Standalone Export           | vorhanden | `scripts/scaffold-standalone-app.mjs`            |
 | Full-Repo-Scaffold          | vorhanden | `pnpm run scaffold:domain-app`                   |
 | Manifest- und Screen-Checks | vorhanden | `pnpm run check:domain-contracts`                |
+| Agent-Bootstrap             | vorhanden | `pnpm run agent:bootstrap -- --json`             |
+| Validierungsprofile         | vorhanden | `check:agent-smoke/domain/ui/release`            |
+| Golden Generated App        | vorhanden | `pnpm run test:golden-generated-app`             |
 
 ## Agenten-Workflow
 
 Vor Dateianpassungen:
 
-1. Package-Script `agent:discover` ausführen.
-2. Package-Script `agent:context` mit der App-Spezifikation ausführen.
-3. Ausgewählte Skills, Policies und Capability-Dokumente lesen.
-4. Package-Script `app:new` verwenden, wenn ein Modul aus einer Spezifikation
+1. Package-Script `agent:bootstrap -- --json` ausführen.
+2. Package-Script `agent:discover -- --json` ausführen.
+3. Package-Script `agent:context` mit der App-Spezifikation ausführen.
+4. `context.nextCommands` als geordnete Ausführungshilfe lesen.
+5. Ausgewählte Skills, Policies und Capability-Dokumente lesen.
+6. Package-Script `app:new` verwenden, wenn ein Modul aus einer Spezifikation
    erzeugt wird.
 
 Danach:
@@ -36,15 +41,20 @@ Danach:
 5. Permissions, Events, Form-Schema, Migrationen, Tests und Compliance-Profil
    ergänzen.
 6. Checks aus `agent:context` und `module.contract.yaml` ausführen.
+7. Package-Script `agent:verify -- --task <app-spec> --json` für einen
+   Report-Entwurf ausführen oder einen vorhandenen Report mit `--report <path>`
+   validieren. Abschluss-Evidenz braucht echte `commandsExecuted`.
 
 Für vollständige neue Repositories zuerst den Full-Repo-Scaffold nutzen:
 
 ```bash
-pnpm run scaffold:domain-app -- --domain <domain> --target <target-dir>
+pnpm run scaffold:domain-app -- --domain <domain> --display-name <name> --target <target-dir> --allow-existing-empty
 ```
 
 Der Scaffold erzeugt `.template/`-Provenienz und kopiert die TypeScript-CLI für
 spätere Updates.
+Ohne `--allow-dirty` verweigert der Scaffold eine nicht saubere Template-Quelle.
+`--force` bleibt für bewusstes Ersetzen reserviert.
 
 Wichtig für Server-Slices: `apps/fachverfahren-template/tsconfig.server.json`
 nimmt nur `server/` und `shared/` in den BFF-Build auf. Agenten sollen
@@ -69,6 +79,15 @@ pnpm run template:status
 pnpm run template:doctor
 pnpm run template:diff -- --to <version>
 pnpm run template:upgrade -- --from <version> --to <version> --dry-run
+```
+
+Validierungsprofile:
+
+```bash
+pnpm run check:agent-smoke
+pnpm run check:agent-domain
+pnpm run check:agent-ui
+pnpm run check:agent-release
 ```
 
 ## Standalone Export

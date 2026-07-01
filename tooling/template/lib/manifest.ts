@@ -21,6 +21,8 @@ export interface TemplateLock {
   templateSource: string;
   templateVersion: string;
   templateCommit: string;
+  templateDirty?: boolean;
+  templateDiffHash?: string;
   generatorVersion: string;
   appliedMigrations: string[];
 }
@@ -84,10 +86,12 @@ export function createLock({
   templateSource = defaultTemplateSource,
   templateVersion = defaultTemplateVersion,
   templateCommit = "working-tree",
+  templateDirty,
+  templateDiffHash,
   generatorVersion = defaultTemplateVersion,
   appliedMigrations = [],
 }: Partial<TemplateLock> = {}): TemplateLock {
-  return {
+  const lock: TemplateLock = {
     schemaVersion: templateSchemaVersion,
     templateSource,
     templateVersion,
@@ -95,6 +99,13 @@ export function createLock({
     generatorVersion,
     appliedMigrations,
   };
+  if (templateDirty !== undefined) {
+    lock.templateDirty = templateDirty;
+  }
+  if (templateDiffHash) {
+    lock.templateDiffHash = templateDiffHash;
+  }
+  return lock;
 }
 
 export async function readTemplateAnswers(

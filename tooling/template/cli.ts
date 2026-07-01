@@ -15,12 +15,12 @@ import { fileURLToPath } from "node:url";
 import { assertCleanWorktree, getGitShortStatus } from "./lib/git.ts";
 import {
   appNew,
+  buildAgentBootstrap,
   buildAgentContext,
   buildDiscovery,
   defaultTaskSpecPath,
   fetchGovernedSource,
   validateAgentDiscovery,
-  validateAgentPreflight,
   validateCapabilityCatalog,
   validateModuleBoundaries,
   validateModuleContracts,
@@ -87,6 +87,8 @@ async function main() {
       return scaffold();
     case "agent:discover":
       return agentDiscover();
+    case "agent:bootstrap":
+      return agentBootstrap();
     case "agent:context":
       return agentContext();
     case "agent:preflight":
@@ -156,6 +158,8 @@ async function main() {
       return checkSourceRegistry();
     case "test:agent-readiness":
       return testAgentReadiness();
+    case "test:golden-generated-app":
+      return testGoldenGeneratedApp();
     case "test:template-upgrades":
       return testTemplateUpgrades();
     case "test:template-upgrade-roundtrip":
@@ -175,7 +179,8 @@ async function main() {
 
 function help() {
   const commands = [
-    "scaffold --domain <slug> --target <dir> [--display-name <name>] [--force]",
+    "scaffold --domain <slug> --target <dir> [--display-name <name>] [--allow-existing-empty] [--allow-dirty] [--force]",
+    "agent:bootstrap [--json]",
     "agent:discover [--json] [--provenance]",
     "agent:context --task <app.spec.yaml> [--paths <path...>] [--json]",
     "agent:preflight [--json]",
@@ -194,6 +199,7 @@ function help() {
     "release [--json]",
     "migration:new --id <id>",
     "consumers:status|consumers:update|consumers:mr|consumers:report",
+    "test:golden-generated-app [--json]",
   ];
   writeReport({
     title: "Fachverfahren Template CLI",
@@ -207,10 +213,14 @@ async function scaffold() {
   const target = requiredOption("--target");
   const displayName = option("--display-name") ?? titleFromDomain(domain);
   const force = args.includes("--force");
+  const allowDirty = args.includes("--allow-dirty");
+  const allowExistingEmpty = args.includes("--allow-existing-empty");
   const result = await renderDomainApp(repoRoot, target, {
     domain,
     displayName,
     force,
+    allowDirty,
+    allowExistingEmpty,
     features: {
       postgres: !args.includes("--no-postgres"),
       mockAuth: !args.includes("--no-mock-auth"),
@@ -234,6 +244,27 @@ async function scaffold() {
     },
     { json: jsonMode },
   );
+}
+
+async function agentBootstrap() {
+  const bootstrap = await buildAgentBootstrap(process.cwd());
+  writeReport(
+    {
+      title: "Agent Bootstrap",
+      status: bootstrap.ready ? "ok" : "failed",
+      bootstrap,
+      sections: [
+        {
+          title: "Blockers",
+          items: bootstrap.blockers,
+        },
+      ],
+    },
+    { json: jsonMode },
+  );
+  if (!bootstrap.ready) {
+    process.exitCode = exitCodes.unavailable;
+  }
 }
 
 async function agentDiscover() {
@@ -291,11 +322,13 @@ async function agentContext() {
 }
 
 async function agentPreflight() {
-  const failures = await validateAgentPreflight(process.cwd());
+  const preflight = await buildAgentBootstrap(process.cwd());
+  const failures = preflight.blockers;
   writeReport(
     {
       title: "Agent Preflight",
       status: failures.length === 0 ? "ok" : "failed",
+      preflight,
       sections: [{ title: "Findings", items: failures }],
     },
     { json: jsonMode },
@@ -307,17 +340,24 @@ async function agentPreflight() {
 
 async function agentVerify() {
   const taskPath = option("--task") ?? defaultTaskSpecPath;
-  const result = await verifyAgentRun(process.cwd(), { taskPath });
+  const reportPath = option("--report");
+  const result = await verifyAgentRun(process.cwd(), { taskPath, reportPath });
   writeReport(
     {
       title: "Agent Verification Report",
-      status: "ok",
+      status: result.failures.length === 0 ? "ok" : "failed",
       reportPath: result.reportPath,
       report: result.report,
-      sections: [{ title: "Report", items: [result.reportPath] }],
+      sections: [
+        { title: "Report", items: [result.reportPath] },
+        { title: "Findings", items: result.failures },
+      ],
     },
     { json: jsonMode },
   );
+  if (result.failures.length > 0) {
+    process.exitCode = exitCodes.invariantFailure;
+  }
 }
 
 async function appNewCommand() {
@@ -832,6 +872,7 @@ async function checkScaffold() {
     domain: "demo-fachverfahren",
     displayName: "Demo Fachverfahren",
     force: true,
+    allowDirty: true,
   });
   const failures = [
     ...(await validateInvariants(target)),
@@ -859,6 +900,7 @@ async function checkScaffoldReproducible() {
     domain: "demo-fachverfahren",
     displayName: "Demo Fachverfahren",
     force: true,
+    allowDirty: true,
   };
   await renderDomainApp(process.cwd(), first, options);
   await renderDomainApp(process.cwd(), second, options);
@@ -1101,6 +1143,46 @@ async function testAgentReadiness() {
   }
 }
 
+async function testGoldenGeneratedApp() {
+  const root = await mkdtemp(join(tmpdir(), "golden-generated-app-"));
+  const target = join(root, "app-hundesteuer");
+  await renderDomainApp(process.cwd(), target, {
+    domain: "hundesteuer",
+    displayName: "Hundesteuer",
+    force: true,
+    allowDirty: true,
+  });
+  const appResult = await appNew(target, {
+    specPath: defaultTaskSpecPath,
+    dryRun: false,
+  });
+  const context = await buildAgentContext(target, {
+    taskPath: defaultTaskSpecPath,
+    paths: ["modules/dog-tax"],
+  });
+  const failures = [
+    ...(appResult.status === "ok" ? [] : appResult.failures),
+    ...(context.nextCommands?.length
+      ? []
+      : ["agent context missing nextCommands"]),
+    ...(await validateGeneratedScaffold(target)),
+    ...(await validateModuleContracts(target)),
+    ...(await validateModuleBoundaries(target)),
+  ];
+  await rm(root, { recursive: true, force: true });
+  writeReport(
+    {
+      title: "Golden Generated App",
+      status: failures.length === 0 ? "ok" : "failed",
+      sections: [{ title: "Findings", items: failures }],
+    },
+    { json: jsonMode },
+  );
+  if (failures.length > 0) {
+    process.exitCode = exitCodes.invariantFailure;
+  }
+}
+
 async function testTemplateUpgrades() {
   return checkScaffold();
 }
@@ -1113,6 +1195,7 @@ async function testTemplateUpgradeRoundtrip() {
     domain: "demo-fachverfahren",
     displayName: "Demo Fachverfahren",
     force: true,
+    allowDirty: true,
   };
   await renderDomainApp(process.cwd(), oldTarget, options);
   await renderDomainApp(process.cwd(), freshTarget, options);
@@ -1138,6 +1221,7 @@ async function testTemplateUpgradeCustomized() {
     domain: "demo-fachverfahren",
     displayName: "Demo Fachverfahren",
     force: true,
+    allowDirty: true,
   });
   const consumerFile = join(
     target,
@@ -1176,6 +1260,7 @@ async function testTemplateUpgradeIdempotent() {
     domain: "demo-fachverfahren",
     displayName: "Demo Fachverfahren",
     force: true,
+    allowDirty: true,
   });
   const before = await snapshotDirectory(target);
   const after = await snapshotDirectory(target);
@@ -1201,6 +1286,7 @@ async function testTemplateUpgradeAtomic() {
     domain: "demo-fachverfahren",
     displayName: "Demo Fachverfahren",
     force: true,
+    allowDirty: true,
   });
   const before = await snapshotDirectory(target);
   const after = await snapshotDirectory(target);
@@ -1274,6 +1360,7 @@ async function computeUpdatePlan({ dryRun }: { dryRun: boolean }) {
   await renderDomainApp(sourceDir, incomingRoot, {
     ...metadata.answers,
     force: true,
+    allowDirty: true,
   });
   const { changes, conflicts } = await planOwnershipUpdate({
     root: process.cwd(),
@@ -1367,15 +1454,22 @@ async function validateInvariants(root) {
     requireScript(scripts, "check:typescript-policy", failures);
     requireScript(scripts, "check:css-tokens", failures);
     requireScript(scripts, "template", failures);
+    requireScript(scripts, "agent:bootstrap", failures);
     requireScript(scripts, "agent:discover", failures);
     requireScript(scripts, "agent:context", failures);
     requireScript(scripts, "agent:preflight", failures);
+    requireScript(scripts, "agent:verify", failures);
     requireScript(scripts, "app:new", failures);
+    requireScript(scripts, "check:agent-smoke", failures);
+    requireScript(scripts, "check:agent-domain", failures);
+    requireScript(scripts, "check:agent-ui", failures);
+    requireScript(scripts, "check:agent-release", failures);
     requireScript(scripts, "check:agent-discovery", failures);
     requireScript(scripts, "check:module-contracts", failures);
     requireScript(scripts, "check:module-boundaries", failures);
     requireScript(scripts, "check:capability-catalog", failures);
     requireScript(scripts, "check:source-registry", failures);
+    requireScript(scripts, "test:golden-generated-app", failures);
     if (
       !scripts["build:packages"]?.includes(
         'pnpm --filter "./packages/**" run --if-present build',
@@ -1437,6 +1531,10 @@ async function validateGeneratedScaffold(root) {
     ".template/README.md",
     "agent.discovery.json",
     ".agents/skills/fachverfahren-app/SKILL.md",
+    ".claude/skills/fachverfahren-app/SKILL.md",
+    "docs/agents/bootstrap.md",
+    "docs/agents/codex.md",
+    "docs/agents/gemini.md",
     "platform/capabilities.json",
     "sources/registry.yaml",
     "tooling/template/cli.ts",

@@ -10,3 +10,15 @@ Agents:
 
 Tool-spezifische Dateien dürfen nur auf diese Quellen verweisen und keine
 abweichenden Regeln duplizieren.
+
+Empfohlener Ablauf:
+
+```bash
+pnpm run agent:bootstrap -- --json
+pnpm run agent:discover -- --json
+pnpm run agent:context -- --task <app-spec> --paths <module-path> --json
+```
+
+Danach `context.nextCommands` und `context.validationProfiles` verwenden. Vor
+Abschluss einen Agentenbericht mit echten `commandsExecuted` erstellen und mit
+`pnpm run agent:verify -- --task <app-spec> --report <path> --json` prüfen.

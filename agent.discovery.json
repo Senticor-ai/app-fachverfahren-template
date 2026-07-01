@@ -53,6 +53,8 @@
   "requiredFiles": [
     "AGENTS.md",
     "docs/agents/bootstrap.md",
+    "docs/agents/codex.md",
+    "docs/agents/gemini.md",
     "docs/reference/template-lifecycle.md",
     "docs/reference/test-driven-development.md",
     "docs/reference/fachverfahren-kit-components.md",
@@ -162,6 +164,10 @@
   ],
   "commands": [
     {
+      "id": "agent.bootstrap",
+      "script": "agent:bootstrap"
+    },
+    {
       "id": "agent.discover",
       "script": "agent:discover"
     },
@@ -216,6 +222,32 @@
     {
       "id": "test.agent-readiness",
       "script": "test:agent-readiness"
+    },
+    {
+      "id": "test.golden-generated-app",
+      "script": "test:golden-generated-app"
+    }
+  ],
+  "validationProfiles": [
+    {
+      "id": "agent-smoke",
+      "script": "check:agent-smoke",
+      "purpose": "Fast agent contract and scaffold metadata check."
+    },
+    {
+      "id": "agent-domain",
+      "script": "check:agent-domain",
+      "purpose": "Domain module contract, boundary and source validation."
+    },
+    {
+      "id": "agent-ui",
+      "script": "check:agent-ui",
+      "purpose": "Screen contract, Storybook and TypeScript UI validation."
+    },
+    {
+      "id": "agent-release",
+      "script": "check:agent-release",
+      "purpose": "Release-grade template, type, test and build validation."
     }
   ],
   "exitCodes": {
