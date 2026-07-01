@@ -66,10 +66,25 @@ jobs:
               ;;
           esac
 
+          validated_sha="$(git rev-parse HEAD)"
           git remote add gitlab "$mirror_url"
           remote_main_sha="$(git ls-remote --heads gitlab main | awk '{print $1}')"
-          if [ -n "$remote_main_sha" ]; then
-            git push --force-with-lease=refs/heads/main:"$remote_main_sha" gitlab "HEAD:main"
+          if [ -z "$remote_main_sha" ]; then
+            git push gitlab "HEAD:main"
+            exit 0
+          fi
+
+          git fetch gitlab main
+          if git merge-base --is-ancestor refs/remotes/gitlab/main "$validated_sha"; then
+            git push gitlab "$validated_sha:main"
           else
+            git checkout -B gitlab-main refs/remotes/gitlab/main
+            git rm -r --ignore-unmatch --quiet .
+            git checkout "$validated_sha" -- .
+            if git diff --cached --quiet; then
+              echo "GitLab main already matches the validated GitHub tree."
+              exit 0
+            fi
+            git commit -m "Mirror GitHub main ${validated_sha}"
             git push gitlab "HEAD:main"
           fi
