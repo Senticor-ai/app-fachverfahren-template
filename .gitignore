@@ -14,15 +14,9 @@ test-results/
 .DS_Store
 *.tsbuildinfo
 
-# CHOS-Code runtime artifacts — only the committed seed files under .chos/ are tracked
-.chos/*
-!.chos/README.md
-!.chos/warm-start.md
-!.chos/build-manifest.json
-!.chos/gold-checklist.json
-!.chos/governance.md
+# Laufzeit-Artefakte externer Build-/Generator-Werkzeuge gehören nicht in das offene Template.
+.chos/
 
-# Governance/Steuerung lebt IP-geschützt in CHOS-Code (packages/journeys/templates/<id>/governance.yaml)
-# und wird beim Provisionieren über den Klon gelegt — NICHT in dieses offene Template aufnehmen.
+# Extern provisionierte Steuerungsdateien werden nicht in das offene Template aufgenommen.
 governance.yaml
 dist-types/
