@@ -34,6 +34,7 @@ import { Separator } from "../ui/separator.js";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group.js";
 import { announcePoliteness, useViewState } from "../hooks/use-view-state.js";
 import { StatusRegion } from "./StatusRegion.js";
+import { formatBetrag as formatBetragKit } from "../format.js";
 
 /** Eine Gebührenposition der Aufschlüsselung (Check-Your-Answers vor dem Zahlen). */
 export interface EPaymentPosition {
@@ -85,18 +86,8 @@ interface Beleg {
  * Fällt bei unbekannter Währung NICHT auf rohe Zahlen zurück, sondern nutzt Intl-Default.
  */
 function formatBetrag(value: number, waehrung: string): string {
-  try {
-    return new Intl.NumberFormat("de-DE", {
-      style: "currency",
-      currency: waehrung,
-    }).format(value);
-  } catch {
-    // Ungültiger Währungscode: defensiv auf EUR, damit nie eine rohe Zahl ohne Einheit erscheint.
-    return new Intl.NumberFormat("de-DE", {
-      style: "currency",
-      currency: "EUR",
-    }).format(value);
-  }
+  // Zentrale, cent-bewusste Formatierung (format.ts) — teilt bei Währungs-Einheiten durch 100 + Währungs-Fallback.
+  return formatBetragKit(value, waehrung);
 }
 
 /**

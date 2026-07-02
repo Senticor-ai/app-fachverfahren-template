@@ -8,10 +8,13 @@ export async function loadPublicRuntimeConfig(): Promise<PublicRuntimeConfig> {
   try {
     // `no-store`: die Identität (Behörde/Titel) wird vom Build frisch geschrieben — nie aus dem Browser-Cache lesen,
     // sonst zeigt ein erneuter Aufruf das alte Template-Gerüst statt des generierten Verfahrens.
-    const response = await fetch("/runtime-config.json", {
-      headers: { accept: "application/json" },
-      cache: "no-store",
-    });
+    const response = await fetch(
+      `${import.meta.env.BASE_URL}runtime-config.json`,
+      {
+        headers: { accept: "application/json" },
+        cache: "no-store",
+      },
+    );
     if (!response.ok) {
       return defaultPublicRuntimeConfig;
     }

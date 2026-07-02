@@ -34,6 +34,7 @@ import { SkeletonTable } from "../ui/skeleton.js";
 import { EmptyState } from "./EmptyState.js";
 import { StatusPill } from "./StatusPill.js";
 import { useStatusRegion } from "./StatusRegion.js";
+import { formatBetrag as formatBetragKit } from "../format.js";
 
 export interface ArbeitsvorratProps<T = Record<string, unknown>> {
   config: LeistungConfig<T>;
@@ -94,12 +95,11 @@ function berechnungText(
   berechnung: Berechnung | undefined,
 ): { betrag: string; sub: string } | null {
   if (!berechnung) return null;
-  const betrag = new Intl.NumberFormat("de-DE", {
-    style: "decimal",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(berechnung.betrag);
-  return { betrag: `${betrag} ${berechnung.einheit}`, sub: berechnung.label };
+  // Zentrale, cent-bewusste Formatierung (format.ts).
+  return {
+    betrag: formatBetragKit(berechnung.betrag, berechnung.einheit),
+    sub: berechnung.label,
+  };
 }
 
 export function Arbeitsvorrat<T = Record<string, unknown>>({

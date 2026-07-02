@@ -73,7 +73,7 @@ export function applyKommuneTheme(
  */
 export async function bootKommuneTheme(): Promise<void> {
   try {
-    const r = await fetch("/runtime-config.json", {
+    const r = await fetch(`${import.meta.env.BASE_URL}runtime-config.json`, {
       cache: "no-store",
       headers: { accept: "application/json" },
     });

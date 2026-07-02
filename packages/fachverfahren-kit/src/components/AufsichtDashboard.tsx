@@ -23,6 +23,7 @@ import type {
   VorgangHistorie,
   VorgangPort,
 } from "../types.js";
+import { formatBetrag as formatBetragKit } from "../format.js";
 
 /** Aufsichts-Sicht — rein generisch über Config + Port; keine personenbezogenen Klartext-Daten. */
 export interface AufsichtDashboardProps<T = Record<string, unknown>> {
@@ -61,19 +62,9 @@ const TONE_TEXT: Record<StatusTone, string> = {
 
 /** Lokale, deterministische Währungsformatierung aus der Berechnung (Betrag + Einheit) — kein hartes „EUR". */
 function formatBetrag(betrag: number, einheit: string): string {
-  const waehrung = /eur|€/i.test(einheit) ? "EUR" : undefined;
-  const zahl = waehrung
-    ? new Intl.NumberFormat("de-DE", {
-        style: "currency",
-        currency: "EUR",
-      }).format(betrag)
-    : new Intl.NumberFormat("de-DE").format(betrag);
-  // Einheit-Suffix (z.B. „/Jahr") anhängen, falls die Berechnung es vorgibt und es nicht schon Teil der Währung ist.
-  const suffix = einheit
-    .replace(/^\s*eur\s*/i, "")
-    .replace(/^€/, "")
-    .trim();
-  return suffix && suffix !== einheit.trim() ? `${zahl} ${suffix}` : zahl;
+  // Zentrale, cent-bewusste Formatierung (format.ts): teilt bei Währungs-Einheiten durch 100 und hängt den Suffix
+  // (z. B. „/Jahr") an. Ersetzt den zuvor cent-blinden lokalen Formatierer.
+  return formatBetragKit(betrag, einheit);
 }
 
 /** Pseudonymisiert eine Vorgangsnummer für den Audit-Trail (zeigt Präfix + verkürzten Hash, nie PII/Klartext). */

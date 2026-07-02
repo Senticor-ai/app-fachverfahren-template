@@ -3,6 +3,7 @@
 export * from "./types.js";
 export * from "./store.js";
 export * from "./contract-snapshot.js";
+export * from "./format.js";
 
 // UI-Bausteine (Tailwind + shadcn/ui OSS) — konsumieren ausschließlich den Vertrag (config/port/vorgang).
 export * from "./ui/badge.js";

@@ -15,6 +15,7 @@ import type { Berechnung, LeistungConfig, Vorgang } from "../types.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "../ui/button.js";
 import { Separator } from "../ui/separator.js";
+import { formatBetrag as formatBetragKit } from "../format.js";
 
 export interface BescheidViewProps<T = Record<string, unknown>> {
   vorgang: Vorgang<T>;
@@ -24,17 +25,7 @@ export interface BescheidViewProps<T = Record<string, unknown>> {
 // ── Anzeige-Helfer (generisch, leistungs-agnostisch) ─────────────────────────────────────────
 /** Betrag inkl. Einheit formatieren: Euro-Einheiten als Währung, sonst Zahl + Einheit. */
 function formatBetrag(betrag: number, einheit: string): string {
-  if (/eur/i.test(einheit)) {
-    return new Intl.NumberFormat("de-DE", {
-      style: "currency",
-      currency: "EUR",
-    }).format(betrag);
-  }
-  const zahl = new Intl.NumberFormat("de-DE", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(betrag);
-  return `${zahl} ${einheit}`.trim();
+  return formatBetragKit(betrag, einheit);
 }
 
 /** ISO-Zeitstempel stabil-absolut als Datum rendern (kein Date.now() → keine Hydration-Diskrepanz). */

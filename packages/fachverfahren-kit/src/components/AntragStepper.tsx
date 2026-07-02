@@ -47,6 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select.js";
+import { formatBetrag as formatBetragKit } from "../format.js";
 
 // ── Pfad-Helfer: verschachteltes Antragsdaten-Objekt über "a.b.c"-Feldpfade ──────────────────
 type Antragsdaten = Record<string, unknown>;
@@ -1032,13 +1033,7 @@ function formatBetrag(b: Berechnung): string {
   return formatEuro(b.betrag, b.einheit);
 }
 function formatEuro(betrag: number, einheit: string): string {
-  if (/eur/i.test(einheit)) {
-    return new Intl.NumberFormat("de-DE", {
-      style: "currency",
-      currency: "EUR",
-    }).format(betrag);
-  }
-  return `${betrag} ${einheit}`.trim();
+  return formatBetragKit(betrag, einheit);
 }
 
 /** Feldwert für die Review-Anzeige aufbereiten (Select → Options-Label, Checkbox → ja/—). */
