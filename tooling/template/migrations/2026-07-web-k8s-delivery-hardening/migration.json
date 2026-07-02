@@ -1,0 +1,31 @@
+{
+  "id": "2026-07-web-k8s-delivery-hardening",
+  "from": ">=0.1.0-rc.1",
+  "to": "0.1.0-rc.1",
+  "mode": "review",
+  "touches": [
+    "Dockerfile",
+    "package.json",
+    ".gitlab-ci.yml",
+    ".github/workflows/ci.yml",
+    "scripts/ci-setup-node.sh",
+    "scripts/ci-validate.sh",
+    "scripts/check-web-delivery.mjs",
+    "scripts/check-k8s-delivery.mjs",
+    "scripts/check-supply-chain.sh",
+    "apps/*/server/**",
+    "apps/*/public/**",
+    "apps/*/deploy/helm/**",
+    "docs/reference/web-delivery.md",
+    "docs/reference/kubernetes-delivery.md",
+    "policy/k8s-delivery.rego"
+  ],
+  "checks": [
+    "build:server",
+    "check:web-delivery",
+    "check:k8s-delivery",
+    "test:supply-chain",
+    "check:template-invariants",
+    "check:scaffold"
+  ]
+}

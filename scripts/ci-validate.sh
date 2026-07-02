@@ -21,5 +21,9 @@ pnpm run check:precommit
 pnpm run check:dockerfile-paths
 pnpm run build:packages
 pnpm run build:app
+pnpm run build:server
+pnpm run check:web-delivery
 pnpm run test:k8s:render
+pnpm run check:k8s-delivery
+pnpm run test:supply-chain
 pnpm run evidence:build

@@ -38,20 +38,36 @@ ENV CI=true
 `ENV CI=true` sorgt dafür, dass nichtinteraktive pnpm-Schritte wie
 `pnpm prune --prod` in Kaniko stabil laufen.
 
+Basis-Images werden mit Digest gepinnt. Der Runtime-Container laeuft als
+nicht-root Benutzer und erwartet ein read-only Root-Filesystem; Kubernetes
+stellt nur `/tmp` als beschreibbares `emptyDir` bereit.
+
 Die Build-Reihenfolge ist verbindlich:
 
 ```bash
 pnpm run build:packages
 pnpm run build:app
+pnpm run build:server
 ```
 
 So existieren die `dist/`-Artefakte und TypeScript-Deklarationen der
-Workspace-Pakete, bevor die App kompiliert wird. Ein `build:server`-Schritt
-kommt erst mit der Backend-Stufe hinzu (PLAN, siehe
-`docs/reference/backend-fastify.md`). Das Dockerfile baut genau diese Kette
-und serviert das statische SPA-Bundle über
-`apps/antragsservice/scripts/serve.mts`; `check:dockerfile-paths` prüft die
-`COPY`-Quellen deterministisch gegen das Scaffold.
+Workspace-Pakete, bevor App und Fastify-Runtime kompiliert werden.
+
+## Delivery-Gates
+
+Die CI validiert zusaetzlich:
+
+```bash
+pnpm run check:web-delivery
+pnpm run test:k8s:render
+pnpm run check:k8s-delivery
+pnpm run test:supply-chain
+```
+
+`check:web-delivery` prueft Cache- und Security-Header-Vertrag,
+Service-Worker-Opt-in und Standards-Assets. `check:k8s-delivery` rendert den
+Helm-Chart und prueft ihn mit `kubeconform` und `conftest`. `test:supply-chain`
+erzeugt ein Syft-SBOM und blockiert High/Critical-Funde mit Trivy.
 
 ## pnpm-Filter
 

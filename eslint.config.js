@@ -18,6 +18,8 @@ export default tseslint.config(
       "playwright-report/**",
       "*.tsbuildinfo",
       "**/public/mockServiceWorker.js",
+      "**/public/preview-reporter.js",
+      "**/public/service-worker.js",
     ],
   },
   js.configs.recommended,

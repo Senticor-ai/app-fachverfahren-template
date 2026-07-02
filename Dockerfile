@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM registry.opencode.de/open-code/oci/nodejs:24 AS build
+FROM registry.opencode.de/open-code/oci/nodejs:24@sha256:4f6d0ed8aeda0c7d83eee77975b9d335524378f577a81722ada78d2ba1d362b6 AS build
 USER root
 WORKDIR /app
 
@@ -30,25 +30,28 @@ RUN mkdir -p "${PNPM_HOME}" \
  && pnpm install --frozen-lockfile
 
 COPY . .
-# Die Referenz-App ist ein reines Vite-SPA (KOMPOSITION des Kits): build:packages liefert die
-# Workspace-Bausteine, build:app rendert das statische Bundle nach apps/antragsservice/dist.
 RUN pnpm run build:packages \
- && pnpm run build:app
+ && pnpm run build:app \
+ && pnpm run build:server \
+ && pnpm prune --prod
 
-FROM registry.opencode.de/open-code/oci/nodejs:24
+FROM registry.opencode.de/open-code/oci/nodejs:24@sha256:4f6d0ed8aeda0c7d83eee77975b9d335524378f577a81722ada78d2ba1d362b6
 ENV NODE_ENV=production
 ENV PORT=8080
+ENV INTERNAL_PORT=9090
 ENV STATIC_DIR=/app/apps/antragsservice/dist
+ENV APP_ENABLE_SERVICE_WORKER=false
 
 USER root
 WORKDIR /app
-# Nur das statische Bundle + der abhängigkeitsfreie Static-Server werden ausgeliefert — kein App-Server,
-# keine node_modules zur Laufzeit.
+COPY --from=build --chown=0:0 /app/node_modules ./node_modules
+COPY --from=build --chown=0:0 /app/apps/antragsservice/node_modules ./apps/antragsservice/node_modules
 COPY --from=build --chown=0:0 /app/apps/antragsservice/dist ./apps/antragsservice/dist
-COPY --from=build --chown=0:0 /app/apps/antragsservice/scripts/serve.mts ./apps/antragsservice/scripts/serve.mts
+COPY --from=build --chown=0:0 /app/apps/antragsservice/dist-server ./apps/antragsservice/dist-server
+COPY --from=build --chown=0:0 /app/apps/antragsservice/package.json ./apps/antragsservice/package.json
 RUN chmod -R g=rX /app
 USER 53111
 
 EXPOSE 8080
-# TypeScript-Quelle via node type-stripping (Repo-Konvention, vgl. emit:contract) — kein Build-Schritt nötig.
-CMD ["node", "--experimental-strip-types", "apps/antragsservice/scripts/serve.mts"]
+EXPOSE 9090
+CMD ["node", "apps/antragsservice/dist-server/index.js"]

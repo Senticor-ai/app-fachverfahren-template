@@ -35,6 +35,7 @@ const ignoredNames = new Set([
   ".git",
   ".agent",
   ".pnpm",
+  ".pnpm-tools",
   ".pnpm-store",
   ".tmp",
   "coverage",
@@ -58,11 +59,15 @@ const textExtensions = new Set([
   ".json",
   ".md",
   ".mjs",
+  ".rego",
   ".sh",
+  ".svg",
   ".toml",
   ".ts",
+  ".tpl",
   ".tsx",
   ".txt",
+  ".webmanifest",
   ".yaml",
   ".yml",
 ]);
@@ -120,6 +125,12 @@ export async function renderDomainApp(
   if ((await exists(appSource)) && appSource !== appTarget) {
     await rm(appTarget, { recursive: true, force: true });
     await rename(appSource, appTarget);
+  }
+  const chartSource = join(appTarget, "deploy", "helm", "antragsservice");
+  const chartTarget = join(appTarget, "deploy", "helm", answers.domain);
+  if ((await exists(chartSource)) && chartSource !== chartTarget) {
+    await rm(chartTarget, { recursive: true, force: true });
+    await rename(chartSource, chartTarget);
   }
 
   const replacements = createReplacements(answers);
@@ -201,6 +212,8 @@ function createReplacements(answers: {
     ["senticor-app-fachverfahren-template", `senticor-app-${domain}`],
     ["@senticor/antragsservice", `@senticor/${domain}`],
     ["apps/antragsservice", `apps/${domain}`],
+    ["Antragsservice", displayName],
+    ["antragsservice", domain],
     ["fachverfahren-template", domain],
     ["Fachverfahren Template", displayName],
     ["Fachverfahren Vorlage", displayName],
@@ -219,6 +232,12 @@ async function writeEnvExample(root: string) {
       "APP_PG_URL=postgres://app:app@127.0.0.1:5432/app",
       "APP_PG_DIRECT_URL=postgres://app:app@127.0.0.1:5432/app",
       "APP_ENABLE_MOCK_AUTH=true",
+      "APP_ENABLE_SERVICE_WORKER=false",
+      "APP_CSP_MODE=enforce",
+      "APP_TRUST_PROXY=loopback",
+      "APP_ALLOWED_HOSTS=127.0.0.1:8080,localhost:8080",
+      "APP_MAX_BODY_BYTES=1048576",
+      "APP_SHUTDOWN_TIMEOUT_MS=10000",
       "VITE_API_MOCKING=disabled",
       "VITE_API_PROXY_TARGET=http://127.0.0.1:8080",
       "",

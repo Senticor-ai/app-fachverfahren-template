@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "antragsservice.fullname" . }}-runtime
+  labels:
+    {{- include "antragsservice.labels" . | nindent 4 }}
+data:
+  HOST: "0.0.0.0"
+  PORT: {{ .Values.service.targetPort | quote }}
+  INTERNAL_PORT: {{ .Values.internalService.targetPort | quote }}
+  PUBLIC_BASE_URL: {{ .Values.runtime.publicBaseUrl | quote }}
+  APP_ENABLE_SERVICE_WORKER: {{ .Values.runtime.appEnableServiceWorker | quote }}
+  APP_ENABLE_HSTS: {{ .Values.runtime.appEnableHsts | quote }}
+  APP_CSP_MODE: {{ .Values.runtime.appCspMode | quote }}
+  APP_FRAME_ANCESTORS: {{ .Values.runtime.appFrameAncestors | quote }}
+  APP_TRUST_PROXY: {{ .Values.runtime.appTrustProxy | quote }}
+  APP_ALLOWED_HOSTS: {{ .Values.runtime.appAllowedHosts | quote }}
+  APP_MAX_BODY_BYTES: {{ .Values.runtime.appMaxBodyBytes | quote }}
+  APP_SHUTDOWN_TIMEOUT_MS: {{ .Values.runtime.appShutdownTimeoutMs | quote }}
+  APP_REQUIRED_UPSTREAMS: {{ .Values.runtime.appRequiredUpstreams | quote }}
+  APP_VERSION: {{ default .Chart.AppVersion .Values.runtime.appVersion | quote }}
+  GIT_SHA: {{ .Values.runtime.gitSha | quote }}
+  BUILD_TIME: {{ .Values.runtime.buildTime | quote }}
+  IMAGE_DIGEST: {{ .Values.runtime.imageDigest | quote }}

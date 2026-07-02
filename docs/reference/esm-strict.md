@@ -12,8 +12,10 @@ Dieses Repository ist strict ESM.
 - Keine `.cjs`- oder `.cts`-Quellen
 - Implementierungscode unter `apps/`, `packages/`, `jurisdictions/` und
   `modules/` ist TypeScript-only: `.ts` oder `.tsx`. `.js`, `.jsx`, `.cjs` und
-  `.mjs` sind dort nicht erlaubt. Ausnahmen sind nur die in
-  `scripts/check-esm-policy.mjs` allowgelisteten Interop-Assets, derzeit
+  `.mjs` sind dort nicht erlaubt. Ausnahmen sind explizit erlaubte
+  Browser-Runtime-Assets wie `apps/antragsservice/public/service-worker.js`
+  und `apps/antragsservice/public/preview-reporter.js` sowie der bewusst
+  veröffentlichte Interop-Export
   `packages/fachverfahren-kit/tailwind-preset.cjs`.
 
 Der automatisierte Check läuft mit:

@@ -220,6 +220,18 @@
       "script": "check:source-registry"
     },
     {
+      "id": "check.web-delivery",
+      "script": "check:web-delivery"
+    },
+    {
+      "id": "check.k8s-delivery",
+      "script": "check:k8s-delivery"
+    },
+    {
+      "id": "test.supply-chain",
+      "script": "test:supply-chain"
+    },
+    {
       "id": "test.agent-readiness",
       "script": "test:agent-readiness"
     },

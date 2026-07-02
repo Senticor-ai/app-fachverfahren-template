@@ -58,10 +58,11 @@ spätere Updates.
 Ohne `--allow-dirty` verweigert der Scaffold eine nicht saubere Template-Quelle.
 `--force` bleibt für bewusstes Ersetzen reserviert.
 
-Wichtig für Server-Slices (PLAN): Es existiert noch kein Server. Die
-Backend-Zielarchitektur (enger `tsconfig.server.json`-Schnitt, keine direkten
-`modules/`-Imports in den Server, DTOs über `shared/` oder Paketverträge)
-steht in `docs/reference/backend-fastify.md`.
+Wichtig für Server-Slices: `apps/antragsservice/tsconfig.server.json`
+nimmt nur `server/` in den Runtime-Build auf. Agenten sollen
+fachliche Serverlogik nicht direkt aus `modules/` in den Template-Server
+importieren, sondern gemeinsame DTOs über Shared- oder Paketverträge führen
+und die Domain-Anbindung explizit registrieren.
 
 Wichtig für CI-Slices: opencode.de-Runner sind unprivilegierte Kubernetes-Pods.
 Es gibt keinen Docker-Socket und kein Docker-in-Docker. Image-Builds nutzen

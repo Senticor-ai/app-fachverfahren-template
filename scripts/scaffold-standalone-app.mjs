@@ -58,8 +58,11 @@ standalonePackage.private = true;
 standalonePackage.scripts = {
   dev: "vite",
   build: "vite build",
+  "build:server": "tsc -p tsconfig.server.json",
   preview: "vite preview",
-  typecheck: "tsc --noEmit -p tsconfig.json",
+  start: "node dist-server/index.js",
+  typecheck:
+    "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json",
 };
 
 await writeFile(

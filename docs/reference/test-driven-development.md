@@ -1,9 +1,10 @@
 # Test Driven Development
 
 > **Für Agenten: Quellen & Pflicht-Lektüre.**
-> Status: IST für Vitest-Tests, Storybook, Screen Contracts und
-> Kubernetes-/Evidence-Checks; PLAN für Backend-, MSW- und E2E-Ebenen (die
-> Scripts `test:e2e`/`test:e2e:postgres` existieren noch nicht).
+> Status: IST für Vitest-Tests, Storybook, Screen Contracts,
+> Web-Delivery-/Fastify-Runtime-Tests und Kubernetes-/Evidence-Checks; PLAN für
+> fachliche Backend-API-, MSW- und E2E-Ebenen (die Scripts
+> `test:e2e`/`test:e2e:postgres` existieren noch nicht).
 > Quellen: `package.json`-Scripts, `vitest.config.ts`, `AGENTS.md`.
 > Pflicht-Lektüre vorher: `AGENTS.md`.
 
@@ -26,8 +27,10 @@ Capabilities, API, UI, Accessibility und Evidence.
 - Naht-Berechnung: die `berechne`-Funktion der `LeistungConfig` ist rein und
   deterministisch und wird gegen die Beispielwerte des Fachkonzepts getestet.
 - Platform Contracts: Contract-Tests für Ports und Adapter.
-- Backend (PLAN): Fastify `inject`-Tests für Routen, OpenAPI-Schemas,
-  Fehlerpfade und Autorisierung — setzt die Backend-Stufe voraus.
+- Fastify-Runtime: `inject`-Tests für Delivery-Header, Health, Runtime-Config,
+  interne Endpunkte und Shutdown-Semantik.
+- Fachliche Backend-API (PLAN): Fastify `inject`-Tests für Routen,
+  OpenAPI-Schemas, Fehlerpfade und Autorisierung.
 - E2E (PLAN): eine vertikale Strecke aus Login, Rollen,
   Benutzereinstellungen, Posteingang/Ausgang und RBAC; die Scripts
   `test:e2e`/`test:e2e:postgres` existieren noch nicht.

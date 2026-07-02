@@ -1,0 +1,134 @@
+replicaCount: 2
+
+image:
+  repository: registry.example.invalid/senticor/antragsservice
+  tag: "0.1.0"
+  digest: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  automountServiceAccountToken: false
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 53111
+  runAsGroup: 53111
+  fsGroup: 53111
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 53111
+  runAsGroup: 53111
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  port: 80
+  targetPort: 8080
+
+internalService:
+  port: 9090
+  targetPort: 9090
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: antragsservice.example.invalid
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+runtime:
+  publicBaseUrl: ""
+  appEnableServiceWorker: "false"
+  appEnableHsts: "true"
+  appCspMode: enforce
+  appFrameAncestors: "'self'"
+  appTrustProxy: loopback
+  appAllowedHosts: ""
+  appMaxBodyBytes: "1048576"
+  appShutdownTimeoutMs: "10000"
+  appRequiredUpstreams: ""
+  appVersion: ""
+  gitSha: ""
+  buildTime: ""
+  imageDigest: ""
+
+secretRefs: []
+extraEnv: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+probes:
+  startup:
+    failureThreshold: 30
+    periodSeconds: 2
+  readiness:
+    failureThreshold: 2
+    periodSeconds: 5
+  liveness:
+    failureThreshold: 3
+    periodSeconds: 10
+
+terminationGracePeriodSeconds: 30
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+topologySpreadConstraints:
+  enabled: true
+  maxSkew: 1
+  topologyKey: kubernetes.io/hostname
+  whenUnsatisfiable: ScheduleAnyway
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 50
+        podAffinityTerm:
+          topologyKey: kubernetes.io/hostname
+
+networkPolicy:
+  enabled: true
+  publicIngress:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: ingress-nginx
+  monitoringIngress:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: monitoring
+  egress:
+    allowDns: true
+    allowHttps: true

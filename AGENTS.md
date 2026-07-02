@@ -12,8 +12,8 @@ Plattformpakete:
 
 - `apps/antragsservice` ist die EINE lauffähige App. Sie rendert drei Personas
   (Bürger:in · Sachbearbeitung · Aufsicht) vollständig aus EINER Konfiguration
-  und enthält selbst keine Fachlogik — nur Routing, eine Store-Instanz und die
-  Konfiguration.
+  und enthält selbst keine Fachlogik — nur Routing, eine Store-Instanz, die
+  Konfiguration und die neutrale Fastify-Web-Runtime für Delivery/Health.
 - `packages/fachverfahren-kit` liefert die generischen Bausteine
   (AntragStepper, Arbeitsvorrat, ReviewWorkspace, AufsichtDashboard, …) und den
   Typ `LeistungConfig`, aus dem die App rendert.
@@ -40,11 +40,15 @@ Scaffolds. Geplante Zielarchitektur ist ausdrücklich mit `(PLAN)` markiert.
 
 Aktuell gilt insbesondere:
 
-- Es existiert KEIN Backend/BFF: kein `server/`-Verzeichnis, kein Fastify.
-  Zielarchitektur: `docs/reference/backend-fastify.md` (PLAN).
+- Es existiert eine neutrale Fastify-Web-Runtime unter
+  `apps/antragsservice/server/` für SPA-Auslieferung, Runtime-Konfiguration,
+  Security-/Cache-Header, Health, Metrics und Build-Info.
+- Fachliche API-, OpenAPI-, Postgres-E2E- und Domain-Route-Schichten sind
+  weiterhin Ausbauschritte; Zielarchitektur:
+  `docs/reference/backend-fastify.md`.
 - Es existiert KEIN MSW-Mocking: `docs/reference/mock-data-msw.md` (PLAN).
 - Es existieren KEINE E2E-Suiten und keine Scripts `test:e2e`,
-  `test:e2e:postgres`, `build:server`, `dev:postgres`, `dev:all`.
+  `test:e2e:postgres`, `dev:postgres`, `dev:all`.
 - `modules/` enthält KEINE Instanz (nur Dokumentation). Der Generator-Pfad
   `app:new` kann dort ein Modul-Gerüst erzeugen, aber die laufende App bindet
   Module NICHT ein (kein Modul-Mount). Details: `modules/README.md`.
@@ -105,6 +109,8 @@ Die realen Routen der App (`apps/antragsservice/src/App.tsx`):
 - Die dünne App-Komposition (`App.tsx`, `store.ts`, `main.tsx`,
   `AppErrorBoundary.tsx`, `styles.css`, `index.html`, `vite.config.ts`): für
   einen Fachverfahren-Build tabu — die Naht reicht.
+- Die neutrale Web-Runtime (`apps/antragsservice/server/`) ist
+  Plattform-/Delivery-Arbeit, kein Nebenprodukt eines Fachverfahren-Builds.
 - Template-Provenienz in generierten Repositories (`.template/*`): nur über
   die Template-CLI.
 
@@ -133,27 +139,27 @@ werden NIE als Fakt behauptet. Konvention:
 
 Jede Zeile beschreibt den IST-Stand. Zeilen mit `(PLAN)` existieren noch nicht.
 
-| Pfad                                                              | Rolle                                                    | Agenten-Regel                                        |
-| ----------------------------------------------------------------- | -------------------------------------------------------- | ---------------------------------------------------- |
-| `apps/antragsservice/src/leistung.config.ts`                      | DIE EINE Austausch-Naht (`LeistungConfig`)               | Einzige Datei eines Fachverfahren-Builds             |
-| `apps/antragsservice/leistung.contract.json`                      | Generierter Vertrags-Snapshot                            | Nur via `emit:contract`                              |
-| `apps/antragsservice/src/`                                        | Dünne Komposition (Routing, Store, Shell)                | Für Verfahrens-Builds nicht ändern                   |
-| `packages/fachverfahren-kit/src/types.ts`                         | Naht-Vertrag (`LeistungConfig`, `Berechnung`, `Vorgang`) | Lesen; Änderungen sind Plattformarbeit               |
-| `packages/fachverfahren-kit/src/components/`                      | Fertige Fachverfahren-Bausteine                          | Importieren, nie kopieren                            |
-| `packages/fachverfahren-kit/src/ui/`                              | shadcn/Radix/Tailwind-Primitive                          | Nur nutzen, wenn kein Baustein passt                 |
-| `packages/fachverfahren-kit/src/stories/`                         | Storybook-Review-Fläche                                  | Stories bei Kit-Änderungen pflegen                   |
-| `packages/public-sector-ui/src/`                                  | Public-Sector-UI-Fassade + Stories                       | UI-Vertrag; ShadCN bleibt Implementierungsdetail     |
-| `packages/platform-contracts/`                                    | Capability-Ports                                         | Fachlogik nutzt Ports, nie Provider direkt           |
-| `packages/public-sector-sdk/`                                     | Authorization, RBAC, Audit, Domain-Kernel                | Rollen über RBAC-Registry erweitern                  |
-| `packages/app-store-postgres/`                                    | PostgreSQL-Migrator + Plattformtabellen                  | Migrationen über `db:migrate`                        |
-| `jurisdictions/de`, `jurisdictions/eu`                            | Rechtsraum-Packs                                         | Keine `country === "DE"`-Logik in der App            |
-| `modules/`                                                        | Leerer Zielort des Generator-Pfads                       | `modules/README.md` lesen; keine Instanz (PLAN)      |
-| `docs/examples/hundesteuer/`                                      | Externes Beispiel (Spec + Prompt)                        | Nie in Runtime-Code kopieren                         |
-| `tooling/template/cli.ts`                                         | Template-Lifecycle- und Agent-CLI                        | Verhalten nur hier, hinter `pnpm run template`       |
-| `scripts/`                                                        | Deterministische Checks und Werkzeuge                    | Checks sind die Wahrheit, kein LLM-Urteil            |
-| `schemas/`, `platform/capabilities.json`, `sources/registry.yaml` | Maschinenlesbare Verträge und Kataloge                   | Über `check:*`-Scripts validiert                     |
-| `agent.discovery.json`                                            | Öffentliche Discovery-API für Agenten                    | Muss `check:agent-discovery` bestehen                |
-| `apps/antragsservice/server/`                                     | BFF/Backend (PLAN)                                       | Existiert nicht; `docs/reference/backend-fastify.md` |
+| Pfad                                                              | Rolle                                                    | Agenten-Regel                                      |
+| ----------------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------- |
+| `apps/antragsservice/src/leistung.config.ts`                      | DIE EINE Austausch-Naht (`LeistungConfig`)               | Einzige Datei eines Fachverfahren-Builds           |
+| `apps/antragsservice/leistung.contract.json`                      | Generierter Vertrags-Snapshot                            | Nur via `emit:contract`                            |
+| `apps/antragsservice/src/`                                        | Dünne Komposition (Routing, Store, Shell)                | Für Verfahrens-Builds nicht ändern                 |
+| `packages/fachverfahren-kit/src/types.ts`                         | Naht-Vertrag (`LeistungConfig`, `Berechnung`, `Vorgang`) | Lesen; Änderungen sind Plattformarbeit             |
+| `packages/fachverfahren-kit/src/components/`                      | Fertige Fachverfahren-Bausteine                          | Importieren, nie kopieren                          |
+| `packages/fachverfahren-kit/src/ui/`                              | shadcn/Radix/Tailwind-Primitive                          | Nur nutzen, wenn kein Baustein passt               |
+| `packages/fachverfahren-kit/src/stories/`                         | Storybook-Review-Fläche                                  | Stories bei Kit-Änderungen pflegen                 |
+| `packages/public-sector-ui/src/`                                  | Public-Sector-UI-Fassade + Stories                       | UI-Vertrag; ShadCN bleibt Implementierungsdetail   |
+| `packages/platform-contracts/`                                    | Capability-Ports                                         | Fachlogik nutzt Ports, nie Provider direkt         |
+| `packages/public-sector-sdk/`                                     | Authorization, RBAC, Audit, Domain-Kernel                | Rollen über RBAC-Registry erweitern                |
+| `packages/app-store-postgres/`                                    | PostgreSQL-Migrator + Plattformtabellen                  | Migrationen über `db:migrate`                      |
+| `jurisdictions/de`, `jurisdictions/eu`                            | Rechtsraum-Packs                                         | Keine `country === "DE"`-Logik in der App          |
+| `modules/`                                                        | Leerer Zielort des Generator-Pfads                       | `modules/README.md` lesen; keine Instanz (PLAN)    |
+| `docs/examples/hundesteuer/`                                      | Externes Beispiel (Spec + Prompt)                        | Nie in Runtime-Code kopieren                       |
+| `tooling/template/cli.ts`                                         | Template-Lifecycle- und Agent-CLI                        | Verhalten nur hier, hinter `pnpm run template`     |
+| `scripts/`                                                        | Deterministische Checks und Werkzeuge                    | Checks sind die Wahrheit, kein LLM-Urteil          |
+| `schemas/`, `platform/capabilities.json`, `sources/registry.yaml` | Maschinenlesbare Verträge und Kataloge                   | Über `check:*`-Scripts validiert                   |
+| `agent.discovery.json`                                            | Öffentliche Discovery-API für Agenten                    | Muss `check:agent-discovery` bestehen              |
+| `apps/antragsservice/server/`                                     | Fastify-Web-Runtime                                      | Plattform-/Delivery-Arbeit; keine Fachlogik direkt |
 
 ## Sprache und Benennung
 
@@ -171,7 +177,7 @@ Jede Zeile beschreibt den IST-Stand. Zeilen mit `(PLAN)` existieren noch nicht.
 - Implementierungsquellen sind TypeScript-only: unter `apps/`, `packages/`,
   `jurisdictions/` und `modules/` sind nur `.ts` und `.tsx` erlaubt.
   Ausnahmen sind ausschließlich die in `scripts/check-esm-policy.mjs`
-  allowgelisteten Interop-Assets.
+  allowgelisteten Interop- und Browser-Runtime-Assets.
 - `pnpm run check:esm` und `pnpm run check:typescript-policy` müssen bestehen.
 
 ## UI
@@ -260,11 +266,11 @@ Die reale Build-Kette ist:
 ```bash
 pnpm run build:packages
 pnpm run build:app
+pnpm run build:server
 ```
 
-`build:server` existiert nicht (PLAN, Teil der Backend-Zielarchitektur). Das
-Dockerfile baut genau diese Kette und serviert das statische SPA-Bundle über
-`apps/antragsservice/scripts/serve.mts`; `check:dockerfile-paths` hält die
+Das Dockerfile baut genau diese Kette und startet die Fastify-Web-Runtime aus
+`apps/antragsservice/dist-server/index.js`; `check:dockerfile-paths` hält die
 `COPY`-Quellen deterministisch mit dem Scaffold synchron.
 
 Bei pnpm-Filterbefehlen steht `--filter` vor `run`:
@@ -319,7 +325,11 @@ pnpm run check:storybook
 pnpm run check:css-tokens
 pnpm run check:agent-discovery
 pnpm run check:domain-contracts
+pnpm run build:server
+pnpm run check:web-delivery
 pnpm run test:k8s:render
+pnpm run check:k8s-delivery
+pnpm run test:supply-chain
 pnpm run evidence:build
 pnpm run test:template
 pnpm run check:template-invariants

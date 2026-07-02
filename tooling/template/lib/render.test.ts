@@ -11,8 +11,8 @@ describe("domain app rendering", () => {
       const first = join(root, "first");
       const second = join(root, "second");
       const options = {
-        domain: "antragsservice",
-        displayName: "Antragsservice",
+        domain: "demo-k8s",
+        displayName: "Demo K8s",
         force: true,
         allowDirty: true,
       };
@@ -36,9 +36,29 @@ describe("domain app rendering", () => {
       expect(firstAnswers).toBe(secondAnswers);
       expect(firstLock).not.toContain(tmpdir());
       expect(firstLock).not.toContain(first);
-      expect(await readFile(join(first, "package.json"), "utf8")).toContain(
-        "@senticor/antragsservice",
-      );
+      const packageJson = await readFile(join(first, "package.json"), "utf8");
+      expect(packageJson).toContain("@senticor/demo-k8s");
+      expect(packageJson).not.toContain("@senticor/antragsservice");
+      await expect(
+        readFile(
+          join(
+            first,
+            "apps",
+            "demo-k8s",
+            "deploy",
+            "helm",
+            "demo-k8s",
+            "Chart.yaml",
+          ),
+          "utf8",
+        ),
+      ).resolves.toContain("name: demo-k8s");
+      expect(
+        await readFile(
+          join(first, "scripts", "check-k8s-delivery.mjs"),
+          "utf8",
+        ),
+      ).not.toContain("apps/antragsservice/deploy/helm/antragsservice");
       expect(
         await readFile(join(first, "tooling", "template", "cli.ts"), "utf8"),
       ).toContain("template");
