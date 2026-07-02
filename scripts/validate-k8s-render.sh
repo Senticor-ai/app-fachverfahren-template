@@ -18,11 +18,15 @@ if [ -n "${charts}" ]; then
     echo "missing required command: helm" >&2
     exit 1
   }
-  for chart_file in ${charts}; do
+  # zeilenweise statt Wort-Splitting: Pfade duerfen Leerzeichen enthalten
+  while IFS= read -r chart_file; do
+    [ -n "${chart_file}" ] || continue
     chart_dir="$(dirname "${chart_file}")"
     echo "==> Rendering ${chart_dir#"${repo_root}"/}"
     helm template "$(basename "${chart_dir}")" "${chart_dir}" >/dev/null
-  done
+  done <<CHARTS_EOF
+${charts}
+CHARTS_EOF
 fi
 
 if [ -n "${overlays}" ]; then
@@ -30,10 +34,13 @@ if [ -n "${overlays}" ]; then
     echo "missing required command: kubectl" >&2
     exit 1
   }
-  for overlay in ${overlays}; do
+  while IFS= read -r overlay; do
+    [ -n "${overlay}" ] || continue
     echo "==> Rendering ${overlay#"${repo_root}"/}"
     KUBECONFIG=/dev/null kubectl kustomize "${overlay}" >/dev/null
-  done
+  done <<OVERLAYS_EOF
+${overlays}
+OVERLAYS_EOF
 fi
 
 echo "k8s render validation passed"
