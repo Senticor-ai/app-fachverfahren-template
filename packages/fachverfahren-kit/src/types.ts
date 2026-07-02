@@ -126,6 +126,10 @@ export interface FeldDef {
    *  + `wenn`), Format, Bereich, erlaubte Werte — jede mit `normRef`. Der reine Interpreter wertet sie aus; ein
    *  Feld ohne `regeln` verhält sich unverändert. */
   regeln?: FeldRegel[];
+  /** PLAUSIBILITÄTS-HINWEISE als DATEN: weiche, NICHT sperrende Hinweise, die erscheinen, wenn ihre `wenn`-Bedingung
+   *  über die Antragsdaten erfüllt ist (z. B. „Wert ungewöhnlich hoch — bitte prüfen"). Anders als `regeln` blockieren
+   *  sie den Antrag NIE. Der reine Interpreter (`feldHinweise`) wertet sie aus; ein Feld ohne `hinweise` ist unverändert. */
+  hinweise?: FeldHinweis[];
 }
 export interface StepDef {
   id: string;
@@ -364,6 +368,20 @@ export interface FeldRegel {
   /** Fehlermeldung bei Verletzung (sonst eine generische Meldung). */
   meldung?: string;
   /** Norm-Provenienz der Regel. */
+  normRef?: NormRef;
+}
+
+/** Ein PLAUSIBILITÄTS-HINWEIS als DATEN — ein weicher, NICHT sperrender Hinweis am Feld, der erscheint, sobald seine
+ *  `wenn`-Bedingung über die Antragsdaten erfüllt ist. Erhöht die Automation (frühe, kontextsensitive Rückmeldung),
+ *  ohne den Antrag zu blockieren — `ton: "warn"` mahnt zur Prüfung, `ton: "info"` erklärt neutral. Generisch. */
+export interface FeldHinweis {
+  /** Bedingung, unter der der Hinweis erscheint (fehlt ⇒ Hinweis gilt immer). */
+  wenn?: Bedingung;
+  /** Der Hinweistext (verfahrensspezifisch als DATEN — nie im Kit-Code). */
+  text: string;
+  /** Ton: neutral erklärend („info", Default) oder aufmerksam machend („warn"). NIE sperrend. */
+  ton?: "info" | "warn";
+  /** Optionale Norm-Provenienz des Hinweises. */
   normRef?: NormRef;
 }
 

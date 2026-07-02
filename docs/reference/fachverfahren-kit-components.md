@@ -35,6 +35,7 @@ not carry copied component templates.
 - `BundIDLoginForm`
 - `AntragStepper`
 - `DateiUpload`
+- `DokumentExtraktion`
 - `AdressValidierung`
 - `ConsentBanner`
 - `EPaymentPanel`

@@ -23,6 +23,7 @@ import {
 import { ErrorSummary, type FieldError } from "./ErrorSummary.js";
 import { useStatusRegion } from "./StatusRegion.js";
 import { DateiUpload } from "./DateiUpload.js";
+import { DokumentExtraktion } from "./DokumentExtraktion.js";
 import {
   AdressValidierung,
   type AdressTreffer,
@@ -52,9 +53,14 @@ import {
   effektiveBerechnung,
   effektiveNachweise,
   feldFehlerVollstaendig,
+  feldHinweise,
   stepGueltigVollstaendig,
   type RegelKontext,
 } from "../lib/interpreter.js";
+import {
+  extraktionsZielFelder,
+  type DokumentExtraktionPort,
+} from "../lib/dokument-extraktion.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "../ui/button.js";
 import { Card } from "../ui/card.js";
@@ -163,6 +169,10 @@ export interface AntragStepperProps<T extends Antragsdaten = Antragsdaten> {
   config: LeistungConfig<T>;
   port: VorgangPort<T>;
   onDone: (vorgang: Vorgang<T>) => void;
+  /** OPTIONAL: ein Dokument-Extraktions-PORT (KI/OCR). Ist er gesetzt, erscheint im ersten Schritt der
+   *  DokumentExtraktion-Assistent (Upload → Vorschläge → Bestätigung → Feld befüllt). Fehlt er, ist der
+   *  Antrag exakt wie bisher — rein additiv, vendor-neutral (Stub im Kit, echte Bindung in PROD). */
+  extraktionPort?: DokumentExtraktionPort | undefined;
 }
 
 /** Der geführte Bürger-Antrag — rendert `config.antrag.steps` dynamisch + Review als letzten Schritt. */
@@ -170,6 +180,7 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
   config,
   port,
   onDone,
+  extraktionPort,
 }: AntragStepperProps<T>): React.ReactElement {
   // Auswahl-Optionen einmalig auflösen: Felder mit `optionsRef` ziehen ihre Optionen aus `config.datenlisten` ODER
   // `config.codelisten` (data-driven, z. B. eine Rassenliste) — ab hier lesen ALLE Funktionen nur noch
@@ -181,6 +192,9 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
   );
   const reviewIndex = steps.length; // virtueller Review-Schritt nach allen Fach-Schritten
   const lastIndex = reviewIndex;
+
+  // Extrahierbare Zielfelder (data-driven aus den Schritten) — nur relevant, wenn ein `extraktionPort` gesetzt ist.
+  const zielFelder = useMemo(() => extraktionsZielFelder(steps), [steps]);
 
   const [stepIdx, setStepIdx] = useState(0);
   const [daten, setDaten] = useState<Antragsdaten>({});
@@ -400,6 +414,18 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
             title={steps[stepIdx]!.titel}
             sub={steps[stepIdx]!.beschreibung}
           >
+            {/* OPTIONAL (nur wenn ein extraktionPort gesetzt ist): KI-/OCR-Assistent im ERSTEN Schritt —
+                Dokument hochladen → Feld-Vorschläge mit Konfidenz → bestätigen/korrigieren → Feld befüllt.
+                Rein additiv; fehlt der Port, ist der Antrag unverändert. */}
+            {stepIdx === 0 && extraktionPort && zielFelder.length > 0 ? (
+              <DokumentExtraktion
+                zielFelder={zielFelder}
+                port={extraktionPort}
+                onUebernehmen={(feldName, wert) => setFeld(feldName, wert)}
+                className="mb-6"
+              />
+            ) : null}
+
             <form
               autoComplete="on"
               onSubmit={(e) => e.preventDefault()}
@@ -411,6 +437,7 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
                   id={feldDomId(idPrefix, feld.name)}
                   feld={feld}
                   wert={getPath(daten, feld.name)}
+                  daten={daten}
                   fehler={feldFehlerVollstaendig(feld, daten, config)}
                   showErrors={showErrors}
                   onChange={(v) => setFeld(feld.name, v)}
@@ -748,6 +775,7 @@ function FeldRenderer({
   id: idProp,
   feld,
   wert,
+  daten,
   fehler,
   showErrors,
   onChange,
@@ -757,6 +785,8 @@ function FeldRenderer({
   id?: string | undefined;
   feld: FeldDef;
   wert: unknown;
+  /** GESAMTE Antragsdaten — für die bedingten Plausibilitäts-Hinweise (`feldHinweise` wertet über alle Felder aus). */
+  daten: Antragsdaten;
   fehler: string | null;
   showErrors: boolean;
   onChange: (value: unknown) => void;
@@ -775,8 +805,15 @@ function FeldRenderer({
   // ids für aria-describedby: Fehlertext UND/ODER Hinweis ans Control koppeln (Screenreader liest beide vor).
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
+  const plausiId = `${id}-plausi`;
+  // Plausibilitäts-Hinweise (weich, nicht sperrend, data-driven): über die GESAMTEN Antragsdaten ausgewertet.
+  const plausiHinweise = feldHinweise(feld, daten);
   const describedBy =
-    [sichtbarerFehler ? errorId : null, feld.hint ? hintId : null]
+    [
+      sichtbarerFehler ? errorId : null,
+      feld.hint ? hintId : null,
+      plausiHinweise.length > 0 ? plausiId : null,
+    ]
       .filter(Boolean)
       .join(" ") || undefined;
 
@@ -791,6 +828,29 @@ function FeldRenderer({
       error={sichtbarerFehler ?? undefined}
       errorId={errorId}
       hintId={hintId}
+      hinweise={
+        plausiHinweise.length > 0 ? (
+          <ul
+            id={plausiId}
+            role="note"
+            className="space-y-1"
+            aria-live="polite"
+          >
+            {plausiHinweise.map((h, i) => (
+              <li
+                key={i}
+                className={cn(
+                  "flex items-start gap-1.5 text-sm",
+                  h.ton === "warn" ? "text-status-warn" : "text-status-info",
+                )}
+              >
+                <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>{h.text}</span>
+              </li>
+            ))}
+          </ul>
+        ) : undefined
+      }
     >
       {renderControl()}
     </Field>
@@ -1201,6 +1261,7 @@ function Field({
   hint,
   errorId,
   hintId,
+  hinweise,
 }: {
   htmlFor: string;
   label: string;
@@ -1215,6 +1276,8 @@ function Field({
   errorId?: string | undefined;
   /** id des Hinweistexts (für aria-describedby des Controls). Optional. */
   hintId?: string | undefined;
+  /** Weiche Plausibilitäts-Hinweise (NICHT sperrend) — unter Fehler/Hilfetext, in der Feld-Spalte. Optional. */
+  hinweise?: React.ReactNode | undefined;
 }) {
   return (
     <div className={cn("flex flex-col gap-2", wide ? "sm:col-span-2" : "")}>
@@ -1256,6 +1319,7 @@ function Field({
           {hint}
         </p>
       ) : null}
+      {hinweise}
     </div>
   );
 }

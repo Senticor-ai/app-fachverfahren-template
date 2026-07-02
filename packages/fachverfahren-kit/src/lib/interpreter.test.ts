@@ -12,6 +12,7 @@ import {
   effektiveNachweise,
   evalBedingung,
   feldFehlerVollstaendig,
+  feldHinweise,
   feldRegelFehler,
   interpretNachweise,
   interpretTarif,
@@ -373,6 +374,62 @@ describe("feldRegelFehler — norm-abgeleitete Feldregeln", () => {
     expect(
       stepGueltigVollstaendig(step, { objekt: { kategorie: "standard" } }),
     ).toBe(true);
+  });
+});
+
+// ── feldHinweise (weiche, nicht sperrende Plausibilitäts-Hinweise) ───────────────
+describe("feldHinweise — bedingte, nicht sperrende Hinweise", () => {
+  it("liefert nur die Hinweise, deren `wenn` erfüllt ist (Bedingung über die Antragsdaten)", () => {
+    const f = feld({
+      name: "posten.anzahl",
+      typ: "number",
+      hinweise: [
+        {
+          wenn: { feld: "posten.anzahl", op: ">", wert: 10 },
+          text: "Ungewöhnlich hoch — bitte prüfen.",
+          ton: "warn",
+        },
+        { text: "Immer sichtbarer Hinweis." },
+      ],
+    });
+    // anzahl 12 → beide Hinweise (bedingter + unbedingter)
+    const aktiv = feldHinweise(f, { posten: { anzahl: 12 } });
+    expect(aktiv.map((h) => h.text)).toEqual([
+      "Ungewöhnlich hoch — bitte prüfen.",
+      "Immer sichtbarer Hinweis.",
+    ]);
+    expect(aktiv[0]!.ton).toBe("warn");
+    expect(aktiv[1]!.ton).toBe("info"); // Default-Ton
+  });
+
+  it("blendet den bedingten Hinweis aus, wenn `wenn` nicht erfüllt ist", () => {
+    const f = feld({
+      name: "posten.anzahl",
+      typ: "number",
+      hinweise: [
+        {
+          wenn: { feld: "posten.anzahl", op: ">", wert: 10 },
+          text: "Ungewöhnlich hoch — bitte prüfen.",
+        },
+      ],
+    });
+    expect(feldHinweise(f, { posten: { anzahl: 3 } })).toEqual([]);
+  });
+
+  it("Hinweise sind NICHT sperrend (feldFehlerVollstaendig bleibt unberührt)", () => {
+    const f = feld({
+      name: "posten.anzahl",
+      typ: "number",
+      hinweise: [{ text: "Nur ein Hinweis." }],
+    });
+    // trotz aktivem Hinweis kein Fehler → der Antrag wird nicht blockiert
+    expect(feldFehlerVollstaendig(f, { posten: { anzahl: 999 } })).toBeNull();
+    expect(feldHinweise(f, { posten: { anzahl: 999 } })).toHaveLength(1);
+  });
+
+  it("ein Feld ohne `hinweise` liefert eine leere Liste", () => {
+    const f = feld({ name: "x", typ: "text" });
+    expect(feldHinweise(f, {})).toEqual([]);
   });
 });
 

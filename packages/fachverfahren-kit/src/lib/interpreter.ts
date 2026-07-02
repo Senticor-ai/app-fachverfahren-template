@@ -16,6 +16,7 @@ import type {
   FeldRegel,
   LeistungConfig,
   Nachweis,
+  NormRef,
   StepDef,
   Tarif,
 } from "../types.js";
@@ -277,6 +278,33 @@ export function feldFehlerVollstaendig(
     feldFehler(feld, getPath(daten, feld.name)) ??
     feldRegelFehler(feld, daten, kontext)
   );
+}
+
+// ── Plausibilitäts-Hinweise (weiche, NICHT sperrende Rückmeldung) ─────────────────────────────────
+/** Ein AKTIVER Plausibilitäts-Hinweis eines Felds (Bedingung erfüllt) — für die Anzeige aufbereitet. */
+export interface FeldHinweisAktiv {
+  text: string;
+  ton: "info" | "warn";
+  normRef?: NormRef;
+}
+
+/** Wertet die `hinweise` eines Felds über die (gesamten) Antragsdaten aus und liefert die AKTIVEN Hinweise (deren
+ *  `wenn` erfüllt ist). Rein zusätzlich: Hinweise blockieren NIE (fließen nicht in `feldFehlerVollstaendig`), sie
+ *  geben nur frühe, kontextsensitive Rückmeldung. Ein Feld ohne `hinweise` liefert `[]`. */
+export function feldHinweise(
+  feld: FeldDef,
+  daten: Antragsdaten,
+): FeldHinweisAktiv[] {
+  const out: FeldHinweisAktiv[] = [];
+  for (const h of feld.hinweise ?? []) {
+    if (!evalBedingung(h.wenn, daten)) continue;
+    out.push({
+      text: h.text,
+      ton: h.ton ?? "info",
+      ...(h.normRef ? { normRef: h.normRef } : {}),
+    });
+  }
+  return out;
 }
 
 /** Ein Schritt ist gültig, wenn KEIN Feld einen (vollständigen) Fehler meldet — inklusive der `regeln`. */

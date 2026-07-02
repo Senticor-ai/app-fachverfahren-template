@@ -7,6 +7,8 @@ export * from "./format.js";
 // Business-Logik als DATEN: Feldwert-/Options-Auflösung + der generische reine Interpreter (Tarif/Regeln/Codelisten).
 export * from "./lib/antrag-felder.js";
 export * from "./lib/interpreter.js";
+// KI-Extraktions-PORT (Dokument → Feld-Vorschläge mit Konfidenz) — vendor-neutral, Stub-Default.
+export * from "./lib/dokument-extraktion.js";
 
 // UI-Bausteine (Tailwind + shadcn/ui OSS) — konsumieren ausschließlich den Vertrag (config/port/vorgang).
 export * from "./ui/badge.js";
@@ -34,6 +36,7 @@ export * from "./components/BescheidView.js";
 export * from "./components/AuditTimeline.js";
 export * from "./components/ReportingPanel.js";
 export * from "./components/DateiUpload.js";
+export * from "./components/DokumentExtraktion.js";
 export * from "./components/AdressValidierung.js";
 export * from "./components/ConsentBanner.js";
 export * from "./components/KommandoPalette.js";
