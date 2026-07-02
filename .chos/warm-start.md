@@ -13,17 +13,17 @@ existiert. Der häufigste und teuerste Fehler ist, einen eigenen `server/`, ein 
 
 ## Was bereits FERTIG ist (NICHT neu bauen)
 
-| Baustein                                                      | Ort                                                  | Du nutzt es durch                                                     |
-| ------------------------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------- |
-| Fastify-Server (App-Factory, OpenAPI, AJV, Session, Health)   | `apps/fachverfahren-template/server/`                | Modul-Routen einhängen (`modules/<domain>/server/routes.ts`)          |
-| UX-Komponenten (BITV, shadcn/Tailwind+KERN, Storybook)        | `packages/public-sector-ui/`                         | **importieren** (`@senticor/public-sector-ui`), nie nachbauen         |
-| Plattform-Ports (Identity/Payment/Mailbox/Audit/Workflow/…)   | `packages/platform-contracts/`                       | Ports aufrufen, nie Provider direkt                                   |
-| Domain-Kernel/Authz/Audit/Manifest                            | `packages/public-sector-sdk/`                        | `@senticor/public-sector-sdk`                                         |
-| App-Shell + Surfaces + MSW-Mocks + i18n                       | `apps/fachverfahren-template/src/`                   | Modul-Screens werden hier sichtbar                                    |
-| **Generischer Modul-Mount** (App entdeckt Module automatisch) | `apps/fachverfahren-template/src/app/ModuleHost.tsx` | `modules/<domain>/ui/screens.tsx` anlegen → erscheint live in der App |
-| Qualitäts-Gates (geerdet, kein LLM-Judge)                     | `scripts/check-*.mjs`, `tooling/template/`           | `pnpm run agent:verify` & `check:*`                                   |
-| **Gefüllte Referenz** (kompiliert!)                           | `modules/neutral-example/`                           | Form kopieren, Werte ersetzen                                         |
-| **Leeres Delta-Skelett**                                      | `modules/_template/`                                 | nach `modules/<domain>/` klonen                                       |
+| Baustein                                                      | Ort                                                                                    | Du nutzt es durch                                                     |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Fastify-Server (App-Factory, OpenAPI, AJV, Session, Health)   | `apps/antragsservice/ (kein eigener Server — Kit-Store; Backend folgt als eigene App)` | Modul-Routen einhängen (`modules/<domain>/server/routes.ts`)          |
+| UX-Komponenten (BITV, shadcn/Tailwind+KERN, Storybook)        | `packages/public-sector-ui/`                                                           | **importieren** (`@senticor/public-sector-ui`), nie nachbauen         |
+| Plattform-Ports (Identity/Payment/Mailbox/Audit/Workflow/…)   | `packages/platform-contracts/`                                                         | Ports aufrufen, nie Provider direkt                                   |
+| Domain-Kernel/Authz/Audit/Manifest                            | `packages/public-sector-sdk/`                                                          | `@senticor/public-sector-sdk`                                         |
+| App-Shell + Surfaces + MSW-Mocks + i18n                       | `apps/antragsservice/src/`                                                             | Modul-Screens werden hier sichtbar                                    |
+| **Generischer Modul-Mount** (App entdeckt Module automatisch) | `apps/antragsservice/src/leistung.config.ts (EINE Austausch-Naht)`                     | `modules/<domain>/ui/screens.tsx` anlegen → erscheint live in der App |
+| Qualitäts-Gates (geerdet, kein LLM-Judge)                     | `scripts/check-*.mjs`, `tooling/template/`                                             | `pnpm run agent:verify` & `check:*`                                   |
+| **Gefüllte Referenz** (kompiliert!)                           | `modules/neutral-example/`                                                             | Form kopieren, Werte ersetzen                                         |
+| **Leeres Delta-Skelett**                                      | `modules/_template/`                                                                   | nach `modules/<domain>/` klonen                                       |
 
 ## Der einzige Weg (5 Schritte)
 

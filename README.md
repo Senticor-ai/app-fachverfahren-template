@@ -36,7 +36,7 @@ Capability-Ports modelliert.
 
 ## Deliverables
 
-- `apps/fachverfahren-template`: dünne React/BFF-Vorlage für eine konkrete App.
+- `apps/antragsservice`: die EINE dünne Kit-Kompositions-App (3 Personas); der governte Build überschreibt nur `src/leistung.config.ts`.
 - `packages/platform-contracts`: Capability-Ports für Identität, Datenaustausch,
   Nachweisabruf, Zahlung, Postfach und weitere Verwaltungsfähigkeiten.
 - `packages/public-sector-sdk`: administrativer Domain-Kernel,

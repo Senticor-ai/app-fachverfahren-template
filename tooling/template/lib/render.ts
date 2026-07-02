@@ -115,7 +115,7 @@ export async function renderDomainApp(
     filter: (path) => shouldCopy(path, source),
   });
 
-  const appSource = join(target, "apps", "fachverfahren");
+  const appSource = join(target, "apps", "antragsservice");
   const appTarget = join(target, "apps", answers.domain);
   if ((await exists(appSource)) && appSource !== appTarget) {
     await rm(appTarget, { recursive: true, force: true });
@@ -199,8 +199,8 @@ function createReplacements(answers: {
   return [
     // Reihenfolge: längste/spezifischste Muster zuerst — sonst zerlegt ein kürzeres Muster die längeren Treffer.
     ["senticor-app-fachverfahren-template", `senticor-app-${domain}`],
-    ["@senticor/fachverfahren-app", `@senticor/${domain}`],
-    ["apps/fachverfahren", `apps/${domain}`],
+    ["@senticor/antragsservice", `@senticor/${domain}`],
+    ["apps/antragsservice", `apps/${domain}`],
     ["fachverfahren-template", domain],
     ["Fachverfahren Template", displayName],
     ["Fachverfahren Vorlage", displayName],

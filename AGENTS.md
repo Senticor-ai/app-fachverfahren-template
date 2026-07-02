@@ -206,7 +206,7 @@ Plattformdaten für Benutzereinstellungen, RBAC und Posteingang/Ausgang liegen
 in `@senticor/app-store-postgres`; produktive App-Datenendpunkte nutzen
 PostgreSQL über `APP_PG_URL` oder `APP_PG_DIRECT_URL`.
 Der erste vertikale App-Datenpfad liegt unter
-`apps/fachverfahren-template/e2e` und prüft Login, Rollen,
+`apps/antragsservice` rendert die 3 Personas aus der Naht `src/leistung.config.ts`,
 Benutzereinstellungen sowie Posteingang/Ausgang.
 Mit `APP_E2E_PG_URL` und optional `APP_E2E_PG_DIRECT_URL` prüft
 `pnpm run test:e2e:postgres` denselben Pfad gegen PostgreSQL.

@@ -1,5 +1,5 @@
 {
-  "$comment": "CHOS-CODE WARM-START DELTA-MAP — generisch für JEDES Fachverfahren. Dieses Repo ist die VOLLE Startbasis (fachverfahren-kit, public-sector-ui, platform-contracts, Server, Gates sind FERTIG). Ein Fachverfahren entsteht NICHT durch Neubau, sondern durch das FÜLLEN DER EINEN Austausch-Naht apps/fachverfahren/src/leistung.config.ts (die getypte LeistungConfig) mit den WERTEN aus dem freigegebenen Fachkonzept/Epic/PRD/Architektur. Die Planungs-Artefakte (FACHKONZEPT.md, EPIC.md, PRD.md, ARCHITEKTUR.md/ADRs) entstehen in EIGENEN, HITL-gegateten Phasen VOR dem Build (governance.yaml) — der Build komponiert nur noch. Hundesteuer ist eine Instanz (docs/examples/hundesteuer/), NICHT Teil des Templates.",
+  "$comment": "CHOS-CODE WARM-START DELTA-MAP — generisch für JEDES Fachverfahren. Dieses Repo ist die VOLLE Startbasis (fachverfahren-kit, public-sector-ui, platform-contracts, Server, Gates sind FERTIG). Ein Fachverfahren entsteht NICHT durch Neubau, sondern durch das FÜLLEN DER EINEN Austausch-Naht apps/antragsservice/src/leistung.config.ts (die getypte LeistungConfig) mit den WERTEN aus dem freigegebenen Fachkonzept/Epic/PRD/Architektur. Die Planungs-Artefakte (FACHKONZEPT.md, EPIC.md, PRD.md, ARCHITEKTUR.md/ADRs) entstehen in EIGENEN, HITL-gegateten Phasen VOR dem Build (governance.yaml) — der Build komponiert nur noch. Hundesteuer ist eine Instanz (docs/examples/hundesteuer/), NICHT Teil des Templates.",
   "schemaVersion": "1.1.0",
   "kind": "chos-warm-start",
   "appliesTo": {
@@ -13,7 +13,7 @@
     "uxLibrary": "packages/public-sector-ui/ — fertige, BITV-getestete, KERN-Token-Komponenten mit Storybook. NICHT nachbauen.",
     "platformContracts": "packages/platform-contracts/ — Ports (IdentityAndTrust/Payment/Mailbox/Audit/Workflow/DataExchange/EvidenceRetrieval/SignatureSeal). Fachlogik nutzt NUR Ports, nie Provider direkt.",
     "sdk": "packages/public-sector-sdk/ — Manifest-Parsing, Authorization/RBAC, Audit, Domain-Kernel.",
-    "appShell": "apps/fachverfahren/ — App-Shell, die store.ts (→ leistung.config.ts) liest und die Surfaces citizen/caseworker/audit rendert. Default = das Kit-Beispiel; der Build ÜBERSCHREIBT leistung.config.ts.",
+    "appShell": "apps/antragsservice/ — App-Shell, die store.ts (→ leistung.config.ts) liest und die Surfaces citizen/caseworker/audit rendert. Default = das Kit-Beispiel; der Build ÜBERSCHREIBT leistung.config.ts.",
     "gates": "scripts/check-*.mjs + tooling/template/cli.ts — check:leistung-contract, check:domain-contracts, check:typescript-policy, typecheck (tsc -b), test (vitest). Diese sind die WAHRHEIT, kein LLM-Judge."
   },
   "workflow": [
@@ -45,7 +45,7 @@
   "deltas": [
     {
       "id": "leistung-config",
-      "target": "apps/fachverfahren/src/leistung.config.ts",
+      "target": "apps/antragsservice/src/leistung.config.ts",
       "role": "DIE EINE Austausch-Naht: die getypte LeistungConfig DIESES Verfahrens (Personas/Rollen, Antragsfelder, Prüfungen, statusMachine, Tarif/Berechnung als Daten, KI-Einschätzung) — abgeleitet aus dem FREIGEGEBENEN Fachkonzept/Epic/PRD/Architektur. Die App rendert allein hieraus über die Kit-Bausteine; KEIN verfahrens-spezifischer Code sonst. ÜBERSCHREIBT die Default-Beispiel-Config (KEIN Import des Kit-Beispiels mehr).",
       "mustContain": [
         "export const leistungConfig",
@@ -60,7 +60,7 @@
       "groundsOn": ["FACHKONZEPT.md", "EPIC.md", "PRD.md", "ARCHITEKTUR.md"],
       "source": "die freigegebenen Planungs-Artefakte (Fachkonzept-Datenmodell/Regellogik, Epic-Akzeptanzkriterien, PRD-Felder, Architektur-Mapping)",
       "gate": "check:leistung-contract, check:typescript-policy, typecheck, test",
-      "shapeRef": "apps/fachverfahren/src/leistung.config.ts",
+      "shapeRef": "apps/antragsservice/src/leistung.config.ts",
       "render": "Build-Card (open/preview) — die Live-App rendert direkt aus dieser Config",
       "reviewable": true,
       "guidingQuestions": [
