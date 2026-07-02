@@ -11,6 +11,7 @@ import type {
   VorgangPort,
   Transition,
 } from "./types.js";
+import { effektiveBerechnung, effektiveNachweise } from "./lib/interpreter.js";
 
 let __seq = 0;
 const pad = (n: number, w: number) => String(n).padStart(w, "0");
@@ -59,7 +60,9 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
 
     einreichen: (antragsdaten) => {
       const ki = { confidence: 0, flags: [] as string[] };
-      const berechnung = safeBerechne(config, antragsdaten);
+      // EFFEKTIVE Berechnung/Nachweise: `berechne`/`nachweise` sind Escape-Hatches, sonst wertet der reine
+      // Interpreter `tarif`/`codelisten` aus (Default = Daten-Auswertung).
+      const berechnung = effektiveBerechnung(config, antragsdaten);
       const v: Vorgang<T> = {
         id: `v-${pad(++__seq, 6)}`,
         vorgangsnummer: vorgangsnummer(),
@@ -69,7 +72,7 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
         // berechnung ist optional — unter exactOptionalPropertyTypes nur setzen, wenn vorhanden.
         ...(berechnung ? { berechnung } : {}),
         ki,
-        nachweise: config.nachweise?.(antragsdaten) ?? [],
+        nachweise: effektiveNachweise(config, antragsdaten),
         history: [
           { ts: now(), aktion: "Antrag eingegangen", rolle: "buerger" },
         ],
@@ -138,13 +141,4 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
     },
   };
   return store;
-}
-
-/** Berechnung defensiv aufrufen — eine fehlerhafte Leistungs-`berechne` darf den Antrag nicht crashen. */
-function safeBerechne<T>(config: LeistungConfig<T>, antragsdaten: T) {
-  try {
-    return config.berechne(antragsdaten);
-  } catch {
-    return undefined;
-  }
 }

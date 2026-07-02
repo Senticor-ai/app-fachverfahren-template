@@ -4,6 +4,9 @@ export * from "./types.js";
 export * from "./store.js";
 export * from "./contract-snapshot.js";
 export * from "./format.js";
+// Business-Logik als DATEN: Feldwert-/Options-Auflösung + der generische reine Interpreter (Tarif/Regeln/Codelisten).
+export * from "./lib/antrag-felder.js";
+export * from "./lib/interpreter.js";
 
 // UI-Bausteine (Tailwind + shadcn/ui OSS) — konsumieren ausschließlich den Vertrag (config/port/vorgang).
 export * from "./ui/badge.js";

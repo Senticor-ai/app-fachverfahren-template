@@ -40,16 +40,21 @@ import type {
 import {
   asString,
   feldAnzeige,
-  feldFehler,
   getPath,
   istDateiWert,
   resolveSteps,
   setPath,
-  stepGueltig,
   typisiereAntragsdaten,
   type Antragsdaten,
   type DateiWert,
 } from "../lib/antrag-felder.js";
+import {
+  effektiveBerechnung,
+  effektiveNachweise,
+  feldFehlerVollstaendig,
+  stepGueltigVollstaendig,
+  type RegelKontext,
+} from "../lib/interpreter.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "../ui/button.js";
 import { Card } from "../ui/card.js";
@@ -139,10 +144,11 @@ function stepFehlerEintraege(
   idPrefix: string,
   step: StepDef,
   daten: Antragsdaten,
+  kontext: RegelKontext,
 ): FieldError[] {
   const out: FieldError[] = [];
   for (const f of step.felder) {
-    const fehler = feldFehler(f, getPath(daten, f.name));
+    const fehler = feldFehlerVollstaendig(f, daten, kontext);
     if (fehler)
       out.push({
         feldId: feldDomId(idPrefix, f.name),
@@ -165,10 +171,12 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
   port,
   onDone,
 }: AntragStepperProps<T>): React.ReactElement {
-  // Auswahl-Optionen einmalig auflösen: Felder mit `optionsRef` ziehen ihre Optionen aus `config.datenlisten`
-  // (data-driven, z. B. eine Rassenliste) — ab hier lesen ALLE Funktionen nur noch `feld.options`. Eine Wahrheit.
+  // Auswahl-Optionen einmalig auflösen: Felder mit `optionsRef` ziehen ihre Optionen aus `config.datenlisten` ODER
+  // `config.codelisten` (data-driven, z. B. eine Rassenliste) — ab hier lesen ALLE Funktionen nur noch
+  // `feld.options`. Eine Wahrheit.
   const steps = useMemo(
-    () => resolveSteps(config.antrag.steps, config.datenlisten),
+    () =>
+      resolveSteps(config.antrag.steps, config.datenlisten, config.codelisten),
     [config],
   );
   const reviewIndex = steps.length; // virtueller Review-Schritt nach allen Fach-Schritten
@@ -212,19 +220,18 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
     [steps, daten],
   );
 
-  // LIVE-Berechnung über dem aktuellen (typisierten) Antragsstand — defensiv (eine fehlerhafte `berechne` darf nicht crashen).
-  const berechnung = useMemo<Berechnung | null>(() => {
-    try {
-      return config.berechne(typisierteDaten as T);
-    } catch {
-      return null;
-    }
-  }, [config, typisierteDaten]);
+  // LIVE-Berechnung über dem aktuellen (typisierten) Antragsstand. EFFEKTIV: `config.berechne` (Escape-Hatch) hat
+  // Vorrang, sonst wertet der reine Interpreter `config.tarif` aus (Default = Daten-Auswertung). Defensiv.
+  const berechnung = useMemo<Berechnung | null>(
+    () => effektiveBerechnung(config, typisierteDaten as T) ?? null,
+    [config, typisierteDaten],
+  );
 
-  // Erforderliche Nachweise aus dem aktuellen Stand ableiten (data-driven, je Tatbestand) — nur wenn das Verfahren
-  // `config.nachweise` deklariert. Erscheint als Upload im Review, sobald die Auswahl Nachweise fordert.
+  // Erforderliche Nachweise aus dem aktuellen Stand ableiten (data-driven, je Tatbestand): `config.nachweise`
+  // (Escape-Hatch) hat Vorrang, sonst leitet der Interpreter sie aus den `config.codelisten` (belege der gewählten
+  // Einträge) ab. Erscheint als Upload im Review, sobald die Auswahl Nachweise fordert.
   const nachweise = useMemo(
-    () => config.nachweise?.(typisierteDaten as T) ?? [],
+    () => effektiveNachweise(config, typisierteDaten as T),
     [config, typisierteDaten],
   );
 
@@ -254,9 +261,14 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
   // ECHTE PFLICHT-SPERRE (eine Wahrheit, Desktop + Mobil): ist der aktuelle Fach-Schritt unvollständig, NICHT weitergehen
   // — die offenen Pflichtfelder rot markieren statt still durchzuwinken. Sonst zum nächsten Schritt.
   const gehWeiter = (): void => {
-    if (stepIdx < steps.length && !stepGueltig(steps[stepIdx]!, daten)) {
+    if (
+      stepIdx < steps.length &&
+      !stepGueltigVollstaendig(steps[stepIdx]!, daten, config)
+    ) {
       setVersuchteWeiter((prev) => new Set(prev).add(stepIdx));
-      focusSummary(stepFehlerEintraege(idPrefix, steps[stepIdx]!, daten));
+      focusSummary(
+        stepFehlerEintraege(idPrefix, steps[stepIdx]!, daten, config),
+      );
       return;
     }
     setSummaryErrors([]);
@@ -265,7 +277,7 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
 
   const firstInvalidStep = (): number | null => {
     for (let i = 0; i < steps.length; i++)
-      if (!stepGueltig(steps[i]!, daten)) return i;
+      if (!stepGueltigVollstaendig(steps[i]!, daten, config)) return i;
     return null;
   };
   const invalidStep = firstInvalidStep();
@@ -314,7 +326,7 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
     const errors: FieldError[] = [];
     const stepOf = new Map<string, number>();
     for (let i = 0; i < steps.length; i++) {
-      for (const e of stepFehlerEintraege(idPrefix, steps[i]!, daten)) {
+      for (const e of stepFehlerEintraege(idPrefix, steps[i]!, daten, config)) {
         errors.push(e);
         stepOf.set(e.feldId, i);
       }
@@ -359,6 +371,7 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
         stepIdx={stepIdx}
         setStepIdx={setStepIdx}
         daten={daten}
+        kontext={config}
         onWeiter={gehWeiter}
       />
 
@@ -398,7 +411,7 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
                   id={feldDomId(idPrefix, feld.name)}
                   feld={feld}
                   wert={getPath(daten, feld.name)}
-                  fehler={feldFehler(feld, getPath(daten, feld.name))}
+                  fehler={feldFehlerVollstaendig(feld, daten, config)}
                   showErrors={showErrors}
                   onChange={(v) => setFeld(feld.name, v)}
                   onRegisterLookup={(raw) => tryRegisterLookup(feld, raw)}
@@ -531,7 +544,8 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
             <Button
               onClick={gehWeiter}
               aria-disabled={
-                stepIdx < steps.length && !stepGueltig(steps[stepIdx]!, daten)
+                stepIdx < steps.length &&
+                !stepGueltigVollstaendig(steps[stepIdx]!, daten, config)
               }
             >
               Weiter
@@ -563,19 +577,22 @@ function Stepper({
   stepIdx,
   setStepIdx,
   daten,
+  kontext,
   onWeiter,
 }: {
   steps: StepDef[];
   stepIdx: number;
   setStepIdx: React.Dispatch<React.SetStateAction<number>>;
   daten: Antragsdaten;
+  kontext: RegelKontext; // Codelisten für regelbasierte Gültigkeit (gleiche Wahrheit wie die echte Pflicht-Sperre)
   onWeiter?: () => void; // gemeinsame Pflicht-Sperre (eine Wahrheit): blockt an leeren Pflichtfeldern, markiert rot
 }) {
   // Labels: Fach-Schritte + virtueller Review-Schritt am Ende.
   const labels = [...steps.map((s) => s.titel), "Prüfen"];
   const total = labels.length;
   const aktuellUnvollstaendig =
-    stepIdx < steps.length && !stepGueltig(steps[stepIdx]!, daten);
+    stepIdx < steps.length &&
+    !stepGueltigVollstaendig(steps[stepIdx]!, daten, kontext);
   const aktuellerName = labels[stepIdx] ?? "";
   const fortschritt = Math.round(((stepIdx + 1) / total) * 100);
 
@@ -651,7 +668,9 @@ function Stepper({
           const visited = i < stepIdx;
           // Ein besuchter Fach-Schritt ist „invalid", wenn er Pflichtangaben offen lässt.
           const invalid =
-            visited && i < steps.length && !stepGueltig(steps[i]!, daten);
+            visited &&
+            i < steps.length &&
+            !stepGueltigVollstaendig(steps[i]!, daten, kontext);
           const done = visited && !invalid;
           const zustand = active
             ? "aktueller Schritt"
