@@ -12,7 +12,8 @@ Nutze diese Anleitung für TypeScript- und ESM-Änderungen.
 - Keine CommonJS-Syntax, keine `.cjs`-/`.cts`-Dateien.
 - Implementierungscode unter `apps/`, `packages/`, `jurisdictions/` und
   `modules/` ist TypeScript-only. Keine `.js`, `.jsx`, `.cjs` oder `.mjs` in
-  diesen Bereichen, außer generierte Assets wie der MSW Worker.
+  diesen Bereichen; Ausnahmen sind nur die in `scripts/check-esm-policy.mjs`
+  und `scripts/check-typescript-policy.mjs` allowgelisteten Interop-Assets.
 - Optional Properties nicht als `undefined` serialisieren; Felder nur setzen,
   wenn ein Wert vorhanden ist.
 

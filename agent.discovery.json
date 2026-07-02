@@ -103,8 +103,8 @@
       "path": ".agents/skills/testing/SKILL.md"
     },
     {
-      "id": "skill:backend-fastify",
-      "path": ".agents/skills/backend-fastify/SKILL.md"
+      "id": "skill:accessibility-bitv",
+      "path": ".agents/skills/accessibility-bitv/SKILL.md"
     }
   ],
   "componentLibraries": [
@@ -113,7 +113,7 @@
       "path": "packages/fachverfahren-kit/src/components",
       "entrypoint": "packages/fachverfahren-kit/src/index.ts",
       "catalog": "docs/reference/fachverfahren-kit-components.md",
-      "count": 57,
+      "count": 61,
       "purpose": "Complete reusable Fachverfahren building blocks for citizen, caseworker and audit surfaces."
     },
     {
@@ -121,7 +121,7 @@
       "path": "packages/fachverfahren-kit/src/ui",
       "entrypoint": "packages/fachverfahren-kit/src/index.ts",
       "catalog": "docs/reference/fachverfahren-kit-components.md",
-      "count": 44,
+      "count": 43,
       "purpose": "shadcn/Radix/Tailwind primitive layer used below the Fachverfahren building blocks."
     },
     {

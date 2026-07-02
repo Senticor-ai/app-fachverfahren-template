@@ -1,119 +1,116 @@
 ---
 name: fachverfahren-app
-description: Build or extend Fachverfahren and Bürgerportal apps from this template. Use when scaffolding a domain module, adding screen contracts, UI, tests, Storybook stories, permissions, events, migrations, compliance evidence, or exporting a standalone app from the workspace template.
+description: Build or extend a Fachverfahren from this template by filling the ONE exchange seam (apps/antragsservice/src/leistung.config.ts), emitting the contract snapshot, and validating with the real repo checks. Also covers full-repo scaffolding and standalone export.
 ---
 
 # Fachverfahren App
 
-Use this workflow for complete vertical slices. Keep platform code
-domain-neutral; put Fachlogik under `modules/<domain>/`.
+Der Startpunkt für jeden Fachverfahren-Build aus diesem Template — für
+automatisierte Build-Agenten genauso wie für Entwickler:innen ohne weiteres
+Tooling. Root-Policy und Pfad-Karte: `AGENTS.md`.
 
-## Decision Path
+## Kernprinzip
 
-1. For a new Fachverfahren, start from the app spec plus
-   `docs/reference/fachverfahren-kit-components.md`.
-2. Run `pnpm run agent:bootstrap -- --json`, then `pnpm run agent:discover`
-   and `pnpm run agent:context -- --task <app-spec> --paths <module-path>`.
-   Follow `agent:context.nextCommands` unless the user gave a narrower scope.
-3. Compose UI from `@senticor/fachverfahren-kit`; keep reusable components in
-   `packages/fachverfahren-kit`, not in `modules/<domain>/`.
-4. For a full generated repository, run
-   `pnpm run scaffold:domain-app -- --domain <domain> --display-name <name> --target <target-dir> --allow-existing-empty`.
-5. For an app-only export, run `pnpm run scaffold:standalone -- <target-dir>`.
-6. For any UI change, create or update a screen contract before implementing the
-   screen.
-7. For UI, Storybook, app-shell, form or screen-contract work, read
-   `.agents/skills/ux-ui/SKILL.md` before coding.
+Dieses Repository ist die FERTIGE Startbasis. Ein neues Fachverfahren entsteht
+durch das Füllen GENAU EINER Datei mit Fachdaten:
 
-## Source Lookup
-
-- Web search is allowed for official domain sources when building or validating
-  a domain module.
-- For German public-sector services, agents may search `https://fimportal.de`
-  and use FIM Leistung IDs, names and hierarchy as source references.
-- Treat FIM as a structural source, not as the complete legal basis. Concrete
-  statutes, fees, deadlines and local rules still need the responsible
-  jurisdiction's source or the status `Annahme zu validieren`.
-- Record source URLs and retrieved IDs in the domain manifest, screen contract,
-  compliance profile or test evidence where they affect behavior.
-
-## Domain Module Workflow
-
-Create or update:
-
-- `domain.module.yaml`
-- `contracts/*.screen.yaml`
-- `ui/*.stories.tsx`
-- `permissions/*.yaml`
-- `events/*.yaml`
-- `migrations/`
-- `tests/`
-- `compliance/`
-
-Then run:
-
-```bash
-pnpm run check:agent-domain
-pnpm run check:agent-ui
+```text
+apps/antragsservice/src/leistung.config.ts
 ```
 
-## App Workflow
+Die App rendert drei Personas (Bürger:in `/buerger`, Sachbearbeitung `/amt`,
+Aufsicht `/aufsicht`) allein aus dieser `LeistungConfig`. Es wird KEIN
+`server/`, kein eigenes `index.html` und keine eigene Komponenten-Bibliothek
+gebaut — die Bausteine existieren in `packages/fachverfahren-kit`.
 
-- Use `@senticor/platform-contracts` ports for basis services.
-- Use `@senticor/public-sector-sdk` for manifests, authorization, audit and
-  domain-kernel primitives.
-- Use `@senticor/public-sector-ui` for UI contracts; ShadCN stays an
-  implementation detail.
-- Write implementation code in TypeScript only. Domain modules use `.ts` and
-  `.tsx`; do not add `.js`, `.jsx`, `.cjs` or `.mjs` under `modules/`.
-- Use MSW mock handlers for early UI, integration and E2E states.
-- Do not add domain-example details to platform runtime code.
-- Keep citizen UI guided and caseworker UI dense/list-detail. Do not expose
-  Basisdienste, ports or adapters in primary user navigation.
-- Screen contracts must include persona, IA, content, HCAI, loading, empty,
-  error, ready, success and accessibility acceptance criteria.
-- For CI or container work on GitLab/opencode.de, use Kaniko, not
-  Docker-in-Docker. The runners are unprivileged Kubernetes pods without a
-  Docker socket.
-- For workspace package builds, keep pnpm filters before `run`, for example
-  `pnpm --filter "./packages/**" run --if-present build`.
-- Build workspace packages before app and server outputs:
-  `pnpm run build:packages`, then `pnpm run build:app`, then
-  `pnpm run build:server`.
+## Workflow (Naht füllen)
 
-## Standalone Export Workflow
+1. `AGENTS.md` lesen: Naht-Vertrag, Annahme-DATEN-Konvention, Pfad-Karte.
+2. Optionaler vendor-neutraler Einstieg:
 
-Run:
+   ```bash
+   pnpm run agent:bootstrap -- --json
+   pnpm run agent:discover -- --json
+   pnpm run agent:context -- --task <app-spec> --paths <pfad>
+   ```
+
+3. `apps/antragsservice/src/leistung.config.ts` mit den Werten des
+   freigegebenen Fachkonzepts füllen: `id/label/kommune`,
+   `rechtsgrundlagen` (nur belegt), `antrag.steps` (Pflichtfelder mit
+   Validierung), `statusMachine` (Endzustände `terminal: true`, kritische
+   Übergänge `vierAugen: true`), `berechne` (rein, deterministisch, GANZE
+   EURO, jede Tarifstufe/Befreiung/Ermäßigung als eigene Verzweigung,
+   `status: "provisional" | "final"`), `register`, `detailSektionen`, `ki`,
+   `seed`. Optionale Signale (`ePayment`, `zustellung`, `termin`,
+   `adressValidierung`, `personas`, `fimLeistung`, `nachweise`) nur setzen,
+   wenn das Fachkonzept sie vorsieht.
+4. Unbekannte Satzungswerte als markierte Annahme-DATEN führen
+   (`// annahme <wert> EUR — TBD-<QUELLE>`), nie als Fakt in
+   Anzeige-Strings.
+5. NACH jedem Naht-Write den Vertrags-Snapshot erzeugen und mitliefern:
+
+   ```bash
+   pnpm --filter @senticor/antragsservice emit:contract
+   ```
+
+6. Verifizieren und im Browser prüfen:
+
+   ```bash
+   pnpm run typecheck
+   pnpm run test
+   pnpm run dev
+   ```
+
+## Quellen-Lookup
+
+- Websuche ist für offizielle Fachquellen erlaubt; für deutsche
+  Verwaltungsleistungen darf `https://fimportal.de` durchsucht und FIM-IDs,
+  Namen und Hierarchie als Strukturquelle verwendet werden.
+- FIM ist Strukturquelle, nicht vollständige Rechtsgrundlage. Konkrete
+  Satzungen, Gebühren, Fristen und lokale Regeln brauchen die zuständige
+  Quelle oder die Annahme-DATEN-Konvention aus `AGENTS.md`.
+- Für in `sources/registry.yaml` registrierte Quellen `source:fetch` nutzen.
+- Quell-URLs und IDs dort festhalten, wo sie Verhalten begründen
+  (`rechtsgrundlagen`, `fimLeistung`, Tests, Abschlussbericht).
+
+## Grenzen
+
+- Kit-Interna (`packages/fachverfahren-kit/src/components|ui`) und die dünne
+  App-Komposition (`App.tsx`, `store.ts`, `main.tsx`) werden für einen
+  Verfahrens-Build nicht geändert.
+- `apps/antragsservice/leistung.contract.json` ist generiert — nur via
+  `emit:contract`.
+- Der Modul-Pfad `modules/<domain>/` (Generator `app:new`) erzeugt ein
+  Artefakt-Gerüst, das die laufende App NICHT einbindet (PLAN) — siehe
+  `modules/README.md`. Für eine klickbare App zählt nur die Naht.
+- Bei Kit-/UI-Änderungen (Plattformarbeit) vorher
+  `.agents/skills/ux-ui/SKILL.md` lesen.
+
+## Full-Repo-Scaffold und Standalone-Export
+
+Neues vollständiges Repository über den Template-Lifecycle:
+
+```bash
+pnpm run scaffold:domain-app -- --domain <domain> --display-name <name> --target <target-dir> --allow-existing-empty
+```
+
+Generierte Repositories tragen `.template/`-Provenienz; Updates laufen über
+`template:status`, `template:diff -- --to <version>`,
+`template:update -- --to <version>`. `--force` nur für bewusstes Ersetzen;
+`--allow-dirty` nur mit ausdrücklicher menschlicher Freigabe.
+
+App-only-Export (kopiert `apps/antragsservice`, löst `catalog:`- und
+`workspace:*`-Versionen auf, schreibt `standalone-export-report.json`):
 
 ```bash
 pnpm run scaffold:standalone -- /tmp/fachverfahren-app
 ```
 
-The exporter copies `apps/fachverfahren-template`, resolves `catalog:` specs
-from `pnpm-workspace.yaml`, resolves `workspace:*` specs to local package
-versions, and writes `standalone-export-report.json`.
+## CI-Hinweise
 
-Use this for SDK-style consumers after the internal packages are published or
-otherwise available at the resolved versions.
-
-## Full-Repo Template Workflow
-
-Use the full-repo scaffold for opencode.de-ready apps:
-
-```bash
-pnpm run scaffold:domain-app -- --domain antragsservice --display-name Antragsservice --target /tmp/app-antragsservice --allow-existing-empty
-```
-
-Generated repositories carry `.template/` provenance and the TypeScript
-template CLI. Do not manually copy files from this template into a generated
-repository before trying:
-
-```bash
-pnpm run template:status
-pnpm run template:diff -- --to <version>
-pnpm run template:update -- --to <version>
-```
-
-Use `--force` only for intentional destructive replacement. Use `--allow-dirty`
-only when a human explicitly accepts a non-clean template source; the generated
-`.template/lock.json` records dirty provenance.
+- GitLab/opencode.de-Runner sind unprivilegierte Kubernetes-Pods: Kaniko statt
+  Docker-in-Docker.
+- pnpm-Filter stehen vor `run`:
+  `pnpm --filter "./packages/**" run --if-present build`.
+- Reale Build-Kette: `pnpm run build:packages`, dann `pnpm run build:app`.
+  Ein `build:server` existiert nicht (PLAN, Backend-Zielarchitektur).

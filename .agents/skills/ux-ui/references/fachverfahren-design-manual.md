@@ -64,9 +64,10 @@ Bürgerportale and Storybook review surfaces.
 - Start with path-deciding questions.
 - Use progressive disclosure for dependent fields.
 - Provide inline validation in plain language; say what to correct and how.
-- Derive supported client-side constraints from
-  `modules/<domain>/forms/*.form.schema.json` and keep server-side schemas
-  authoritative.
+- Derive supported client-side constraints from the field definitions in
+  `antrag.steps` of the `LeistungConfig` seam (or, on the generator path,
+  from `modules/<domain>/forms/*.form.schema.json` (PLAN)) and keep
+  server-side schemas authoritative.
 - Mark required fields clearly.
 - Provide review before submit and confirmation with case/reference number.
 - Persist drafts and support recovery.

@@ -21,6 +21,14 @@ pnpm run check:scaffold
 pnpm run check:scaffold-reproducible
 ```
 
+Nach jeder Änderung an der Austausch-Naht
+`apps/antragsservice/src/leistung.config.ts` zusätzlich den Vertrags-Snapshot
+erzeugen und mit committen:
+
+```bash
+pnpm --filter @senticor/antragsservice emit:contract
+```
+
 Bei schmalen Änderungen darf zunächst ein Pakettest laufen. Vor Abschluss
 einer plattformweiten Änderung müssen die Standardchecks versucht werden.
 
