@@ -3,72 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Fachverfahren — Referenz-App (Kit + Hundesteuer-Config)</title>
-    <!-- CHOS Live-App Fehler-Reporter (generisch, vendor-neutral): meldet Laufzeitfehler + „leere App" via
-         postMessage an die einbettende Builder-Konsole, damit die CHOS-Agenten einen weißen Screen reparieren
-         können. Läuft VOR dem App-JS (fängt auch Lade-/Import-Crashes). Tut nichts, wenn NICHT eingebettet. -->
-    <script>
-      (function () {
-        if (window.parent === window) return;
-        function post(kind, detail) {
-          try {
-            window.parent.postMessage(
-              {
-                source: "chos-app",
-                kind: kind,
-                detail: detail,
-                url: location.href,
-                at: new Date().toISOString(),
-              },
-              "*",
-            );
-          } catch (e) {}
-        }
-        window.addEventListener("error", function (e) {
-          post("error", {
-            message: e.message,
-            stack: e.error && e.error.stack ? String(e.error.stack) : "",
-            filename: e.filename,
-            line: e.lineno,
-            col: e.colno,
-          });
-        });
-        window.addEventListener("unhandledrejection", function (e) {
-          var r = e.reason;
-          post("unhandledrejection", {
-            message: r && r.message ? r.message : String(r),
-            stack: r && r.stack ? String(r.stack) : "",
-          });
-        });
-        var origErr = console.error.bind(console);
-        console.error = function () {
-          try {
-            post("console.error", {
-              message: Array.prototype.map.call(arguments, String).join(" "),
-            });
-          } catch (e) {}
-          return origErr.apply(null, arguments);
-        };
-        window.addEventListener("load", function () {
-          setTimeout(function () {
-            var root = document.getElementById("root");
-            var empty =
-              !root ||
-              root.childElementCount === 0 ||
-              (root.textContent || "").trim() === "";
-            if (empty)
-              post("blank", {
-                message:
-                  "App-Wurzel (#root) ist nach dem Laden leer — vermutlich Render-/Import-Fehler (weißer Screen).",
-                html: document.body
-                  ? document.body.innerHTML.slice(0, 600)
-                  : "",
-              });
-          }, 6000);
-        });
-        post("ready", { message: "Fehler-Reporter aktiv" });
-      })();
-    </script>
+    <meta name="theme-color" content="#0f766e" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>Fachverfahren - Referenz-App</title>
+    <script src="/preview-reporter.js"></script>
   </head>
   <body>
     <div id="root"></div>

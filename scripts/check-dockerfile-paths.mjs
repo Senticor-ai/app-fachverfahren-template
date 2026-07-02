@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // check-dockerfile-paths — deterministischer Guard gegen genau den Fehler, der die GitLab-`container-image`-
-// Stage nach dem apps/fachverfahren-template -> apps/antragsservice-Rename brach: das Dockerfile verwies auf
-// Pfade, die es nicht mehr gibt (kaniko: "lstat .../apps/fachverfahren-template/package.json: no such file").
+// Stage nach einem App-Directory-Rename brach: das Dockerfile verwies auf Pfade, die es nicht mehr gibt
+// (kaniko: "lstat .../apps/<stale-app>/package.json: no such file").
 //
 // Läuft OHNE Netzwerk/Registry (im Gegensatz zu `docker build`, das das opencode-Base-Image ziehen müsste und
 // von GitHub-Runnern aus unzuverlässig erreichbar ist). Prüft:

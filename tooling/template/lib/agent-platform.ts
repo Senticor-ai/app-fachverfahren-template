@@ -1101,6 +1101,9 @@ function buildValidationProfiles() {
         "check:scaffold-reproducible",
         "build:packages",
         "build:app",
+        "build:server",
+        "check:web-delivery",
+        "check:k8s-delivery",
       ],
     },
   ];

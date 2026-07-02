@@ -1436,6 +1436,8 @@ async function runPendingMigrations({ dryRun }) {
 
 async function validateInvariants(root) {
   const failures = [];
+  const appDomain = await resolveAppDomain(root);
+  const appPath = `apps/${appDomain}`;
   const packageJson = await readJson<PackageJson>(
     join(root, "package.json"),
   ).catch(() => undefined);
@@ -1448,11 +1450,15 @@ async function validateInvariants(root) {
   } else {
     const scripts = packageJson.scripts ?? {};
     requireScript(scripts, "build:packages", failures);
+    requireScript(scripts, "build:server", failures);
     // EINE App (Komposition + Naht): der Dev-Einstieg ist `dev`; der alte BFF-/Postgres-Dreiklang
     // (dev:postgres/dev:vite/dev:all) gehörte zur entfernten Beispiel-Shell.
     requireScript(scripts, "dev", failures);
     requireScript(scripts, "check:typescript-policy", failures);
     requireScript(scripts, "check:css-tokens", failures);
+    requireScript(scripts, "check:web-delivery", failures);
+    requireScript(scripts, "check:k8s-delivery", failures);
+    requireScript(scripts, "test:supply-chain", failures);
     requireScript(scripts, "template", failures);
     requireScript(scripts, "agent:bootstrap", failures);
     requireScript(scripts, "agent:discover", failures);
@@ -1492,11 +1498,14 @@ async function validateInvariants(root) {
       failures.push("Dockerfile build stage must set ENV CI=true");
     }
     if (
-      !/RUN pnpm run build:packages\s*\\\n && pnpm run build:app/m.test(
+      !/RUN pnpm run build:packages\s*\\\n && pnpm run build:app\s*\\\n && pnpm run build:server/m.test(
         dockerfile,
       )
     ) {
-      failures.push("Dockerfile must build packages before app");
+      failures.push("Dockerfile must build packages before app and server");
+    }
+    if (!/@sha256:[a-f0-9]{64}/.test(dockerfile)) {
+      failures.push("Dockerfile base images must be pinned by digest");
     }
   }
 
@@ -1516,6 +1525,21 @@ async function validateInvariants(root) {
   if (!(await exists(join(root, ".env.local.example")))) {
     failures.push("missing .env.local.example");
   }
+  for (const requiredPath of [
+    `${appPath}/deploy/helm/${appDomain}/Chart.yaml`,
+    `${appPath}/public/robots.txt`,
+    `${appPath}/public/manifest.webmanifest`,
+    `${appPath}/server/index.ts`,
+    "docs/reference/web-delivery.md",
+    "docs/reference/kubernetes-delivery.md",
+    "policy/k8s-delivery.rego",
+    "scripts/check-web-delivery.mjs",
+    "scripts/check-k8s-delivery.mjs",
+  ]) {
+    if (!(await exists(join(root, requiredPath)))) {
+      failures.push(`missing ${requiredPath}`);
+    }
+  }
   if (!gitignore?.includes(".env.local")) {
     failures.push(".gitignore must ignore .env.local");
   }
@@ -1524,6 +1548,8 @@ async function validateInvariants(root) {
 
 async function validateGeneratedScaffold(root) {
   const failures = [];
+  const appDomain = await resolveAppDomain(root);
+  const appPath = `apps/${appDomain}`;
   for (const path of [
     ".template/answers.json",
     ".template/lock.json",
@@ -1532,10 +1558,14 @@ async function validateGeneratedScaffold(root) {
     "agent.discovery.json",
     ".agents/skills/fachverfahren-app/SKILL.md",
     ".claude/skills/fachverfahren-app/SKILL.md",
+    `${appPath}/deploy/helm/${appDomain}/Chart.yaml`,
+    `${appPath}/server/index.ts`,
+    `${appPath}/public/robots.txt`,
     "docs/agents/bootstrap.md",
     "docs/agents/codex.md",
     "docs/agents/gemini.md",
     "platform/capabilities.json",
+    "policy/k8s-delivery.rego",
     "sources/registry.yaml",
     "tooling/template/cli.ts",
   ]) {
@@ -1548,6 +1578,14 @@ async function validateGeneratedScaffold(root) {
   failures.push(...validateAnswers(metadata.answers));
   failures.push(...validateOwnership(metadata.ownership));
   return failures;
+}
+
+async function resolveAppDomain(root) {
+  const metadata = await readMetadataOrSourceDefaults(root);
+  if (await exists(join(root, "apps", metadata.answers.domain))) {
+    return metadata.answers.domain;
+  }
+  return "antragsservice";
 }
 
 async function readMetadataOrSourceDefaults(root = process.cwd()) {

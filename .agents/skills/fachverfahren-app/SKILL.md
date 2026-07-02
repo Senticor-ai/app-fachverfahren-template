@@ -20,8 +20,10 @@ apps/antragsservice/src/leistung.config.ts
 
 Die App rendert drei Personas (Bürger:in `/buerger`, Sachbearbeitung `/amt`,
 Aufsicht `/aufsicht`) allein aus dieser `LeistungConfig`. Es wird KEIN
-`server/`, kein eigenes `index.html` und keine eigene Komponenten-Bibliothek
-gebaut — die Bausteine existieren in `packages/fachverfahren-kit`.
+fachlicher Server, kein eigenes `index.html` und keine eigene
+Komponenten-Bibliothek gebaut — die neutrale Fastify-Web-Runtime existiert in
+`apps/antragsservice/server`, die Bausteine existieren in
+`packages/fachverfahren-kit`.
 
 ## Workflow (Naht füllen)
 
@@ -113,5 +115,5 @@ pnpm run scaffold:standalone -- /tmp/fachverfahren-app
   Docker-in-Docker.
 - pnpm-Filter stehen vor `run`:
   `pnpm --filter "./packages/**" run --if-present build`.
-- Reale Build-Kette: `pnpm run build:packages`, dann `pnpm run build:app`.
-  Ein `build:server` existiert nicht (PLAN, Backend-Zielarchitektur).
+- Reale Build-Kette: `pnpm run build:packages`, dann `pnpm run build:app`,
+  dann `pnpm run build:server`.

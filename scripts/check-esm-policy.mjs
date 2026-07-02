@@ -14,8 +14,11 @@ const ignoredDirectories = new Set([
 
 const packageRoots = ["apps", "packages", "jurisdictions"];
 const sourceRoots = ["apps", "packages", "jurisdictions", "modules", "scripts"];
-// Generierte JS-Assets (z. B. ein MSW-Worker) hier allowlisten, sobald sie real existieren.
-const generatedJavaScriptAssets = new Set([]);
+// Generierte oder statische Browser-JS-Assets hier allowlisten; Implementierungscode bleibt TypeScript-only.
+const generatedJavaScriptAssets = new Set([
+  "apps/antragsservice/public/preview-reporter.js",
+  "apps/antragsservice/public/service-worker.js",
+]);
 // Legitime CommonJS-Interop-Punkte, die das Kit BEWUSST als .cjs veroeffentlicht (oeffentlicher package.json-Export):
 // das Tailwind-v3-Preset wird von Consumer-Apps in ihre CommonJS-tailwind.config.cjs eingebunden — CommonJS ist hier
 // der KORREKTE, notwendige Interop-Punkt (ein ESM-Preset liesse sich dort nicht einbinden). Scoped Ausnahme.

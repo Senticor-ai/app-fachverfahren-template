@@ -23,5 +23,12 @@ Operative Endpunkte:
 - `GET /startupz`
 - `GET /runtime-config.json`
 - `GET /internal/metrics`
+- `GET /internal/build-info`
 
-`/internal/metrics` darf nicht öffentlich geroutet werden.
+`/runtime-config.json` ist ein Public-Endpunkt auf `PORT` und wird mit
+`Cache-Control: no-store` ausgeliefert. `/internal/metrics` und
+`/internal/build-info` laufen auf `INTERNAL_PORT` und dürfen nicht öffentlich
+geroutet werden.
+
+Der Service Worker bleibt per `APP_ENABLE_SERVICE_WORKER=false` deaktiviert,
+bis die App den Update-Flow bewusst freischaltet.
