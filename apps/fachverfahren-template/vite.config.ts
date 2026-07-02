@@ -42,6 +42,12 @@ const resolveModuleExtensions: Plugin = {
 const devHost = process.env["VITE_DEV_HOST"] ?? "127.0.0.1";
 const devPort = Number(process.env["VITE_DEV_PORT"] ?? 5173);
 const apiProxyTarget = process.env["VITE_API_PROXY_TARGET"];
+// Wird die App hinter dem CHOS-Preview-Proxy unter /flow/preview/<session>/ gehostet, MUSS vite mit genau diesem `base`
+// laufen — sonst serviert der Dev-Server alle Modul-/Dep-/HMR-Pfade ROOT-absolut (/@vite, /src, /node_modules/.vite) OHNE
+// Präfix, der Proxy kann nur HTML-Attribute (nicht die JS-import-Strings) umschreiben → 404 → WEISSER SCHIRM im Builder.
+// Mit base=<previewPath> präfixiert vite ALLE Pfade → jeder Request trägt /flow/preview/<session>/ → der Proxy trifft ihn.
+// Der flow-server reicht den Wert als CHOS_FLOW_PREVIEW_BASE bereits durch; lokal/standalone bleibt es "/" (kein Regress).
+const previewBase = process.env["CHOS_FLOW_PREVIEW_BASE"] || "/";
 
 const appDir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(appDir, "..", "..");
@@ -74,6 +80,7 @@ const moduleSharedAlias = [
 ];
 
 export default defineConfig({
+  base: previewBase,
   plugins: [resolveModuleExtensions, react(), tailwindcss()],
   resolve: {
     alias: moduleSharedAlias,
