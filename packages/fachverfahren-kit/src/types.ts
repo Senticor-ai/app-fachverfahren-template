@@ -14,6 +14,10 @@ export interface VorgangHistorie {
   ts: string;
   aktion: string;
   rolle: string;
+  /** Der HANDELNDE (pseudonymes Kürzel/Nutzer-ID, keine Klarnamen nötig) — zusätzlich zur Rolle. Ohne Akteur ist ein
+   *  Vier-Augen-Nachweis nicht führbar: „Vier Augen" heißt ZWEI VERSCHIEDENE Personen, nicht zwei Rollen desselben
+   *  Menschen. Optional (bestehende Configs bleiben gültig); Compliance-KPIs messen über history[].akteur. */
+  akteur?: string;
   detail?: string;
 }
 
@@ -258,8 +262,16 @@ export interface VorgangPort<TAntragsdaten = Record<string, unknown>> {
   get(id: string): Vorgang<TAntragsdaten> | undefined;
   /** Bürger-Antrag absenden → neuer Vorgang im Initialstatus + History-Eintrag. */
   einreichen(antragsdaten: TAntragsdaten): Vorgang<TAntragsdaten>;
-  /** Status-Übergang (SB-Entscheidung) — prüft die Transition + schreibt History (4-Augen serverseitig in PROD). */
-  uebergang(id: string, to: string, rolle: string, detail?: string): void;
+  /** Status-Übergang (SB-Entscheidung) — prüft die Transition + schreibt History (4-Augen serverseitig in PROD).
+   *  `akteur` (optional): pseudonyme Kennung des Handelnden → landet als `history[].akteur` und macht Vier-Augen
+   *  nachweisbar; bei `vierAugen`-Transitionen prüft schon der DEV-Store, dass ZWEI VERSCHIEDENE Akteure handeln. */
+  uebergang(
+    id: string,
+    to: string,
+    rolle: string,
+    detail?: string,
+    akteur?: string,
+  ): void;
   /** Once-Only-Lookup gegen das Register. */
   lookupRegister(query: string): Record<string, string> | undefined;
 }

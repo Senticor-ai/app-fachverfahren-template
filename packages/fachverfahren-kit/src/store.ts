@@ -78,7 +78,7 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
       return v;
     },
 
-    uebergang: (id, to, rolle, detail) => {
+    uebergang: (id, to, rolle, detail, akteur) => {
       const v = store.get(id);
       if (!v) throw new Error(`Vorgang ${id} nicht gefunden`);
       const t = config.statusMachine.transitions.find(
@@ -91,8 +91,17 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
         );
       if (t.detailPflicht && !detail)
         throw new Error(`Übergang „${t.label}" erfordert eine Begründung`);
-      // 4-Augen wird in PROD serverseitig erzwungen (anderer Bearbeiter als der Antragsteller/Vorprüfer);
-      // im DEV-Store ist es ein Vermerk in der History (revisionssicher, append-only).
+      // 4-Augen wird in PROD serverseitig erzwungen (anderer Bearbeiter als der Antragsteller/Vorprüfer).
+      // Im DEV-Store gilt dieselbe Regel, sobald Akteure bekannt sind: ZWEI VERSCHIEDENE Personen — der letzte
+      // bekannte Akteur der History darf einen vierAugen-Übergang nicht selbst auslösen. Ohne Akteur-Angabe bleibt
+      // es (abwärtskompatibel) beim History-Vermerk; der Nachweis ist dann über history[].akteur nicht führbar.
+      if (t.vierAugen && akteur) {
+        const letzter = [...v.history].reverse().find((h) => h.akteur)?.akteur;
+        if (letzter && letzter === akteur)
+          throw new Error(
+            `Vier-Augen verletzt: „${t.label}" erfordert eine ANDERE Person als ${akteur} (letzter Akteur der History)`,
+          );
+      }
       setState((vs) =>
         vs.map((x) =>
           x.id === id
@@ -101,11 +110,12 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
                 status: to,
                 history: [
                   ...x.history,
-                  // detail ist optional — unter exactOptionalPropertyTypes nur setzen, wenn vorhanden.
+                  // detail/akteur sind optional — unter exactOptionalPropertyTypes nur setzen, wenn vorhanden.
                   {
                     ts: now(),
                     aktion: `${t.label} (→ ${to})`,
                     rolle,
+                    ...(akteur ? { akteur } : {}),
                     ...(detail ? { detail } : {}),
                   },
                 ],

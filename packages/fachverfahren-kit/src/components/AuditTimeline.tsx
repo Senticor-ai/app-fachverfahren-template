@@ -244,6 +244,15 @@ export function AuditTimeline({
                     <RolleIcon rolle={eintrag.rolle} />
                     {eintrag.rolle}
                   </Badge>
+                  {/* Vier-Augen-Nachweis: der HANDELNDE (pseudonymes Kürzel) zusätzlich zur Rolle — nur wenn geführt. */}
+                  {eintrag.akteur && (
+                    <span
+                      className="font-mono text-xs text-muted-foreground"
+                      title="Handelnde Person (pseudonyme Kennung) — Grundlage des Vier-Augen-Nachweises"
+                    >
+                      {eintrag.akteur}
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm font-medium text-foreground">
                   {eintrag.aktion}

@@ -29,6 +29,9 @@ export interface EntscheidungPanelProps<T = Record<string, unknown>> {
   vorgang: Vorgang<T>;
   /** Die handelnde Rolle (entscheidet, welche Übergänge erlaubt sind). */
   rolle: string;
+  /** Der HANDELNDE (pseudonymes Kürzel/Nutzer-ID) — optional, wird als `history[].akteur` geführt.
+   *  Bei `vierAugen`-Übergängen prüft der Port damit, dass ZWEI VERSCHIEDENE Personen handeln (Vier-Augen-Nachweis). */
+  akteur?: string;
   /** Nach erfolgreichem Übergang aufgerufen (z.B. zurück zum Arbeitsvorrat). */
   onEntschieden?: (to: string) => void;
   className?: string;
@@ -40,6 +43,7 @@ export function EntscheidungPanel<T = Record<string, unknown>>({
   port,
   vorgang,
   rolle,
+  akteur,
   onEntschieden,
   className,
 }: EntscheidungPanelProps<T>) {
@@ -80,8 +84,9 @@ export function EntscheidungPanel<T = Record<string, unknown>>({
       return;
     }
     try {
-      // Übergang über den Port — DEV: Zustand-Store, PROD: SDK/Fastify. 4-Augen wird serverseitig erzwungen.
-      port.uebergang(vorgang.id, t.to, rolle, text || undefined);
+      // Übergang über den Port — DEV: Zustand-Store, PROD: SDK/Fastify. 4-Augen wird serverseitig erzwungen;
+      // der akteur macht den Vier-Augen-Nachweis in der History führbar (zwei VERSCHIEDENE Personen).
+      port.uebergang(vorgang.id, t.to, rolle, text || undefined, akteur);
       setFehler(null);
       onEntschieden?.(t.to);
     } catch (e) {
