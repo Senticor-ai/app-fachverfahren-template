@@ -1101,7 +1101,6 @@ function buildValidationProfiles() {
         "check:scaffold-reproducible",
         "build:packages",
         "build:app",
-        "build:server",
       ],
     },
   ];

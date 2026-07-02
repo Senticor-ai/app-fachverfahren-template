@@ -19,6 +19,27 @@ const config: StorybookConfig = {
   },
   viteFinal: async (config) => {
     config.plugins = [...(config.plugins ?? []), tailwindcss()];
+    // `@senticor/public-sector-ui` ist ein Workspace-Paket, das (absichtlich) von keinem anderen Paket
+    // als Dependency deklariert wird — pnpm verlinkt es daher nicht in node_modules, und Rolldown kann den
+    // Bare-Import aus den Kit-Stories nicht auflösen. Storybook lädt die public-sector-ui-Stories ohnehin
+    // aus dem Quellcode (siehe stories-Glob), also mappen wir den Import deterministisch auf den src-Entry.
+    const publicSectorUiSrc = path.resolve(
+      repoRoot,
+      "packages/public-sector-ui/src/index.ts",
+    );
+    config.resolve ??= {};
+    const existingAlias = config.resolve.alias;
+    if (Array.isArray(existingAlias)) {
+      existingAlias.push({
+        find: "@senticor/public-sector-ui",
+        replacement: publicSectorUiSrc,
+      });
+    } else {
+      config.resolve.alias = {
+        ...(existingAlias ?? {}),
+        "@senticor/public-sector-ui": publicSectorUiSrc,
+      };
+    }
     config.server ??= {};
     config.server.fs ??= {};
     config.server.fs.strict = false;

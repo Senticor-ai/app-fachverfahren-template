@@ -43,3 +43,12 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Validate
         run: scripts/ci-validate.sh
+
+      # Die folgenden Schritte spiegeln die GitLab-Stages `pages` und `image`, damit Storybook- und
+      # Container-Build-Fehler HIER auffallen (und den Mirror-Push blockieren), statt erst nach dem
+      # Push in der GitLab-Pipeline.
+      - name: Build Storybook (mirrors GitLab `pages`)
+        run: pnpm run build:storybook
+
+      - name: Build container image (mirrors GitLab `image`)
+        run: docker build -t app-fachverfahren-template:ci .

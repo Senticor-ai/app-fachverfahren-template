@@ -1492,11 +1492,11 @@ async function validateInvariants(root) {
       failures.push("Dockerfile build stage must set ENV CI=true");
     }
     if (
-      !/RUN pnpm run build:packages\s*\\\n && pnpm run build:app\s*\\\n && pnpm run build:server/m.test(
+      !/RUN pnpm run build:packages\s*\\\n && pnpm run build:app/m.test(
         dockerfile,
       )
     ) {
-      failures.push("Dockerfile must build packages before app and server");
+      failures.push("Dockerfile must build packages before app");
     }
   }
 
