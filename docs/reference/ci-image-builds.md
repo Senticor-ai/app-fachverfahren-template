@@ -48,8 +48,10 @@ pnpm run build:app
 So existieren die `dist/`-Artefakte und TypeScript-Deklarationen der
 Workspace-Pakete, bevor die App kompiliert wird. Ein `build:server`-Schritt
 kommt erst mit der Backend-Stufe hinzu (PLAN, siehe
-`docs/reference/backend-fastify.md`); Dockerfile und Teile dieser Referenz
-zielen noch auf diese Stufe.
+`docs/reference/backend-fastify.md`). Das Dockerfile baut genau diese Kette
+und serviert das statische SPA-Bundle über
+`apps/antragsservice/scripts/serve.mts`; `check:dockerfile-paths` prüft die
+`COPY`-Quellen deterministisch gegen das Scaffold.
 
 ## pnpm-Filter
 

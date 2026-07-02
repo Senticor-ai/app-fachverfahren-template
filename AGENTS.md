@@ -262,8 +262,10 @@ pnpm run build:packages
 pnpm run build:app
 ```
 
-`build:server` existiert nicht (PLAN, Teil der Backend-Zielarchitektur).
-Dockerfile und Teile der CI-Referenz zielen noch auf diese (PLAN)-Stufe.
+`build:server` existiert nicht (PLAN, Teil der Backend-Zielarchitektur). Das
+Dockerfile baut genau diese Kette und serviert das statische SPA-Bundle über
+`apps/antragsservice/scripts/serve.mts`; `check:dockerfile-paths` hält die
+`COPY`-Quellen deterministisch mit dem Scaffold synchron.
 
 Bei pnpm-Filterbefehlen steht `--filter` vor `run`:
 
