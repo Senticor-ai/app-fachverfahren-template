@@ -59,7 +59,8 @@ der App. Die exportierte `leistungConfig: LeistungConfig` (Typ:
 `packages/fachverfahren-kit/src/types.ts`) treibt die komplette 3-Personen-UX.
 Ein Fachverfahren-Build ändert ausschließlich diese Datei.
 
-Der Vertrag der `LeistungConfig` (Pflichtfelder zuerst):
+Der Vertrag der `LeistungConfig` (Pflichtfelder zuerst; `?` = im Typ
+optional):
 
 | Feld               | Vertrag                                                                                                                                                                                                                                                               |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -71,8 +72,8 @@ Der Vertrag der `LeistungConfig` (Pflichtfelder zuerst):
 | `berechne`         | REINE, deterministische Funktion (kein Datum, kein Zufall). Beträge in GANZEN EURO (natürliche Einheit, `120` = 120,00 €), `status` `provisional`/`final`, `begruendung` als belegte Herleitung, jede Tarifstufe/Befreiung/Ermäßigung als eigene prüfbare Verzweigung |
 | `register`         | Once-Only-Register: `suchfelder` + deterministische `mock`-Daten                                                                                                                                                                                                      |
 | `detailSektionen`  | Anzeige-Mapping der Antragsdaten für die Sachbearbeitung                                                                                                                                                                                                              |
-| `ki`               | `schwelleAutonom` + optional transparenter `vorschlag` (KI assistiert, Mensch entscheidet)                                                                                                                                                                            |
-| `seed`             | Deterministische Demo-Vorgänge, damit die Sachbearbeitungs-Sicht sofort arbeitet                                                                                                                                                                                      |
+| `ki?`              | `schwelleAutonom` + optional transparenter `vorschlag` (KI assistiert, Mensch entscheidet); im Typ optional, im Template-Default gesetzt                                                                                                                              |
+| `seed?`            | Deterministische Demo-Vorgänge, damit die Sachbearbeitungs-Sicht sofort arbeitet; im Typ optional, im Template-Default gesetzt                                                                                                                                        |
 | optional           | `fimLeistung`, `nachweise`, `ePayment`, `zustellung`, `termin`, `adressValidierung`, `personas` — NUR setzen, wenn das Fachkonzept es vorsieht                                                                                                                        |
 
 NACH JEDEM Write auf die Naht den Vertrags-Snapshot neu erzeugen und mit
@@ -123,8 +124,9 @@ werden NIE als Fakt behauptet. Konvention:
 2. Anzeige-Strings (Labels, `begruendung`, Microcopy) geben Annahmen nie als
    geltendes Recht aus. Eine auf Annahmen beruhende Herleitung benennt das:
    „Annahme — zu validieren gegen <Quelle>".
-3. `rechtsgrundlagen` und `fimLeistung` enthalten nur belegte Einträge;
-   Unbelegtes bekommt `status: "annahme-zu-validieren"` bzw. wird im
+3. `rechtsgrundlagen` und `fimLeistung` enthalten nur belegte Einträge. Ein
+   unbelegtes `fimLeistung` trägt `status: "annahme-zu-validieren"`; unbelegte
+   Rechtsgrundlagen entfallen (Einträge haben KEIN Status-Feld) und werden im
    Abschlussbericht als offene Validierungsfrage gemeldet.
 
 ## Kanonische Pfad-Karte

@@ -40,10 +40,11 @@ gebaut — die Bausteine existieren in `packages/fachverfahren-kit`.
    Validierung), `statusMachine` (Endzustände `terminal: true`, kritische
    Übergänge `vierAugen: true`), `berechne` (rein, deterministisch, GANZE
    EURO, jede Tarifstufe/Befreiung/Ermäßigung als eigene Verzweigung,
-   `status: "provisional" | "final"`), `register`, `detailSektionen`, `ki`,
-   `seed`. Optionale Signale (`ePayment`, `zustellung`, `termin`,
-   `adressValidierung`, `personas`, `fimLeistung`, `nachweise`) nur setzen,
-   wenn das Fachkonzept sie vorsieht.
+   `status: "provisional" | "final"`), `register`, `detailSektionen` sowie
+   `ki` und `seed` (im Typ optional — setzen, damit Aufsicht und
+   Sachbearbeitung sofort arbeiten). Optionale Signale (`ePayment`,
+   `zustellung`, `termin`, `adressValidierung`, `personas`, `fimLeistung`,
+   `nachweise`) nur setzen, wenn das Fachkonzept sie vorsieht.
 4. Unbekannte Satzungswerte als markierte Annahme-DATEN führen
    (`// annahme <wert> EUR — TBD-<QUELLE>`), nie als Fakt in
    Anzeige-Strings.
