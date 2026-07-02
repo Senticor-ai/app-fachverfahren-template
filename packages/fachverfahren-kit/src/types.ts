@@ -122,6 +122,10 @@ export interface FeldDef {
   accept?: string;
   hint?: string; // Hilfetext / Beispiel
   onceOnly?: boolean; // aus Register vorbefüllbar + editierbar (Once-Only)
+  /** NORM-ABGELEITETE Feldregeln als DATEN (additiv zu required/pattern/min/max): bedingte Pflicht („pflicht"
+   *  + `wenn`), Format, Bereich, erlaubte Werte — jede mit `normRef`. Der reine Interpreter wertet sie aus; ein
+   *  Feld ohne `regeln` verhält sich unverändert. */
+  regeln?: FeldRegel[];
 }
 export interface StepDef {
   id: string;
@@ -231,6 +235,187 @@ export interface AdressValidierungConfig {
   enabled?: boolean | undefined;
 }
 
+// ── Business-Logik als DATEN (Tiefe-Stage-0) ────────────────────────────────
+// Normativ vorgegebene Fach-Logik wird TRAGBAR als Daten statt in TS-Funktionen versteckt: Tarif-/Gebührentabelle,
+// Codelisten mit Provenienz, norm-abgeleitete Feldregeln, Register-/FIM-Referenzen und Fristen-Typen. Alles OPTIONAL
+// und additiv — eine Config ohne diese Felder rendert unverändert. Der generische reine Interpreter
+// (lib/interpreter) wertet sie aus; `berechne`/`nachweise` werden damit zu OPTIONALEN Escape-Hatches (Default =
+// Daten-Auswertung). Durchgängige `normRef` an Tarif/Codeliste/Regel/Frist erdet jeden Wert an „Gesetz#§" + Status.
+
+/** Durchgängige Norm-/Beweis-Provenienz an Tarifen, Codelisten, Regeln, Fristen und Register-Refs. Kanonisch
+ *  „Gesetz#§" (z. B. „AO#§12"); `status` trennt belegte Fundstellen von zu validierenden Annahmen — nie erfinden. */
+export interface NormRef {
+  /** Norm-Identifikator, kanonisch „Gesetz#§" (z. B. „AO#§12", „GewO#§14"). */
+  norm: string;
+  /** Titel/Kurzbeschreibung der Fundstelle (optional). */
+  titel?: string;
+  /** Beweisstatus: aus verifizierter Quelle („belegt") vs. zu validierende Annahme („annahme"). */
+  status: "belegt" | "annahme";
+}
+
+/** Vergleichsoperator einer Feld-Bedingung. `gesetzt`/`nicht-gesetzt` prüfen nur Anwesenheit (ohne `wert`). */
+export type BedingungOperator =
+  | "=="
+  | "!="
+  | ">"
+  | ">="
+  | "<"
+  | "<="
+  | "in"
+  | "nicht-in"
+  | "gesetzt"
+  | "nicht-gesetzt";
+
+/** Prädikat über EIN Antragsfeld (Feldpfad wie in `FeldDef.name`). Der reine Interpreter wertet es tolerant gegen
+ *  die Antragsdaten aus (Zahl/String/Boolean-Koerzierung), sodass die Subsumtion — z. B. Schwelle `>= 3` — greift. */
+export interface FeldBedingung {
+  feld: string;
+  op: BedingungOperator;
+  /** Vergleichswert (bei `in`/`nicht-in` eine Menge); entfällt bei `gesetzt`/`nicht-gesetzt`. */
+  wert?: string | number | boolean | (string | number)[];
+}
+
+/** Boolesche Verknüpfung von Bedingungen (rekursiv). Genau EINE Kombinator-Angabe je Gruppe. */
+export interface BedingungGruppe {
+  /** UND — alle Teil-Bedingungen müssen erfüllt sein. */
+  alle?: Bedingung[];
+  /** ODER — mindestens eine Teil-Bedingung muss erfüllt sein. */
+  eine?: Bedingung[];
+  /** NICHT — die Teil-Bedingung muss NICHT erfüllt sein. */
+  nicht?: Bedingung;
+}
+
+/** Generische, verfahrensfreie Bedingung — Blatt (`FeldBedingung`) oder Gruppe. Vom Interpreter ausgewertet. */
+export type Bedingung = FeldBedingung | BedingungGruppe;
+
+/** Eine Staffel/Stufe einer Gebühren-/Tariftabelle. Greift, wenn `bedingung` über die Antragsdaten erfüllt ist;
+ *  fehlt `bedingung`, ist die Staffel der Auffang/Default. `betrag` in der NATÜRLICHEN Haupteinheit (kein Cent). */
+export interface TarifStaffel {
+  /** Beschriftung/Begründung der Staffel (fließt in `Berechnung.begruendung`/`positionen`). */
+  label?: string;
+  /** Subsumtions-Bedingung; fehlt sie ⇒ Auffang-Staffel (immer erfüllt). */
+  bedingung?: Bedingung;
+  /** Betrag dieser Staffel (natürliche Einheit; z. B. 120 = 120,00 €). */
+  betrag: number;
+  /** Einheit dieser Staffel, falls abweichend von der Tarif-Einheit. */
+  einheit?: string;
+  /** Norm-Provenienz genau dieser Staffel. */
+  normRef?: NormRef;
+}
+
+/** Eine GEBÜHREN-/TARIFTABELLE als DATEN (statt const+switch im Code). Der reine Interpreter wertet sie zu einer
+ *  `Berechnung` aus; `modus` bestimmt, ob die erste treffende Staffel gilt oder alle treffenden summiert werden. */
+export interface Tarif {
+  /** Ergebnis-Einheit (z. B. „EUR/Jahr"), falls nicht je Staffel gesetzt. */
+  einheit: string;
+  /** Ergebnis-Titel (`Berechnung.label`). */
+  label?: string;
+  /** Auswertung: erste treffende Staffel (Default) ODER Summe aller treffenden Staffeln. */
+  modus?: "erste-treffende" | "summe";
+  /** Die Staffeln/Stufen in Prüfreihenfolge. */
+  staffeln: TarifStaffel[];
+  /** Norm-Provenienz der gesamten Tabelle. */
+  normRef?: NormRef;
+}
+
+/** Ein Eintrag einer Codeliste — eine Auswahl-Option MIT Herkunft. Ein normativ enumerierter Kategorien-Selektor
+ *  ist eine Instanz: jede Kategorie ein Eintrag mit `normRef` (Verordnungsanlage) und ggf. `belege` (dadurch
+ *  geforderte Nachweise). */
+export interface CodelistenEintrag {
+  value: string;
+  label: string;
+  /** Norm-Provenienz genau dieses Eintrags (z. B. die Anlage, die diese Kategorie normiert). */
+  normRef?: NormRef;
+  /** Freie Herkunftsangabe, falls kein strukturierter `normRef` vorliegt (z. B. Registername). */
+  herkunft?: string;
+  /** Nachweise, die dieser Eintrag auslöst (als Nachweis-Label) — der Interpreter leitet daraus Nachweise ab. */
+  belege?: string[];
+}
+
+/** Eine CODELISTE als DATEN: eine benannte Enumeration mit Provenienz je Eintrag. Über `FeldDef.optionsRef`
+ *  referenzierbar wie eine `datenliste`, trägt aber zusätzlich Herkunft/Belege — die reichere, geerdete Variante. */
+export interface Codeliste {
+  id: string;
+  label: string;
+  /** Norm-Provenienz der GESAMTEN Liste (z. B. die Verordnung, deren Anlage die Werte enumeriert). */
+  normRef?: NormRef;
+  eintraege: CodelistenEintrag[];
+}
+
+/** Art einer norm-abgeleiteten Feldregel: bedingte Pflicht, Format, Bereich, erlaubte Werte. */
+export type FeldRegelArt = "pflicht" | "format" | "bereich" | "erlaubte-werte";
+
+/** Eine VALIDIERUNGS-/FELDREGEL als DATEN (norm-abgeleitet), additiv zu den Kurzformen an `FeldDef`
+ *  (required/pattern/min/max). Erlaubt BEDINGTE Pflicht (`pflicht` + `wenn` = „required-wenn") und trägt `normRef`. */
+export interface FeldRegel {
+  art: FeldRegelArt;
+  /** Bedingung, unter der die Regel greift (v. a. „required-wenn"). Fehlt sie ⇒ Regel gilt immer. */
+  wenn?: Bedingung;
+  /** Für `format`: RegExp-Quelle. */
+  pattern?: string;
+  /** Für `bereich`: inklusive Untergrenze. */
+  min?: number;
+  /** Für `bereich`: inklusive Obergrenze. */
+  max?: number;
+  /** Für `erlaubte-werte`: zulässige Werte inline … */
+  werte?: (string | number)[];
+  /** … oder als Referenz auf eine Codeliste (deren Eintrags-`value`s die erlaubte Menge bilden). */
+  codelisteRef?: string;
+  /** Fehlermeldung bei Verletzung (sonst eine generische Meldung). */
+  meldung?: string;
+  /** Norm-Provenienz der Regel. */
+  normRef?: NormRef;
+}
+
+/** REGISTER-REFERENZ: ein Antragsfeld stammt aus / wird abgeglichen mit einem Register. `richtung` trennt die
+ *  Interop-Trias (inbound Nachweisabruf ≠ outbound Meldung/Zustellung). */
+export interface RegisterRef {
+  /** Antragsfeld (Feldpfad), das aus diesem Register stammt/vorbefüllt wird. */
+  feld: string;
+  /** Register-/Quellsystem (z. B. „Melderegister", „Gewerberegister", eine NOOTS-Quelle). */
+  register: string;
+  /** Datenformat/Schema des Austauschs (z. B. „XMeld", ein FIM-Datenschema). */
+  datenformat?: string;
+  /** Vertrauensniveau der Herkunft (z. B. eIDAS „hoch"/„substantiell"/„niedrig"). */
+  vertrauensniveau?: string;
+  /** Interop-Richtung: inbound (Nachweisabruf) vs. outbound (Meldung/Zustellung). */
+  richtung?: "inbound" | "outbound";
+  /** Norm-/Rechtsgrundlage des Abrufs/der Meldung. */
+  normRef?: NormRef;
+}
+
+/** FIM-REFERENZ (Föderales Informationsmanagement): bindet ein Feld/den Antrag an einen FIM-Baustein. `status`
+ *  trennt belegte Zuordnungen von zu validierenden Annahmen — nie erfinden. */
+export interface FimRef {
+  /** FIM-Schlüssel/URN des Bausteins. */
+  fimId: string;
+  /** Art des FIM-Bausteins. */
+  art?: "leistung" | "prozess" | "datenschema" | "datenfeld";
+  /** Antragsfeld, das dieser FIM-Baustein beschreibt (bei Datenfeldern). */
+  feld?: string;
+  status: "belegt" | "annahme-zu-validieren";
+}
+
+/** Zeit-Einheit eines Fristen-Typs. */
+export type FristEinheit = "tage" | "werktage" | "wochen" | "monate" | "jahre";
+/** Ereignis, ab dem eine Frist läuft. */
+export type FristAnker = "eingang" | "bekanntgabe" | "bescheid" | "ereignis";
+
+/** Ein FRISTEN-TYP als DATEN (die Norm-Regel „X ab Ankerdatum"), unabhängig von einer konkreten Instanz
+ *  (`FristItemConfig`). Der Interpreter kann daraus ab einem Ankerdatum eine konkrete Fälligkeit berechnen. */
+export interface FristTyp {
+  id: string;
+  label: string;
+  /** Dauer in `einheit`. */
+  dauer: number;
+  einheit: FristEinheit;
+  /** Ereignis, ab dem die Frist läuft. */
+  anker: FristAnker;
+  /** Fristcharakter (informativ). */
+  art?: "gesetzlich" | "behoerdlich" | "ausschluss";
+  normRef?: NormRef;
+}
+
 /** Die EINE Config, die ein Fachverfahren vollständig beschreibt — von der Generierung aus dem Fachkonzept gefüllt. */
 export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   id: string; // slug, z.B. "leistung"
@@ -243,10 +428,27 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
    *  referenziert eine Liste über `FeldDef.optionsRef` und zieht seine Optionen damit aus der Config — die generische
    *  Fähigkeit, dass ein Verfahren z. B. eine Rassenliste liefert, ohne Kit-Code zu ändern. */
   datenlisten?: Record<string, { value: string; label: string }[]>;
+  /** GEBÜHREN-/TARIFTABELLE als DATEN (Staffeln statt const+switch). Fehlt `berechne`, wertet der reine Interpreter
+   *  (lib/interpreter) diesen Tarif zur `Berechnung` aus — `berechne` ist der Escape-Hatch für nicht-tabellarische
+   *  Logik und hat, falls gesetzt, Vorrang. */
+  tarif?: Tarif;
+  /** CODELISTEN mit Provenienz (Enumerationen mit `normRef`/`belege` je Eintrag). Über `FeldDef.optionsRef`
+   *  referenzierbar wie `datenlisten`, aber geerdet — ein normativ enumerierter Kategorien-Selektor ist eine Instanz.
+   *  Ein Eintrag mit `belege` leitet zusätzlich die erforderlichen Nachweise ab (Default für `nachweise`). */
+  codelisten?: Record<string, Codeliste>;
+  /** REGISTER-REFERENZEN als DATEN: Feld ↔ Register/Datenformat/Vertrauensniveau/Richtung. */
+  registerRefs?: RegisterRef[];
+  /** FIM-REFERENZEN als DATEN: Feld/Antrag ↔ FIM-Baustein (belegt|annahme-zu-validieren). */
+  fimRefs?: FimRef[];
+  /** FRISTEN-TYPEN als DATEN (Norm-Regel „X ab Ankerdatum") — unabhängig von konkreten Frist-Instanzen. */
+  fristenTypen?: FristTyp[];
   statusMachine: StatusMachine;
-  /** Reine Subsumtions-/Berechnungsfunktion (Tatbestand→Rechtsfolge). Testbar, deterministisch, kein Datum/Random. */
-  berechne: (antragsdaten: TAntragsdaten) => Berechnung;
-  /** Erforderliche Nachweise je Antrag (statisch oder aus den Antragsdaten abgeleitet). */
+  /** ESCAPE-HATCH für nicht-tabellarische Subsumtion (Tatbestand→Rechtsfolge): reine, testbare, deterministische
+   *  Berechnung (kein Datum/Random). OPTIONAL — fehlt sie, ist die Daten-Auswertung von `tarif` durch den reinen
+   *  Interpreter der Default. Ist sie gesetzt, hat sie Vorrang vor `tarif`. */
+  berechne?: (antragsdaten: TAntragsdaten) => Berechnung;
+  /** ESCAPE-HATCH für Nachweise. OPTIONAL — fehlt sie, leitet der Interpreter die Nachweise aus den `codelisten`
+   *  (`belege` der gewählten Einträge) ab. Ist sie gesetzt, hat sie Vorrang. */
   nachweise?: (antragsdaten: TAntragsdaten) => Nachweis[];
   register: RegisterConfig;
   detailSektionen: DetailSektion[];

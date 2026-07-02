@@ -1,11 +1,13 @@
 import { describe, it, expect } from "vitest";
-import type { FeldDef, StepDef } from "../types.js";
+import type { Codeliste, FeldDef, StepDef } from "../types.js";
 import {
   asString,
+  codelisteOptionen,
   feldAnzeige,
   feldFehler,
   feldOptionen,
   getPath,
+  istBeantwortet,
   istDateiWert,
   resolveFeld,
   resolveSteps,
@@ -247,6 +249,80 @@ describe("feldOptionen / resolveFeld — data-driven Auswahl (Liste als DATEN)",
     ];
     const [erster] = resolveSteps(steps, datenlisten);
     expect(erster!.felder[0]!.options).toEqual(datenlisten.kategorien);
+  });
+});
+
+describe("codelisten — geerdete Auswahl (mit Provenienz) über dieselbe optionsRef-Auflösung", () => {
+  const codeliste: Codeliste = {
+    id: "kategorien",
+    label: "Kategorien",
+    normRef: { norm: "Satzung#Anlage1", status: "annahme" },
+    eintraege: [
+      {
+        value: "premium",
+        label: "Premium",
+        normRef: { norm: "Satzung#§3", status: "belegt" },
+      },
+      { value: "standard", label: "Standard" },
+    ],
+  };
+  const codelisten = { kategorien: codeliste };
+
+  it("codelisteOptionen projiziert Einträge auf value/label (Provenienz bleibt in der Liste)", () => {
+    expect(codelisteOptionen(codeliste)).toEqual([
+      { value: "premium", label: "Premium" },
+      { value: "standard", label: "Standard" },
+    ]);
+  });
+
+  it("optionsRef löst gegen codelisten auf, wenn keine gleichnamige datenliste existiert", () => {
+    const f = feld({
+      name: "objekt.kategorie",
+      typ: "select",
+      optionsRef: "kategorien",
+    });
+    expect(feldOptionen(f, undefined, codelisten)).toEqual([
+      { value: "premium", label: "Premium" },
+      { value: "standard", label: "Standard" },
+    ]);
+    expect(resolveFeld(f, undefined, codelisten).options).toHaveLength(2);
+  });
+
+  it("datenlisten haben Vorrang vor codelisten bei gleicher optionsRef", () => {
+    const f = feld({ name: "x", typ: "select", optionsRef: "kategorien" });
+    const datenlisten = {
+      kategorien: [{ value: "nur-daten", label: "Nur Daten" }],
+    };
+    expect(feldOptionen(f, datenlisten, codelisten)).toEqual([
+      { value: "nur-daten", label: "Nur Daten" },
+    ]);
+  });
+});
+
+describe("istBeantwortet — presence-Wahrheit je FeldTyp (Basis bedingter Pflicht)", () => {
+  it("checkbox nur bei true, ja-nein bei Ja UND Nein, file bei Datei, sonst nicht-leer", () => {
+    expect(istBeantwortet(feld({ name: "c", typ: "checkbox" }), true)).toBe(
+      true,
+    );
+    expect(istBeantwortet(feld({ name: "c", typ: "checkbox" }), false)).toBe(
+      false,
+    );
+    expect(istBeantwortet(feld({ name: "j", typ: "ja-nein" }), false)).toBe(
+      true,
+    );
+    expect(istBeantwortet(feld({ name: "j", typ: "ja-nein" }), undefined)).toBe(
+      false,
+    );
+    expect(
+      istBeantwortet(feld({ name: "f", typ: "file" }), {
+        name: "b.pdf",
+        groesse: 1,
+      }),
+    ).toBe(true);
+    expect(istBeantwortet(feld({ name: "t", typ: "text" }), "Muster")).toBe(
+      true,
+    );
+    expect(istBeantwortet(feld({ name: "t", typ: "text" }), "   ")).toBe(false);
   });
 });
 

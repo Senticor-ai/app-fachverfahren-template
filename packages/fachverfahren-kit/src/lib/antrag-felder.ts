@@ -5,10 +5,14 @@
 // Der `AntragStepper` RENDERT nur und delegiert jede fachliche Entscheidung hierher — so ist die Subsumtion
 // deterministisch prüfbar (und die Klasse „getippte Zahl kommt als String an, `switch` matcht nie" strukturell
 // ausgeschlossen).
-import type { FeldDef, StepDef } from "../types.js";
+import type { Codeliste, FeldDef, StepDef } from "../types.js";
 
 export type Antragsdaten = Record<string, unknown>;
 export type FeldOption = { value: string; label: string };
+/** Benannte Auswahl-Listen: die schlanke `datenliste` (nur value/label) UND die geerdete `codeliste` (mit
+ *  Provenienz) teilen sich EINE Auflösung über `FeldDef.optionsRef`. */
+export type Datenlisten = Record<string, FeldOption[]>;
+export type Codelisten = Record<string, Codeliste>;
 /** Datei-Metadaten eines `file`-Felds — der echte Inhalt wandert in PROD über den Port. */
 export type DateiWert = { name: string; groesse: number };
 
@@ -56,36 +60,51 @@ export function istDateiWert(v: unknown): v is DateiWert {
   );
 }
 
-// ── Auswahl-Optionen auflösen: inline (`options`) ODER data-driven (`optionsRef` → config.datenlisten) ──
-/** Die effektiven Optionen eines Felds: inline hat Vorrang, sonst die referenzierte Datenliste. */
+// ── Auswahl-Optionen auflösen: inline (`options`) ODER data-driven (`optionsRef` → datenlisten|codelisten) ──
+/** Projiziert eine geerdete `Codeliste` auf schlanke Auswahl-Optionen (value/label) — die Provenienz
+ *  (`normRef`/`belege`) bleibt in der Codeliste und wird vom Interpreter genutzt, nicht im Selektor. */
+export function codelisteOptionen(codeliste: Codeliste): FeldOption[] {
+  return codeliste.eintraege.map((e) => ({ value: e.value, label: e.label }));
+}
+
+/** Die effektiven Optionen eines Felds: inline (`options`) hat Vorrang, sonst die über `optionsRef` referenzierte
+ *  Liste — zuerst aus `datenlisten`, dann aus `codelisten` (eine Auflösung für beide Listen-Arten). */
 export function feldOptionen(
   feld: FeldDef,
-  datenlisten?: Record<string, FeldOption[]> | undefined,
+  datenlisten?: Datenlisten | undefined,
+  codelisten?: Codelisten | undefined,
 ): FeldOption[] | undefined {
   if (feld.options) return feld.options;
-  if (feld.optionsRef) return datenlisten?.[feld.optionsRef];
-  return undefined;
+  if (!feld.optionsRef) return undefined;
+  const ausDaten = datenlisten?.[feld.optionsRef];
+  if (ausDaten) return ausDaten;
+  const codeliste = codelisten?.[feld.optionsRef];
+  return codeliste ? codelisteOptionen(codeliste) : undefined;
 }
 
 /** Materialisiert die Optionen eines Felds (aus `optionsRef`) in `options`, damit ALLE nachgelagerten
  *  Funktionen (Rendering, Typisierung, Anzeige) nur noch `feld.options` lesen — eine Wahrheit. */
 export function resolveFeld(
   feld: FeldDef,
-  datenlisten?: Record<string, FeldOption[]> | undefined,
+  datenlisten?: Datenlisten | undefined,
+  codelisten?: Codelisten | undefined,
 ): FeldDef {
   if (feld.options) return feld; // inline: nichts zu tun
-  const opts = feldOptionen(feld, datenlisten);
+  const opts = feldOptionen(feld, datenlisten, codelisten);
   return opts ? { ...feld, options: opts } : feld;
 }
 
 /** Wendet `resolveFeld` auf alle Felder aller Schritte an (Options-Referenzen einmalig materialisieren). */
 export function resolveSteps(
   steps: StepDef[],
-  datenlisten?: Record<string, FeldOption[]> | undefined,
+  datenlisten?: Datenlisten | undefined,
+  codelisten?: Codelisten | undefined,
 ): StepDef[] {
   return steps.map((step) => ({
     ...step,
-    felder: step.felder.map((feld) => resolveFeld(feld, datenlisten)),
+    felder: step.felder.map((feld) =>
+      resolveFeld(feld, datenlisten, codelisten),
+    ),
   }));
 }
 
@@ -143,6 +162,16 @@ export function typisiereAntragsdaten(
     }
   }
   return out;
+}
+
+/** Ist das Feld sachlich BEANTWORTET? (checkbox → angehakt, ja-nein → Ja/Nein gewählt, file → Datei vorhanden,
+ *  sonst → nicht-leerer Wert). Die presence-Wahrheit hinter Pflicht-Prüfungen — auch für bedingte Pflicht-Regeln
+ *  („required-wenn") im Interpreter, damit „Pflicht" überall gleich bedeutet. */
+export function istBeantwortet(feld: FeldDef, wert: unknown): boolean {
+  if (feld.typ === "checkbox") return wert === true;
+  if (feld.typ === "ja-nein") return typeof wert === "boolean";
+  if (feld.typ === "file") return istDateiWert(wert);
+  return asString(wert).trim().length > 0;
 }
 
 // ── Validierung eines Einzelfelds (required + pattern + min/max, je FeldTyp) ─────────────────────
