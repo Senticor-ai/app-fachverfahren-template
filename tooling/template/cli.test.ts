@@ -34,7 +34,7 @@ describe("template CLI", () => {
   it("explains ownership for consumer paths", async () => {
     const output = await runTemplate([
       "explain",
-      "apps/antragsservice/src/domain/example.ts",
+      "apps/fachverfahren/src/domain/example.ts",
       "--json",
     ]);
     const report = JSON.parse(output);
@@ -50,9 +50,9 @@ describe("template CLI", () => {
       const output = await runTemplate([
         "scaffold",
         "--domain",
-        "antragsservice",
+        "fachverfahren",
         "--display-name",
-        "Antragsservice",
+        "Fachverfahren",
         "--target",
         target,
         "--allow-existing-empty",

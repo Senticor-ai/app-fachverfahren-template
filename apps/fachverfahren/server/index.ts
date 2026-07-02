@@ -128,7 +128,7 @@ export function readRuntimeConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): RuntimeConfig {
   const staticDir = path.resolve(
-    env["STATIC_DIR"] ?? path.join(process.cwd(), "apps/antragsservice/dist"),
+    env["STATIC_DIR"] ?? path.join(process.cwd(), "apps/fachverfahren/dist"),
   );
   const publicBaseUrl = optionalUrl(env["PUBLIC_BASE_URL"]);
   const serviceWorkerEnabled = parseBoolean(
@@ -546,8 +546,8 @@ function buildPublicRuntimeConfig(
   return {
     schemaVersion: "public-runtime.v1",
     application: {
-      applicationId: env["APP_APPLICATION_ID"] ?? "antragsservice",
-      displayName: env["APP_DISPLAY_NAME"] ?? "Antragsservice",
+      applicationId: env["APP_APPLICATION_ID"] ?? "fachverfahren",
+      displayName: env["APP_DISPLAY_NAME"] ?? "Fachverfahren",
       version: buildInfo.version,
     },
     tenant: {

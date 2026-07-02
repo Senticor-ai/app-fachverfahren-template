@@ -15,8 +15,8 @@ const ignoredDirectories = new Set([
   "storybook-static",
 ]);
 const generatedJavaScriptAssets = new Set([
-  "apps/antragsservice/public/preview-reporter.js",
-  "apps/antragsservice/public/service-worker.js",
+  "apps/fachverfahren/public/preview-reporter.js",
+  "apps/fachverfahren/public/service-worker.js",
   // legitimer CommonJS-Interop (kein TS): Tailwind-v3-Preset, oeffentlicher package.json-Export, von Consumer-Apps eingebunden
   "packages/fachverfahren-kit/tailwind-preset.cjs",
 ]);

@@ -1,6 +1,6 @@
 ---
 name: fachverfahren-app
-description: Build or extend a Fachverfahren from this template by filling the ONE exchange seam (apps/antragsservice/src/leistung.config.ts), emitting the contract snapshot, and validating with the real repo checks. Also covers full-repo scaffolding and standalone export.
+description: Build or extend a Fachverfahren from this template by filling the ONE exchange seam (apps/fachverfahren/src/leistung.config.ts), emitting the contract snapshot, and validating with the real repo checks. Also covers full-repo scaffolding and standalone export.
 ---
 
 # Fachverfahren App
@@ -15,14 +15,14 @@ Dieses Repository ist die FERTIGE Startbasis. Ein neues Fachverfahren entsteht
 durch das Füllen GENAU EINER Datei mit Fachdaten:
 
 ```text
-apps/antragsservice/src/leistung.config.ts
+apps/fachverfahren/src/leistung.config.ts
 ```
 
 Die App rendert drei Personas (Bürger:in `/buerger`, Sachbearbeitung `/amt`,
 Aufsicht `/aufsicht`) allein aus dieser `LeistungConfig`. Es wird KEIN
 fachlicher Server, kein eigenes `index.html` und keine eigene
 Komponenten-Bibliothek gebaut — die neutrale Fastify-Web-Runtime existiert in
-`apps/antragsservice/server`, die Bausteine existieren in
+`apps/fachverfahren/server`, die Bausteine existieren in
 `packages/fachverfahren-kit`.
 
 ## Workflow (Naht füllen)
@@ -36,7 +36,7 @@ Komponenten-Bibliothek gebaut — die neutrale Fastify-Web-Runtime existiert in
    pnpm run agent:context -- --task <app-spec> --paths <pfad>
    ```
 
-3. `apps/antragsservice/src/leistung.config.ts` mit den Werten des
+3. `apps/fachverfahren/src/leistung.config.ts` mit den Werten des
    freigegebenen Fachkonzepts füllen: `id/label/kommune`,
    `rechtsgrundlagen` (nur belegt), `antrag.steps` (Pflichtfelder mit
    Validierung), `statusMachine` (Endzustände `terminal: true`, kritische
@@ -53,7 +53,7 @@ Komponenten-Bibliothek gebaut — die neutrale Fastify-Web-Runtime existiert in
 5. NACH jedem Naht-Write den Vertrags-Snapshot erzeugen und mitliefern:
 
    ```bash
-   pnpm --filter @senticor/antragsservice emit:contract
+   pnpm --filter @senticor/fachverfahren emit:contract
    ```
 
 6. Verifizieren und im Browser prüfen:
@@ -81,7 +81,7 @@ Komponenten-Bibliothek gebaut — die neutrale Fastify-Web-Runtime existiert in
 - Kit-Interna (`packages/fachverfahren-kit/src/components|ui`) und die dünne
   App-Komposition (`App.tsx`, `store.ts`, `main.tsx`) werden für einen
   Verfahrens-Build nicht geändert.
-- `apps/antragsservice/leistung.contract.json` ist generiert — nur via
+- `apps/fachverfahren/leistung.contract.json` ist generiert — nur via
   `emit:contract`.
 - Der Modul-Pfad `modules/<domain>/` (Generator `app:new`) erzeugt ein
   Artefakt-Gerüst, das die laufende App NICHT einbindet (PLAN) — siehe
@@ -102,7 +102,7 @@ Generierte Repositories tragen `.template/`-Provenienz; Updates laufen über
 `template:update -- --to <version>`. `--force` nur für bewusstes Ersetzen;
 `--allow-dirty` nur mit ausdrücklicher menschlicher Freigabe.
 
-App-only-Export (kopiert `apps/antragsservice`, löst `catalog:`- und
+App-only-Export (kopiert `apps/fachverfahren`, löst `catalog:`- und
 `workspace:*`-Versionen auf, schreibt `standalone-export-report.json`):
 
 ```bash

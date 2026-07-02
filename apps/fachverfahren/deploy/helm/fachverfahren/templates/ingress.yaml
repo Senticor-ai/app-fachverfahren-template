@@ -2,9 +2,9 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "antragsservice.fullname" . }}
+  name: {{ include "fachverfahren.fullname" . }}
   labels:
-    {{- include "antragsservice.labels" . | nindent 4 }}
+    {{- include "fachverfahren.labels" . | nindent 4 }}
   {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -27,7 +27,7 @@ spec:
             pathType: {{ .pathType }}
             backend:
               service:
-                name: {{ include "antragsservice.fullname" $ }}
+                name: {{ include "fachverfahren.fullname" $ }}
                 port:
                   name: http
           {{- end }}

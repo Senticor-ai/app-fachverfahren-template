@@ -1,5 +1,5 @@
 apiVersion: v2
-name: antragsservice
+name: fachverfahren
 description: Helm chart for a Kubernetes-ready Fachverfahren web runtime.
 type: application
 version: 0.1.0

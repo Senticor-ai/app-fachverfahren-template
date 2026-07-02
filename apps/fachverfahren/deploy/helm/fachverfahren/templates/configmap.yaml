@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "antragsservice.fullname" . }}-runtime
+  name: {{ include "fachverfahren.fullname" . }}-runtime
   labels:
-    {{- include "antragsservice.labels" . | nindent 4 }}
+    {{- include "fachverfahren.labels" . | nindent 4 }}
 data:
   HOST: "0.0.0.0"
   PORT: {{ .Values.service.targetPort | quote }}

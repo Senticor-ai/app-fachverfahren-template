@@ -32,9 +32,9 @@ Vor Dateianpassungen:
 
 Danach — kanonischer Weg für ein klickbares Fachverfahren (IST):
 
-1. Die Austausch-Naht `apps/antragsservice/src/leistung.config.ts` nach dem
+1. Die Austausch-Naht `apps/fachverfahren/src/leistung.config.ts` nach dem
    Vertrag aus `AGENTS.md` füllen.
-2. `pnpm --filter @senticor/antragsservice emit:contract` ausführen und den
+2. `pnpm --filter @senticor/fachverfahren emit:contract` ausführen und den
    Snapshot mit committen.
 3. `pnpm run typecheck`, `pnpm run test`, `pnpm run dev`.
 4. Package-Script `agent:verify -- --task <app-spec> --json` für einen
@@ -58,7 +58,7 @@ spätere Updates.
 Ohne `--allow-dirty` verweigert der Scaffold eine nicht saubere Template-Quelle.
 `--force` bleibt für bewusstes Ersetzen reserviert.
 
-Wichtig für Server-Slices: `apps/antragsservice/tsconfig.server.json`
+Wichtig für Server-Slices: `apps/fachverfahren/tsconfig.server.json`
 nimmt nur `server/` in den Runtime-Build auf. Agenten sollen
 fachliche Serverlogik nicht direkt aus `modules/` in den Template-Server
 importieren, sondern gemeinsame DTOs über Shared- oder Paketverträge führen

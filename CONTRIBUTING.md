@@ -4,7 +4,7 @@
 
 - Wiederverwendbare Logik gehört in `packages/*`.
 - Fachlogik gehört in die Austausch-Naht
-  `apps/antragsservice/src/leistung.config.ts` (siehe `AGENTS.md`); der
+  `apps/fachverfahren/src/leistung.config.ts` (siehe `AGENTS.md`); der
   Modul-Pfad `modules/<domain>/` ist der Generator-Weg (PLAN, siehe
   `modules/README.md`).
 - Providerdetails gehören in `packages/provider-*`.

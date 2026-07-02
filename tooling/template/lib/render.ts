@@ -120,13 +120,13 @@ export async function renderDomainApp(
     filter: (path) => shouldCopy(path, source),
   });
 
-  const appSource = join(target, "apps", "antragsservice");
+  const appSource = join(target, "apps", "fachverfahren");
   const appTarget = join(target, "apps", answers.domain);
   if ((await exists(appSource)) && appSource !== appTarget) {
     await rm(appTarget, { recursive: true, force: true });
     await rename(appSource, appTarget);
   }
-  const chartSource = join(appTarget, "deploy", "helm", "antragsservice");
+  const chartSource = join(appTarget, "deploy", "helm", "fachverfahren");
   const chartTarget = join(appTarget, "deploy", "helm", answers.domain);
   if ((await exists(chartSource)) && chartSource !== chartTarget) {
     await rm(chartTarget, { recursive: true, force: true });
@@ -201,6 +201,14 @@ async function rewriteTextFiles(
   }
 }
 
+// Schutz-Platzhalter: Namen, die "fachverfahren" enthalten, aber beim Scaffold NIE umbenannt werden dürfen —
+// das Kit-Paket (packages/fachverfahren-kit bleibt in jeder App gleichnamig; "@senticor/fachverfahren" ist ein
+// Präfix von "@senticor/fachverfahren-kit") und der Skill-Ordner .agents/skills/fachverfahren-app (Verzeichnisse
+// werden nicht umbenannt, Text-Referenzen müssen dazu passen). Werden vor den Identitäts-Regeln maskiert und
+// danach wiederhergestellt; die Platzhalter-Strings kommen im Repo sonst nirgends vor.
+const KIT_GUARD = "@@senticor-kit-guard@@";
+const SKILL_GUARD = "@@fachverfahren-app-skill-guard@@";
+
 function createReplacements(answers: {
   domain: string;
   displayName: string;
@@ -208,17 +216,32 @@ function createReplacements(answers: {
   const domain = answers.domain;
   const displayName = answers.displayName;
   return [
-    // Reihenfolge: längste/spezifischste Muster zuerst — sonst zerlegt ein kürzeres Muster die längeren Treffer.
+    // SCHUTZ zuerst (siehe oben) — dann Reihenfolge: längste/spezifischste Muster zuerst,
+    // sonst zerlegt ein kürzeres Muster die längeren Treffer.
+    ["fachverfahren-kit", KIT_GUARD],
+    ["fachverfahren-app", SKILL_GUARD],
     ["senticor-app-fachverfahren-template", `senticor-app-${domain}`],
-    ["@senticor/antragsservice", `@senticor/${domain}`],
-    ["apps/antragsservice", `apps/${domain}`],
-    ["Antragsservice", displayName],
-    ["antragsservice", domain],
     ["fachverfahren-template", domain],
     ["Fachverfahren Template", displayName],
     ["Fachverfahren Vorlage", displayName],
+    // App-IDENTITÄT (Paketname, Pfade, Helm-Chart/-Helper, Registry/Host, Anzeige-Name) — bewusst
+    // KEINE nackte fachverfahren-Regel: das Wort ist zugleich Gattungsbegriff der Doku und Bestandteil
+    // von Kit-Bezeichnern (FachverfahrenShell/FachverfahrenStore bleiben unangetastet).
+    ["@senticor/fachverfahren", `@senticor/${domain}`],
+    ["apps/fachverfahren", `apps/${domain}`],
+    ["deploy/helm/fachverfahren", `deploy/helm/${domain}`],
+    ["senticor/fachverfahren", `senticor/${domain}`],
+    ['"fachverfahren.', `"${domain}.`],
+    ["fachverfahren.example.invalid", `${domain}.example.invalid`],
+    ["name: fachverfahren", `name: ${domain}`],
+    ['"Fachverfahren"', `"${displayName}"`],
+    ["Fachverfahren - Referenz-App", `${displayName} - Referenz-App`],
+    ["Fachverfahren Referenz-App", `${displayName} Referenz-App`],
     // Die neutrale Demo-Leistung der Vorlage wird beim Scaffold zum konkreten Verfahren.
     ["Musterantrag", displayName],
+    // Schutz wieder aufheben:
+    [KIT_GUARD, "fachverfahren-kit"],
+    [SKILL_GUARD, "fachverfahren-app"],
   ];
 }
 

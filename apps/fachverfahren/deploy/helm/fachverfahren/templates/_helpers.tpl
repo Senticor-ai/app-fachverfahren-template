@@ -1,8 +1,8 @@
-{{- define "antragsservice.name" -}}
+{{- define "fachverfahren.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
-{{- define "antragsservice.fullname" -}}
+{{- define "fachverfahren.fullname" -}}
 {{- if .Values.fullnameOverride -}}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
@@ -15,29 +15,29 @@
 {{- end -}}
 {{- end -}}
 
-{{- define "antragsservice.labels" -}}
+{{- define "fachverfahren.labels" -}}
 helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
-app.kubernetes.io/name: {{ include "antragsservice.name" . }}
+app.kubernetes.io/name: {{ include "fachverfahren.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 app.kubernetes.io/part-of: fachverfahren
 {{- end -}}
 
-{{- define "antragsservice.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "antragsservice.name" . }}
+{{- define "fachverfahren.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "fachverfahren.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
-{{- define "antragsservice.serviceAccountName" -}}
+{{- define "fachverfahren.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create -}}
-{{- default (include "antragsservice.fullname" .) .Values.serviceAccount.name -}}
+{{- default (include "fachverfahren.fullname" .) .Values.serviceAccount.name -}}
 {{- else -}}
 {{- default "default" .Values.serviceAccount.name -}}
 {{- end -}}
 {{- end -}}
 
-{{- define "antragsservice.image" -}}
+{{- define "fachverfahren.image" -}}
 {{- if .Values.image.digest -}}
 {{- printf "%s@%s" .Values.image.repository .Values.image.digest -}}
 {{- else -}}

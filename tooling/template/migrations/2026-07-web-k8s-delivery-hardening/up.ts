@@ -24,7 +24,7 @@ export async function up(context: MigrationContext) {
       : {};
 
   const requiredScripts: Record<string, string> = {
-    "build:server": "pnpm --filter @senticor/antragsservice build:server",
+    "build:server": "pnpm --filter @senticor/fachverfahren build:server",
     "check:web-delivery": "node scripts/check-web-delivery.mjs",
     "check:k8s-delivery": "node scripts/check-k8s-delivery.mjs",
     "test:supply-chain": "sh scripts/check-supply-chain.sh",

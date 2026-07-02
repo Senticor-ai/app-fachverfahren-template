@@ -23,7 +23,7 @@ if (!targetArg) {
 }
 
 const targetDir = resolve(root, targetArg);
-const appSourceDir = join(root, "apps/antragsservice");
+const appSourceDir = join(root, "apps/fachverfahren");
 const appTargetDir = targetDir;
 const rootPackage = await readJson(join(root, "package.json"));
 const appPackage = await readJson(join(appSourceDir, "package.json"));

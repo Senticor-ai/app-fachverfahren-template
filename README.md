@@ -36,7 +36,7 @@ Capability-Ports modelliert.
 
 ## Deliverables
 
-- `apps/antragsservice`: die EINE dünne Kit-Kompositions-App (3 Personas); der governte Build überschreibt nur `src/leistung.config.ts`.
+- `apps/fachverfahren`: die EINE dünne Kit-Kompositions-App (3 Personas); der governte Build überschreibt nur `src/leistung.config.ts`.
 - `packages/platform-contracts`: Capability-Ports für Identität, Datenaustausch,
   Nachweisabruf, Zahlung, Postfach und weitere Verwaltungsfähigkeiten.
 - `packages/public-sector-sdk`: administrativer Domain-Kernel,
@@ -77,11 +77,11 @@ pnpm run dev
 
 Die App läuft lokal als vollständige, klickbare 3-Personas-Oberfläche
 (Bürger:in, Sachbearbeitung, Aufsicht). Ein konkretes Fachverfahren entsteht,
-indem die EINE Austausch-Naht `apps/antragsservice/src/leistung.config.ts`
+indem die EINE Austausch-Naht `apps/fachverfahren/src/leistung.config.ts`
 mit Fachdaten gefüllt wird; danach den Vertrags-Snapshot aktualisieren:
 
 ```bash
-pnpm --filter @senticor/antragsservice emit:contract
+pnpm --filter @senticor/fachverfahren emit:contract
 ```
 
 Die verbindliche Arbeitsanweisung für Menschen und Coding Agents steht in

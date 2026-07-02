@@ -1,7 +1,7 @@
 # Mockdaten und MSW
 
 Das Template haelt Mockdaten fachneutral. Die aktuelle Referenz-App
-`apps/antragsservice` ist eine duenne Kit-Komposition und liefert keine
+`apps/fachverfahren` ist eine duenne Kit-Komposition und liefert keine
 eingebaute fachliche MSW-Schicht aus.
 
 ## Vertrag

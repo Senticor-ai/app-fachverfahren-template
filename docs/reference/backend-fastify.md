@@ -2,7 +2,7 @@
 
 > **Für Agenten: Quellen & Pflicht-Lektüre.**
 > Status: IST für die neutrale Web-Delivery-Runtime unter
-> `apps/antragsservice/server/`; fachliche API-, OpenAPI-, App-Daten- und
+> `apps/fachverfahren/server/`; fachliche API-, OpenAPI-, App-Daten- und
 > Postgres-E2E-Routen bleiben explizite Ausbauschritte.
 > Quellen: Architekturentscheidungen dieses Templates, `AGENTS.md`.
 > Pflicht-Lektüre vorher: `AGENTS.md`.
@@ -25,14 +25,14 @@ kritische Abhängigkeiten prüfen; Liveness darf das nicht.
 
 ## Plattform- und Domain-Routen
 
-Der aktuelle Template-Server unter `apps/antragsservice/server/` liefert den
+Der aktuelle Template-Server unter `apps/fachverfahren/server/` liefert den
 Web-Delivery-Vertrag: SPA, Health, Runtime-Konfiguration, Security-Header,
 Cache-Header, Metrics und Build-Info. Plattform- oder Domain-APIs werden als
 explizite Fastify-Routen ergänzt und behalten ihre Permissions, Events und
 Compliance-Hinweise im Domain-Manifest.
 
 Der Server-Build ist absichtlich eng geschnitten:
-`apps/antragsservice/tsconfig.server.json` umfasst nur `server/`. Server-Code
+`apps/fachverfahren/tsconfig.server.json` umfasst nur `server/`. Server-Code
 importiert deshalb nicht direkt aus `modules/`. Gemeinsame DTOs gehören nach
 einem expliziten Shared- oder Paketvertrag, fachliche Serverlogik bleibt im
 Domain-Modul und wird über einen expliziten Registrierungs- oder Paketexportpfad

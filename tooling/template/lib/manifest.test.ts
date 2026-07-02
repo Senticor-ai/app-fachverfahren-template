@@ -13,12 +13,12 @@ describe("template manifest metadata", () => {
   it("creates stable answers without timestamps or machine paths", () => {
     expect(
       createAnswers({
-        domain: "antragsservice",
-        displayName: "Antragsservice",
+        domain: "fachverfahren",
+        displayName: "Fachverfahren",
       }),
     ).toEqual({
-      domain: "antragsservice",
-      displayName: "Antragsservice",
+      domain: "fachverfahren",
+      displayName: "Fachverfahren",
       features: {
         postgres: true,
         mockAuth: true,
@@ -52,7 +52,7 @@ describe("template manifest metadata", () => {
       strategy: "replace",
     });
     expect(
-      explainOwnership(parsed, "apps/antragsservice/src/domain/example.ts"),
+      explainOwnership(parsed, "apps/fachverfahren/src/domain/example.ts"),
     ).toMatchObject({
       strategy: "consumer",
     });

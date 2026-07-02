@@ -1,9 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "antragsservice.fullname" . }}
+  name: {{ include "fachverfahren.fullname" . }}
   labels:
-    {{- include "antragsservice.labels" . | nindent 4 }}
+    {{- include "fachverfahren.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   strategy:
@@ -13,11 +13,11 @@ spec:
       maxSurge: 1
   selector:
     matchLabels:
-      {{- include "antragsservice.selectorLabels" . | nindent 6 }}
+      {{- include "fachverfahren.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "antragsservice.selectorLabels" . | nindent 8 }}
+        {{- include "fachverfahren.selectorLabels" . | nindent 8 }}
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -27,7 +27,7 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
-      serviceAccountName: {{ include "antragsservice.serviceAccountName" . }}
+      serviceAccountName: {{ include "fachverfahren.serviceAccountName" . }}
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       securityContext:
@@ -43,13 +43,13 @@ spec:
           whenUnsatisfiable: {{ .Values.topologySpreadConstraints.whenUnsatisfiable }}
           labelSelector:
             matchLabels:
-              {{- include "antragsservice.selectorLabels" . | nindent 14 }}
+              {{- include "fachverfahren.selectorLabels" . | nindent 14 }}
       {{- end }}
       affinity:
         {{- toYaml .Values.affinity | nindent 8 }}
       containers:
         - name: app
-          image: {{ include "antragsservice.image" . | quote }}
+          image: {{ include "fachverfahren.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
@@ -62,7 +62,7 @@ spec:
               protocol: TCP
           envFrom:
             - configMapRef:
-                name: {{ include "antragsservice.fullname" . }}-runtime
+                name: {{ include "fachverfahren.fullname" . }}-runtime
             {{- range .Values.secretRefs }}
             - secretRef:
                 name: {{ . | quote }}

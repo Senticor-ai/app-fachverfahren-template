@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
-const appRoot = join(root, "apps/antragsservice");
+const appRoot = join(root, "apps/fachverfahren");
 const publicRoot = join(appRoot, "public");
 const distRoot = join(appRoot, "dist");
 const failures = [];
@@ -26,7 +26,7 @@ const sourceIndex = read(join(appRoot, "index.html"));
 if (sourceIndex) {
   if (/<script(?![^>]*\bsrc=)[^>]*>/i.test(sourceIndex)) {
     failures.push(
-      "apps/antragsservice/index.html must not contain inline scripts",
+      "apps/fachverfahren/index.html must not contain inline scripts",
     );
   }
   if (!sourceIndex.includes('src="/preview-reporter.js"')) {

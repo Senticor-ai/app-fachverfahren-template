@@ -10,7 +10,7 @@ Dateien (`CLAUDE.md`, `.claude/skills/*`) sind nur Shims auf diese Datei und
 Eine fertige, dünne Fachverfahren-App als Kit-Komposition plus versionierte
 Plattformpakete:
 
-- `apps/antragsservice` ist die EINE lauffähige App. Sie rendert drei Personas
+- `apps/fachverfahren` ist die EINE lauffähige App. Sie rendert drei Personas
   (Bürger:in · Sachbearbeitung · Aufsicht) vollständig aus EINER Konfiguration
   und enthält selbst keine Fachlogik — nur Routing, eine Store-Instanz, die
   Konfiguration und die neutrale Fastify-Web-Runtime für Delivery/Health.
@@ -41,7 +41,7 @@ Scaffolds. Geplante Zielarchitektur ist ausdrücklich mit `(PLAN)` markiert.
 Aktuell gilt insbesondere:
 
 - Es existiert eine neutrale Fastify-Web-Runtime unter
-  `apps/antragsservice/server/` für SPA-Auslieferung, Runtime-Konfiguration,
+  `apps/fachverfahren/server/` für SPA-Auslieferung, Runtime-Konfiguration,
   Security-/Cache-Header, Health, Metrics und Build-Info.
 - Fachliche API-, OpenAPI-, Postgres-E2E- und Domain-Route-Schichten sind
   weiterhin Ausbauschritte; Zielarchitektur:
@@ -58,7 +58,7 @@ Change und verdrahtet die zugehörigen Scripts real.
 
 ## DIE EINE Austausch-Naht
 
-`apps/antragsservice/src/leistung.config.ts` ist der einzige Austausch-Punkt
+`apps/fachverfahren/src/leistung.config.ts` ist der einzige Austausch-Punkt
 der App. Die exportierte `leistungConfig: LeistungConfig` (Typ:
 `packages/fachverfahren-kit/src/types.ts`) treibt die komplette 3-Personen-UX.
 Ein Fachverfahren-Build ändert ausschließlich diese Datei.
@@ -84,13 +84,13 @@ NACH JEDEM Write auf die Naht den Vertrags-Snapshot neu erzeugen und mit
 committen:
 
 ```bash
-pnpm --filter @senticor/antragsservice emit:contract
+pnpm --filter @senticor/fachverfahren emit:contract
 ```
 
-Der Snapshot `apps/antragsservice/leistung.contract.json` ist GENERIERT und
+Der Snapshot `apps/fachverfahren/leistung.contract.json` ist GENERIERT und
 wird nie von Hand editiert.
 
-Die realen Routen der App (`apps/antragsservice/src/App.tsx`):
+Die realen Routen der App (`apps/fachverfahren/src/App.tsx`):
 
 ```text
 /buerger · /buerger/anmelden · /buerger/bestaetigung/:id
@@ -104,12 +104,12 @@ Die realen Routen der App (`apps/antragsservice/src/App.tsx`):
   werden importiert, nicht kopiert und für einen Fachverfahren-Build nicht
   geändert. Neue wiederverwendbare Bausteine sind Plattformarbeit mit Tests
   und Storybook, kein Nebenprodukt eines Verfahrens-Builds.
-- Generierte Snapshots: `apps/antragsservice/leistung.contract.json` (nur via
+- Generierte Snapshots: `apps/fachverfahren/leistung.contract.json` (nur via
   `emit:contract`).
 - Die dünne App-Komposition (`App.tsx`, `store.ts`, `main.tsx`,
   `AppErrorBoundary.tsx`, `styles.css`, `index.html`, `vite.config.ts`): für
   einen Fachverfahren-Build tabu — die Naht reicht.
-- Die neutrale Web-Runtime (`apps/antragsservice/server/`) ist
+- Die neutrale Web-Runtime (`apps/fachverfahren/server/`) ist
   Plattform-/Delivery-Arbeit, kein Nebenprodukt eines Fachverfahren-Builds.
 - Template-Provenienz in generierten Repositories (`.template/*`): nur über
   die Template-CLI.
@@ -141,9 +141,9 @@ Jede Zeile beschreibt den IST-Stand. Zeilen mit `(PLAN)` existieren noch nicht.
 
 | Pfad                                                              | Rolle                                                    | Agenten-Regel                                      |
 | ----------------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------- |
-| `apps/antragsservice/src/leistung.config.ts`                      | DIE EINE Austausch-Naht (`LeistungConfig`)               | Einzige Datei eines Fachverfahren-Builds           |
-| `apps/antragsservice/leistung.contract.json`                      | Generierter Vertrags-Snapshot                            | Nur via `emit:contract`                            |
-| `apps/antragsservice/src/`                                        | Dünne Komposition (Routing, Store, Shell)                | Für Verfahrens-Builds nicht ändern                 |
+| `apps/fachverfahren/src/leistung.config.ts`                       | DIE EINE Austausch-Naht (`LeistungConfig`)               | Einzige Datei eines Fachverfahren-Builds           |
+| `apps/fachverfahren/leistung.contract.json`                       | Generierter Vertrags-Snapshot                            | Nur via `emit:contract`                            |
+| `apps/fachverfahren/src/`                                         | Dünne Komposition (Routing, Store, Shell)                | Für Verfahrens-Builds nicht ändern                 |
 | `packages/fachverfahren-kit/src/types.ts`                         | Naht-Vertrag (`LeistungConfig`, `Berechnung`, `Vorgang`) | Lesen; Änderungen sind Plattformarbeit             |
 | `packages/fachverfahren-kit/src/components/`                      | Fertige Fachverfahren-Bausteine                          | Importieren, nie kopieren                          |
 | `packages/fachverfahren-kit/src/ui/`                              | shadcn/Radix/Tailwind-Primitive                          | Nur nutzen, wenn kein Baustein passt               |
@@ -159,7 +159,7 @@ Jede Zeile beschreibt den IST-Stand. Zeilen mit `(PLAN)` existieren noch nicht.
 | `scripts/`                                                        | Deterministische Checks und Werkzeuge                    | Checks sind die Wahrheit, kein LLM-Urteil          |
 | `schemas/`, `platform/capabilities.json`, `sources/registry.yaml` | Maschinenlesbare Verträge und Kataloge                   | Über `check:*`-Scripts validiert                   |
 | `agent.discovery.json`                                            | Öffentliche Discovery-API für Agenten                    | Muss `check:agent-discovery` bestehen              |
-| `apps/antragsservice/server/`                                     | Fastify-Web-Runtime                                      | Plattform-/Delivery-Arbeit; keine Fachlogik direkt |
+| `apps/fachverfahren/server/`                                      | Fastify-Web-Runtime                                      | Plattform-/Delivery-Arbeit; keine Fachlogik direkt |
 
 ## Sprache und Benennung
 
@@ -270,7 +270,7 @@ pnpm run build:server
 ```
 
 Das Dockerfile baut genau diese Kette und startet die Fastify-Web-Runtime aus
-`apps/antragsservice/dist-server/index.js`; `check:dockerfile-paths` hält die
+`apps/fachverfahren/dist-server/index.js`; `check:dockerfile-paths` hält die
 `COPY`-Quellen deterministisch mit dem Scaffold synchron.
 
 Bei pnpm-Filterbefehlen steht `--filter` vor `run`:
@@ -311,7 +311,7 @@ Annahme-DATEN-Konvention dieses Dokuments.
 Vor Abschluss einer Änderung, je nach Scope (alles reale Scripts):
 
 ```bash
-pnpm --filter @senticor/antragsservice emit:contract
+pnpm --filter @senticor/fachverfahren emit:contract
 pnpm run check:agent-smoke
 pnpm run check:agent-domain
 pnpm run check:agent-ui

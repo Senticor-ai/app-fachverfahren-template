@@ -29,9 +29,9 @@ Wenn dies dein einziger Startprompt ist:
 ## Aufgabe
 
 Baue aus dieser Plattform das klickbare Fachverfahren Hundesteuer, indem du
-die EINE Austausch-Naht `apps/antragsservice/src/leistung.config.ts` nach dem
+die EINE Austausch-Naht `apps/fachverfahren/src/leistung.config.ts` nach dem
 Vertrag aus `AGENTS.md` füllst und danach
-`pnpm --filter @senticor/antragsservice emit:contract` ausführst. Ändere
+`pnpm --filter @senticor/fachverfahren emit:contract` ausführst. Ändere
 Kernpakete nur, wenn ein echter Plattformvertrag fehlt. Fachliche Werte, die
 nicht belegt sind, folgen der Annahme-DATEN-Konvention aus `AGENTS.md`.
 
@@ -97,7 +97,7 @@ bleiben separat zu validieren.
 - `berechne` bildet jede Tarifstufe, Gefährlichkeits- und
   Befreiungs-/Ermäßigungsregel als eigene prüfbare Verzweigung ab (ganze
   Euro, `provisional`/`final`) und ist gegen die Beispielwerte getestet.
-- `pnpm --filter @senticor/antragsservice emit:contract` wurde ausgeführt;
+- `pnpm --filter @senticor/fachverfahren emit:contract` wurde ausgeführt;
   `pnpm run typecheck` und `pnpm run test` sind grün; die drei Personas sind
   unter `/buerger`, `/amt` und `/aufsicht` klickbar.
 - KI bleibt assistiv (`ki.schwelleAutonom`, optional transparenter

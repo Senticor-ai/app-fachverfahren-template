@@ -17,7 +17,7 @@ Domain module
 Enthält Fachlogik, Fachbegriffe, Formulare, Berechtigungen, Events,
 Migrationen und Compliance-Angaben eines konkreten Verfahrens. Im IST-Stand
 lebt die Fachlogik in der Austausch-Naht
-`apps/antragsservice/src/leistung.config.ts` (siehe `AGENTS.md`). Ein
+`apps/fachverfahren/src/leistung.config.ts` (siehe `AGENTS.md`). Ein
 Domain-Modul unter `modules/<domain>/` mit `domain.module.yaml` ist der
 Generator-Pfad (PLAN für die App-Einbindung, siehe `modules/README.md`).
 

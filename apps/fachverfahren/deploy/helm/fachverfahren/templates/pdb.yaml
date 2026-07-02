@@ -2,12 +2,12 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ include "antragsservice.fullname" . }}
+  name: {{ include "fachverfahren.fullname" . }}
   labels:
-    {{- include "antragsservice.labels" . | nindent 4 }}
+    {{- include "fachverfahren.labels" . | nindent 4 }}
 spec:
   minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
   selector:
     matchLabels:
-      {{- include "antragsservice.selectorLabels" . | nindent 6 }}
+      {{- include "fachverfahren.selectorLabels" . | nindent 6 }}
 {{- end }}

@@ -16,8 +16,8 @@ const packageRoots = ["apps", "packages", "jurisdictions"];
 const sourceRoots = ["apps", "packages", "jurisdictions", "modules", "scripts"];
 // Generierte oder statische Browser-JS-Assets hier allowlisten; Implementierungscode bleibt TypeScript-only.
 const generatedJavaScriptAssets = new Set([
-  "apps/antragsservice/public/preview-reporter.js",
-  "apps/antragsservice/public/service-worker.js",
+  "apps/fachverfahren/public/preview-reporter.js",
+  "apps/fachverfahren/public/service-worker.js",
 ]);
 // Legitime CommonJS-Interop-Punkte, die das Kit BEWUSST als .cjs veroeffentlicht (oeffentlicher package.json-Export):
 // das Tailwind-v3-Preset wird von Consumer-Apps in ihre CommonJS-tailwind.config.cjs eingebunden — CommonJS ist hier

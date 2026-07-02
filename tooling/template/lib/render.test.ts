@@ -38,7 +38,7 @@ describe("domain app rendering", () => {
       expect(firstLock).not.toContain(first);
       const packageJson = await readFile(join(first, "package.json"), "utf8");
       expect(packageJson).toContain("@senticor/demo-k8s");
-      expect(packageJson).not.toContain("@senticor/antragsservice");
+      expect(packageJson).not.toContain("@senticor/fachverfahren");
       await expect(
         readFile(
           join(
@@ -58,7 +58,7 @@ describe("domain app rendering", () => {
           join(first, "scripts", "check-k8s-delivery.mjs"),
           "utf8",
         ),
-      ).not.toContain("apps/antragsservice/deploy/helm/antragsservice");
+      ).not.toContain("apps/fachverfahren/deploy/helm/fachverfahren");
       expect(
         await readFile(join(first, "tooling", "template", "cli.ts"), "utf8"),
       ).toContain("template");

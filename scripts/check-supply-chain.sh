@@ -18,5 +18,5 @@ trivy fs \
   --exit-code 1 \
   --ignore-unfixed \
   --skip-dirs node_modules \
-  --skip-dirs apps/antragsservice/dist \
+  --skip-dirs apps/fachverfahren/dist \
   .

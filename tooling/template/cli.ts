@@ -1585,7 +1585,7 @@ async function resolveAppDomain(root) {
   if (await exists(join(root, "apps", metadata.answers.domain))) {
     return metadata.answers.domain;
   }
-  return "antragsservice";
+  return "fachverfahren";
 }
 
 async function readMetadataOrSourceDefaults(root = process.cwd()) {

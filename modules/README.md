@@ -10,9 +10,9 @@
 ## IST-Stand
 
 Dieses Verzeichnis enthält KEINE Modul-Instanz — nur diese Dokumentation. Die
-EINE ausgelieferte App (`apps/antragsservice`) nutzt den Modul-Weg nicht: Sie
+EINE ausgelieferte App (`apps/fachverfahren`) nutzt den Modul-Weg nicht: Sie
 rendert vollständig aus der Austausch-Naht
-`apps/antragsservice/src/leistung.config.ts`. Das ist der kanonische Weg für
+`apps/fachverfahren/src/leistung.config.ts`. Das ist der kanonische Weg für
 ein neues Fachverfahren in diesem Repository (siehe `AGENTS.md`,
 „DIE EINE Austausch-Naht").
 

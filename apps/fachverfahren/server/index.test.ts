@@ -8,7 +8,7 @@ import {
   readRuntimeConfig,
 } from "./index.js";
 
-describe("antragsservice runtime", () => {
+describe("fachverfahren runtime", () => {
   it("sets redeploy-safe cache and security headers", async () => {
     const staticDir = await createStaticDir();
     const config = readRuntimeConfig({
@@ -115,7 +115,7 @@ describe("antragsservice runtime", () => {
 });
 
 async function createStaticDir(): Promise<string> {
-  const dir = join(tmpdir(), `antragsservice-runtime-${Date.now()}`);
+  const dir = join(tmpdir(), `fachverfahren-runtime-${Date.now()}`);
   await mkdir(join(dir, "assets"), { recursive: true });
   await writeFile(
     join(dir, "index.html"),

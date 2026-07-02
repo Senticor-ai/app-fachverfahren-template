@@ -10,7 +10,7 @@ ENV PATH="${PNPM_HOME}:${PATH}"
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY scripts/setup-husky.mjs scripts/setup-husky.mjs
-COPY apps/antragsservice/package.json apps/antragsservice/package.json
+COPY apps/fachverfahren/package.json apps/fachverfahren/package.json
 COPY packages/fachverfahren-kit/package.json packages/fachverfahren-kit/package.json
 COPY packages/platform-contracts/package.json packages/platform-contracts/package.json
 COPY packages/public-sector-sdk/package.json packages/public-sector-sdk/package.json
@@ -39,19 +39,19 @@ FROM registry.opencode.de/open-code/oci/nodejs:24@sha256:4f6d0ed8aeda0c7d83eee77
 ENV NODE_ENV=production
 ENV PORT=8080
 ENV INTERNAL_PORT=9090
-ENV STATIC_DIR=/app/apps/antragsservice/dist
+ENV STATIC_DIR=/app/apps/fachverfahren/dist
 ENV APP_ENABLE_SERVICE_WORKER=false
 
 USER root
 WORKDIR /app
 COPY --from=build --chown=0:0 /app/node_modules ./node_modules
-COPY --from=build --chown=0:0 /app/apps/antragsservice/node_modules ./apps/antragsservice/node_modules
-COPY --from=build --chown=0:0 /app/apps/antragsservice/dist ./apps/antragsservice/dist
-COPY --from=build --chown=0:0 /app/apps/antragsservice/dist-server ./apps/antragsservice/dist-server
-COPY --from=build --chown=0:0 /app/apps/antragsservice/package.json ./apps/antragsservice/package.json
+COPY --from=build --chown=0:0 /app/apps/fachverfahren/node_modules ./apps/fachverfahren/node_modules
+COPY --from=build --chown=0:0 /app/apps/fachverfahren/dist ./apps/fachverfahren/dist
+COPY --from=build --chown=0:0 /app/apps/fachverfahren/dist-server ./apps/fachverfahren/dist-server
+COPY --from=build --chown=0:0 /app/apps/fachverfahren/package.json ./apps/fachverfahren/package.json
 RUN chmod -R g=rX /app
 USER 53111
 
 EXPOSE 8080
 EXPOSE 9090
-CMD ["node", "apps/antragsservice/dist-server/index.js"]
+CMD ["node", "apps/fachverfahren/dist-server/index.js"]
