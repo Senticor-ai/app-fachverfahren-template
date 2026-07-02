@@ -66,7 +66,7 @@ Gibt der Nutzer im Prompt eine **Kommune** an, soll die generierte App **deren W
 Das teilt sich sauber an der Token-Bridge:
 
 - **Kit (umgesetzt, `KommuneTheme.tsx`):** nimmt ein `KommuneTheme` als DATEN (Markenfarben + Logo/Wappen + Provenienz) und injiziert es in genau die CSS-Custom-Properties, aus denen das ganze Kit seine Farben zieht (`--primary`/`--accent`/`--ring`/…). `KommuneThemeProvider` (ganzseitig), `useKommuneTheme()`, `KommuneLogo` (Wappen mit Pflicht-alt + Quelle). **BITV-AA:** fehlt eine Vordergrundfarbe, wird sie kontrast-sicher (schwarz/weiß per Luminanz) abgeleitet. Generisch — jede Kommune/Behörde ohne Code-Änderung.
-- **Fabrik (CHOS-Code, offen):** ein Build-Schritt, der den Kommune-Namen aus dem Prompt nimmt, per **WebSearch den offiziellen Webauftritt findet + als echte Kommune verifiziert** (Domain/Impressum), Markenfarben aus der Seiten-CSS + das Wappen extrahiert/herunterlädt und als `KommuneTheme` (Token-Overrides + Logo-Asset) ins Projekt emittiert.
+- **Fabrik (externes Build-Werkzeug, offen):** ein Build-Schritt, der den Kommune-Namen aus dem Prompt nimmt, per **WebSearch den offiziellen Webauftritt findet + als echte Kommune verifiziert** (Domain/Impressum), Markenfarben aus der Seiten-CSS + das Wappen extrahiert/herunterlädt und als `KommuneTheme` (Token-Overrides + Logo-Asset) ins Projekt emittiert.
 - **COMPLIANCE-Vorgabe:** das **Wappen ist ein Hoheitszeichen** — Nutzung nur im eigenen Behörden-Dienst zulässig. Das Theme trägt Provenienz (Quelle-URL + Prüfdatum + verifiziert-Flag); die Herkunft bleibt nachvollziehbar. Asset-Download respektiert die Seiten-Nutzungsbedingungen; Provenienz wird im Evidence-Bundle protokolliert.
 
 ---

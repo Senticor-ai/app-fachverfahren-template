@@ -1,7 +1,7 @@
 // fachverfahren-kit/contract-snapshot — projiziert eine `LeistungConfig` in einen JSON-SAFE Struktur-Snapshot
 // (`leistung.contract.json`). Funktionen (berechne/nachweise/seed) sind in JSON nicht serialisierbar → als
 // Präsenz-Marker dargestellt; die STRUKTUR (Pflichtfelder · Status-Machine · Wire-through · Grounding) bleibt voll
-// erhalten. Das governte Build-Gate der Fabrik (CHOS leistung-vertrag-gueltig) validiert genau diesen Snapshot —
+// erhalten. Ein externes Build-Gate kann genau diesen Snapshot deterministisch validieren —
 // so kann der Vertrag einer GENERIERTEN Leistung deterministisch geprüft werden, ohne die .ts-Config zu importieren.
 import type { LeistungConfig } from "./types.js";
 

@@ -10,12 +10,12 @@ import { defineConfig } from "vite";
 const appDir = path.dirname(fileURLToPath(import.meta.url));
 const sharedDep = (pkg: string) => path.join(appDir, "node_modules", pkg);
 
-// Wird die App hinter dem CHOS-Preview-Proxy unter /flow/preview/<session>/ gehostet, MUSS vite mit genau diesem
+// Wird die App hinter einem einbettenden Preview-Proxy unter /flow/preview/<session>/ gehostet, MUSS vite mit genau diesem
 // `base` laufen — sonst serviert der Dev-Server alle Modul-/Dep-/HMR-Pfade ROOT-absolut (/@vite, /src,
 // /node_modules/.vite) OHNE Präfix; der Proxy kann nur HTML-Attribute (nicht die JS-import-Strings) umschreiben
 // → 404 → WEISSER SCHIRM im Builder. Mit base=<previewPath> präfixiert vite ALLE Pfade → jeder Request trägt
-// /flow/preview/<session>/ → der Proxy trifft ihn. Der flow-server reicht den Wert als CHOS_FLOW_PREVIEW_BASE
-// durch; lokal/standalone bleibt es "/" (kein Regress).
+// /flow/preview/<session>/ → der Proxy trifft ihn. Der einbettende Host reicht den Wert über die stabile
+// Umgebungsvariable CHOS_FLOW_PREVIEW_BASE durch; lokal/standalone bleibt es "/" (kein Regress).
 const previewBase = process.env["CHOS_FLOW_PREVIEW_BASE"] || "/";
 
 export default defineConfig({

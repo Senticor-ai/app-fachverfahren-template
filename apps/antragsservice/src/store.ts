@@ -10,7 +10,7 @@ import {
   type FachverfahrenStore,
 } from "@senticor/fachverfahren-kit";
 // Die Config kommt aus DER EINEN Austausch-Naht (./leistung.config) — Default = ein NEUTRALES Demo-Verfahren,
-// vom governten CHOS-Build überschrieben mit der aus dem Fachkonzept generierten Config. Die Composition-App bleibt
+// von einem generierenden Build überschrieben mit der aus dem Fachkonzept generierten Config. Die Composition-App bleibt
 // VERFAHRENS-AGNOSTISCH: sie reicht eine beliebige LeistungConfig an dieselben Kit-Bausteine.
 import { leistungConfig } from "./leistung.config";
 

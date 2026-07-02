@@ -1,8 +1,8 @@
 // AppErrorBoundary — generischer Auffang für JEDEN Render-Fehler der generierten App. Wurzel-Schutz gegen den
 // „weißen Screen": eine agent-generierte leistung.config.ts kann nicht zum Kit-Vertrag passen (z. B. fehlt
 // `antrag.steps`) → ein Kit-Component wirft → ohne Boundary bleibt #root LEER (blank). Mit Boundary: lesbare
-// Fehlermeldung im Bild UND eine postMessage-Meldung an die einbettende Builder-Konsole, damit die CHOS-Agenten
-// die generierte App reparieren können (statt eines stillen weißen Screens). Inline-Styles → rendert auch, wenn
+// Fehlermeldung im Bild UND eine postMessage-Meldung an die einbettende Builder-Konsole, damit einbettende
+// Build-Werkzeuge die generierte App reparieren können (statt eines stillen weißen Screens). Inline-Styles → rendert auch, wenn
 // das CSS/Theme selbst kaputt ist.
 import { Component, type ErrorInfo, type ReactNode } from "react";
 

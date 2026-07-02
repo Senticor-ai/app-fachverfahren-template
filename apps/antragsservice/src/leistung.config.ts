@@ -6,7 +6,7 @@
 // (pnpm dev) und sofort alle drei Sichten zeigt. Es sind bewusst KEINE echten Fachdaten: Sätze/Gebühren, Fristen,
 // Rechtsgrundlagen und Prüfungen eines realen Verfahrens stehen NICHT hier — sie kommen aus dem FACHKONZEPT.
 //
-// GENERIERT: der governte CHOS-Build ÜBERSCHREIBT GENAU DIESE DATEI mit der aus dem Fachkonzept generierten
+// GENERIERT: ein generierender Build (Agent oder externe Fabrik) ÜBERSCHREIBT GENAU DIESE DATEI mit der aus dem Fachkonzept generierten
 // LeistungConfig des jeweiligen Verfahrens. Dieselbe App, dieselben Bausteine, anderes Verfahren — ohne dass eine
 // weitere Datei der App sich ändert. Das ist die EINE Naht zwischen Generierung und laufender App.
 import type {

@@ -1,5 +1,5 @@
-// emit-contract — schreibt den JSON-Vertrags-Snapshot der App-Leistung (leistung.contract.json), den das governte
-// Build-Gate der Fabrik (leistung-vertrag-gueltig) deterministisch validiert. Quelle ist IMMER die EINE
+// emit-contract — schreibt den JSON-Vertrags-Snapshot der App-Leistung (leistung.contract.json), den externe
+// Build-Gates deterministisch validieren können. Quelle ist IMMER die EINE
 // Austausch-Naht ../src/leistung.config.ts — nach jedem Config-Wechsel (Generierung) neu ausführen.
 import { writeFileSync } from "node:fs";
 // Direkt auf die .ts-Quelle (statt Paket-Index): läuft so ohne Bundler mit `node --experimental-strip-types` —

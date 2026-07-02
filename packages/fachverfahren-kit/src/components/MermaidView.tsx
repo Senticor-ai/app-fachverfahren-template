@@ -1,4 +1,4 @@
-// MermaidView — robuste Mermaid-Diagramm-Anzeige für das Kit (portiert aus der CHOS-Builder-Pipeline).
+// MermaidView — robuste Mermaid-Diagramm-Anzeige für das Kit (aus einer produktionserprobten Builder-Pipeline portiert).
 //
 // Robustheit (für agent-/LLM-generierte Diagramme): VORVERARBEITUNG (normalizeMermaid: Entities/\n/Zaun) →
 // parse-first (suppressErrors, kein „Syntax-error"-Bombe im DOM) → ELK-Layout (knoten-ausweichendes Routing) mit

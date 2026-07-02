@@ -1,5 +1,5 @@
 // MarkdownView — advanced Markdown-Anzeige für das Kit (GFM + Syntax-Highlighting + eingebettete Mermaid-Diagramme).
-// Portiert aus der CHOS-Builder-Render-Schicht: GFM (Tabellen/Task-Lists/Strikethrough), highlight.js, ```mermaid →
+// Aus einer produktionserprobten Builder-Render-Schicht portiert: GFM (Tabellen/Task-Lists/Strikethrough), highlight.js, ```mermaid →
 // MermaidView (ELK/Zoom). Generisch, token-vereinheitlicht, barrierefrei. Deps MIT (react-markdown/remark-gfm/
 // rehype-highlight/highlight.js).
 import ReactMarkdown, { type Components } from "react-markdown";
