@@ -117,39 +117,52 @@
         "from": "eingegangen",
         "to": "in_pruefung",
         "label": "In Prüfung nehmen",
-        "rollen": ["sachbearbeitung"]
+        "rollen": [
+          "sachbearbeitung"
+        ]
       },
       {
         "from": "in_pruefung",
         "to": "review_noetig",
         "label": "Zur Zweitprüfung",
-        "rollen": ["sachbearbeitung"]
+        "rollen": [
+          "sachbearbeitung"
+        ]
       },
       {
         "from": "in_pruefung",
         "to": "festgesetzt",
         "label": "Festsetzen",
-        "rollen": ["sachbearbeitung"],
+        "rollen": [
+          "sachbearbeitung"
+        ],
         "vierAugen": true
       },
       {
         "from": "review_noetig",
         "to": "festgesetzt",
         "label": "Festsetzen (Zweitfreigabe)",
-        "rollen": ["sachbearbeitung"],
+        "rollen": [
+          "sachbearbeitung"
+        ],
         "vierAugen": true
       },
       {
         "from": "in_pruefung",
         "to": "abgelehnt",
         "label": "Ablehnen",
-        "rollen": ["sachbearbeitung"],
+        "rollen": [
+          "sachbearbeitung"
+        ],
         "detailPflicht": true
       }
     ]
   },
   "register": {
-    "suchfelder": ["nachname", "plz"],
+    "suchfelder": [
+      "nachname",
+      "plz"
+    ],
     "mock": [
       {
         "nachname": "Muster",
