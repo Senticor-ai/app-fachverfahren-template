@@ -26,7 +26,7 @@ export interface KiEinschaetzung {
 
 /** Ergebnis der Subsumtion/Berechnung — Betrag + die fachliche BEGRÜNDUNG (Tatbestand→Rechtsfolge). */
 export interface Berechnung {
-  betrag: number; // in der kleinsten Währungseinheit ODER ganzzahlig je Einheit
+  betrag: number; // in der NATÜRLICHEN Haupteinheit der `einheit` (bei EUR: ganze Euro, 120 = 120,00 €) — kein Cent
   einheit: string; // "EUR/Jahr", "EUR", …
   label: string; // kurzer Ergebnis-Titel
   begruendung: string; // die belegte fachliche Herleitung

@@ -1,0 +1,210 @@
+{
+  "id": "musterantrag",
+  "label": "Musterantrag",
+  "kommune": "Stadt Musterstadt",
+  "rechtsgrundlagen": [
+    {
+      "norm": "§ 1 Demo-Satzung",
+      "titel": "Platzhalter — reale Rechtsgrundlagen kommen aus dem Fachkonzept, nicht aus der Vorlage"
+    }
+  ],
+  "antrag": {
+    "steps": [
+      {
+        "id": "antragsteller",
+        "titel": "Antragsteller:in",
+        "felder": [
+          {
+            "name": "antragsteller.vorname",
+            "label": "Vorname",
+            "typ": "text",
+            "required": true,
+            "onceOnly": true
+          },
+          {
+            "name": "antragsteller.nachname",
+            "label": "Nachname",
+            "typ": "text",
+            "required": true,
+            "onceOnly": true
+          },
+          {
+            "name": "antragsteller.plz",
+            "label": "Postleitzahl",
+            "typ": "plz",
+            "required": true,
+            "pattern": "^\\d{5}$",
+            "hint": "5-stellig",
+            "onceOnly": true
+          },
+          {
+            "name": "antragsteller.ort",
+            "label": "Ort",
+            "typ": "text",
+            "required": true,
+            "onceOnly": true
+          }
+        ]
+      },
+      {
+        "id": "anliegen",
+        "titel": "Anliegen",
+        "felder": [
+          {
+            "name": "anliegen.kategorie",
+            "label": "Kategorie",
+            "typ": "select",
+            "required": true,
+            "options": [
+              {
+                "value": "standard",
+                "label": "Standard (50 €)"
+              },
+              {
+                "value": "express",
+                "label": "Express (90 €)"
+              },
+              {
+                "value": "gebuehrenfrei",
+                "label": "Gebührenfrei (0 €)"
+              }
+            ]
+          },
+          {
+            "name": "anliegen.beschreibung",
+            "label": "Beschreibung",
+            "typ": "textarea",
+            "hint": "optional"
+          }
+        ]
+      }
+    ],
+    "einleitung": "Neutrales Demo-Verfahren — es zeigt die drei Sichten (Bürger:in · Sachbearbeitung · Aufsicht), enthält aber keine echten Fachdaten."
+  },
+  "statusMachine": {
+    "initial": "eingegangen",
+    "states": [
+      {
+        "key": "eingegangen",
+        "label": "Eingegangen",
+        "tone": "neu"
+      },
+      {
+        "key": "in_pruefung",
+        "label": "In Prüfung",
+        "tone": "info"
+      },
+      {
+        "key": "review_noetig",
+        "label": "Review nötig",
+        "tone": "warn"
+      },
+      {
+        "key": "festgesetzt",
+        "label": "Festgesetzt",
+        "tone": "ok",
+        "terminal": true
+      },
+      {
+        "key": "abgelehnt",
+        "label": "Abgelehnt",
+        "tone": "block",
+        "terminal": true
+      }
+    ],
+    "transitions": [
+      {
+        "from": "eingegangen",
+        "to": "in_pruefung",
+        "label": "In Prüfung nehmen",
+        "rollen": ["sachbearbeitung"]
+      },
+      {
+        "from": "in_pruefung",
+        "to": "review_noetig",
+        "label": "Zur Zweitprüfung",
+        "rollen": ["sachbearbeitung"]
+      },
+      {
+        "from": "in_pruefung",
+        "to": "festgesetzt",
+        "label": "Festsetzen",
+        "rollen": ["sachbearbeitung"],
+        "vierAugen": true
+      },
+      {
+        "from": "review_noetig",
+        "to": "festgesetzt",
+        "label": "Festsetzen (Zweitfreigabe)",
+        "rollen": ["sachbearbeitung"],
+        "vierAugen": true
+      },
+      {
+        "from": "in_pruefung",
+        "to": "abgelehnt",
+        "label": "Ablehnen",
+        "rollen": ["sachbearbeitung"],
+        "detailPflicht": true
+      }
+    ]
+  },
+  "register": {
+    "suchfelder": ["nachname", "plz"],
+    "mock": [
+      {
+        "nachname": "Muster",
+        "vorname": "Alex",
+        "plz": "12345",
+        "ort": "Musterstadt"
+      },
+      {
+        "nachname": "Beispiel",
+        "vorname": "Kim",
+        "plz": "12347",
+        "ort": "Musterstadt"
+      }
+    ]
+  },
+  "detailSektionen": [
+    {
+      "titel": "Antragsteller:in",
+      "felder": [
+        {
+          "pfad": "antragsteller.vorname",
+          "label": "Vorname"
+        },
+        {
+          "pfad": "antragsteller.nachname",
+          "label": "Nachname"
+        },
+        {
+          "pfad": "antragsteller.plz",
+          "label": "PLZ"
+        },
+        {
+          "pfad": "antragsteller.ort",
+          "label": "Ort"
+        }
+      ]
+    },
+    {
+      "titel": "Anliegen",
+      "felder": [
+        {
+          "pfad": "anliegen.kategorie",
+          "label": "Kategorie"
+        },
+        {
+          "pfad": "anliegen.beschreibung",
+          "label": "Beschreibung"
+        }
+      ]
+    }
+  ],
+  "ki": {
+    "schwelleAutonom": 0.9
+  },
+  "berechne": "[function]",
+  "seedCount": 4,
+  "_snapshot": true
+}

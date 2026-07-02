@@ -1,5 +1,6 @@
 import type { Preview } from "@storybook/react";
-import "../apps/fachverfahren-template/src/styles/index.css";
+// Das Design-System lebt im Kit — Storybook lädt DIE Kit-Tokens (keine App-eigene zweite Wahrheit).
+import "../packages/fachverfahren-kit/src/styles.css";
 
 const preview: Preview = {
   parameters: {

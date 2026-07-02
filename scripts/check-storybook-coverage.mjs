@@ -5,12 +5,12 @@ const root = process.cwd();
 const requiredFiles = [
   ".storybook/main.ts",
   ".storybook/preview.ts",
-  "apps/fachverfahren-template/src/stories/DesignSystem.stories.tsx",
-  "apps/fachverfahren-template/src/stories/ScreenContracts.stories.tsx",
-  "apps/fachverfahren-template/src/stories/PublicSectorUi.stories.tsx",
-  "apps/fachverfahren-template/src/stories/UxMethodikPublicSector.stories.tsx",
-  "apps/fachverfahren-template/src/stories/FachverfahrenDesignManual.stories.tsx",
-  "apps/fachverfahren-template/src/stories/MdfilesUxUiSkill.stories.tsx",
+  "packages/fachverfahren-kit/src/stories/DesignSystem.stories.tsx",
+  "packages/fachverfahren-kit/src/stories/ScreenContracts.stories.tsx",
+  "packages/fachverfahren-kit/src/stories/PublicSectorUi.stories.tsx",
+  "packages/fachverfahren-kit/src/stories/UxMethodikPublicSector.stories.tsx",
+  "packages/fachverfahren-kit/src/stories/FachverfahrenDesignManual.stories.tsx",
+  "packages/fachverfahren-kit/src/stories/MdfilesUxUiSkill.stories.tsx",
   "docs/reference/fachverfahren-kit-components.md",
   "docs/reference/storybook.md",
   "docs/reference/test-driven-development.md",
@@ -20,7 +20,6 @@ const requiredFiles = [
   "docs/ux-ui/ux-methodik-public-sector-audit.md",
 ];
 const storyRoots = [
-  "apps/fachverfahren-template/src",
   "modules",
   "packages/fachverfahren-kit/src",
   "packages/public-sector-ui/src",

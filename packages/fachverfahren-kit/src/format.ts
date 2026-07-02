@@ -1,16 +1,17 @@
 // format — EINE Wahrheit für die Betrags-Anzeige aus einer Berechnung/Position.
 //
-// Konvention (siehe types.ts `Berechnung.betrag`): bei WÄHRUNGS-Einheiten (EUR/…) ist `betrag` in der KLEINSTEN Einheit
-// (Cent, ganzzahlig, währungssicher) → für die Anzeige durch 100 teilen und als Währung formatieren. Nicht-Währungs-
-// Einheiten ("Stück", "je Einheit") sind ganzzahlig je Einheit → unverändert als Zahl + Einheit.
+// Konvention (siehe types.ts `Berechnung.betrag`): `betrag` ist in der NATÜRLICHEN Haupteinheit der `einheit` —
+// bei WÄHRUNGS-Einheiten (EUR/…) also in ganzen Euro (120 = „120,00 €"), NICHT in Cent. Das ist die Einheit, in der
+// die Fachkonzepte ihre Sätze/Gebühren führen und in der der governte Build sie in die `leistung.config` generiert
+// (z. B. Gebühr 26 = „26 €", Jahres-Satz 120 = „120 €/Jahr"). Nicht-Währungs-Einheiten ("Stück",
+// "je Einheit") sind ganzzahlig je Einheit → unverändert als Zahl + Einheit.
 //
-// Ohne diese Teilung erschien 12000 Cent (= 120,00 €) fälschlich als „12.000,00 €" — ein 100×-Fehler in JEDER
-// Betrags-Anzeige des Kits (Antrag-Live-Berechnung, Bescheid, Aufsicht, E-Payment). Diese EINE Funktion ersetzt die
-// zuvor 4 divergierenden, cent-blinden Formatierer.
+// EINE Funktion für ALLE Betrags-Anzeigen (Antrag-Live-Berechnung, Bescheid, Aufsicht, E-Payment) — keine
+// divergierenden Formatierer, keine Einheiten-Umrechnung, die jede Config an /100 erinnern müsste.
 
 const CURRENCY_RE = /\b(EUR|USD|CHF|GBP)\b/i;
 
-/** Formatiert `betrag` (bei Währungs-`einheit` in Cent) für die Anzeige. `einheit` z. B. "EUR/Jahr", "EUR", "Stück". */
+/** Formatiert `betrag` (natürliche Haupteinheit der `einheit`) für die Anzeige. `einheit` z. B. "EUR/Jahr", "EUR", "Stück". */
 export function formatBetrag(betrag: number, einheit: string): string {
   const m = (einheit ?? "").match(CURRENCY_RE);
   if (m) {
@@ -21,12 +22,12 @@ export function formatBetrag(betrag: number, einheit: string): string {
       txt = new Intl.NumberFormat("de-DE", {
         style: "currency",
         currency,
-      }).format(betrag / 100);
+      }).format(betrag);
     } catch {
       txt = new Intl.NumberFormat("de-DE", {
         style: "currency",
         currency: "EUR",
-      }).format(betrag / 100);
+      }).format(betrag);
     }
     return suffix ? `${txt}${suffix.startsWith("/") ? "" : " "}${suffix}` : txt;
   }

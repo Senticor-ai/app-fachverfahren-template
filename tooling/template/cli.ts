@@ -1448,9 +1448,9 @@ async function validateInvariants(root) {
   } else {
     const scripts = packageJson.scripts ?? {};
     requireScript(scripts, "build:packages", failures);
-    requireScript(scripts, "dev:postgres", failures);
-    requireScript(scripts, "dev:vite", failures);
-    requireScript(scripts, "dev:all", failures);
+    // EINE App (Komposition + Naht): der Dev-Einstieg ist `dev`; der alte BFF-/Postgres-Dreiklang
+    // (dev:postgres/dev:vite/dev:all) gehörte zur entfernten Beispiel-Shell.
+    requireScript(scripts, "dev", failures);
     requireScript(scripts, "check:typescript-policy", failures);
     requireScript(scripts, "check:css-tokens", failures);
     requireScript(scripts, "template", failures);

@@ -20,6 +20,5 @@ esac
 pnpm run check:precommit
 pnpm run build:packages
 pnpm run build:app
-pnpm run build:server
 pnpm run test:k8s:render
 pnpm run evidence:build

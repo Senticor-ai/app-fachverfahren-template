@@ -115,7 +115,7 @@ export async function renderDomainApp(
     filter: (path) => shouldCopy(path, source),
   });
 
-  const appSource = join(target, "apps", "fachverfahren-template");
+  const appSource = join(target, "apps", "fachverfahren");
   const appTarget = join(target, "apps", answers.domain);
   if ((await exists(appSource)) && appSource !== appTarget) {
     await rm(appTarget, { recursive: true, force: true });
@@ -197,12 +197,15 @@ function createReplacements(answers: {
   const domain = answers.domain;
   const displayName = answers.displayName;
   return [
-    ["apps/fachverfahren-template", `apps/${domain}`],
-    ["@senticor/fachverfahren-template", `@senticor/${domain}`],
+    // Reihenfolge: längste/spezifischste Muster zuerst — sonst zerlegt ein kürzeres Muster die längeren Treffer.
     ["senticor-app-fachverfahren-template", `senticor-app-${domain}`],
+    ["@senticor/fachverfahren-app", `@senticor/${domain}`],
+    ["apps/fachverfahren", `apps/${domain}`],
     ["fachverfahren-template", domain],
     ["Fachverfahren Template", displayName],
     ["Fachverfahren Vorlage", displayName],
+    // Die neutrale Demo-Leistung der Vorlage wird beim Scaffold zum konkreten Verfahren.
+    ["Musterantrag", displayName],
   ];
 }
 

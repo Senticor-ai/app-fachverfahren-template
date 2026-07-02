@@ -13,7 +13,6 @@
 // WCAG 2.2 AA / BITV: aria-current, sr-only Status je Segment + Live-Region, kanonischer 3px-Fokus
 // (`fv-focus`), Information nie nur über Farbe (Icon + Text je Zustand), `motion-reduce`.
 // Steuerbar via `useStepMachine` (index → activeIndex, steps → StepperStep[]).
-import * as React from "react";
 import { Check, AlertTriangle } from "lucide-react";
 
 import { cn } from "../lib/cn.js";

@@ -8,24 +8,14 @@
   "engines": {
     "node": ">=24.0.0 <25.0.0"
   },
-  "msw": {
-    "workerDirectory": [
-      "apps/fachverfahren-template/public"
-    ]
-  },
   "scripts": {
     "predev": "node scripts/check-dev-dependencies.mjs vite",
-    "dev": "pnpm --filter @senticor/fachverfahren-template dev",
-    "dev:postgres": "kubectl apply -f dev/postgres.yaml && kubectl wait --for=condition=available deployment/app-postgres --timeout=120s && kubectl port-forward service/app-postgres 5432:5432",
-    "dev:server": "APP_ENABLE_MOCK_AUTH=true APP_PG_URL=postgres://app:app@127.0.0.1:5432/app APP_PG_DIRECT_URL=postgres://app:app@127.0.0.1:5432/app pnpm --filter @senticor/fachverfahren-template dev:server",
-    "dev:vite": "VITE_API_MOCKING=disabled VITE_API_PROXY_TARGET=http://127.0.0.1:8080 pnpm --filter @senticor/fachverfahren-template dev",
-    "dev:all": "concurrently --kill-others --names pg,server,vite --prefix-colors blue,green,magenta \"pnpm run dev:postgres\" \"pnpm run dev:server\" \"pnpm run dev:vite\"",
+    "dev": "pnpm --filter @senticor/fachverfahren-app dev",
     "build": "pnpm -r --if-present build",
     "build:packages": "pnpm --filter \"./packages/**\" run --if-present build && pnpm --filter \"./jurisdictions/**\" run --if-present build",
-    "build:app": "pnpm --filter @senticor/fachverfahren-template build",
-    "build:server": "pnpm --filter @senticor/fachverfahren-template build:server",
-    "storybook": "pnpm --filter @senticor/fachverfahren-template storybook",
-    "build:storybook": "pnpm --filter @senticor/fachverfahren-template build:storybook",
+    "build:app": "pnpm --filter @senticor/fachverfahren-app build",
+    "storybook": "storybook dev -p 6006 --config-dir .storybook --ci",
+    "build:storybook": "storybook build --config-dir .storybook -o storybook-static",
     "prepare": "node scripts/setup-husky.mjs",
     "precommit:check": "pnpm run check:esm && pnpm run check:typescript-policy && pnpm run check:domain-contracts && pnpm run check:storybook && pnpm run check:css-tokens && pnpm run test:template && pnpm run check:agent-discovery && pnpm run check:module-contracts && pnpm run check:module-boundaries && pnpm run check:capability-catalog && pnpm run check:source-registry && pnpm run check:template-invariants && pnpm run check:scaffold && pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test",
     "check:git-hygiene": "sh scripts/git-hooks/git-hygiene.sh",
@@ -34,15 +24,13 @@
     "check:precommit": "pnpm run check:git-hygiene && pnpm run precommit:check",
     "check:ci": "scripts/ci-validate.sh",
     "check:push": "pnpm run check:ci",
-    "typecheck": "tsc -b",
+    "typecheck": "tsc -b && pnpm --filter @senticor/fachverfahren-app typecheck",
     "typecheck:all": "pnpm typecheck",
-    "typecheck:storybook": "pnpm --filter @senticor/fachverfahren-template typecheck:storybook",
+    "typecheck:storybook": "tsc --noEmit -p tsconfig.storybook.json",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:e2e": "pnpm --filter @senticor/fachverfahren-template test:e2e",
-    "test:e2e:postgres": "pnpm --filter @senticor/fachverfahren-template test:e2e:postgres",
     "test:platform-contracts": "vitest run packages/platform-contracts",
     "test:provider-codesphere": "vitest run packages/provider-codesphere",
     "test:service-portability": "vitest run packages/provider-local packages/provider-codesphere packages/provider-dvc-generic",
@@ -115,8 +103,7 @@
     "test:template": "vitest run tooling/template && pnpm run check:template-types",
     "scaffold:domain-app": "pnpm run template -- scaffold",
     "scaffold:standalone": "node scripts/scaffold-standalone-app.mjs",
-    "db:migrate": "pnpm --filter @senticor/app-store-postgres db:migrate",
-    "dev:old-shell": "pnpm --filter @senticor/fachverfahren-template dev"
+    "db:migrate": "pnpm --filter @senticor/app-store-postgres db:migrate"
   },
   "devDependencies": {
     "@eslint-react/eslint-plugin": "^5.9.2",
