@@ -1,5 +1,12 @@
 # Test Driven Development
 
+> **Für Agenten: Quellen & Pflicht-Lektüre.**
+> Status: IST für Vitest-Tests, Storybook, Screen Contracts und
+> Kubernetes-/Evidence-Checks; PLAN für Backend-, MSW- und E2E-Ebenen (die
+> Scripts `test:e2e`/`test:e2e:postgres` existieren noch nicht).
+> Quellen: `package.json`-Scripts, `vitest.config.ts`, `AGENTS.md`.
+> Pflicht-Lektüre vorher: `AGENTS.md`.
+
 Dieses Repository soll Fachverfahren testgetrieben ermöglichen. TDD heißt hier
 nicht nur Unit-Tests, sondern ein prüfbarer Vertrag aus Domain-Regeln,
 Capabilities, API, UI, Accessibility und Evidence.
@@ -16,24 +23,28 @@ Capabilities, API, UI, Accessibility und Evidence.
 
 - Domain-Kernel: reine Unit-Tests für Zustände, Fristen, Versionen,
   Retention-Regeln und Berechtigungsentscheidungen.
+- Naht-Berechnung: die `berechne`-Funktion der `LeistungConfig` ist rein und
+  deterministisch und wird gegen die Beispielwerte des Fachkonzepts getestet.
 - Platform Contracts: Contract-Tests für Ports und Adapter.
-- Backend: Fastify `inject`-Tests für Routen, OpenAPI-Schemas, Fehlerpfade und
-  Autorisierung.
-- E2E: `apps/fachverfahren-template/e2e` prüft die erste vertikale Strecke aus
-  Login, Rollen, Benutzereinstellungen, Posteingang/Ausgang und RBAC.
-- PostgreSQL-E2E: `pnpm run test:e2e:postgres` nutzt
-  `APP_E2E_PG_URL` und optional `APP_E2E_PG_DIRECT_URL`, führt Migrationen aus
-  und prüft dieselbe Strecke gegen den echten Datenbankdienst.
-- Mocking: MSW-Handler für Browser-, Node- und E2E-Tests, damit UI und
-  Integration früh gegen stabile API-Zustände laufen.
-- Datenbank: Migrationstests, Checksum-Drift, Rollback- und Restore-Szenarien.
+- Backend (PLAN): Fastify `inject`-Tests für Routen, OpenAPI-Schemas,
+  Fehlerpfade und Autorisierung — setzt die Backend-Stufe voraus.
+- E2E (PLAN): eine vertikale Strecke aus Login, Rollen,
+  Benutzereinstellungen, Posteingang/Ausgang und RBAC; die Scripts
+  `test:e2e`/`test:e2e:postgres` existieren noch nicht.
+- Mocking (PLAN): MSW-Handler, siehe `docs/reference/mock-data-msw.md`.
+- Datenbank: Migrationstests, Checksum-Drift, Rollback- und Restore-Szenarien
+  (`packages/app-store-postgres`, `packages/migration-kit`).
 - UI: Component-Tests und Storybook-Stories für alle Screen States.
-- Formulare: Storybook- und Komponentenzustände prüfen clientseitige
-  Inline-Validierung aus `forms/*.form.schema.json`; serverseitige Schemas
-  bleiben zusätzlich verbindlich.
+- Formulare: Feld-Validierung kommt aus `antrag.steps` der `LeistungConfig`
+  (`required`, `pattern`); Storybook- und Komponentenzustände prüfen die
+  Inline-Fehler. Schemas unter `forms/*.form.schema.json` gehören zum
+  (PLAN-)Modul-Pfad.
 - Kubernetes/Evidence: Render-, Policy- und Evidence-Bundle-Checks.
 
-## Domain-Modul-Struktur
+## Domain-Modul-Struktur (PLAN)
+
+Gilt für Module aus dem Generator-Pfad (`app:new`, siehe
+`modules/README.md`); im Scaffold existiert keine Instanz.
 
 ```text
 modules/<domain>/
@@ -147,8 +158,6 @@ pnpm run check:domain-contracts
 pnpm run check:storybook
 pnpm run typecheck
 pnpm run test
-pnpm run test:e2e
-pnpm run test:e2e:postgres
 pnpm run test:k8s:render
 pnpm run evidence:build
 ```
@@ -161,4 +170,5 @@ pnpm run build:storybook
 pnpm run typecheck:storybook
 ```
 
-Mockdaten und MSW sind in `docs/reference/mock-data-msw.md` beschrieben.
+Die geplante Mock-Schicht ist in `docs/reference/mock-data-msw.md`
+beschrieben (PLAN).

@@ -22,14 +22,18 @@ Wenn dies dein einziger Startprompt ist:
    `docs/examples/hundesteuer/app.spec.yaml` aus.
 4. Lies die dort ausgewählten Pflichtdateien vor Änderungen.
 5. Nutze Package-Script `app:new` mit
-   `docs/examples/hundesteuer/app.spec.yaml`, wenn `modules/dog-tax/` erzeugt
-   werden soll.
+   `docs/examples/hundesteuer/app.spec.yaml` nur, wenn zusätzlich das
+   Modul-Gerüst `modules/dog-tax/` erzeugt werden soll (Generator-Pfad, PLAN
+   für die App-Einbindung — siehe `modules/README.md`).
 
 ## Aufgabe
 
-Baue aus dieser Plattform ein Bürgerportal und ein internes Fachverfahren für
-Hundesteuer als Domain-Modul unter `modules/dog-tax/`. Ändere Kernpakete nur,
-wenn ein echter Plattformvertrag fehlt.
+Baue aus dieser Plattform das klickbare Fachverfahren Hundesteuer, indem du
+die EINE Austausch-Naht `apps/antragsservice/src/leistung.config.ts` nach dem
+Vertrag aus `AGENTS.md` füllst und danach
+`pnpm --filter @senticor/antragsservice emit:contract` ausführst. Ändere
+Kernpakete nur, wenn ein echter Plattformvertrag fehlt. Fachliche Werte, die
+nicht belegt sind, folgen der Annahme-DATEN-Konvention aus `AGENTS.md`.
 
 ## Fachannahmen
 
@@ -48,8 +52,9 @@ wenn ein echter Plattformvertrag fehlt.
   bestätigte Entscheidungen.
 
 Alle Werte, Fristen, Rechtsverweise, Rassen-/Gefährlichkeitsregeln und
-Berechnungen sind synthetisch und müssen als Daten im Domain-/Regelmodul
-liegen, nie in Template- oder Plattformcode.
+Berechnungen sind synthetisch und müssen als Daten in der Naht (benannte
+Konstanten, `berechne` als reine Funktion) liegen, nie in Kit- oder
+Plattformcode.
 
 ## FIM-Bezug
 
@@ -68,10 +73,12 @@ Der FIM-Steckbrief `99 102 013 000 000` beschreibt die Leistung
 | `99 102 013 104 000` | Hundesteuer Anmeldung   |
 | `99 102 013 149 000` | Hundesteuer Ermäßigung  |
 
-Modelliere diese FIM-IDs als fachliche Referenzen im Domain-Modul, zum Beispiel
-im Manifest, in Screen Contracts, Events oder Compliance-Profilen. FIM liefert
-die Leistungsstruktur und Bezeichnungen; kommunale Satzungswerte und konkrete
-Rechtsgrundlagen bleiben separat zu validieren.
+Modelliere die Leistungs-FIM-ID als `fimLeistung` in der Naht (Status
+`belegt` oder `annahme-zu-validieren`); weitere FIM-Referenzen gehören in
+Tests, Abschlussbericht oder — beim Generator-Pfad — in Manifest, Screen
+Contracts, Events und Compliance-Profil. FIM liefert die Leistungsstruktur
+und Bezeichnungen; kommunale Satzungswerte und konkrete Rechtsgrundlagen
+bleiben separat zu validieren.
 
 ## Demo-Grenzen
 
@@ -83,18 +90,23 @@ Rechtsgrundlagen bleiben separat zu validieren.
 
 ## Akzeptanz
 
-- `modules/dog-tax/domain.module.yaml` beschreibt Routen, Capabilities, Rechte,
-  Events, FIM-Referenzen, Datenkategorien, Retention und Migrationen.
-- Screen Contracts liegen für Bürgerportal, Sachbearbeitung und Audit vor.
-- Storybook-Stories zeigen Default, Loading, Empty, Error, Success und relevante
-  Accessibility-Zustände.
-- Fachliche Daten nutzen Plattform-Ports, zum Beispiel `PaymentPort` und
-  `MailboxPort`, statt Provider direkt anzusprechen.
-- Fachliche Audit-Events sind modelliert und append-only.
-- Vier-Augen-Entscheidungen sind serverseitig autorisiert.
-- Compliance-Profil enthält Rechtsgrundlagen, Datenkategorien und Retention.
-- Kein Hundesteuer-Code landet außerhalb des Domain-Moduls oder dieses
+- Die Naht enthält `rechtsgrundlagen` (belegt oder als Annahme markiert),
+  `fimLeistung`, alle Antragsschritte mit validierten Pflichtfeldern und eine
+  `statusMachine` mit `terminal`-Zuständen und `vierAugen`-Übergängen für
+  Festsetzung, Befreiung und Ermäßigung.
+- `berechne` bildet jede Tarifstufe, Gefährlichkeits- und
+  Befreiungs-/Ermäßigungsregel als eigene prüfbare Verzweigung ab (ganze
+  Euro, `provisional`/`final`) und ist gegen die Beispielwerte getestet.
+- `pnpm --filter @senticor/antragsservice emit:contract` wurde ausgeführt;
+  `pnpm run typecheck` und `pnpm run test` sind grün; die drei Personas sind
+  unter `/buerger`, `/amt` und `/aufsicht` klickbar.
+- KI bleibt assistiv (`ki.schwelleAutonom`, optional transparenter
+  `vorschlag`); Entscheidungen bleiben menschlich bestätigt.
+- Kein Hundesteuer-Code landet außerhalb der Naht oder dieses
   Beispielverzeichnisses.
+- Beim optionalen Generator-Pfad zusätzlich: `modules/dog-tax/` mit
+  Manifest, Screen Contracts, Permissions, Events, Compliance-Profil und
+  grünem `check:domain-contracts`.
 
 ## Offene Validierungsfragen
 

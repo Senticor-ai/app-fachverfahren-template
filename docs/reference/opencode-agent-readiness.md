@@ -30,20 +30,22 @@ Vor Dateianpassungen:
 6. Package-Script `app:new` verwenden, wenn ein Modul aus einer Spezifikation
    erzeugt wird.
 
-Danach:
+Danach — kanonischer Weg für ein klickbares Fachverfahren (IST):
 
-1. `module.contract.yaml` prüfen oder erzeugen.
-2. Screen Contracts unter `contracts/*.screen.yaml` schreiben.
-3. UI-Stories unter `ui/*.stories.tsx` anlegen und Formular-Constraints aus
-   `forms/*.form.schema.json` clientseitig sichtbar machen.
-4. UI aus `@senticor/fachverfahren-kit` komponieren; neue wiederverwendbare
-   Bausteine zuerst im Kit anlegen und exportieren.
-5. Permissions, Events, Form-Schema, Migrationen, Tests und Compliance-Profil
-   ergänzen.
-6. Checks aus `agent:context` und `module.contract.yaml` ausführen.
-7. Package-Script `agent:verify -- --task <app-spec> --json` für einen
+1. Die Austausch-Naht `apps/antragsservice/src/leistung.config.ts` nach dem
+   Vertrag aus `AGENTS.md` füllen.
+2. `pnpm --filter @senticor/antragsservice emit:contract` ausführen und den
+   Snapshot mit committen.
+3. `pnpm run typecheck`, `pnpm run test`, `pnpm run dev`.
+4. Package-Script `agent:verify -- --task <app-spec> --json` für einen
    Report-Entwurf ausführen oder einen vorhandenen Report mit `--report <path>`
    validieren. Abschluss-Evidenz braucht echte `commandsExecuted`.
+
+Alternativ — Generator-Pfad für Modul-Gerüste (PLAN für die App-Einbindung,
+siehe `modules/README.md`): `module.contract.yaml`, Screen Contracts,
+`ui/*.stories.tsx`, `forms/*.form.schema.json`, Permissions, Events,
+Migrationen, Tests und Compliance-Profil über `app:new` erzeugen und mit
+`check:domain-contracts`/`check:module-contracts` validieren.
 
 Für vollständige neue Repositories zuerst den Full-Repo-Scaffold nutzen:
 
@@ -56,11 +58,10 @@ spätere Updates.
 Ohne `--allow-dirty` verweigert der Scaffold eine nicht saubere Template-Quelle.
 `--force` bleibt für bewusstes Ersetzen reserviert.
 
-Wichtig für Server-Slices: `apps/fachverfahren-template/tsconfig.server.json`
-nimmt nur `server/` und `shared/` in den BFF-Build auf. Agenten sollen
-fachliche Serverlogik nicht direkt aus `modules/` in den Template-Server
-importieren, sondern gemeinsame DTOs über `shared/` oder Paketverträge führen
-und die Domain-Anbindung explizit registrieren.
+Wichtig für Server-Slices (PLAN): Es existiert noch kein Server. Die
+Backend-Zielarchitektur (enger `tsconfig.server.json`-Schnitt, keine direkten
+`modules/`-Imports in den Server, DTOs über `shared/` oder Paketverträge)
+steht in `docs/reference/backend-fastify.md`.
 
 Wichtig für CI-Slices: opencode.de-Runner sind unprivilegierte Kubernetes-Pods.
 Es gibt keinen Docker-Socket und kein Docker-in-Docker. Image-Builds nutzen

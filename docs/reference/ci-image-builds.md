@@ -43,11 +43,13 @@ Die Build-Reihenfolge ist verbindlich:
 ```bash
 pnpm run build:packages
 pnpm run build:app
-pnpm run build:server
 ```
 
 So existieren die `dist/`-Artefakte und TypeScript-Deklarationen der
-Workspace-Pakete, bevor App und BFF kompiliert werden.
+Workspace-Pakete, bevor die App kompiliert wird. Ein `build:server`-Schritt
+kommt erst mit der Backend-Stufe hinzu (PLAN, siehe
+`docs/reference/backend-fastify.md`); Dockerfile und Teile dieser Referenz
+zielen noch auf diese Stufe.
 
 ## pnpm-Filter
 
@@ -68,9 +70,5 @@ pnpm -r build --if-present --filter "./packages/**"
 
 Lokale PostgreSQL-Entwicklung nutzt `dev/postgres.yaml` statt Docker Compose.
 Das Manifest läuft mit Rancher Desktop auf containerd/k3s und mit Docker
-Desktop, wenn Kubernetes aktiviert ist.
-
-```bash
-pnpm run dev:postgres
-pnpm run dev:all
-```
+Desktop, wenn Kubernetes aktiviert ist. Details und die (PLAN-)Komfort-Scripts
+stehen in `docs/reference/db-migrations.md`.

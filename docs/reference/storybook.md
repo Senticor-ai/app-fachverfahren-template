@@ -21,13 +21,13 @@ pnpm run check:storybook
 ## Struktur
 
 - `.storybook/` enthält die zentrale Konfiguration.
-- `apps/fachverfahren-template/src/stories/` enthält App- und
-  Pattern-Stories.
-- `modules/<domain>/ui/` enthält Domain-Modul-Stories.
-- `packages/fachverfahren-kit` enthält wiederverwendbare Fachverfahren-
-  Bausteine und shadcn/Radix/Tailwind-Primitive.
-- `packages/public-sector-ui` enthält wiederverwendbare Komponenten, die durch
-  Stories abgedeckt sein müssen.
+- `packages/fachverfahren-kit/src/stories/` enthält die App-, Pattern- und
+  Methodik-Stories; die Bausteine und shadcn/Radix/Tailwind-Primitive liegen
+  daneben unter `src/components/` und `src/ui/`.
+- `packages/public-sector-ui/src/` enthält wiederverwendbare Komponenten mit
+  ihren Stories; neue Exports müssen durch Stories abgedeckt sein.
+- `modules/<domain>/ui/` wird als Story-Quelle mitgeladen (PLAN — derzeit
+  existiert keine Modul-Instanz, siehe `modules/README.md`).
 
 ## Story-Kategorien
 

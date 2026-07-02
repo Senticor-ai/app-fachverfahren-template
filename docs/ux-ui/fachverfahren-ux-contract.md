@@ -113,12 +113,14 @@ Vertrag. ShadCN-Primitives bleiben austauschbares Implementierungsdetail.
 - Once-Only-Vorausfüllung wird als übernommen gekennzeichnet und bleibt
   editierbar.
 - Es gibt echte `form`-Elemente mit passenden `autoComplete`-Tokens.
-- Formularschemas unter `modules/<domain>/forms/*.form.schema.json` sind die
-  Quelle für Feldnamen, Pflichtfelder und einfache Constraints wie `minLength`,
-  `maxLength` und `pattern`.
-- Clientseitige Formular-UI leitet unterstützte Constraints aus dem Schema ab
-  und zeigt Inline-Fehler mit Korrekturpfad vor dem Absenden. Serverseitige
-  Fastify-/Route-Schemas bleiben die verbindliche Prüfung.
+- Quelle für Feldnamen, Pflichtfelder und einfache Constraints wie `pattern`
+  ist im IST-Stand `antrag.steps` der `LeistungConfig`-Naht; Formularschemas
+  unter `modules/<domain>/forms/*.form.schema.json` gehören zum
+  Generator-Pfad (PLAN, siehe `modules/README.md`).
+- Clientseitige Formular-UI leitet unterstützte Constraints aus dieser Quelle
+  ab und zeigt Inline-Fehler mit Korrekturpfad vor dem Absenden.
+  Serverseitige Route-Schemas bleiben die verbindliche Prüfung (PLAN,
+  Backend-Zielarchitektur).
 - Nicht unterstützte Schema-Regeln werden im Screen Contract als
   Validierungslücke oder bewusste serverseitige Prüfung benannt.
 - Validierung trennt `err`, `warn` und `ok`; nur `err` blockiert.

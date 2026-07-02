@@ -1,6 +1,15 @@
-# Domain-Module
+# Domain-Module (PLAN)
 
-Ein Fachverfahren wird als Domain-Modul geliefert:
+> **Für Agenten: Quellen & Pflicht-Lektüre.**
+> Status: PLAN — beschreibt das Modul-Layout des Generator-Pfads (`app:new`).
+> Im Scaffold existiert keine Modul-Instanz, und die laufende App bindet
+> Module nicht ein; der kanonische IST-Weg ist die Austausch-Naht
+> (`AGENTS.md`, `modules/README.md`).
+> Quellen: `tooling/template/lib/agent-platform.ts`,
+> `schemas/module-contract.schema.json`.
+> Pflicht-Lektüre vorher: `AGENTS.md`.
+
+Ein Fachverfahren kann als Domain-Modul geliefert werden:
 
 ```text
 modules/<domain>/

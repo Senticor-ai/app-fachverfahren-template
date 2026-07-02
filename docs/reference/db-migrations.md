@@ -1,5 +1,14 @@
 # Datenbankmigrationen
 
+> **Für Agenten: Quellen & Pflicht-Lektüre.**
+> Status: IST für den Migrator (`packages/app-store-postgres`,
+> `pnpm run db:migrate`, `dev/postgres.yaml`); PLAN für alles, was den
+> BFF/Server voraussetzt (`dev:postgres`, `dev:all`, `test:e2e:postgres`) —
+> diese Scripts existieren noch nicht, siehe
+> `docs/reference/backend-fastify.md`.
+> Quellen: `packages/app-store-postgres`, `AGENTS.md`.
+> Pflicht-Lektüre vorher: `AGENTS.md`.
+
 Migrationen laufen als kontrollierter Kubernetes-Job im `migrator`-Workload.
 Sie werden nicht beim Start jeder Web-Replik automatisch ausgeführt.
 
@@ -26,28 +35,23 @@ Für lokale Entwicklung liefert das Repository `dev/postgres.yaml` statt einer
 Compose-Datei. Das Manifest läuft mit Rancher Desktop auf containerd/k3s und mit
 Docker Desktop, sobald Kubernetes aktiviert ist.
 
-PostgreSQL starten und auf `127.0.0.1:5432` weiterleiten:
+PostgreSQL wird über das Manifest gestartet und weitergeleitet, zum Beispiel:
 
 ```bash
-pnpm run dev:postgres
+kubectl apply -f dev/postgres.yaml
+kubectl port-forward svc/postgres 5432:5432
 ```
 
-BFF, Vite und Port-Forwarding gemeinsam starten:
+(PLAN) Komfort-Scripts `dev:postgres` (Start + Port-Forward) und `dev:all`
+(BFF, Vite und Port-Forwarding gemeinsam) gehören zur Backend-Zielarchitektur
+und existieren noch nicht.
 
-```bash
-pnpm run dev:all
-```
-
-`pnpm run dev:all` setzt für den BFF die lokalen `APP_PG_URL`- und
-`APP_PG_DIRECT_URL`-Werte und konfiguriert Vite so, dass API-Aufrufe an den
-lokalen Fastify-Server gehen.
-
-## Domain-Module
+## Domain-Module (PLAN)
 
 Fachverfahren legen eigene Migrationen unter
 `modules/<domain>/migrations/` ab und referenzieren sie im
-`domain.module.yaml`. Die Plattformmigrationen bleiben nur die administrative
-Basis.
+`domain.module.yaml` (Generator-Pfad, siehe `modules/README.md`). Die
+Plattformmigrationen bleiben nur die administrative Basis.
 
 ## Plattformdaten
 
@@ -75,18 +79,9 @@ Neue Tabellen müssen mandantenfähig bleiben: `tenant_id`, `authority_id` und
 `jurisdiction_id` sind getrennte Konzepte und dürfen nicht in einem losen
 Gemeindeschlüssel zusammenfallen.
 
-## PostgreSQL-E2E
+## PostgreSQL-E2E (PLAN)
 
-Der schnelle E2E-Test nutzt `InMemoryAppStore`. Der servicebasierte E2E-Test
-nutzt denselben Fastify-Pfad gegen PostgreSQL:
-
-```bash
-APP_E2E_PG_URL=postgres://app:app@localhost:5432/app \
-APP_E2E_PG_DIRECT_URL=postgres://app:app@localhost:5432/app \
-pnpm run test:e2e:postgres
-```
-
-Der Test führt die Plattformmigrationen aus, schreibt fachneutrale
-Postfach-Fixtures über `PostgresAppStore.saveMailboxMessage(...)` und prüft
-helle/dunkle Darstellung, Barrierefreiheitspräferenzen, Posteingang, Ausgang
-und RBAC-Grenzen.
+Zielbild: ein schneller E2E-Test mit `InMemoryAppStore` und ein
+servicebasierter E2E-Test (`test:e2e:postgres` mit `APP_E2E_PG_URL` und
+optional `APP_E2E_PG_DIRECT_URL`) gegen denselben Server-Pfad. Beides setzt
+die Backend-Stufe voraus und existiert im Scaffold noch nicht.

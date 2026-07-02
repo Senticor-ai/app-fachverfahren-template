@@ -13,7 +13,7 @@ Die Methode ist jetzt repo-lokal codifiziert:
 
 - `docs/ux-ui/fachverfahren-ux-contract.md` übersetzt die Methodik in den
   verbindlichen UI-Vertrag.
-- `apps/fachverfahren-template/src/stories/UxMethodikPublicSector.stories.tsx`
+- `packages/fachverfahren-kit/src/stories/UxMethodikPublicSector.stories.tsx`
   zeigt Methodik-Audit, Sachbearbeitungstabelle und Bürgerin-Formularvertrag.
 - `scripts/check-storybook-coverage.mjs` erzwingt die Storybook-Abdeckung für
   `UX-Methodik`, `Time to Clarity`, `HCAI`, `Bürgerin`, `Sachbearbeitung` und
@@ -37,7 +37,7 @@ Die Methode ist jetzt repo-lokal codifiziert:
 
 | Abschnitt                            |                 Status | Aktueller Stand                                                                                                                                                                                                                                            |
 | ------------------------------------ | ---------------------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A Stack, Daten, Stabilität           |                Erfüllt | Node 24, strict ESM, React, Tailwind, shadcn-Primitives, MSW, deterministische Mockdaten, Postgres-Pfade für Präferenzen und Posteingang/Ausgang.                                                                                                          |
+| A Stack, Daten, Stabilität           |                Erfüllt | Node 24, strict ESM, React, Tailwind, shadcn-Primitives, deterministische Demo-Daten aus der `LeistungConfig`-Naht; MSW und Postgres-Datenpfade sind (PLAN) Teil der Backend-Zielarchitektur.                                                              |
 | B App-Shell und IA                   |                Erfüllt | Geschützte Shell, rollenbezogene Navigation, Nutzer-Menü, Breadcrumbs und einklappbare Sachbearbeitungs-Sidebar mit Auto-/Statikmodus sind vorhanden. Die Sachbearbeitungs-Sidebar startet am Viewport-Top; der Header sitzt kompakt in der Arbeitsfläche. |
 | C Mobile                             |                Erfüllt | Layouts reflowen, Tabellen scrollen horizontal und mobile Navigation läuft über einen rechtsseitigen Drawer.                                                                                                                                               |
 | D Seiten-Konsistenz                  |                Erfüllt | Arbeitsbereiche haben konsistente Header; primäre Fachnavigation bleibt rollenbezogen und basisdienstfrei.                                                                                                                                                 |

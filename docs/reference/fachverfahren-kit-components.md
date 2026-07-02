@@ -11,8 +11,8 @@ generated `modules/<domain>/` scaffolds.
 | Complete Fachverfahren building blocks | `packages/fachverfahren-kit/src/components/` | Use first for citizen, caseworker and audit screens.          |
 | shadcn/Radix/Tailwind primitives       | `packages/fachverfahren-kit/src/ui/`         | Use only when no complete building block fits.                |
 | Package entrypoint                     | `packages/fachverfahren-kit/src/index.ts`    | Import from `@senticor/fachverfahren-kit`; keep exports here. |
-| App shell                              | `apps/fachverfahren-template/src/app/`       | Thin module mount and shell, no domain logic.                 |
-| Storybook review surface               | `apps/fachverfahren-template/src/stories/`   | Add or update stories for new reusable UI.                    |
+| App shell + the ONE exchange seam      | `apps/antragsservice/src/`                   | Thin composition; a build only edits `leistung.config.ts`.    |
+| Storybook review surface               | `packages/fachverfahren-kit/src/stories/`    | Add or update stories for new reusable UI.                    |
 | Public-sector facade                   | `packages/public-sector-ui/src/`             | Lower-level public-sector patterns and stories.               |
 
 Domain modules under `modules/<domain>/` are generated outputs. They should

@@ -37,5 +37,6 @@ Neue Rollen werden nicht als verstreute `if`-Bedingungen eingeführt. Vorgehen:
 4. Actor-Zuordnungen in `app_actor_roles` schreiben.
 5. API- und Storybook-Tests für erlaubte und verbotene Pfade ergänzen.
 
-Domain-Module dürfen eigene Permissions definieren, müssen sie aber im
-`domain.module.yaml` und in Migrationen nachvollziehbar machen.
+Domain-Module (Generator-Pfad, PLAN) dürfen eigene Permissions definieren,
+müssen sie aber im `domain.module.yaml` und in Migrationen nachvollziehbar
+machen.
