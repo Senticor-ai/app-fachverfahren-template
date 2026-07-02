@@ -31,6 +31,7 @@ import {
 
 import type { Nachweis } from "../types.js";
 import { cn } from "../lib/utils.js";
+import { formatDateiGroesse } from "../format.js";
 import { Button } from "../ui/button.js";
 import { Progress } from "../ui/progress.js";
 import { useStatusRegion } from "./StatusRegion.js";
@@ -90,23 +91,8 @@ export interface DateiUploadProps {
   className?: string;
 }
 
-/** Bytes menschenlesbar formatieren (de-DE, dep-frei). */
-function formatGroesse(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return "—";
-  if (bytes < 1024) return `${bytes} B`;
-  const einheiten = ["KB", "MB", "GB", "TB"];
-  let wert = bytes / 1024;
-  let i = 0;
-  while (wert >= 1024 && i < einheiten.length - 1) {
-    wert /= 1024;
-    i += 1;
-  }
-  const gerundet =
-    wert >= 10 || Number.isInteger(wert)
-      ? Math.round(wert)
-      : Math.round(wert * 10) / 10;
-  return `${new Intl.NumberFormat("de-DE").format(gerundet)} ${einheiten[i]}`;
-}
+/** Bytes menschenlesbar formatieren (de-DE) — delegiert an die EINE Wahrheit in `../format.js`. */
+const formatGroesse = formatDateiGroesse;
 
 /** Lokal hochgeladene Datei-Metadaten je Nachweis-Id (der echte Datei-Inhalt wandert in PROD über den Port). */
 type LokaleDatei = { name: string; groesse: number };

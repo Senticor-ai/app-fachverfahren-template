@@ -33,3 +33,21 @@ export function formatBetrag(betrag: number, einheit: string): string {
   }
   return `${new Intl.NumberFormat("de-DE").format(betrag)} ${einheit ?? ""}`.trim();
 }
+
+/** Datei-Größe menschenlesbar (de-DE) — EINE Wahrheit für Datei-Uploads (inline `file`-Feld + DateiUpload). */
+export function formatDateiGroesse(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  const einheiten = ["KB", "MB", "GB", "TB"];
+  let wert = bytes / 1024;
+  let i = 0;
+  while (wert >= 1024 && i < einheiten.length - 1) {
+    wert /= 1024;
+    i += 1;
+  }
+  const gerundet =
+    wert >= 10 || Number.isInteger(wert)
+      ? Math.round(wert)
+      : Math.round(wert * 10) / 10;
+  return `${new Intl.NumberFormat("de-DE").format(gerundet)} ${einheiten[i]}`;
+}

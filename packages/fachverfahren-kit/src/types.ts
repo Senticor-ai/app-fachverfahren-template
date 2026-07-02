@@ -92,11 +92,18 @@ export type FeldTyp =
   | "plz"
   | "date"
   | "select"
-  | "checkbox"
+  | "checkbox" // Zustimmung/Bestätigung: `required` = MUSS angehakt werden (Einwilligung, AGB) — NICHT für Ja/Nein-Tatbestände
   | "number"
   | "tel"
   | "email"
-  | "textarea";
+  | "textarea"
+  // Boolescher TATBESTAND als Ja/Nein-Auswahl (Radio). `required` heißt „muss BEANTWORTET werden" (Ja ODER Nein) —
+  // nicht „muss bejaht werden". Damit sperrt ein sachlich verneinter Tatbestand (Antwort „Nein") den Antrag NICHT,
+  // anders als eine Pflicht-Checkbox. Der Wert wird als boolean geführt (Ja=true / Nein=false).
+  | "ja-nein"
+  // Einzelner Datei-Upload (Nachweis) inline im Feld. Der Wert ist { name, groesse } (Datei-Metadaten) oder leer.
+  // Der echte Datei-Inhalt wandert in PROD über den Port; das Feld hält nur die Referenz.
+  | "file";
 export interface FeldDef {
   name: string; // Pfad in den Antragsdaten, z.B. "halter.nachname"
   label: string;
@@ -105,7 +112,14 @@ export interface FeldDef {
   pattern?: string; // z.B. "^\\d{5}$" für PLZ
   min?: number;
   max?: number;
+  /** Auswahl-Optionen (Select) INLINE. Vorrang vor `optionsRef`. */
   options?: { value: string; label: string }[];
+  /** DATA-DRIVEN Auswahl: Name einer benannten Liste in `LeistungConfig.datenlisten` (z. B. "rassen"). So liefert ein
+   *  Verfahren seine Auswahl (Rassenliste, Kategorien, …) als DATEN und mehrere Felder teilen dieselbe Liste — statt
+   *  Freitext oder inline-dupliziertem `options`. Wird ignoriert, wenn `options` gesetzt ist. */
+  optionsRef?: string;
+  /** Nur `typ: "file"`: erlaubte Datei-Typen für den Datei-Dialog (das native `accept`-Attribut, z. B. "application/pdf,image/*"). */
+  accept?: string;
   hint?: string; // Hilfetext / Beispiel
   onceOnly?: boolean; // aus Register vorbefüllbar + editierbar (Once-Only)
 }
@@ -225,6 +239,10 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   rechtsgrundlagen: { norm: string; titel: string; satzung?: boolean }[];
   fimLeistung?: { id: string; status: "belegt" | "annahme-zu-validieren" }; // GROUNDED — nie erfinden
   antrag: { steps: StepDef[]; einleitung?: string };
+  /** Benannte, wiederverwendbare Auswahl-Listen als DATEN (z. B. `{ rassen: [...], kategorien: [...] }`). Ein Feld
+   *  referenziert eine Liste über `FeldDef.optionsRef` und zieht seine Optionen damit aus der Config — die generische
+   *  Fähigkeit, dass ein Verfahren z. B. eine Rassenliste liefert, ohne Kit-Code zu ändern. */
+  datenlisten?: Record<string, { value: string; label: string }[]>;
   statusMachine: StatusMachine;
   /** Reine Subsumtions-/Berechnungsfunktion (Tatbestand→Rechtsfolge). Testbar, deterministisch, kein Datum/Random. */
   berechne: (antragsdaten: TAntragsdaten) => Berechnung;

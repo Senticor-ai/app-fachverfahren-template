@@ -14,11 +14,15 @@ import {
   ChevronLeft,
   ChevronRight,
   Info,
+  Paperclip,
   Sparkles,
+  Trash2,
+  UploadCloud,
 } from "lucide-react";
 
 import { ErrorSummary, type FieldError } from "./ErrorSummary.js";
 import { useStatusRegion } from "./StatusRegion.js";
+import { DateiUpload } from "./DateiUpload.js";
 import {
   AdressValidierung,
   type AdressTreffer,
@@ -33,6 +37,19 @@ import type {
   Vorgang,
   VorgangPort,
 } from "../types.js";
+import {
+  asString,
+  feldAnzeige,
+  feldFehler,
+  getPath,
+  istDateiWert,
+  resolveSteps,
+  setPath,
+  stepGueltig,
+  typisiereAntragsdaten,
+  type Antragsdaten,
+  type DateiWert,
+} from "../lib/antrag-felder.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "../ui/button.js";
 import { Card } from "../ui/card.js";
@@ -40,6 +57,7 @@ import { Input } from "../ui/input.js";
 import { Textarea } from "../ui/textarea.js";
 import { Label } from "../ui/label.js";
 import { Checkbox } from "../ui/checkbox.js";
+import { RadioGroup, RadioGroupItem } from "../ui/radio-group.js";
 import {
   Select,
   SelectContent,
@@ -47,53 +65,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select.js";
-import { formatBetrag as formatBetragKit } from "../format.js";
+import {
+  formatBetrag as formatBetragKit,
+  formatDateiGroesse,
+} from "../format.js";
 
-// ── Pfad-Helfer: verschachteltes Antragsdaten-Objekt über "a.b.c"-Feldpfade ──────────────────
-type Antragsdaten = Record<string, unknown>;
-
-/** Liest einen Wert aus dem verschachtelten Objekt anhand des Feldpfads (z.B. "person.nachname"). */
-function getPath(obj: Antragsdaten, path: string): unknown {
-  return path.split(".").reduce<unknown>((acc, key) => {
-    if (acc && typeof acc === "object") return (acc as Antragsdaten)[key];
-    return undefined;
-  }, obj);
-}
-
-/** Setzt einen Wert im verschachtelten Objekt (immutabel) anhand des Feldpfads. */
-function setPath(
-  obj: Antragsdaten,
-  path: string,
-  value: unknown,
-): Antragsdaten {
-  const keys = path.split(".");
-  const [head, ...rest] = keys;
-  if (head === undefined) return obj;
-  if (rest.length === 0) return { ...obj, [head]: value };
-  const child = obj[head];
-  const childObj =
-    child && typeof child === "object" ? (child as Antragsdaten) : {};
-  return { ...obj, [head]: setPath(childObj, rest.join("."), value) };
-}
-
-/** Select-/Radix-Werte kommen IMMER als String aus dem DOM. Sind ALLE Options eines Selects numerisch, speichern
- *  wir den Wert als ZAHL — damit die fachliche Subsumtion (numerische Vergleiche/Staffeln, `=== 1`) deterministisch
- *  greift, statt still in den Default zu fallen ("1" === 1 ist false). Enum-Selects (z.B. Geschlecht m/w) bleiben
- *  String. GENERISCH + data-driven aus der Feld-Definition — kein leistungs-spezifischer Sonderfall. */
-function coerceFeldwert(feld: FeldDef, v: unknown): unknown {
-  if (feld.typ !== "select" || typeof v !== "string" || v === "") return v;
-  const opts = feld.options ?? [];
-  const allNumerisch =
-    opts.length > 0 &&
-    opts.every((o) => o.value.trim() !== "" && !Number.isNaN(Number(o.value)));
-  return allNumerisch ? Number(v) : v;
-}
-
-/** Feldwert als String (für Inputs) — undefined/null → "". */
-function asString(v: unknown): string {
-  if (v === undefined || v === null) return "";
-  return String(v);
-}
+// ── Feldwert-Logik (Pfad-Zugriff, Typisierung je FeldTyp, Validierung, Anzeige) ist die EINE, pur getestete
+// Wahrheit in ../lib/antrag-felder — dieser Stepper RENDERT nur und delegiert jede fachliche Entscheidung dorthin.
 
 // ── Adress-Validierung (OPTIONAL, generisch) ─────────────────────────────────────────────────────
 // Sammelt eine (Teil-)Anschrift aus den Antragsdaten über die GENERISCHEN Adress-Blattnamen strasse/plz/ort
@@ -148,45 +126,6 @@ function adressValidieren<T extends Antragsdaten>(
   return Promise.resolve([{ strasse, plz, ort }]);
 }
 
-// ── Validierung eines Einzelfelds (required + pattern + min/max) ─────────────────────────────
-function feldFehler(feld: FeldDef, wert: unknown): string | null {
-  const s = asString(wert).trim();
-
-  if (feld.required) {
-    if (feld.typ === "checkbox") {
-      if (wert !== true) return "Bitte bestätigen.";
-    } else if (s.length === 0) {
-      return "Pflichtangabe — bitte ausfüllen.";
-    }
-  }
-  // Leere optionale Felder sind gültig (außer required oben).
-  if (s.length === 0) return null;
-
-  if (feld.pattern) {
-    try {
-      if (!new RegExp(feld.pattern).test(s))
-        return "Eingabe entspricht nicht dem erwarteten Format.";
-    } catch {
-      // Defekte Pattern dürfen den Antrag nicht blockieren.
-    }
-  }
-  if (feld.typ === "number") {
-    const n = Number(s);
-    if (Number.isNaN(n)) return "Bitte eine Zahl eingeben.";
-    if (feld.min !== undefined && n < feld.min)
-      return `Mindestens ${feld.min}.`;
-    if (feld.max !== undefined && n > feld.max) return `Höchstens ${feld.max}.`;
-  }
-  return null;
-}
-
-/** Ein Schritt ist gültig, wenn keines seiner Felder einen Fehler meldet. */
-function stepGueltig(step: StepDef, daten: Antragsdaten): boolean {
-  return step.felder.every(
-    (f) => feldFehler(f, getPath(daten, f.name)) === null,
-  );
-}
-
 /** DETERMINISTISCHE Feld-DOM-id (gemeinsame Wahrheit für Control, aria-describedby UND ErrorSummary-Anker).
  *  Aus dem Instanz-Präfix (useId) + dem Feldpfad → eindeutig pro Stepper-Instanz, aber vorhersagbar, damit der
  *  Summary-Anker (#feldId) genau auf das Control zeigt. Punkte/Sonderzeichen → Bindestrich (CSS/HTML-id-tauglich). */
@@ -226,13 +165,21 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
   port,
   onDone,
 }: AntragStepperProps<T>): React.ReactElement {
-  const steps = config.antrag.steps;
+  // Auswahl-Optionen einmalig auflösen: Felder mit `optionsRef` ziehen ihre Optionen aus `config.datenlisten`
+  // (data-driven, z. B. eine Rassenliste) — ab hier lesen ALLE Funktionen nur noch `feld.options`. Eine Wahrheit.
+  const steps = useMemo(
+    () => resolveSteps(config.antrag.steps, config.datenlisten),
+    [config],
+  );
   const reviewIndex = steps.length; // virtueller Review-Schritt nach allen Fach-Schritten
   const lastIndex = reviewIndex;
 
   const [stepIdx, setStepIdx] = useState(0);
   const [daten, setDaten] = useState<Antragsdaten>({});
   const [registerHinweis, setRegisterHinweis] = useState<string | null>(null);
+  // Angehängte Nachweis-Dateien (aus dem config.nachweise()-Upload im Review) — je Nachweis-Id. In PROD nimmt der
+  // Port die Datei entgegen; hier halten wir die Referenz, damit der Fluss vollständig klickbar ist.
+  const nachweisDateien = useRef<Record<string, DateiWert | null>>({});
 
   // ── a11y-Fehlerverdrahtung (additiv): ein Instanz-Präfix für deterministische Feld-ids, eine Fehler-Zusammenfassung
   // oben (WCAG-konformes Fehlerzusammenfassungs-Muster, WCAG 3.3.1/3.3.3, BITV 2.0) die bei „Weiter"/„Absenden" den
@@ -258,14 +205,28 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
   const setFeld = (path: string, value: unknown) =>
     setDaten((prev) => setPath(prev, path, value));
 
-  // LIVE-Berechnung über dem aktuellen Antragsstand — defensiv (eine fehlerhafte `berechne` darf nicht crashen).
+  // Antragsdaten an der EINEN Naht TYPISIEREN (je FeldTyp: Zahl/Boolean/String) — bevor sie in die fachliche Logik
+  // gehen. So subsumiert `berechne` über echte Zahlen (Staffel `=== 1` greift) statt über DOM-Strings ("1" === 1 = false).
+  const typisierteDaten = useMemo(
+    () => typisiereAntragsdaten(steps, daten),
+    [steps, daten],
+  );
+
+  // LIVE-Berechnung über dem aktuellen (typisierten) Antragsstand — defensiv (eine fehlerhafte `berechne` darf nicht crashen).
   const berechnung = useMemo<Berechnung | null>(() => {
     try {
-      return config.berechne(daten as T);
+      return config.berechne(typisierteDaten as T);
     } catch {
       return null;
     }
-  }, [config, daten]);
+  }, [config, typisierteDaten]);
+
+  // Erforderliche Nachweise aus dem aktuellen Stand ableiten (data-driven, je Tatbestand) — nur wenn das Verfahren
+  // `config.nachweise` deklariert. Erscheint als Upload im Review, sobald die Auswahl Nachweise fordert.
+  const nachweise = useMemo(
+    () => config.nachweise?.(typisierteDaten as T) ?? [],
+    [config, typisierteDaten],
+  );
 
   // Pflichtfeld-Markierung (rot) aktiv: am Review-Schritt IMMER — ODER sobald in DIESEM Schritt „Weiter" trotz offener
   // Pflichtangabe versucht wurde. So sieht der/die Nutzer:in die roten Felder genau dann, wenn der Prozess sie blockiert.
@@ -386,7 +347,8 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
       return;
     }
     setSummaryErrors([]);
-    const vorgang = port.einreichen(daten as T);
+    // Typisiert einreichen (Zahlen/Booleans/Datei-Referenzen) — der Port/das Backend erhält fachlich korrekte Werte.
+    const vorgang = port.einreichen(typisierteDaten as T);
     onDone(vorgang);
   }
 
@@ -438,7 +400,7 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
                   wert={getPath(daten, feld.name)}
                   fehler={feldFehler(feld, getPath(daten, feld.name))}
                   showErrors={showErrors}
-                  onChange={(v) => setFeld(feld.name, coerceFeldwert(feld, v))}
+                  onChange={(v) => setFeld(feld.name, v)}
                   onRegisterLookup={(raw) => tryRegisterLookup(feld, raw)}
                 />
               ))}
@@ -492,6 +454,21 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
                 }),
               )}
             </dl>
+
+            {/* Erforderliche Nachweise (data-driven aus `config.nachweise(daten)`): erscheinen je nach gewähltem
+                Tatbestand als Upload — VOR dem Absenden. Nur sichtbar, wenn der aktuelle Stand Nachweise fordert.
+                Der/die Bürger:in hängt die Datei an; der Port nimmt sie in PROD entgegen. */}
+            {nachweise.length > 0 ? (
+              <div className="mt-6">
+                <DateiUpload
+                  nachweise={nachweise}
+                  titel="Erforderliche Nachweise"
+                  onChange={(id, datei) => {
+                    nachweisDateien.current[id] = datei;
+                  }}
+                />
+              </div>
+            ) : null}
 
             {/* OPTIONAL (nur wenn config.adressValidierung.enabled): deterministischer Melderegister-Abgleich
                 der erfassten Anschrift VOR dem Absenden — additiv, ohne den bestehenden Flow zu ändern. */}
@@ -849,6 +826,48 @@ function FeldRenderer({
           </div>
         );
 
+      case "ja-nein":
+        // Tatbestand als Ja/Nein-Radio (Wert = boolean). „Nein" ist eine gültige, den Antrag NICHT sperrende Antwort —
+        // im Gegensatz zu einer Pflicht-Checkbox. Die Gruppe trägt das Feld-Label (aria-label) + die Fehler-/Hinweis-Kopplung.
+        return (
+          <RadioGroup
+            id={id}
+            className="flex flex-row flex-wrap gap-x-6 gap-y-2 pt-1"
+            aria-label={feld.label}
+            aria-invalid={invalidAttr}
+            aria-describedby={describedBy}
+            value={wert === true ? "ja" : wert === false ? "nein" : ""}
+            onValueChange={(v) => onChange(v === "ja")}
+          >
+            {[
+              { v: "ja", label: "Ja" },
+              { v: "nein", label: "Nein" },
+            ].map((opt) => (
+              <div key={opt.v} className="flex items-center gap-2">
+                <RadioGroupItem id={`${id}-${opt.v}`} value={opt.v} />
+                <label
+                  htmlFor={`${id}-${opt.v}`}
+                  className="cursor-pointer text-sm text-foreground"
+                >
+                  {opt.label}
+                </label>
+              </div>
+            ))}
+          </RadioGroup>
+        );
+
+      case "file":
+        return (
+          <FileFeld
+            id={id}
+            feld={feld}
+            wert={wert}
+            invalid={invalidAttr}
+            describedBy={describedBy}
+            onChange={onChange}
+          />
+        );
+
       case "textarea":
         return (
           <Textarea
@@ -962,6 +981,92 @@ function FeldRenderer({
   }
 }
 
+// ── Inline-Datei-Feld (`typ: "file"`) — ein einzelner, barrierefreier Nachweis-Upload direkt im Feld ──────────────
+// Der Wert ist { name, groesse } (Datei-Metadaten) oder null. Der echte Inhalt wandert in PROD über den Port; hier
+// halten wir nur die Referenz. Auslösung über einen echten Button (Maus + Tastatur), verstecktes natives File-Input.
+function FileFeld({
+  id,
+  feld,
+  wert,
+  invalid,
+  describedBy,
+  onChange,
+}: {
+  id: string;
+  feld: FeldDef;
+  wert: unknown;
+  invalid: boolean;
+  describedBy: string | undefined;
+  onChange: (value: unknown) => void;
+}): React.ReactElement {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const datei = istDateiWert(wert) ? wert : null;
+  const oeffnen = () => inputRef.current?.click();
+
+  return (
+    <div>
+      <input
+        ref={inputRef}
+        id={id}
+        type="file"
+        className="sr-only"
+        aria-invalid={invalid}
+        aria-describedby={describedBy}
+        {...(feld.accept ? { accept: feld.accept } : {})}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          onChange(file ? { name: file.name, groesse: file.size } : null);
+          // Eingabe leeren, damit dieselbe Datei erneut gewählt werden kann (löst sonst kein change-Event aus).
+          e.target.value = "";
+        }}
+      />
+      {datei ? (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-status-ok/40 bg-status-ok-soft/40 p-2.5">
+          <span className="flex min-w-0 items-center gap-2 text-sm text-foreground">
+            <Paperclip
+              className="h-4 w-4 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <span className="truncate" title={datei.name}>
+              {datei.name}
+            </span>
+            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+              {formatDateiGroesse(datei.groesse)}
+            </span>
+          </span>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={oeffnen}>
+              <UploadCloud className="h-3.5 w-3.5" aria-hidden="true" />
+              Ersetzen
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => onChange(null)}
+              aria-label={`Datei „${datei.name}" für ${feld.label} entfernen`}
+              className="text-status-block hover:text-status-block"
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+              Entfernen
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={oeffnen}
+          aria-describedby={describedBy}
+        >
+          <UploadCloud className="h-4 w-4" aria-hidden="true" />
+          Datei auswählen
+        </Button>
+      )}
+    </div>
+  );
+}
+
 // ── Berechnungs-Karte (LIVE-Stand + Begründung) — Tokens statt Domänen-Texte ──────────────────
 function BerechnungKarte<T extends Antragsdaten>({
   berechnung,
@@ -1034,17 +1139,6 @@ function formatBetrag(b: Berechnung): string {
 }
 function formatEuro(betrag: number, einheit: string): string {
   return formatBetragKit(betrag, einheit);
-}
-
-/** Feldwert für die Review-Anzeige aufbereiten (Select → Options-Label, Checkbox → ja/—). */
-function feldAnzeige(feld: FeldDef, wert: unknown): string {
-  if (feld.typ === "checkbox") return wert === true ? "Ja" : "";
-  const s = asString(wert).trim();
-  if (s.length === 0) return "";
-  if (feld.typ === "select") {
-    return feld.options?.find((o) => o.value === s)?.label ?? s;
-  }
-  return s;
 }
 
 // ── Layout-Bausteine (1:1 aus der Referenz, generisch) ─────────────────────────────────────────
