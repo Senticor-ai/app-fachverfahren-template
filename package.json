@@ -62,6 +62,7 @@
     "template:consumers:mr": "pnpm run template -- consumers:mr",
     "template:consumers:report": "pnpm run template -- consumers:report",
     "check:esm": "node scripts/check-esm-policy.mjs",
+    "check:dockerfile-paths": "node scripts/check-dockerfile-paths.mjs",
     "check:typescript-policy": "node scripts/check-typescript-policy.mjs",
     "check:domain-contracts": "node scripts/check-domain-contracts.mjs",
     "check:storybook": "node scripts/check-storybook-coverage.mjs",

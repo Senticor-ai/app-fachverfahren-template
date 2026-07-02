@@ -18,6 +18,7 @@ case "$tmp_root" in
 esac
 
 pnpm run check:precommit
+pnpm run check:dockerfile-paths
 pnpm run build:packages
 pnpm run build:app
 pnpm run test:k8s:render
