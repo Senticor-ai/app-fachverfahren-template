@@ -1,8 +1,10 @@
 // fachverfahren-kit/contract-snapshot — projiziert eine `LeistungConfig` in einen JSON-SAFE Struktur-Snapshot
-// (`leistung.contract.json`). Funktionen (berechne/nachweise/seed) sind in JSON nicht serialisierbar → als
-// Präsenz-Marker dargestellt; die STRUKTUR (Pflichtfelder · Status-Machine · Wire-through · Grounding) bleibt voll
-// erhalten. Ein externes Build-Gate kann genau diesen Snapshot deterministisch validieren —
-// so kann der Vertrag einer GENERIERTEN Leistung deterministisch geprüft werden, ohne die .ts-Config zu importieren.
+// (`leistung.contract.json`). Die BUSINESS-LOGIK liegt jetzt als DATEN vor: Tarif-Staffeln, Codelisten (mit
+// Provenienz), Feldregeln (in den Steps), Register-/FIM-Referenzen und Fristen-Typen werden als ECHTE ZEILEN
+// serialisiert — nicht mehr als „[function]"-Marker versteckt. Nur die Escape-Hatches `berechne`/`nachweise` (falls
+// ein Verfahren sie statt der Daten nutzt) bleiben JSON-untragbar und werden als Präsenz-Marker geführt. So kann ein
+// externes Build-Gate den Vertrag — inklusive der subsumierbaren Business-Logik — deterministisch prüfen, ohne die
+// .ts-Config zu importieren.
 import type { LeistungConfig } from "./types.js";
 
 export interface LeistungContractSnapshot {
@@ -12,11 +14,25 @@ export interface LeistungContractSnapshot {
   rechtsgrundlagen: LeistungConfig["rechtsgrundlagen"];
   fimLeistung?: LeistungConfig["fimLeistung"];
   antrag: { steps: LeistungConfig["antrag"]["steps"]; einleitung?: string };
+  /** Benannte Auswahl-Listen (schlank, value/label) — als echte Zeilen. */
+  datenlisten?: LeistungConfig["datenlisten"];
+  /** TARIF-/GEBÜHRENTABELLE als echte Staffel-Zeilen (statt „[function]"). */
+  tarif?: LeistungConfig["tarif"];
+  /** CODELISTEN mit Provenienz (Einträge + normRef/belege) als echte Zeilen. */
+  codelisten?: LeistungConfig["codelisten"];
+  /** REGISTER-REFERENZEN als echte Zeilen. */
+  registerRefs?: LeistungConfig["registerRefs"];
+  /** FIM-REFERENZEN als echte Zeilen. */
+  fimRefs?: LeistungConfig["fimRefs"];
+  /** FRISTEN-TYPEN als echte Zeilen. */
+  fristenTypen?: LeistungConfig["fristenTypen"];
   statusMachine: LeistungConfig["statusMachine"];
   register: LeistungConfig["register"];
   detailSektionen: LeistungConfig["detailSektionen"];
   ki?: LeistungConfig["ki"];
-  berechne: "[function]"; // Präsenz-Marker (nicht JSON-serialisierbar) — der Validator akzeptiert ihn
+  /** ESCAPE-HATCH-Präsenz: nur gesetzt, wenn eine `berechne`-Funktion statt eines `tarif` genutzt wird. */
+  berechne?: "[function]";
+  /** ESCAPE-HATCH-Präsenz: nur gesetzt, wenn eine `nachweise`-Funktion statt der Codelisten-Ableitung genutzt wird. */
   nachweise?: "[function]";
   seedCount: number;
   _snapshot: true;
@@ -45,11 +61,19 @@ export function toContractSnapshot<T = Record<string, unknown>>(
         ? { einleitung: config.antrag.einleitung }
         : {}),
     },
+    // Business-Logik-DATEN als echte Zeilen (nur wenn deklariert — additiv, bestehende Snapshots bleiben gültig).
+    ...(config.datenlisten ? { datenlisten: config.datenlisten } : {}),
+    ...(config.tarif ? { tarif: config.tarif } : {}),
+    ...(config.codelisten ? { codelisten: config.codelisten } : {}),
+    ...(config.registerRefs ? { registerRefs: config.registerRefs } : {}),
+    ...(config.fimRefs ? { fimRefs: config.fimRefs } : {}),
+    ...(config.fristenTypen ? { fristenTypen: config.fristenTypen } : {}),
     statusMachine: config.statusMachine,
     register: config.register,
     detailSektionen: config.detailSektionen,
     ...(config.ki ? { ki: config.ki } : {}),
-    berechne: "[function]",
+    // Escape-Hatches nur als Präsenz-Marker (nicht JSON-serialisierbar) — und nur, wenn tatsächlich genutzt.
+    ...(config.berechne ? { berechne: "[function]" as const } : {}),
     ...(config.nachweise ? { nachweise: "[function]" as const } : {}),
     seedCount,
     _snapshot: true,
