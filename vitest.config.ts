@@ -16,6 +16,12 @@ export default defineConfig({
     },
   },
   test: {
+    // Template-Scaffold-/Render-/Agent-Contract-Tests machen echte mkdtemp-, Full-Repo-Render- und
+    // Subprozess-Arbeit. Auf den langsameren opencode.de-CI-Runnern reißt Vitests 5s-Default unter Last
+    // (nicht-deterministisch mal 2, mal 6 Timeouts) — GitHubs schnellere Runner treffen die Grenze nie.
+    // Ein großzügigeres Budget stabilisiert die GitLab-Pipeline, ohne echte Hänger zu verstecken.
+    testTimeout: 20000,
+    hookTimeout: 20000,
     exclude: [
       "**/.{git,cache,output,temp}/**",
       "**/coverage/**",
