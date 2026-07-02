@@ -1,299 +1,327 @@
 # AGENTS.md
 
-Kanonische Arbeitsanweisung für Coding Agents in diesem Repository.
+Kanonische Arbeitsanweisung für Coding Agents (Claude Code, Cursor, Copilot,
+OpenCode, Codex, Gemini, …) und Menschen in diesem Repository. Tool-spezifische
+Dateien (`CLAUDE.md`, `.claude/skills/*`) sind nur Shims auf diese Datei und
+`.agents/skills/*` — sie duplizieren keine Regeln.
 
-## Zweck
+## Was dieses Repository IST
 
-Dieses Repository baut eine wiederverwendbare Public-Sector-App-Plattform für
-Fachverfahren, Bürgerapps und interne Verwaltungsprozesse. Es ist nicht als
-dauerhaft geforkte Einmalvorlage gedacht. Wiederverwendbare Logik gehört in
-versionierte Pakete; konkrete Fachlogik gehört in Domain-Module.
+Eine fertige, dünne Fachverfahren-App als Kit-Komposition plus versionierte
+Plattformpakete:
 
-## Architekturregel
+- `apps/antragsservice` ist die EINE lauffähige App. Sie rendert drei Personas
+  (Bürger:in · Sachbearbeitung · Aufsicht) vollständig aus EINER Konfiguration
+  und enthält selbst keine Fachlogik — nur Routing, eine Store-Instanz und die
+  Konfiguration.
+- `packages/fachverfahren-kit` liefert die generischen Bausteine
+  (AntragStepper, Arbeitsvorrat, ReviewWorkspace, AufsichtDashboard, …) und den
+  Typ `LeistungConfig`, aus dem die App rendert.
+- Weitere Pakete (`platform-contracts`, `public-sector-sdk`,
+  `public-sector-ui`, `provider-*`, `conformance-kit`, `migration-kit`,
+  `app-store-postgres`, `jurisdictions/*`) sind die wiederverwendbare
+  Plattformbasis.
 
-Jede vertikale Fachfunktion folgt dieser Richtung:
+Das Template baut und läuft ohne jedes externe Werkzeug:
 
-```text
-Domain module
-  -> public-sector capability contracts
-  -> jurisdiction/provider adapters
-  -> managed infrastructure services
+```bash
+pnpm install
+pnpm run dev
 ```
 
-Domain-Code darf nicht direkt mit PostgreSQL, FIT-Connect, XBezahldienste,
-NOOTS, Object Storage, RabbitMQ, OpenSearch oder Kubernetes sprechen. Nutze
-Ports aus `@senticor/platform-contracts` und Profile aus den Provider-Packs.
+Ein neues Fachverfahren entsteht, indem GENAU EINE Datei mit Fachdaten gefüllt
+wird — die Austausch-Naht (nächster Abschnitt). Es wird nichts neu gebaut, was
+im Kit existiert.
+
+## PLAN vs. IST
+
+Dieses Dokument und alle Pfadangaben darin beschreiben den IST-Stand des
+Scaffolds. Geplante Zielarchitektur ist ausdrücklich mit `(PLAN)` markiert.
+
+Aktuell gilt insbesondere:
+
+- Es existiert KEIN Backend/BFF: kein `server/`-Verzeichnis, kein Fastify.
+  Zielarchitektur: `docs/reference/backend-fastify.md` (PLAN).
+- Es existiert KEIN MSW-Mocking: `docs/reference/mock-data-msw.md` (PLAN).
+- Es existieren KEINE E2E-Suiten und keine Scripts `test:e2e`,
+  `test:e2e:postgres`, `build:server`, `dev:postgres`, `dev:all`.
+- `modules/` enthält KEINE Instanz (nur Dokumentation). Der Generator-Pfad
+  `app:new` kann dort ein Modul-Gerüst erzeugen, aber die laufende App bindet
+  Module NICHT ein (kein Modul-Mount). Details: `modules/README.md`.
+
+Wer eines dieser Themen umsetzt, entfernt die `(PLAN)`-Markierung im selben
+Change und verdrahtet die zugehörigen Scripts real.
+
+## DIE EINE Austausch-Naht
+
+`apps/antragsservice/src/leistung.config.ts` ist der einzige Austausch-Punkt
+der App. Die exportierte `leistungConfig: LeistungConfig` (Typ:
+`packages/fachverfahren-kit/src/types.ts`) treibt die komplette 3-Personen-UX.
+Ein Fachverfahren-Build ändert ausschließlich diese Datei.
+
+Der Vertrag der `LeistungConfig` (Pflichtfelder zuerst):
+
+| Feld               | Vertrag                                                                                                                                                                                                                                                               |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`, `label`      | Slug und Anzeigename der Leistung                                                                                                                                                                                                                                     |
+| `kommune`          | Trägerin der Leistung, z. B. `"Stadt Musterstadt"`                                                                                                                                                                                                                    |
+| `rechtsgrundlagen` | Liste `{ norm, titel, satzung? }` — nur belegte Normen, nie erfunden                                                                                                                                                                                                  |
+| `antrag.steps`     | Schritte mit Feldern (`FeldDef`: `name/label/typ/required/pattern/onceOnly/…`); jedes Pflichtfeld mit passender Validierung                                                                                                                                           |
+| `statusMachine`    | `initial` + `states` (Endzustände mit `terminal: true`) + `transitions` (`rollen`, kritische Entscheidungen mit `vierAugen: true`, `detailPflicht`)                                                                                                                   |
+| `berechne`         | REINE, deterministische Funktion (kein Datum, kein Zufall). Beträge in GANZEN EURO (natürliche Einheit, `120` = 120,00 €), `status` `provisional`/`final`, `begruendung` als belegte Herleitung, jede Tarifstufe/Befreiung/Ermäßigung als eigene prüfbare Verzweigung |
+| `register`         | Once-Only-Register: `suchfelder` + deterministische `mock`-Daten                                                                                                                                                                                                      |
+| `detailSektionen`  | Anzeige-Mapping der Antragsdaten für die Sachbearbeitung                                                                                                                                                                                                              |
+| `ki`               | `schwelleAutonom` + optional transparenter `vorschlag` (KI assistiert, Mensch entscheidet)                                                                                                                                                                            |
+| `seed`             | Deterministische Demo-Vorgänge, damit die Sachbearbeitungs-Sicht sofort arbeitet                                                                                                                                                                                      |
+| optional           | `fimLeistung`, `nachweise`, `ePayment`, `zustellung`, `termin`, `adressValidierung`, `personas` — NUR setzen, wenn das Fachkonzept es vorsieht                                                                                                                        |
+
+NACH JEDEM Write auf die Naht den Vertrags-Snapshot neu erzeugen und mit
+committen:
+
+```bash
+pnpm --filter @senticor/antragsservice emit:contract
+```
+
+Der Snapshot `apps/antragsservice/leistung.contract.json` ist GENERIERT und
+wird nie von Hand editiert.
+
+Die realen Routen der App (`apps/antragsservice/src/App.tsx`):
+
+```text
+/buerger · /buerger/anmelden · /buerger/bestaetigung/:id
+/amt · /amt/vorgang/:id
+/aufsicht
+```
+
+## Was Agenten NIE anfassen
+
+- Kit-Interna: `packages/fachverfahren-kit/src/components/` und `…/src/ui/`
+  werden importiert, nicht kopiert und für einen Fachverfahren-Build nicht
+  geändert. Neue wiederverwendbare Bausteine sind Plattformarbeit mit Tests
+  und Storybook, kein Nebenprodukt eines Verfahrens-Builds.
+- Generierte Snapshots: `apps/antragsservice/leistung.contract.json` (nur via
+  `emit:contract`).
+- Die dünne App-Komposition (`App.tsx`, `store.ts`, `main.tsx`,
+  `AppErrorBoundary.tsx`, `styles.css`, `index.html`, `vite.config.ts`): für
+  einen Fachverfahren-Build tabu — die Naht reicht.
+- Template-Provenienz in generierten Repositories (`.template/*`): nur über
+  die Template-CLI.
+
+## WISSENSLÜCKE ⇒ Annahme als DATEN
+
+Unbekannte oder unbelegte Fachwerte (Satzungsbeträge, Fristen, Schwellen)
+werden NIE als Fakt behauptet. Konvention:
+
+1. Der Wert steht als benannte Konstante in der Naht, markiert mit einem
+   Annahme-Kommentar im Format `// annahme <wert> <einheit> — TBD-<QUELLE>`:
+
+   ```ts
+   // annahme 120 EUR — TBD-SATZUNG-MUSTERSTADT
+   const TARIF_ERSTER_HUND = 120;
+   ```
+
+2. Anzeige-Strings (Labels, `begruendung`, Microcopy) geben Annahmen nie als
+   geltendes Recht aus. Eine auf Annahmen beruhende Herleitung benennt das:
+   „Annahme — zu validieren gegen <Quelle>".
+3. `rechtsgrundlagen` und `fimLeistung` enthalten nur belegte Einträge;
+   Unbelegtes bekommt `status: "annahme-zu-validieren"` bzw. wird im
+   Abschlussbericht als offene Validierungsfrage gemeldet.
+
+## Kanonische Pfad-Karte
+
+Jede Zeile beschreibt den IST-Stand. Zeilen mit `(PLAN)` existieren noch nicht.
+
+| Pfad                                                              | Rolle                                                    | Agenten-Regel                                        |
+| ----------------------------------------------------------------- | -------------------------------------------------------- | ---------------------------------------------------- |
+| `apps/antragsservice/src/leistung.config.ts`                      | DIE EINE Austausch-Naht (`LeistungConfig`)               | Einzige Datei eines Fachverfahren-Builds             |
+| `apps/antragsservice/leistung.contract.json`                      | Generierter Vertrags-Snapshot                            | Nur via `emit:contract`                              |
+| `apps/antragsservice/src/`                                        | Dünne Komposition (Routing, Store, Shell)                | Für Verfahrens-Builds nicht ändern                   |
+| `packages/fachverfahren-kit/src/types.ts`                         | Naht-Vertrag (`LeistungConfig`, `Berechnung`, `Vorgang`) | Lesen; Änderungen sind Plattformarbeit               |
+| `packages/fachverfahren-kit/src/components/`                      | Fertige Fachverfahren-Bausteine                          | Importieren, nie kopieren                            |
+| `packages/fachverfahren-kit/src/ui/`                              | shadcn/Radix/Tailwind-Primitive                          | Nur nutzen, wenn kein Baustein passt                 |
+| `packages/fachverfahren-kit/src/stories/`                         | Storybook-Review-Fläche                                  | Stories bei Kit-Änderungen pflegen                   |
+| `packages/public-sector-ui/src/`                                  | Public-Sector-UI-Fassade + Stories                       | UI-Vertrag; ShadCN bleibt Implementierungsdetail     |
+| `packages/platform-contracts/`                                    | Capability-Ports                                         | Fachlogik nutzt Ports, nie Provider direkt           |
+| `packages/public-sector-sdk/`                                     | Authorization, RBAC, Audit, Domain-Kernel                | Rollen über RBAC-Registry erweitern                  |
+| `packages/app-store-postgres/`                                    | PostgreSQL-Migrator + Plattformtabellen                  | Migrationen über `db:migrate`                        |
+| `jurisdictions/de`, `jurisdictions/eu`                            | Rechtsraum-Packs                                         | Keine `country === "DE"`-Logik in der App            |
+| `modules/`                                                        | Leerer Zielort des Generator-Pfads                       | `modules/README.md` lesen; keine Instanz (PLAN)      |
+| `docs/examples/hundesteuer/`                                      | Externes Beispiel (Spec + Prompt)                        | Nie in Runtime-Code kopieren                         |
+| `tooling/template/cli.ts`                                         | Template-Lifecycle- und Agent-CLI                        | Verhalten nur hier, hinter `pnpm run template`       |
+| `scripts/`                                                        | Deterministische Checks und Werkzeuge                    | Checks sind die Wahrheit, kein LLM-Urteil            |
+| `schemas/`, `platform/capabilities.json`, `sources/registry.yaml` | Maschinenlesbare Verträge und Kataloge                   | Über `check:*`-Scripts validiert                     |
+| `agent.discovery.json`                                            | Öffentliche Discovery-API für Agenten                    | Muss `check:agent-discovery` bestehen                |
+| `apps/antragsservice/server/`                                     | BFF/Backend (PLAN)                                       | Existiert nicht; `docs/reference/backend-fastify.md` |
 
 ## Sprache und Benennung
 
-- User-facing Dokumentation und UI-Texte: Deutsch.
+- User-facing Dokumentation und UI-Texte: Deutsch mit echten Umlauten.
 - Code, Typen, Variablen, Package-Namen, Env-Keys: Englisch.
-- Keine Hundesteuer-Inhalte im Template-Runtime-Code. Hundesteuer ist nur ein
-  externes Beispiel unter `docs/examples/hundesteuer/`.
+- Keine Hundesteuer- oder sonstigen Fachinhalte im Template-Runtime-Code.
+  Fachliches lebt in der Naht eines konkreten Builds oder unter
+  `docs/examples/<instanz>/`.
 
 ## Runtime- und Toolchain-Vertrag
 
-- Node.js `>=24 <25`.
-- pnpm ist der einzige Paketmanager.
-- Das Repository ist strict ESM: alle Workspaces deklarieren `"type": "module"`,
-  TypeScript nutzt `NodeNext`, relative Imports enden in `.js`.
-- Implementierungsquellen sind TypeScript-only. Unter `apps/`, `packages/`,
-  `jurisdictions/` und `modules/` sind `.ts` und `.tsx` die erlaubten
-  Quellformate. `.js`, `.jsx`, `.cjs` und `.mjs` sind dort nicht zulässig,
-  außer generierten Assets wie dem MSW Worker.
-- `pnpm run check:esm` muss für Plattformänderungen bestanden werden.
-- `pnpm run check:typescript-policy` muss für App-, Package-, Jurisdiction- und
-  Domain-Modul-Änderungen bestanden werden.
+- Node.js `>=24 <25`; pnpm ist der einzige Paketmanager.
+- Strict ESM: alle Workspaces deklarieren `"type": "module"`, TypeScript nutzt
+  `NodeNext`, relative Imports enden in `.js`.
+- Implementierungsquellen sind TypeScript-only: unter `apps/`, `packages/`,
+  `jurisdictions/` und `modules/` sind nur `.ts` und `.tsx` erlaubt.
+  Ausnahmen sind ausschließlich die in `scripts/check-esm-policy.mjs`
+  allowgelisteten Interop-Assets.
+- `pnpm run check:esm` und `pnpm run check:typescript-policy` müssen bestehen.
 
-## CI und Container-Builds
+## UI
 
-OpenCode-/opencode.de-Runner laufen als unprivilegierte Kubernetes-Pods. Es
-gibt keinen Docker-Socket und keine privilegierten Container; `docker:dind` ist
-deshalb kein zulässiger Standard für Image-Builds. GitLab-CI-Beispiele und
-Agenten-Skills verwenden Kaniko mit `.gitlab-ci.yml` als Referenz.
+Die wiederverwendbaren Bausteine liegen in
+`packages/fachverfahren-kit/src/components/`, die Primitive in
+`packages/fachverfahren-kit/src/ui/`. Vor UI-Arbeit
+`docs/reference/fachverfahren-kit-components.md` lesen und über
+`@senticor/fachverfahren-kit` importieren. Der verbindliche UX/UI-Vertrag steht
+in `docs/ux-ui/fachverfahren-ux-contract.md`; bei UI-, Storybook- oder
+Screen-Contract-Änderungen gilt zusätzlich `.agents/skills/ux-ui/SKILL.md`.
 
-Im Dockerfile gilt:
+- Design-Tokens: Komponenten und Stories nutzen die `--color-*`-Aliasse,
+  nie rohe HSL-Quelltokens wie `var(--foreground)`;
+  `pnpm run check:css-tokens` blockiert Verstöße.
+- Jede neue UI-Funktion braucht Tastaturbedienbarkeit, Landmarks, sichtbaren
+  Fokus, Fehlermeldungen mit Recovery-Pfad sowie Storybook-/Testzustände für
+  Default, Loading, Empty, Error und relevante Accessibility-Varianten.
+- React-Hilfskomponenten stehen auf Modulebene; lokale Render-Helfer werden als
+  Funktionsaufruf wie `{renderStep()}` verwendet, nicht als JSX-Komponente.
+- Neue Exports aus `public-sector-ui` müssen in Storybook sichtbar sein und
+  `pnpm run check:storybook` bestehen.
 
-- Build-Stage mit `USER root`, weil das opencode.de-Node-Image standardmäßig
-  nicht als Root läuft und `pnpm` sonst bei `node_modules` scheitern kann.
-- `ENV CI=true`, damit nichtinteraktive `pnpm`-Schritte wie `pnpm prune --prod`
-  in Kaniko nicht abbrechen.
-- Workspace-Pakete vor App und BFF bauen: `pnpm run build:packages`, danach
-  `pnpm run build:app` und `pnpm run build:server`.
+## Test-Konvention
 
-Bei pnpm-Filterbefehlen steht `--filter` vor `run`, damit Flags nicht an das
-unterliegende Script weitergereicht werden:
+- Unit-/Contract-Tests liegen neben der Quelle als `*.test.ts` und laufen über
+  Vitest vom Repo-Root: `pnpm run test`.
+- Die Berechnung der Naht ist rein und deterministisch — sie wird gegen die
+  Beispielwerte des Fachkonzepts getestet, nicht gegen die UI.
+- Typprüfung: `pnpm run typecheck` (Root-Pakete + App).
+- Template-Lifecycle-Code wird testgetrieben entwickelt:
+  `pnpm run test:template` plus `check:template-invariants` und
+  `check:scaffold` vor Abschluss von Template-Änderungen.
+- Evidenz statt Chat-Behauptung: wenn ein Check einen Report erzeugt
+  (`dist/evidence/`, `agent:verify`), ist der Report die Quelle.
+
+## Agent-Workflow
+
+Vendor-neutraler Einstieg (alle Befehle sind reale Package-Scripts):
 
 ```bash
-pnpm --filter "./packages/**" run --if-present build
+pnpm run agent:bootstrap -- --json
+pnpm run agent:discover -- --json
+pnpm run agent:context -- --task <app-spec> --paths <pfad>
 ```
+
+`agent.discovery.json` ist die öffentliche Discovery-API. `agent:context`
+liefert `nextCommands`, `validationProfiles` und `writeBoundaries`;
+`agent:verify` validiert einen Abschlussbericht mit echten
+`commandsExecuted`. Kurzskills liegen kanonisch unter `.agents/skills/`;
+Startpunkt für Fachverfahren-Builds ist
+`.agents/skills/fachverfahren-app/SKILL.md`.
+
+Gouvernierte Webquellen stehen in `sources/registry.yaml`; für registrierte
+Quellen `source:fetch` statt beliebiger Netzwerkzugriffe verwenden.
 
 ## Template-Lifecycle
 
-Dieses Repository ist ein versioniertes Template, kein einmaliger Dateikopierer.
-Neue vollständige Fachverfahren-Repositories werden über den TypeScript-CLI
-erzeugt:
+Dieses Repository ist ein versioniertes Template. Neue vollständige
+Fachverfahren-Repositories entstehen über die TypeScript-CLI:
 
 ```bash
 pnpm run scaffold:domain-app -- --domain beispiel --display-name Beispiel --target /tmp/app-beispiel --allow-existing-empty
 ```
 
-Generierte Repositories enthalten `.template/answers.json`,
-`.template/lock.json`, `.template/ownership.yaml` und `.template/README.md`.
-Diese Dateien sind reproduzierbare Provenienz und dürfen keine Zeitstempel oder
-lokalen Maschinenpfade enthalten.
-Der Full-Repo-Scaffold verweigert eine nicht saubere Template-Quelle, sofern
-kein Mensch `--allow-dirty` ausdrücklich akzeptiert. Für bereits existierende
-leere Zielverzeichnisse `--allow-existing-empty` nutzen; `--force` bleibt für
-bewusstes Ersetzen reserviert.
-
-Alle Template-Lifecycle-Befehle laufen über `tooling/template/cli.ts`:
+Ein App-only-Export der Kompositions-App:
 
 ```bash
-pnpm run template:status
-pnpm run template:diff -- --to <version>
-pnpm run template:update -- --to <version>
-pnpm run template:doctor
-pnpm run template:explain -- <path>
+pnpm run scaffold:standalone -- /tmp/fachverfahren-app
 ```
 
-Template-Code wird testgetrieben und in TypeScript entwickelt. Vor Abschluss von
-Template-Änderungen mindestens ausführen:
+Lifecycle-Befehle laufen über `tooling/template/cli.ts`
+(`template:status/diff/update/doctor/explain`). Generierte Repositories tragen
+`.template/`-Provenienz ohne Zeitstempel und lokale Pfade. Runbook-Befehle
+enthalten keine Inline-Shell-Kommentare (`check:runbook-commands`).
+
+## CI und Container-Builds
+
+GitHub `main` ist die kanonische Quelle; nach grüner CI wird nach
+GitLab/openCode gespiegelt. opencode.de-Runner sind unprivilegierte
+Kubernetes-Pods: kein Docker-Socket, kein `docker:dind` — Image-Builds nutzen
+Kaniko (`.gitlab-ci.yml`).
+
+Die reale Build-Kette ist:
 
 ```bash
-pnpm run test:template
-pnpm run check:template-invariants
-pnpm run check:scaffold
+pnpm run build:packages
+pnpm run build:app
 ```
 
-Runbook-Befehle dürfen keine Inline-Shell-Kommentare enthalten. Schreibe die
-Erklärung vor den Codeblock, nicht hinter den Befehl.
+`build:server` existiert nicht (PLAN, Teil der Backend-Zielarchitektur).
+Dockerfile und Teile der CI-Referenz zielen noch auf diese (PLAN)-Stufe.
 
-## Domain-Module
-
-Neue Fachverfahren werden unter `modules/<domain>/` modelliert:
-
-```text
-modules/<domain>/
-  domain.module.yaml
-  contracts/
-  server/
-  ui/
-  forms/
-  permissions/
-  events/
-  migrations/
-  i18n/
-  tests/
-  compliance/
-```
-
-Das Manifest beschreibt Routen, benötigte Capabilities, Rechte, Events,
-Datenkategorien, Retention-Policies und Migrationen. Tooling und Agents sollen
-vom Manifest aus scaffolden.
-
-Vor UI-Implementierung muss ein Screen Contract existieren. Vorlage:
-`docs/ux-ui/screen-contract.template.yaml`. Vorgehen und Teststrategie:
-`docs/reference/test-driven-development.md`.
-
-Für frühe UI-, Integrations- und E2E-Tests stehen fachneutrale MSW-Mocks für
-Login, Logout, Sitzung und Benachrichtigungen bereit. Details:
-`docs/reference/mock-data-msw.md`. Fachliche Mockdaten gehören in das jeweilige
-Domain-Modul, nicht in die Basis-App.
-
-## UI
-
-`packages/public-sector-ui` ist der öffentliche UI-Vertrag. KERN-Muster und
-verwaltungsspezifische Komponenten stehen vor ShadCN. ShadCN bleibt
-Implementierungsdetail für Primitive.
-
-Die wiederverwendbaren Fachverfahren-Bausteine liegen in
-`packages/fachverfahren-kit/src/components/`; die shadcn/Radix/Tailwind-
-Primitive liegen in `packages/fachverfahren-kit/src/ui/`. Coding Agents lesen
-vor UI-Arbeit `docs/reference/fachverfahren-kit-components.md` und importieren
-moeglichst ueber `@senticor/fachverfahren-kit`, statt Bausteine in
-`modules/<domain>/` zu kopieren.
-
-Der verbindliche UX/UI-Vertrag steht in
-`docs/ux-ui/fachverfahren-ux-contract.md`. Generische Guidance wird dort in
-Repository-Regeln übersetzt; Hundesteuer bleibt nur ein externes Beispiel.
-Der aktuelle Abgleich zum Fachverfahren Design Manual steht in
-`docs/ux-ui/fachverfahren-design-manual-audit.md`.
-Der aktuelle Abgleich zur generischen UX-Methodik steht in
-`docs/ux-ui/ux-methodik-public-sector-audit.md`; offene Abweichungen müssen als
-RC-Gap sichtbar bleiben, nicht in der App versteckt werden.
-Bei UI-, Storybook- oder Screen-Contract-Änderungen ist zusätzlich
-`.agents/skills/ux-ui/SKILL.md` anzuwenden.
-
-Design-Tokens haben zwei Ebenen: rohe HSL-Komponenten wie `--foreground` sind
-nur Token-Quelle; Komponenten, Stories und generierter Code nutzen die
-direkten `--color-*`-Aliasse wie `--color-text`, `--color-sidebar` und
-`--color-status-warn`. Direkte Nutzung wie `color: var(--foreground)` ist
-ungültig und wird durch `pnpm run check:css-tokens` blockiert.
-
-Jede neue UI-Funktion braucht:
-
-- Tastaturbedienbarkeit
-- sinnvolle Semantik und Landmarks
-- sichtbaren Fokus
-- Fehlermeldungen mit Recovery-Pfad
-- clientseitige Inline-Validierung für unterstützte Regeln aus
-  `forms/*.form.schema.json`
-- Storybook- und Testzustand für Default, Loading, Empty, Error und relevante
-  Accessibility-Varianten
-
-React-Komponenten dürfen nicht innerhalb von Render-Funktionen definiert
-werden. Hilfskomponenten stehen auf Modulebene; lokale Render-Helfer werden als
-Funktionsaufruf wie `{renderStep()}` verwendet, nicht als JSX-Komponente.
-
-Designer nutzen Storybook als gemeinsame Review-Fläche:
-`docs/reference/storybook.md`. Neue Exports aus `public-sector-ui` müssen in
-Storybook sichtbar sein und `pnpm run check:storybook` bestehen.
-
-## Backend, OpenAPI und Migrationen
-
-Das BFF/Backend basiert auf Fastify und TypeScript. Route-Schemas sind die
-OpenAPI-Quelle. OpenAPI JSON liegt unter `/api/openapi.json`; Swagger UI unter
-`/api/v1/docs`.
-
-Fastify validiert Request-Bodies vor dem Route-Handler. Tests für `401` müssen
-einen schema-gültigen Body senden, sonst kommt zuerst `400`.
-
-Datenbankmigrationen laufen über `@senticor/app-store-postgres` im
-`migrator`-Workload. Web-Replicas führen keine Migrationen beim Start aus.
-Fachverfahren legen eigene Migrationen in `modules/<domain>/migrations/` ab.
-Plattformdaten für Benutzereinstellungen, RBAC und Posteingang/Ausgang liegen
-in `@senticor/app-store-postgres`; produktive App-Datenendpunkte nutzen
-PostgreSQL über `APP_PG_URL` oder `APP_PG_DIRECT_URL`.
-Der erste vertikale App-Datenpfad liegt unter
-`apps/antragsservice` rendert die 3 Personas aus der Naht `src/leistung.config.ts`,
-Benutzereinstellungen sowie Posteingang/Ausgang.
-Mit `APP_E2E_PG_URL` und optional `APP_E2E_PG_DIRECT_URL` prüft
-`pnpm run test:e2e:postgres` denselben Pfad gegen PostgreSQL.
-
-Agent-spezifische Kurzskills liegen kanonisch unter `.agents/skills/`. Für komplette
-Fachverfahren- oder Bürgerportal-Slices ist
-`.agents/skills/fachverfahren-app/SKILL.md` der Startpunkt.
-
-Vendor-neutrale Agenten starten mit:
+Bei pnpm-Filterbefehlen steht `--filter` vor `run`:
 
 ```bash
-pnpm run agent:bootstrap -- --json
-pnpm run agent:discover
-pnpm run agent:context -- --task <app-spec> --paths <module-path>
-```
-
-`agent.discovery.json` ist die öffentliche Discovery-API. Default-JSON enthält
-nur relative Pfade, sortierte Listen und keine Git- oder Maschinenprovenienz;
-volatile Details gibt es nur mit `--provenance`.
-`agent:context` liefert `nextCommands`, `validationProfiles` und
-`writeBoundaries`; Agenten folgen dieser Reihenfolge, sofern der Nutzer keinen
-engeren Scope vorgibt. `agent:verify` erzeugt einen Report-Entwurf mit
-`plannedCommands` oder validiert mit `--report <path>` echte Evidenz. Ein
-abschließender Bericht muss tatsächliche `commandsExecuted` enthalten.
-
-Jedes Domain-Modul braucht `module.contract.yaml`. Der Vertrag deklariert
-Capabilities, öffentliche Exports, erlaubte Abhängigkeiten, Routen, Rollen,
-Datenklassen, Retention, Events, Storage und erlaubte Domain-Pfade. Domain-
-Begriffe dürfen in ihren App-Spezifikationen und erlaubten Modulpfaden
-vorkommen, aber nicht in Plattformpaketen.
-
-Plattformfähigkeiten stehen in `platform/capabilities.json` und den
-Capability-Dokumenten unter `docs/capabilities/`. Fachmodule dürfen
-Authentifizierung, Benachrichtigung, Zahlung, Workflow oder Audit nicht lokal
-neu bauen, wenn sie eine Plattformfähigkeit konsumieren.
-
-Gouvernierte Webquellen stehen in `sources/registry.yaml`; Agenten verwenden
-`source:fetch` statt beliebiger Netzwerkzugriffe, wenn eine registrierte Quelle
-betroffen ist.
-
-Vor Abschluss neuer oder geänderter Domain-Module ausführen:
-
-```bash
-pnpm run check:domain-contracts
+pnpm --filter "./packages/**" run --if-present build
 ```
 
 ## Authorization und Audit
 
 Rollen in der UI sind keine Autorisierung. Entscheidungen gehören serverseitig
-in Policy-Checks mit Authority-, Jurisdiction-, Tenant-, Mandate- und
-Case-Kontext. Fachliche Audit-Events sind append-only und getrennt von
-technischen Logs und Security Events.
+in Policy-Checks; kritische Übergänge tragen `vierAugen: true` in der
+`statusMachine` und werden in der Zielarchitektur serverseitig erzwungen
+(PLAN). Fachliche Audit-Historie (`Vorgang.history`) ist append-only.
+Eingebaute Rollen sind `citizen` und `caseworker`; neue Rollen laufen über die
+RBAC-Registry in `@senticor/public-sector-sdk`, nicht über verstreute
+UI-Bedingungen.
 
-Eingebaute Rollen sind `citizen` und `caseworker`. Neue Rollen werden über die
-RBAC-Registry in `@senticor/public-sector-sdk`, Migrationen und API-Tests
-erweitert; keine verstreuten Rollenbedingungen im UI-Code.
+## Kopfblock-Standard für generierte Dokumentation
+
+Jedes von Agenten generierte Dokument (Fachkonzept, Audit, Referenz, Report)
+beginnt mit diesem Kopfblock:
+
+```markdown
+> **Für Agenten: Quellen & Pflicht-Lektüre.**
+> Status: IST | PLAN — `IST` beschreibt das reale Scaffold, `PLAN` eine
+> Zielarchitektur, die noch nicht existiert.
+> Quellen: <Dateien, Normen, Specs, aus denen dieses Dokument abgeleitet ist>
+> Pflicht-Lektüre vorher: `AGENTS.md`, <weitere Skills/Docs>
+```
+
+Regeln: Jede Pfadangabe existiert im Scaffold oder trägt `(PLAN)`. Gemischte
+Dokumente markieren PLAN-Abschnitte einzeln. Annahmen folgen der
+Annahme-DATEN-Konvention dieses Dokuments.
 
 ## Verifikation
 
-Vor Abschluss einer Änderung nach Möglichkeit ausführen:
+Vor Abschluss einer Änderung, je nach Scope (alles reale Scripts):
 
 ```bash
+pnpm --filter @senticor/antragsservice emit:contract
 pnpm run check:agent-smoke
 pnpm run check:agent-domain
 pnpm run check:agent-ui
-pnpm run check:precommit
-pnpm run check:push
 pnpm run format:check
+pnpm run lint
+pnpm run typecheck
+pnpm run test
 pnpm run check:esm
 pnpm run check:typescript-policy
 pnpm run check:storybook
 pnpm run check:css-tokens
 pnpm run check:agent-discovery
-pnpm run check:module-contracts
-pnpm run check:module-boundaries
-pnpm run check:capability-catalog
-pnpm run check:source-registry
-pnpm run lint
-pnpm run typecheck
-pnpm run test
-pnpm run test:e2e
-pnpm run test:e2e:postgres
+pnpm run check:domain-contracts
 pnpm run test:k8s:render
 pnpm run evidence:build
 pnpm run test:template
 pnpm run check:template-invariants
 pnpm run check:scaffold
+pnpm run check:precommit
 ```
 
-Wenn Abhängigkeiten nicht installiert sind, dokumentiere das klar im Ergebnis.
+`emit:contract` ist nur nach Naht-Änderungen nötig. Wenn Abhängigkeiten nicht
+installiert sind, wird das klar im Ergebnis dokumentiert — nicht behauptet.

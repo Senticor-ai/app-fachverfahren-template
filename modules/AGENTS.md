@@ -1,25 +1,28 @@
 # Module Instructions
 
-Diese Regeln gelten zusätzlich zu `../AGENTS.md`.
+Diese Regeln gelten zusätzlich zu `../AGENTS.md` — für Module, die über den
+Generator-Pfad (`app:new`) unter `modules/<domain>/` entstehen. Derzeit
+existiert hier keine Instanz; die App-Einbindung von Modulen ist (PLAN),
+siehe `README.md` in diesem Verzeichnis.
 
-- Jedes konkrete Fachverfahren braucht `module.contract.yaml`.
+- Jedes konkrete Fachverfahren-Modul braucht `module.contract.yaml`
+  (Schema: `schemas/module-contract.schema.json`).
 - Domain-Code darf Plattformfähigkeiten nur über deklarierte Capabilities
-  nutzen.
+  nutzen (`platform/capabilities.json`).
 - Modulinterne Regeln dürfen die Root-Policy nur verschärfen.
 - Gemeinsame Logik wandert nicht aus Bequemlichkeit aus dem Modul in
   Plattformpakete.
-- **Modul-Server ist FRAMEWORK-AGNOSTISCH.** `modules/<domain>/server/` exportiert einen
-  deklarativen Routen-Descriptor (`describe<Domain>Routes`) + REINE Handler-Funktionen
-  `(input, ports) => result` über die deklarierten Ports. Das Modul importiert **niemals** ein
-  HTTP-/Server-Framework (kein `fastify`/`express`/`http`), nutzt **kein** `declare module` und
-  startet **keinen** Server. Das HTTP-/BFF-Framework ist Sache der App-Factory (`apps/<app>/server/`,
-  Anleitung `.agents/skills/backend-fastify`), die den Descriptor + die Handler mountet. Struktur:
-  `docs/architecture/domain-modules.md`.
-- **Oberflächen nach ZONE/Persona getrennt.** Bürger-, Sachbearbeiter- und Aufsichts-Oberflächen laufen in
-  GETRENNTEN Sicherheitszonen (BSI Netzsegmentierung: Bürger=Internet/DMZ, Sachbearbeitung=Verwaltungsnetz,
-  Aufsicht=separat/pseudonymisiert). Darum werden die persona-getaggten Screen-Contracts
-  (`persona: citizen|caseworker|auditor`) in SEPARATE, je Zone deploybare Bundles/Entry-Points gebaut
-  (z. B. `ui/citizen.screens.tsx`, `ui/caseworker.screens.tsx`, `ui/auditor.screens.tsx`) — **nicht** alles in
-  eine gemeinsame Datei/Bundle. Keine zonenübergreifenden Importe; Kopplung NUR über die governte Modul-API.
-  UI **nur** aus dem Design-System komponieren (Tokens/Komponenten, BITV-AA) — keine rohen Styles/Hex/px.
-  Primaerer Komponenten-Katalog: `docs/reference/fachverfahren-kit-components.md`.
+- Nur TypeScript unter `modules/` (`.ts`/`.tsx`, kein `.js/.jsx/.cjs/.mjs`).
+- **Modul-Server ist FRAMEWORK-AGNOSTISCH (PLAN).** `modules/<domain>/server/`
+  exportiert deklarative Routen-Descriptoren und REINE Handler-Funktionen
+  `(input, ports) => result` über die deklarierten Ports. Das Modul importiert
+  niemals ein HTTP-/Server-Framework und startet keinen Server. Das Mounten
+  übernimmt die (PLAN-)App-Factory, siehe `docs/reference/backend-fastify.md`.
+- **Oberflächen nach Zone/Persona getrennt (PLAN für Bundles).** Bürger-,
+  Sachbearbeitungs- und Aufsichts-Oberflächen laufen in getrennten
+  Sicherheitszonen; persona-getaggte Screen Contracts
+  (`persona: citizen|caseworker|auditor`) werden in separate Entry-Points
+  gebaut. Keine zonenübergreifenden Imports; Kopplung nur über die Modul-API.
+- UI nur aus dem Design-System komponieren (Tokens/Komponenten, BITV AA) —
+  keine rohen Styles/Hex/px. Komponenten-Katalog:
+  `docs/reference/fachverfahren-kit-components.md`.

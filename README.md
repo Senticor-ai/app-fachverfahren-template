@@ -5,10 +5,10 @@
 
 **English summary:** This repository provides a reusable public-sector
 application template for case-management portals and citizen services. It
-combines a React/Fastify starter app, German/EU jurisdiction profiles,
-capability contracts, provider adapters, conformance tooling and a template
-lifecycle so GovTech teams can create maintainable domain applications instead
-of long-lived forks.
+combines a ready-to-run React app (three personas rendered from one typed
+config), German/EU jurisdiction profiles, capability contracts, provider
+adapters, conformance tooling and a template lifecycle so GovTech teams can
+create maintainable domain applications instead of long-lived forks.
 
 Dieses Repository ist der Startpunkt für wiederverwendbare
 Fachverfahren- und Bürgerapp-Stacks auf Kubernetes. Es ist bewusst nicht nur
@@ -43,7 +43,7 @@ Capability-Ports modelliert.
   Domain-Module-Manifeste, Runtime-Konfiguration, Authorization und Audit.
 - `packages/public-sector-ui`: KERN-orientierte UI-Fassade auf ShadCN-Primitiven.
 - `packages/fachverfahren-kit`: wiederverwendbare Fachverfahren-Bausteine
-  auf Tailwind/shadcn-Basis; der Katalog fuer Build-Agenten steht in
+  auf Tailwind/shadcn-Basis; der Katalog für Build-Agenten steht in
   `docs/reference/fachverfahren-kit-components.md`.
 - `packages/provider-*`: lokale, Codesphere- und DVC-Providerprofile.
 - `packages/conformance-kit`: Compliance-Profile und Evidence-Bundle-Planung.
@@ -54,16 +54,13 @@ Capability-Ports modelliert.
 ## Stack
 
 - Node.js `>=24 <25`, pnpm, strict ESM und TypeScript `NodeNext`.
-- Frontend: React, Vite, Tailwind CSS und ShadCN-Primitive hinter der
-  Public-Sector-UI-Fassade.
-- Backend: Fastify mit OpenAPI JSON unter `/api/openapi.json` und Swagger UI
-  unter `/api/v1/docs`.
-- Datenbank: PostgreSQL-Migrationen über `@senticor/app-store-postgres` im
-  `migrator`-Workload.
-- Mocking: MSW für Browser-, Integrations- und E2E-Tests mit fachneutralen
-  Login-/Logout- und Benachrichtigungsdaten.
-- Design/TDD: Storybook, Screen Contracts, semantische Tokens und
-  testgetriebene Domain-Module.
+- Frontend: React, Vite, Tailwind CSS und ShadCN-Primitive hinter dem
+  `fachverfahren-kit` und der Public-Sector-UI-Fassade.
+- Datenbank: PostgreSQL-Migrator und Plattformtabellen in
+  `@senticor/app-store-postgres` (`pnpm run db:migrate`).
+- Backend/BFF: (PLAN) Zielarchitektur Fastify mit OpenAPI, beschrieben in
+  `docs/reference/backend-fastify.md`; im Scaffold existiert noch kein Server.
+- Design/TDD: Storybook, Screen Contracts, semantische Tokens.
 
 ## Erste Schritte
 
@@ -75,13 +72,20 @@ pnpm run check:typescript-policy
 pnpm run check:storybook
 pnpm run typecheck
 pnpm run test
-pnpm run test:e2e
 pnpm run dev
 ```
 
-Die App läuft lokal als dünne Beispieloberfläche. Konkrete Fachverfahren
-werden als Domain-Module unter `modules/<domain>/` ergänzt und über ein
-`domain.module.yaml` beschrieben.
+Die App läuft lokal als vollständige, klickbare 3-Personas-Oberfläche
+(Bürger:in, Sachbearbeitung, Aufsicht). Ein konkretes Fachverfahren entsteht,
+indem die EINE Austausch-Naht `apps/antragsservice/src/leistung.config.ts`
+mit Fachdaten gefüllt wird; danach den Vertrags-Snapshot aktualisieren:
+
+```bash
+pnpm --filter @senticor/antragsservice emit:contract
+```
+
+Die verbindliche Arbeitsanweisung für Menschen und Coding Agents steht in
+`AGENTS.md` (inklusive kanonischer Pfad-Karte und PLAN-vs-IST-Markierungen).
 
 `pnpm install` richtet in Git-Checkouts Husky ein. Der Pre-Commit-Hook startet
 `pnpm run check:precommit`; vor Pushes laeuft `pnpm run check:push`. Details
@@ -96,41 +100,24 @@ pnpm run storybook
 Die UX/UI-Regeln stehen in `docs/ux-ui/fachverfahren-ux-contract.md`, die
 TDD-Regeln in `docs/reference/test-driven-development.md` und die
 Storybook-Nutzung in `docs/reference/storybook.md`. Der wiederverwendbare
-Komponenten-Katalog fuer Coding Agents steht in
-`docs/reference/fachverfahren-kit-components.md`. Mockdaten und MSW sind in
-`docs/reference/mock-data-msw.md` beschrieben.
-
-Der erste E2E-Pfad prüft Anmeldung, Rollenwechsel, Benutzereinstellungen,
-Posteingang/Ausgang und RBAC für Bürgerinnen/Bürger und Sachbearbeitung. Für
-den echten PostgreSQL-Servicepfad:
-
-```bash
-APP_E2E_PG_URL=postgres://app:app@localhost:5432/app \
-APP_E2E_PG_DIRECT_URL=postgres://app:app@localhost:5432/app \
-pnpm run test:e2e:postgres
-```
+Komponenten-Katalog für Coding Agents steht in
+`docs/reference/fachverfahren-kit-components.md`. Die geplante Mock-Schicht
+ist in `docs/reference/mock-data-msw.md` beschrieben (PLAN).
 
 Im Kubernetes-Profil liest die Web-App `APP_PG_URL` aus dem Secret
 `app-postgresql`, Migrationen nutzen `APP_PG_DIRECT_URL` im `migrator`-Job.
 
 Für lokale Entwicklung mit echter Datenbank liegt ein Kubernetes-Manifest unter
 `dev/postgres.yaml`. Es funktioniert mit Rancher Desktop und Docker Desktop,
-wenn Kubernetes aktiviert ist.
-
-PostgreSQL starten und lokal auf Port `5432` weiterleiten:
+wenn Kubernetes aktiviert ist. Migrationen laufen über:
 
 ```bash
-pnpm run dev:postgres
+pnpm run db:migrate
 ```
 
-BFF, Vite und Port-Forwarding gemeinsam starten:
-
-```bash
-pnpm run dev:all
-```
-
-`dev:all` nutzt `concurrently`, setzt die lokalen Datenbank-URLs für den BFF
-und leitet Vite-API-Aufrufe an `http://127.0.0.1:8080` weiter.
+E2E-Suiten (`test:e2e`, `test:e2e:postgres`) und ein kombinierter Dev-Start
+(`dev:postgres`, `dev:all`) sind (PLAN) Teil der Backend-Zielarchitektur und
+existieren im Scaffold noch nicht.
 
 Coding Agents nutzen `agent.discovery.json`, `docs/agents/bootstrap.md` und die
 repo-lokalen Skills unter `.agents/skills`. Die Agent-Readiness und der
@@ -154,8 +141,8 @@ https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-pl
 ```
 
 Der Mirror-Workflow nutzt `GITLAB_MIRROR_TOKEN`; optional kann
-`GITLAB_MIRROR_URL` das Ziel ueberschreiben. Ohne Token wird der Mirror-Schritt
-mit Notice uebersprungen, damit die eigentliche Validierungs-CI nicht wegen
+`GITLAB_MIRROR_URL` das Ziel überschreiben. Ohne Token wird der Mirror-Schritt
+mit Notice übersprungen, damit die eigentliche Validierungs-CI nicht wegen
 fehlender Repository-Secrets rot wird.
 
 Vollständige neue App-Repositories werden über den Template-Lifecycle erzeugt:
@@ -167,8 +154,10 @@ pnpm run scaffold:domain-app -- --domain beispiel --target /tmp/app-beispiel
 Provenienz, Ownership, Updates, Migrationen und Fleet-Befehle stehen in
 `docs/reference/template-lifecycle.md`.
 
-App-Spezifikationen liegen unter `docs/examples/*/app.spec.yaml`. Sie erzeugen
-Domain-Module mit `module.contract.yaml`; Capability-IDs und verbotene
+App-Spezifikationen liegen unter `docs/examples/*/app.spec.yaml`. Der
+Generator `pnpm run app:new` erzeugt daraus ein Modul-Gerüst unter
+`modules/<domain>/`; die laufende App bindet solche Module derzeit nicht ein
+(PLAN, siehe `modules/README.md`). Capability-IDs und verbotene
 Reimplementierungen stehen in `platform/capabilities.json`.
 
 ## Projekt und Community
@@ -199,8 +188,6 @@ pnpm run dev
 ```
 
 Das passiert auch, wenn zuvor production-only installiert wurde.
-Der App-Dev-Start nutzt `scripts/run-vite-dev.mjs`, damit Vite sowohl aus dem
-App-Workspace als auch aus dem Repository-Root aufgelöst werden kann.
 
 Der Vite-Dev-Server bindet lokal standardmäßig an `127.0.0.1:5173`. Für
 Container- oder LAN-Zugriff kann der Host explizit geöffnet werden:
