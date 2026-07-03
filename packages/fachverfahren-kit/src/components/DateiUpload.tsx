@@ -19,6 +19,7 @@ import {
 } from "react";
 import {
   CheckCircle2,
+  Clock,
   FileUp,
   Loader2,
   Paperclip,
@@ -32,6 +33,7 @@ import {
 import type { Nachweis } from "../types.js";
 import { cn } from "../lib/utils.js";
 import { formatDateiGroesse } from "../format.js";
+import { nachweisBezugsweg } from "../lib/interpreter.js";
 import {
   nachweisAcceptAttribut,
   nachweisEinschraenkungenText,
@@ -40,6 +42,7 @@ import {
 } from "../lib/nachweis-pruefung.js";
 import { Button } from "../ui/button.js";
 import { Progress } from "../ui/progress.js";
+import { NachweisAutorisierung } from "./NachweisAutorisierung.js";
 import { useStatusRegion } from "./StatusRegion.js";
 
 /**
@@ -91,6 +94,11 @@ export interface DateiUploadProps {
    * Ablehnung). Fehlt eine Id (oder die ganze Map), verhält sich die Position exakt wie bisher.
    */
   uploadStatus?: Record<string, NachweisUploadStatus | undefined> | undefined;
+  /**
+   * M4 — OPTIONAL: wird gerufen, wenn der/die Bürger:in einen `register-once-only`-Nachweis autorisiert (statt
+   * hochzuladen). In PROD löst das den echten Registerabruf über den Port aus; hier bleibt der Fluss klickbar.
+   */
+  onRegisterAbruf?: ((id: string) => void) | undefined;
   className?: string;
 }
 
@@ -109,10 +117,24 @@ export function DateiUpload({
   onChange,
   titel = "Nachweise hochladen",
   uploadStatus,
+  onRegisterAbruf,
   className,
 }: DateiUploadProps): ReactElement {
   const [dateien, setDateien] = useState<Record<string, LokaleDatei>>({});
   const [statusMeldung, setStatusMeldung] = useState<string>("");
+  // M4 — Spiegel des Register-Autorisierungs-Status (die Autorisierungs-Karte verwaltet ihn selbst; hier nur für
+  // die Fortschritts-Zählung im Kopf). Vor-autorisierte Nachweise (register.status) zählen sofort als erledigt.
+  const [autorisiert, setAutorisiert] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(
+      nachweise
+        .filter(
+          (n) =>
+            n.register?.status === "autorisiert" ||
+            n.register?.status === "abgerufen",
+        )
+        .map((n) => [n.id, true]),
+    ),
+  );
 
   const setDatei = (nachweis: Nachweis, datei: LokaleDatei | null) => {
     setDateien((prev) => {
@@ -129,13 +151,23 @@ export function DateiUpload({
     );
   };
 
+  // M4 — „erledigt" je Bezugsweg: upload = Datei da / serverseitig hochgeladen; register-once-only = autorisiert;
+  // gefordert (nachzureichen) = jetzt weder offen noch erledigt (bewusst später).
+  const istRegister = (n: Nachweis) =>
+    nachweisBezugsweg(n) === "register-once-only";
+  const istGefordert = (n: Nachweis) => nachweisBezugsweg(n) === "gefordert";
+  const istErledigt = (n: Nachweis): boolean =>
+    istRegister(n)
+      ? !!autorisiert[n.id]
+      : istGefordert(n)
+        ? false
+        : !!dateien[n.id] || n.hochgeladen;
+
   const offenePflicht = nachweise.filter(
-    (n) => n.erforderlich && !dateien[n.id] && !n.hochgeladen,
+    (n) => n.erforderlich && !istGefordert(n) && !istErledigt(n),
   ).length;
   const gesamt = nachweise.length;
-  const erledigt = nachweise.filter(
-    (n) => !!dateien[n.id] || n.hochgeladen,
-  ).length;
+  const erledigt = nachweise.filter(istErledigt).length;
 
   return (
     <section
@@ -178,18 +210,35 @@ export function DateiUpload({
         </p>
       ) : (
         <ul className="mt-4 grid gap-3">
-          {nachweise.map((nachweis) => (
-            <li key={nachweis.id}>
-              <NachweisZeile
-                nachweis={nachweis}
-                datei={dateien[nachweis.id]}
-                bereitsHochgeladen={nachweis.hochgeladen}
-                status={uploadStatus?.[nachweis.id]}
-                onPick={(datei) => setDatei(nachweis, datei)}
-                onRemove={() => setDatei(nachweis, null)}
-              />
-            </li>
-          ))}
+          {nachweise.map((nachweis) =>
+            // M4 — je BEZUGSWEG eine andere UI: register-once-only = Autorisierungs-Karte (bestätigen statt
+            // hochladen); upload/gefordert = Datei-Position (Dropzone bzw. „nachzureichen"-Hinweis).
+            nachweisBezugsweg(nachweis) === "register-once-only" ? (
+              <li key={nachweis.id}>
+                <NachweisAutorisierung
+                  nachweis={nachweis}
+                  onAutorisieren={(id) => {
+                    setAutorisiert((prev) => ({ ...prev, [id]: true }));
+                    setStatusMeldung(
+                      `${nachweis.label}: Registerabruf autorisiert.`,
+                    );
+                    onRegisterAbruf?.(id);
+                  }}
+                />
+              </li>
+            ) : (
+              <li key={nachweis.id}>
+                <NachweisZeile
+                  nachweis={nachweis}
+                  datei={dateien[nachweis.id]}
+                  bereitsHochgeladen={nachweis.hochgeladen}
+                  status={uploadStatus?.[nachweis.id]}
+                  onPick={(datei) => setDatei(nachweis, datei)}
+                  onRemove={() => setDatei(nachweis, null)}
+                />
+              </li>
+            ),
+          )}
         </ul>
       )}
     </section>
@@ -269,6 +318,8 @@ function NachweisZeile({
 
   const istHochgeladen = !!datei || bereitsHochgeladen;
   const erforderlich = !!nachweis.erforderlich;
+  // M4 — `gefordert`: der Nachweis ist NACHZUREICHEN (wird später verlangt) — jetzt KEIN Upload, kein Dropzone.
+  const gefordert = nachweisBezugsweg(nachweis) === "gefordert";
 
   const verarbeiteDatei = (file: File | undefined | null) => {
     if (!file) return;
@@ -316,6 +367,41 @@ function NachweisZeile({
     e.preventDefault();
     setDragOver(false);
   };
+
+  // M4 — GEFORDERT (nachzureichen): kompakte Karte OHNE Upload — ein „Nachzureichen"-Badge + Erklärung, dass der
+  // Nachweis später verlangt wird. Kein Dropzone, kein File-Input (der Antrag wird dadurch nicht blockiert).
+  if (gefordert) {
+    return (
+      <div className="rounded-md border border-status-warn/40 bg-status-warn-soft/40 p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-foreground">
+                {nachweis.label}
+              </span>
+              {erforderlich ? (
+                <span className="rounded-sm border border-status-block/30 bg-status-block-soft px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide text-status-block">
+                  Erforderlich
+                </span>
+              ) : (
+                <span className="rounded-sm border border-border bg-secondary px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Optional
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Dieser Nachweis wird später angefordert — Sie müssen jetzt nichts
+              hochladen.
+            </p>
+          </div>
+          <span className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-status-warn">
+            <Clock className="h-4 w-4" aria-hidden="true" />
+            Nachzureichen
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

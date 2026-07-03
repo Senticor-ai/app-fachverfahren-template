@@ -85,6 +85,58 @@ export const Empty: Story = {
   render: () => <Interaktiv nachweise={[]} />,
 };
 
+/** M4 — BEZUGSWEGE: je Nachweis eine andere UI. `upload` = Dropzone; `register-once-only` = Autorisierungs-Karte
+ *  (bestätigen statt hochladen, Once-Only + Provenienz); `gefordert` = „Nachzureichen"-Hinweis ohne Upload. */
+export const Bezugswege: Story = {
+  render: () => (
+    <StatusRegionProvider>
+      <div className="max-w-2xl">
+        <DateiUpload
+          titel="Erforderliche Nachweise"
+          nachweise={[
+            // upload (Default): klassische Dropzone.
+            {
+              id: "impfpass",
+              label: "Impfnachweis (Upload)",
+              hochgeladen: false,
+              erforderlich: true,
+              akzeptierteTypen: ["application/pdf", "image/*"],
+            },
+            // register-once-only: der Nachweis liegt im Register — nur autorisieren, nichts hochladen.
+            {
+              id: "meldebestaetigung",
+              label: "Meldebestätigung",
+              hochgeladen: false,
+              erforderlich: true,
+              bezugsweg: "register-once-only",
+              register: {
+                quelle: "Melderegister",
+                richtung: "inbound",
+                rechtsgrundlage: "§ 34 BMG i. V. m. Art. 6 Abs. 1 lit. e DSGVO",
+                einwilligung: {
+                  erforderlich: true,
+                  text: "Ich bestätige den einmaligen Abruf meiner Meldedaten aus dem Melderegister für diesen Antrag.",
+                },
+                status: "nicht-abgerufen",
+              },
+            },
+            // gefordert: wird später verlangt (Nachreichung) — jetzt kein Upload.
+            {
+              id: "gutachten",
+              label: "Fachgutachten (nachzureichen)",
+              hochgeladen: false,
+              erforderlich: false,
+              bezugsweg: "gefordert",
+            },
+          ]}
+          onChange={() => undefined}
+          onRegisterAbruf={() => undefined}
+        />
+      </div>
+    </StatusRegionProvider>
+  ),
+};
+
 /** Server-autoritative Detail-Zustände: Übertragung (mit Fortschritt), Virenscan, Ablehnung — vom Server gemeldet. */
 export const ServerZustaende: Story = {
   render: () => (

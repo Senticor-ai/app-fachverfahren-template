@@ -11,7 +11,12 @@ import type {
   VorgangPort,
   Transition,
 } from "./types.js";
-import { effektiveBerechnung, effektiveNachweise } from "./lib/interpreter.js";
+import {
+  abgeleiteteFelder,
+  effektiveBerechnung,
+  effektiveNachweise,
+} from "./lib/interpreter.js";
+import type { Antragsdaten } from "./lib/antrag-felder.js";
 
 let __seq = 0;
 const pad = (n: number, w: number) => String(n).padStart(w, "0");
@@ -60,19 +65,26 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
 
     einreichen: (antragsdaten) => {
       const ki = { confidence: 0, flags: [] as string[] };
+      // M1 — ABGELEITETE Felder (Codelisten-Merkmal → Antragsfeld) VOR der Berechnung anwenden (defensiv &
+      // idempotent: der Stepper reicht i. d. R. schon abgeleitete Daten ein, ein direkter Port-Aufruf nicht). Die
+      // abgeleiteten Werte werden mit eingereicht, damit sie im Vorgang/Detail sichtbar sind.
+      const wirksam = abgeleiteteFelder(
+        config,
+        antragsdaten as Antragsdaten,
+      ) as T;
       // EFFEKTIVE Berechnung/Nachweise: `berechne`/`nachweise` sind Escape-Hatches, sonst wertet der reine
       // Interpreter `tarif`/`codelisten` aus (Default = Daten-Auswertung).
-      const berechnung = effektiveBerechnung(config, antragsdaten);
+      const berechnung = effektiveBerechnung(config, wirksam);
       const v: Vorgang<T> = {
         id: `v-${pad(++__seq, 6)}`,
         vorgangsnummer: vorgangsnummer(),
         eingangIso: now(),
-        antragsdaten,
+        antragsdaten: wirksam,
         status: config.statusMachine.initial,
         // berechnung ist optional — unter exactOptionalPropertyTypes nur setzen, wenn vorhanden.
         ...(berechnung ? { berechnung } : {}),
         ki,
-        nachweise: effektiveNachweise(config, antragsdaten),
+        nachweise: effektiveNachweise(config, wirksam),
         history: [
           { ts: now(), aktion: "Antrag eingegangen", rolle: "buerger" },
         ],

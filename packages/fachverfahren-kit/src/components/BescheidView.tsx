@@ -175,14 +175,16 @@ export function BescheidView<T = Record<string, unknown>>({
                 )}
               </div>
 
-              {/* Begründung (Tatbestand → Rechtsfolge) */}
-              {berechnung.begruendung && (
+              {/* Begründung (Tatbestand → Rechtsfolge). M5 — der Bescheid trägt die RECHTLICHE Fassung
+                  (`begruendungRecht`, inkl. §/Norm); fehlt sie, gilt die kanonische `begruendung`. Die
+                  bürgernahe Fassung (`begruendungBuerger`) erscheint dagegen in der Antrags-/Bürger-Sicht. */}
+              {(berechnung.begruendungRecht ?? berechnung.begruendung) && (
                 <div className="mt-6">
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-black">
                     Begründung
                   </h3>
                   <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-foreground print:text-black">
-                    {berechnung.begruendung}
+                    {berechnung.begruendungRecht ?? berechnung.begruendung}
                   </p>
                 </div>
               )}

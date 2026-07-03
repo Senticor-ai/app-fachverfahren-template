@@ -5,6 +5,9 @@ import {
   codelisteOptionen,
   feldAnzeige,
   feldFehler,
+  feldHint,
+  feldLabel,
+  feldLabelFachlich,
   feldOptionen,
   getPath,
   istBeantwortet,
@@ -371,5 +374,72 @@ describe("asString / istDateiWert — Hilfsfunktionen", () => {
     expect(istDateiWert({ name: "b.pdf" })).toBe(false);
     expect(istDateiWert(null)).toBe(false);
     expect(istDateiWert("x")).toBe(false);
+  });
+});
+
+// ── M1: codelisteOptionen reicht markierung/merkmale durch (für den Selektor) ────────────────────
+describe("codelisteOptionen — M1 Markierung/Merkmale durchreichen", () => {
+  it("reicht markierung + merkmale eines Eintrags durch (nur wenn vorhanden — sonst schlank)", () => {
+    const codeliste: Codeliste = {
+      id: "kategorien",
+      label: "Kategorien",
+      eintraege: [
+        {
+          value: "sonderklasse",
+          label: "Sonderklasse",
+          markierung: { ton: "warn", label: "Sonderklasse" },
+          merkmale: { sonderpflichtig: true, stufe: 1 },
+        },
+        { value: "standard", label: "Standard" },
+      ],
+    };
+    const opts = codelisteOptionen(codeliste);
+    expect(opts[0]).toEqual({
+      value: "sonderklasse",
+      label: "Sonderklasse",
+      markierung: { ton: "warn", label: "Sonderklasse" },
+      merkmale: { sonderpflichtig: true, stufe: 1 },
+    });
+    // Ein Eintrag ohne markierung/merkmale bleibt schlank (keine undefined-Keys).
+    expect(opts[1]).toEqual({ value: "standard", label: "Standard" });
+  });
+});
+
+// ── M2: feldLabel / feldHint / feldLabelFachlich (Sprach-Projektion PRO FELD) ────────────────────
+describe("feldLabel / feldHint / feldLabelFachlich — M2 Bürger-/Leichte-/Amtssprache", () => {
+  const f = feld({
+    name: "kategorie",
+    typ: "select",
+    label: "Kategorie",
+    labelFachlich: "Kategorie gem. Anlage",
+    leichteSprache: "Welche Art?",
+    hint: "Bitte wählen",
+    hintEinfach: "Wähle eine Art aus.",
+  });
+
+  it("Standard: Bürger-label und -hint", () => {
+    expect(feldLabel(f)).toBe("Kategorie");
+    expect(feldHint(f)).toBe("Bitte wählen");
+  });
+
+  it("Leichte Sprache: leichteSprache/hintEinfach, wenn gesetzt", () => {
+    expect(feldLabel(f, { leicht: true })).toBe("Welche Art?");
+    expect(feldHint(f, { leicht: true })).toBe("Wähle eine Art aus.");
+  });
+
+  it("Leichte Sprache degradiert sauber auf label/hint, wenn keine Leichte-Fassung existiert", () => {
+    const g = feld({
+      name: "x",
+      typ: "text",
+      label: "Nur Standard",
+      hint: "H",
+    });
+    expect(feldLabel(g, { leicht: true })).toBe("Nur Standard");
+    expect(feldHint(g, { leicht: true })).toBe("H");
+  });
+
+  it("feldLabelFachlich liefert die Amtsbezeichnung (oder undefined)", () => {
+    expect(feldLabelFachlich(f)).toBe("Kategorie gem. Anlage");
+    expect(feldLabelFachlich(feld({ name: "y", typ: "text" }))).toBeUndefined();
   });
 });

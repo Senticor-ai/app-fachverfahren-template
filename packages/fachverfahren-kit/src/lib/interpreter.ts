@@ -16,6 +16,7 @@ import type {
   FeldRegel,
   LeistungConfig,
   Nachweis,
+  NachweisBezugsweg,
   NormRef,
   StepDef,
   Tarif,
@@ -25,6 +26,7 @@ import {
   feldFehler,
   getPath,
   istBeantwortet,
+  setPath,
   type Antragsdaten,
 } from "./antrag-felder.js";
 
@@ -123,6 +125,64 @@ function alsBool(v: unknown): boolean {
   return v === "true" || v === "ja" || v === 1 || v === "1";
 }
 
+// ── M1: Abgeleitete Felder (Codelisten-Merkmal → Antragsfeld, VOR der Berechnung) ─────────────────
+/** Wendet die `ableitungen` aller Codelisten auf die Antragsdaten an: für jedes Feld mit `optionsRef` auf eine
+ *  Codeliste liefert der GEWÄHLTE Eintrag über sein Merkmal (`ausMerkmal`) den Wert des Zielfelds (`setzeFeld`).
+ *  Fehlt das Merkmal (oder ist noch nichts gewählt), greift der `default`. So ersetzt ein Codelisten-Merkmal ein
+ *  manuelles Parallel-Flag: die Berechnung liest das ABGELEITETE Feld. Rein, immutabel, IDEMPOTENT (mehrfaches
+ *  Anwenden ergibt dasselbe). Eine Config ohne `ableitungen` gibt die Daten unverändert zurück. */
+export function abgeleiteteFelder<T = Record<string, unknown>>(
+  config: Pick<LeistungConfig<T>, "antrag" | "codelisten">,
+  daten: Antragsdaten,
+): Antragsdaten {
+  const codelisten = config.codelisten ?? {};
+  let out = daten;
+  for (const step of config.antrag.steps) {
+    for (const feld of step.felder) {
+      if (!feld.optionsRef) continue;
+      const liste = codelisten[feld.optionsRef];
+      if (!liste?.ableitungen?.length) continue;
+      const wert = asString(getPath(out, feld.name));
+      const eintrag = wert
+        ? liste.eintraege.find((e) => e.value === wert)
+        : undefined;
+      for (const ableitung of liste.ableitungen) {
+        const ausMerkmal = eintrag?.merkmale?.[ableitung.ausMerkmal];
+        const zuSetzen =
+          ausMerkmal !== undefined ? ausMerkmal : ableitung.default;
+        if (zuSetzen !== undefined) {
+          out = setPath(out, ableitung.setzeFeld, zuSetzen);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+// ── M3: Sichtbare Schritte/Felder (progressive disclosure) ────────────────────────────────────────
+/** Die SICHTBAREN Schritte für den aktuellen Antragsstand: filtert Schritte UND ihre Felder über `sichtbarWenn`
+ *  (der reine `evalBedingung`) und zieht `rolle: "kontext"`-Schritte nach vorne — die konditionierende Vorgangsart
+ *  ZUERST. Stabil: ohne `rolle`/`sichtbarWenn` bleiben Menge und Reihenfolge exakt wie deklariert. Ein verstecktes
+ *  (Pflicht-)Feld wird gar nicht gerendert und daher auch nicht validiert — es sperrt den Antrag nicht. Rein. */
+export function sichtbareSchritte(
+  steps: StepDef[],
+  daten: Antragsdaten,
+): StepDef[] {
+  const gefiltert = steps
+    .filter((s) => evalBedingung(s.sichtbarWenn, daten))
+    .map((s) => ({
+      ...s,
+      felder: s.felder.filter((f) => evalBedingung(f.sichtbarWenn, daten)),
+    }));
+  const rang = (s: StepDef): number =>
+    s.rolle === "kontext" ? 0 : s.rolle === "pruefung" ? 2 : 1;
+  // Stabile Sortierung: kontext (0) vor Erhebung/Default (1) vor Prüfung (2); innerhalb eines Rangs Reihenfolge erhalten.
+  return gefiltert
+    .map((s, i) => ({ s, i }))
+    .sort((a, b) => rang(a.s) - rang(b.s) || a.i - b.i)
+    .map((x) => x.s);
+}
+
 // ── Tarif-Auswertung (Gebührentabelle als DATEN → Berechnung) ─────────────────────────────────────
 /** Wertet eine Tariftabelle über die Antragsdaten zu einer `Berechnung` aus. `modus: "summe"` addiert alle
  *  treffenden Staffeln, sonst gilt die ERSTE treffende. Trifft keine Staffel (kein Default), ist das Ergebnis
@@ -139,16 +199,35 @@ export function interpretTarif(tarif: Tarif, daten: Antragsdaten): Berechnung {
     betrag: s.betrag,
   }));
   const vollstaendig = anwendbar.length > 0;
+  const labels = anwendbar.map(
+    (s) => s.label ?? `${s.betrag} ${s.einheit ?? tarif.einheit}`,
+  );
   const begruendung = vollstaendig
-    ? anwendbar
-        .map((s) => s.label ?? `${s.betrag} ${s.einheit ?? tarif.einheit}`)
-        .join("; ")
+    ? labels.join("; ")
     : "Noch keine Angaben, die eine Tarif-Staffel bestimmen.";
+  // M5 — ZWEI EBENEN aus denselben DATEN: die Bürger-Fassung nennt nur die (bürgersprachlichen) Staffel-Gründe
+  // OHNE Paragraphen; die Rechts-Fassung hängt die belegten Normen der treffenden Staffeln an (Bescheid/Prüfsicht).
+  const begruendungBuerger = vollstaendig
+    ? labels.join("; ")
+    : "Sobald Ihre Angaben vollständig sind, berechnen wir den Betrag für Sie.";
+  const normen = [
+    ...new Set(
+      anwendbar
+        .map((s) => s.normRef?.norm)
+        .filter((n): n is string => typeof n === "string" && n.length > 0),
+    ),
+  ];
+  const begruendungRecht =
+    vollstaendig && normen.length > 0
+      ? `${begruendung} (${normen.join(", ")})`
+      : begruendung;
   return {
     betrag,
     einheit: tarif.einheit,
     label: tarif.label ?? "Gebühr",
     begruendung,
+    begruendungBuerger,
+    begruendungRecht,
     status: vollstaendig ? "final" : "provisional",
     positionen,
   };
@@ -189,6 +268,19 @@ function belegId(label: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   return slug || "nachweis";
+}
+
+// ── M4: Bezugsweg eines Nachweises (upload | register-once-only | gefordert) ──────────────────────
+/** Der EFFEKTIVE Bezugsweg eines Nachweises — die EINE Wahrheit für die Kit-Rendering-Verzweigung: fehlt
+ *  `bezugsweg`, ist es der klassische Datei-`upload` (rückwärtskompatibel). So müssen Renderer nicht selbst
+ *  defaulten. Rein. */
+export function nachweisBezugsweg(nachweis: Nachweis): NachweisBezugsweg {
+  return nachweis.bezugsweg ?? "upload";
+}
+
+/** Ist dieser Nachweis ein Once-Only-Registerabruf (der/die Bürger:in autorisiert statt hochzuladen)? */
+export function istRegisterAbruf(nachweis: Nachweis): boolean {
+  return nachweisBezugsweg(nachweis) === "register-once-only";
 }
 
 // ── Feldregeln (norm-abgeleitete Validierung) ─────────────────────────────────────────────────────

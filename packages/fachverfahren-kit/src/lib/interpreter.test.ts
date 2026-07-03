@@ -4,10 +4,12 @@ import type {
   Codeliste,
   FeldDef,
   LeistungConfig,
+  Nachweis,
   StepDef,
   Tarif,
 } from "../types.js";
 import {
+  abgeleiteteFelder,
   effektiveBerechnung,
   effektiveNachweise,
   evalBedingung,
@@ -16,6 +18,9 @@ import {
   feldRegelFehler,
   interpretNachweise,
   interpretTarif,
+  istRegisterAbruf,
+  nachweisBezugsweg,
+  sichtbareSchritte,
   stepGueltigVollstaendig,
 } from "./interpreter.js";
 
@@ -516,5 +521,208 @@ describe("effektiveNachweise — nachweise (Escape-Hatch) ODER codelisten (Defau
       { objekt: { kategorie: "premium" } },
     );
     expect(nw.map((n) => n.label)).toEqual(["Nachweis A"]);
+  });
+});
+
+// ── M1: abgeleiteteFelder (Codelisten-Merkmal → Antragsfeld, VOR der Berechnung) ─────────────────
+describe("abgeleiteteFelder — M1 Codelisten-Merkmal in ein Zielfeld projizieren", () => {
+  const config: Pick<LeistungConfig, "antrag" | "codelisten"> = {
+    antrag: {
+      steps: [
+        {
+          id: "s",
+          titel: "S",
+          felder: [
+            feld({ name: "tier.art", typ: "select", optionsRef: "arten" }),
+          ],
+        },
+      ],
+    },
+    codelisten: {
+      arten: {
+        id: "arten",
+        label: "Arten",
+        ableitungen: [
+          {
+            ausMerkmal: "markiert",
+            setzeFeld: "tier.istMarkiert",
+            default: false,
+          },
+        ],
+        eintraege: [
+          { value: "a", label: "A", merkmale: { markiert: true } },
+          { value: "b", label: "B" }, // kein Merkmal → default greift
+        ],
+      },
+    },
+  };
+
+  it("schreibt das Merkmal des GEWÄHLTEN Eintrags in das Zielfeld (ersetzt manuelles Flag)", () => {
+    expect(abgeleiteteFelder(config, { tier: { art: "a" } })).toEqual({
+      tier: { art: "a", istMarkiert: true },
+    });
+  });
+
+  it("fällt auf den default zurück, wenn der Eintrag das Merkmal nicht trägt", () => {
+    expect(abgeleiteteFelder(config, { tier: { art: "b" } })).toEqual({
+      tier: { art: "b", istMarkiert: false },
+    });
+  });
+
+  it("setzt den default auch OHNE Auswahl (Normalfall) und ist IDEMPOTENT", () => {
+    const einmal = abgeleiteteFelder(config, {});
+    expect(einmal).toEqual({ tier: { istMarkiert: false } });
+    expect(abgeleiteteFelder(config, einmal)).toEqual(einmal);
+  });
+
+  it("ohne `ableitungen` bleiben die Daten unverändert (rückwärtskompatibel, gleiche Referenz)", () => {
+    const ohne: Pick<LeistungConfig, "antrag" | "codelisten"> = {
+      antrag: { steps: [] },
+    };
+    const daten = { x: 1 };
+    expect(abgeleiteteFelder(ohne, daten)).toBe(daten);
+  });
+});
+
+// ── M3: sichtbareSchritte (progressive disclosure + Rollen-Ordnung) ─────────────────────────────
+describe("sichtbareSchritte — M3 Filterung + kontext-zuerst", () => {
+  it("zieht rolle:kontext nach vorne, pruefung ans Ende (sonst stabil)", () => {
+    const steps: StepDef[] = [
+      { id: "erhebung", titel: "Erhebung", felder: [] },
+      { id: "kontext", titel: "Vorgangsart", rolle: "kontext", felder: [] },
+      { id: "abschluss", titel: "Abschluss", rolle: "pruefung", felder: [] },
+    ];
+    expect(sichtbareSchritte(steps, {}).map((s) => s.id)).toEqual([
+      "kontext",
+      "erhebung",
+      "abschluss",
+    ]);
+  });
+
+  it("filtert SCHRITTE über sichtbarWenn (Vorgangsart konditioniert)", () => {
+    const steps: StepDef[] = [
+      { id: "k", titel: "K", rolle: "kontext", felder: [] },
+      {
+        id: "nur-abmeldung",
+        titel: "Nur Abmeldung",
+        sichtbarWenn: { feld: "art", op: "==", wert: "abmeldung" },
+        felder: [],
+      },
+    ];
+    expect(
+      sichtbareSchritte(steps, { art: "anmeldung" }).map((s) => s.id),
+    ).toEqual(["k"]);
+    expect(
+      sichtbareSchritte(steps, { art: "abmeldung" }).map((s) => s.id),
+    ).toEqual(["k", "nur-abmeldung"]);
+  });
+
+  it("filtert FELDER innerhalb eines Schritts über sichtbarWenn", () => {
+    const steps: StepDef[] = [
+      {
+        id: "s",
+        titel: "S",
+        felder: [
+          feld({ name: "art", typ: "select" }),
+          feld({
+            name: "extra",
+            typ: "text",
+            sichtbarWenn: { feld: "art", op: "==", wert: "premium" },
+          }),
+        ],
+      },
+    ];
+    expect(
+      sichtbareSchritte(steps, { art: "basis" })[0]!.felder.map((f) => f.name),
+    ).toEqual(["art"]);
+    expect(
+      sichtbareSchritte(steps, { art: "premium" })[0]!.felder.map(
+        (f) => f.name,
+      ),
+    ).toEqual(["art", "extra"]);
+  });
+
+  it("ohne rolle/sichtbarWenn bleiben Menge und Reihenfolge exakt (rückwärtskompatibel)", () => {
+    const plain: StepDef[] = [
+      { id: "a", titel: "A", felder: [] },
+      { id: "b", titel: "B", felder: [] },
+    ];
+    expect(sichtbareSchritte(plain, {}).map((s) => s.id)).toEqual(["a", "b"]);
+  });
+});
+
+// ── M5: interpretTarif füllt zwei Begründungs-Ebenen (Bürger vs. Recht) ──────────────────────────
+describe("interpretTarif — M5 zwei Begründungs-Ebenen", () => {
+  const tarif: Tarif = {
+    einheit: "EUR/Jahr",
+    label: "Jahresgebühr",
+    staffeln: [
+      {
+        label: "Ausnahme (0 €)",
+        bedingung: { feld: "fall", op: "==", wert: "ausnahme" },
+        betrag: 0,
+        normRef: { norm: "KAG#§4", status: "belegt" },
+      },
+      {
+        label: "Grundbetrag",
+        betrag: 120,
+        normRef: { norm: "Satzung#§2", status: "annahme" },
+      },
+    ],
+  };
+
+  it("begruendungBuerger OHNE Paragraphen, begruendungRecht MIT belegten Normen", () => {
+    const b = interpretTarif(tarif, { fall: "ausnahme" });
+    expect(b.betrag).toBe(0);
+    expect(b.begruendungBuerger).toBe("Ausnahme (0 €)");
+    expect(b.begruendungBuerger).not.toContain("§");
+    expect(b.begruendungRecht).toContain("KAG#§4");
+  });
+
+  it("provisional: die Bürger-Fassung erklärt, dass noch Angaben fehlen", () => {
+    const ohneAuffang: Tarif = {
+      einheit: "EUR",
+      staffeln: [{ bedingung: { feld: "x", op: "==", wert: "y" }, betrag: 5 }],
+    };
+    const b = interpretTarif(ohneAuffang, {});
+    expect(b.status).toBe("provisional");
+    expect(b.begruendungBuerger).toMatch(/vollständig/i);
+  });
+
+  it("ohne normRef ist begruendungRecht = begruendung (sauberer Degrade)", () => {
+    const ohneNorm: Tarif = {
+      einheit: "EUR",
+      staffeln: [{ label: "Pauschal", betrag: 10 }],
+    };
+    const b = interpretTarif(ohneNorm, {});
+    expect(b.begruendungRecht).toBe(b.begruendung);
+  });
+});
+
+// ── M4: nachweisBezugsweg / istRegisterAbruf ────────────────────────────────────────────────────
+describe("nachweisBezugsweg — M4 Bezugsweg (Default upload)", () => {
+  it("defaultet auf upload, wenn nicht deklariert", () => {
+    const n: Nachweis = { id: "x", label: "X", hochgeladen: false };
+    expect(nachweisBezugsweg(n)).toBe("upload");
+    expect(istRegisterAbruf(n)).toBe(false);
+  });
+
+  it("erkennt register-once-only und gefordert", () => {
+    const reg: Nachweis = {
+      id: "r",
+      label: "R",
+      hochgeladen: false,
+      bezugsweg: "register-once-only",
+    };
+    expect(nachweisBezugsweg(reg)).toBe("register-once-only");
+    expect(istRegisterAbruf(reg)).toBe(true);
+    expect(
+      nachweisBezugsweg({
+        id: "g",
+        label: "G",
+        hochgeladen: false,
+        bezugsweg: "gefordert",
+      }),
+    ).toBe("gefordert");
   });
 });

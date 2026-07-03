@@ -32,6 +32,7 @@ import {
 
 import type {
   Berechnung,
+  CodelistenMarkierung,
   FeldDef,
   LeistungConfig,
   StepDef,
@@ -41,6 +42,8 @@ import type {
 import {
   asString,
   feldAnzeige,
+  feldHint,
+  feldLabel,
   getPath,
   istDateiWert,
   resolveSteps,
@@ -50,10 +53,12 @@ import {
   type DateiWert,
 } from "../lib/antrag-felder.js";
 import {
+  abgeleiteteFelder,
   effektiveBerechnung,
   effektiveNachweise,
   feldFehlerVollstaendig,
   feldHinweise,
+  sichtbareSchritte,
   stepGueltigVollstaendig,
   type RegelKontext,
 } from "../lib/interpreter.js";
@@ -173,6 +178,12 @@ export interface AntragStepperProps<T extends Antragsdaten = Antragsdaten> {
    *  DokumentExtraktion-Assistent (Upload → Vorschläge → Bestätigung → Feld befüllt). Fehlt er, ist der
    *  Antrag exakt wie bisher — rein additiv, vendor-neutral (Stub im Kit, echte Bindung in PROD). */
   extraktionPort?: DokumentExtraktionPort | undefined;
+  /** M2 — LEICHTE SPRACHE aktiv: rendert je Feld die `leichteSprache`-Fassung des Labels + `hintEinfach` (falls
+   *  gesetzt). Kontrolliert von der App (z. B. via LanguageSwitch). Default `false` = reguläre Bürger-Sprache. */
+  leichteSprache?: boolean | undefined;
+  /** M2 — FACHBEGRIFFE zeigen (Sachbearbeiter-/Prüf-Sicht): blendet je Feld die `labelFachlich`-Amtsbezeichnung als
+   *  Zusatz ein. Default `false` = reine Bürger-Sicht (keine §/Fachkürzel). */
+  zeigeFachbegriffe?: boolean | undefined;
 }
 
 /** Der geführte Bürger-Antrag — rendert `config.antrag.steps` dynamisch + Review als letzten Schritt. */
@@ -181,17 +192,18 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
   port,
   onDone,
   extraktionPort,
+  leichteSprache = false,
+  zeigeFachbegriffe = false,
 }: AntragStepperProps<T>): React.ReactElement {
   // Auswahl-Optionen einmalig auflösen: Felder mit `optionsRef` ziehen ihre Optionen aus `config.datenlisten` ODER
   // `config.codelisten` (data-driven, z. B. eine Rassenliste) — ab hier lesen ALLE Funktionen nur noch
-  // `feld.options`. Eine Wahrheit.
+  // `feld.options`. Eine Wahrheit. `steps` ist die VOLLE (aufgelöste) Menge; die progressive-disclosure-Filterung
+  // (M3) erfolgt darunter über `sichtbareSteps`.
   const steps = useMemo(
     () =>
       resolveSteps(config.antrag.steps, config.datenlisten, config.codelisten),
     [config],
   );
-  const reviewIndex = steps.length; // virtueller Review-Schritt nach allen Fach-Schritten
-  const lastIndex = reviewIndex;
 
   // Extrahierbare Zielfelder (data-driven aus den Schritten) — nur relevant, wenn ein `extraktionPort` gesetzt ist.
   const zielFelder = useMemo(() => extraktionsZielFelder(steps), [steps]);
@@ -234,20 +246,44 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
     [steps, daten],
   );
 
-  // LIVE-Berechnung über dem aktuellen (typisierten) Antragsstand. EFFEKTIV: `config.berechne` (Escape-Hatch) hat
-  // Vorrang, sonst wertet der reine Interpreter `config.tarif` aus (Default = Daten-Auswertung). Defensiv.
-  const berechnung = useMemo<Berechnung | null>(
-    () => effektiveBerechnung(config, typisierteDaten as T) ?? null,
+  // M1 — ABGELEITETE Felder (Codelisten-Merkmal → Antragsfeld) VOR Berechnung/Sichtbarkeit anwenden. `effektiveDaten`
+  // ist die WIRKSAME Wahrheit (typisiert + abgeleitet), auf der Sichtbarkeit, Berechnung, Nachweise, Validierung und
+  // das Absenden beruhen. Der rohe `daten`-Buffer bleibt die Quelle der EDITIERBAREN Eingaben (kein Feld-Springen).
+  const effektiveDaten = useMemo(
+    () => abgeleiteteFelder(config, typisierteDaten),
     [config, typisierteDaten],
   );
 
-  // Erforderliche Nachweise aus dem aktuellen Stand ableiten (data-driven, je Tatbestand): `config.nachweise`
-  // (Escape-Hatch) hat Vorrang, sonst leitet der Interpreter sie aus den `config.codelisten` (belege der gewählten
-  // Einträge) ab. Erscheint als Upload im Review, sobald die Auswahl Nachweise fordert.
-  const nachweise = useMemo(
-    () => effektiveNachweise(config, typisierteDaten as T),
-    [config, typisierteDaten],
+  // M3 — SICHTBARE Schritte/Felder (progressive disclosure): der `rolle: "kontext"`-Schritt (Vorgangsart) zuerst,
+  // danach materialisieren die von `sichtbarWenn` abhängigen Schritte/Felder. Ohne diese Signale = volle Menge in
+  // Originalreihenfolge (rückwärtskompatibel).
+  const sichtbareSteps = useMemo(
+    () => sichtbareSchritte(steps, effektiveDaten),
+    [steps, effektiveDaten],
   );
+  const reviewIndex = sichtbareSteps.length; // virtueller Review-Schritt nach allen sichtbaren Fach-Schritten
+  const lastIndex = reviewIndex;
+
+  // LIVE-Berechnung über dem wirksamen (typisiert + abgeleitet) Antragsstand. EFFEKTIV: `config.berechne`
+  // (Escape-Hatch) hat Vorrang, sonst wertet der reine Interpreter `config.tarif` aus. Defensiv.
+  const berechnung = useMemo<Berechnung | null>(
+    () => effektiveBerechnung(config, effektiveDaten as T) ?? null,
+    [config, effektiveDaten],
+  );
+
+  // Erforderliche Nachweise aus dem wirksamen Stand ableiten (data-driven, je Tatbestand): `config.nachweise`
+  // (Escape-Hatch) hat Vorrang, sonst leitet der Interpreter sie aus den `config.codelisten` (belege der gewählten
+  // Einträge) ab. Erscheint als Upload/Register-Autorisierung im Review, sobald die Auswahl Nachweise fordert.
+  const nachweise = useMemo(
+    () => effektiveNachweise(config, effektiveDaten as T),
+    [config, effektiveDaten],
+  );
+
+  // M3 — wenn ein zuvor sichtbarer Schritt durch geänderte Angaben verschwindet, den Cursor in den gültigen
+  // Bereich zurückholen (nie über den Review-Schritt hinaus zeigen).
+  useEffect(() => {
+    if (stepIdx > reviewIndex) setStepIdx(reviewIndex);
+  }, [reviewIndex, stepIdx]);
 
   // Pflichtfeld-Markierung (rot) aktiv: am Review-Schritt IMMER — ODER sobald in DIESEM Schritt „Weiter" trotz offener
   // Pflichtangabe versucht wurde. So sieht der/die Nutzer:in die roten Felder genau dann, wenn der Prozess sie blockiert.
@@ -276,12 +312,17 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
   // — die offenen Pflichtfelder rot markieren statt still durchzuwinken. Sonst zum nächsten Schritt.
   const gehWeiter = (): void => {
     if (
-      stepIdx < steps.length &&
-      !stepGueltigVollstaendig(steps[stepIdx]!, daten, config)
+      stepIdx < sichtbareSteps.length &&
+      !stepGueltigVollstaendig(sichtbareSteps[stepIdx]!, effektiveDaten, config)
     ) {
       setVersuchteWeiter((prev) => new Set(prev).add(stepIdx));
       focusSummary(
-        stepFehlerEintraege(idPrefix, steps[stepIdx]!, daten, config),
+        stepFehlerEintraege(
+          idPrefix,
+          sichtbareSteps[stepIdx]!,
+          effektiveDaten,
+          config,
+        ),
       );
       return;
     }
@@ -290,8 +331,9 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
   };
 
   const firstInvalidStep = (): number | null => {
-    for (let i = 0; i < steps.length; i++)
-      if (!stepGueltigVollstaendig(steps[i]!, daten, config)) return i;
+    for (let i = 0; i < sichtbareSteps.length; i++)
+      if (!stepGueltigVollstaendig(sichtbareSteps[i]!, effektiveDaten, config))
+        return i;
     return null;
   };
   const invalidStep = firstInvalidStep();
@@ -339,8 +381,13 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
   } => {
     const errors: FieldError[] = [];
     const stepOf = new Map<string, number>();
-    for (let i = 0; i < steps.length; i++) {
-      for (const e of stepFehlerEintraege(idPrefix, steps[i]!, daten, config)) {
+    for (let i = 0; i < sichtbareSteps.length; i++) {
+      for (const e of stepFehlerEintraege(
+        idPrefix,
+        sichtbareSteps[i]!,
+        effektiveDaten,
+        config,
+      )) {
         errors.push(e);
         stepOf.set(e.feldId, i);
       }
@@ -373,18 +420,19 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
       return;
     }
     setSummaryErrors([]);
-    // Typisiert einreichen (Zahlen/Booleans/Datei-Referenzen) — der Port/das Backend erhält fachlich korrekte Werte.
-    const vorgang = port.einreichen(typisierteDaten as T);
+    // WIRKSAM einreichen (typisiert + M1-abgeleitet) — der Port/das Backend erhält fachlich korrekte, konsistente
+    // Werte inkl. der abgeleiteten Felder (der Store leitet defensiv nochmals ab; die Ableitung ist idempotent).
+    const vorgang = port.einreichen(effektiveDaten as T);
     onDone(vorgang);
   }
 
   return (
     <section className="mx-auto w-full max-w-2xl px-6 py-8 md:max-w-3xl lg:max-w-5xl">
       <Stepper
-        steps={steps}
+        steps={sichtbareSteps}
         stepIdx={stepIdx}
         setStepIdx={setStepIdx}
-        daten={daten}
+        daten={effektiveDaten}
         kontext={config}
         onWeiter={gehWeiter}
       />
@@ -407,12 +455,12 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
           />
         )}
 
-        {/* Fach-Schritte (dynamisch aus config) */}
+        {/* Fach-Schritte (dynamisch aus config, M3-gefiltert/geordnet) */}
         {stepIdx < reviewIndex && (
           <Section
             titleRef={headingRef}
-            title={steps[stepIdx]!.titel}
-            sub={steps[stepIdx]!.beschreibung}
+            title={sichtbareSteps[stepIdx]!.titel}
+            sub={sichtbareSteps[stepIdx]!.beschreibung}
           >
             {/* OPTIONAL (nur wenn ein extraktionPort gesetzt ist): KI-/OCR-Assistent im ERSTEN Schritt —
                 Dokument hochladen → Feld-Vorschläge mit Konfidenz → bestätigen/korrigieren → Feld befüllt.
@@ -431,15 +479,27 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
               onSubmit={(e) => e.preventDefault()}
               className="grid gap-4 sm:grid-cols-2"
             >
-              {steps[stepIdx]!.felder.map((feld) => (
+              {sichtbareSteps[stepIdx]!.felder.map((feld) => (
                 <FeldRenderer
                   key={feld.name}
                   id={feldDomId(idPrefix, feld.name)}
                   feld={feld}
-                  wert={getPath(daten, feld.name)}
-                  daten={daten}
-                  fehler={feldFehlerVollstaendig(feld, daten, config)}
+                  // M1 — abgeleitete Felder zeigen ihren WIRKSAMEN (abgeleiteten) Wert read-only; editierbare Felder
+                  // spiegeln den rohen Eingabe-Buffer (kein Feld-Springen beim Tippen).
+                  wert={getPath(
+                    feld.abgeleitet ? effektiveDaten : daten,
+                    feld.name,
+                  )}
+                  daten={effektiveDaten}
+                  // Abgeleitete Felder sind read-only und werden nicht validiert (der Wert wird automatisch gesetzt).
+                  fehler={
+                    feld.abgeleitet
+                      ? null
+                      : feldFehlerVollstaendig(feld, effektiveDaten, config)
+                  }
                   showErrors={showErrors}
+                  leicht={leichteSprache}
+                  zeigeFachbegriff={zeigeFachbegriffe}
                   onChange={(v) => setFeld(feld.name, v)}
                   onRegisterLookup={(raw) => tryRegisterLookup(feld, raw)}
                 />
@@ -479,15 +539,18 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
             )}
 
             <dl className="mt-6 grid gap-0 text-sm">
-              {steps.flatMap((step) =>
+              {sichtbareSteps.flatMap((step) =>
                 step.felder.map((feld) => {
-                  const v = getPath(daten, feld.name);
+                  const v = getPath(effektiveDaten, feld.name);
                   const text = feldAnzeige(feld, v);
                   if (text.length === 0) return null;
                   return (
                     <ReviewRow
                       key={feld.name}
-                      label={feld.label}
+                      label={feldLabel(feld, { leicht: leichteSprache })}
+                      labelFachlich={
+                        zeigeFachbegriffe ? feld.labelFachlich : undefined
+                      }
                       value={text}
                     />
                   );
@@ -542,7 +605,8 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
               <span>
                 Pflichtangaben fehlen in{" "}
                 <strong>
-                  Schritt {invalidStep + 1}: {steps[invalidStep]!.titel}
+                  Schritt {invalidStep + 1}:{" "}
+                  {sichtbareSteps[invalidStep]!.titel}
                 </strong>
                 . Bitte ergänzen, bevor Sie absenden.
               </span>
@@ -571,8 +635,12 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
             <Button
               onClick={gehWeiter}
               aria-disabled={
-                stepIdx < steps.length &&
-                !stepGueltigVollstaendig(steps[stepIdx]!, daten, config)
+                stepIdx < sichtbareSteps.length &&
+                !stepGueltigVollstaendig(
+                  sichtbareSteps[stepIdx]!,
+                  effektiveDaten,
+                  config,
+                )
               }
             >
               Weiter
@@ -770,6 +838,30 @@ function Stepper({
   );
 }
 
+// ── M1: Codelisten-Markierung (Badge/Farbe eines Auswahl-Eintrags) — Token-only, kein Domänen-Literal ──
+/** Token-Klassen je Markierungs-Ton (nur Design-Tokens, keine Hex/Domänen-Farben). */
+function markierungKlasse(ton: CodelistenMarkierung["ton"]): string {
+  switch (ton) {
+    case "kritisch":
+      return "border-status-block/40 bg-status-block-soft text-status-block";
+    case "warn":
+      return "border-status-warn/40 bg-status-warn-soft text-status-warn";
+    default:
+      return "border-status-info/40 bg-status-info-soft text-status-info";
+  }
+}
+/** Generisches Default-Badge-Wort, falls die Markierung kein eigenes `label` trägt (verfahrensfrei). */
+function markierungDefaultLabel(ton: CodelistenMarkierung["ton"]): string {
+  switch (ton) {
+    case "kritisch":
+      return "Achtung";
+    case "warn":
+      return "Hinweis";
+    default:
+      return "Info";
+  }
+}
+
 // ── Ein Feld → passendes shadcn-Element je `typ` ───────────────────────────────────────────────
 function FeldRenderer({
   id: idProp,
@@ -778,6 +870,8 @@ function FeldRenderer({
   daten,
   fehler,
   showErrors,
+  leicht = false,
+  zeigeFachbegriff = false,
   onChange,
   onRegisterLookup,
 }: {
@@ -789,11 +883,20 @@ function FeldRenderer({
   daten: Antragsdaten;
   fehler: string | null;
   showErrors: boolean;
+  /** M2 — Leichte-Sprache-Modus (nutzt `leichteSprache`/`hintEinfach` je Feld, falls gesetzt). */
+  leicht?: boolean | undefined;
+  /** M2 — Fachbegriff (`labelFachlich`) als Zusatz einblenden (Sachbearbeiter-/Prüfsicht). */
+  zeigeFachbegriff?: boolean | undefined;
   onChange: (value: unknown) => void;
   onRegisterLookup: (rohwert: string) => void;
 }) {
   const fallbackId = useId();
   const id = idProp ?? fallbackId;
+  // M1 — abgeleitetes Feld: read-only, auto-gesetzt (kein Pflicht-Fehler, keine Eingabe).
+  const istAbgeleitet = !!feld.abgeleitet;
+  // M2 — die Bürger-/Leichte-Sprache-Projektion des Labels/Hilfetexts (fällt sauber auf `label`/`hint` zurück).
+  const label = feldLabel(feld, { leicht });
+  const hint = feldHint(feld, { leicht });
   // Fehler erst zeigen, wenn die Prüfungsseite erreicht ODER bereits etwas Ungültiges eingegeben wurde.
   // Pflichtfeld-Fehler nur ab Review; Format-/Wertefehler auch sofort bei Eingabe.
   const hatEingabe = asString(wert).trim().length > 0;
@@ -811,7 +914,7 @@ function FeldRenderer({
   const describedBy =
     [
       sichtbarerFehler ? errorId : null,
-      feld.hint ? hintId : null,
+      hint ? hintId : null,
       plausiHinweise.length > 0 ? plausiId : null,
     ]
       .filter(Boolean)
@@ -820,9 +923,10 @@ function FeldRenderer({
   return (
     <Field
       htmlFor={id}
-      label={feld.label}
-      required={feld.required}
-      hint={feld.hint}
+      label={label}
+      labelFachlich={zeigeFachbegriff ? feld.labelFachlich : undefined}
+      required={istAbgeleitet ? false : feld.required}
+      hint={hint}
       wide={wide}
       invalid={!!sichtbarerFehler}
       error={sichtbarerFehler ?? undefined}
@@ -860,6 +964,32 @@ function FeldRenderer({
     const s = asString(wert);
     const invalidAttr = !!sichtbarerFehler;
 
+    // M1 — ABGELEITETES Feld: nicht editierbar, sondern eine read-only Anzeige des automatisch gesetzten Werts
+    // („automatisch abgeleitet"-Badge). Der Wert stammt aus der Codelisten-Merkmal-Ableitung (VOR der Berechnung).
+    if (istAbgeleitet) {
+      const anzeige = feldAnzeige(feld, wert);
+      return (
+        <div
+          id={id}
+          aria-readonly="true"
+          aria-describedby={describedBy}
+          className="flex min-h-9 flex-wrap items-center gap-2 rounded-md border border-border bg-surface-2 px-3 py-2 text-sm"
+        >
+          <span className="text-foreground">
+            {anzeige || (
+              <span className="text-muted-foreground">
+                wird automatisch ermittelt
+              </span>
+            )}
+          </span>
+          <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-status-info/30 bg-status-info-soft px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-status-info">
+            <Sparkles className="h-3 w-3" aria-hidden="true" /> automatisch
+            abgeleitet
+          </span>
+        </div>
+      );
+    }
+
     switch (feld.typ) {
       case "select":
         return (
@@ -872,12 +1002,26 @@ function FeldRenderer({
               aria-invalid={invalidAttr}
               aria-describedby={describedBy}
             >
-              <SelectValue placeholder={feld.hint ?? "Bitte auswählen"} />
+              <SelectValue placeholder={hint ?? "Bitte auswählen"} />
             </SelectTrigger>
             <SelectContent>
               {(feld.options ?? []).map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
+                  {/* M1 — markierte Codelisten-Einträge (z. B. eine Sonderklasse) tragen ein farbiges Badge. */}
+                  <span className="flex w-full items-center gap-2">
+                    <span>{opt.label}</span>
+                    {opt.markierung ? (
+                      <span
+                        className={cn(
+                          "ml-auto inline-flex items-center rounded-full border px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide",
+                          markierungKlasse(opt.markierung.ton),
+                        )}
+                      >
+                        {opt.markierung.label ??
+                          markierungDefaultLabel(opt.markierung.ton)}
+                      </span>
+                    ) : null}
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -894,12 +1038,12 @@ function FeldRenderer({
               aria-invalid={invalidAttr}
               aria-describedby={describedBy}
             />
-            {feld.hint && (
+            {hint && (
               <label
                 htmlFor={id}
                 className="cursor-pointer text-sm text-muted-foreground"
               >
-                {feld.hint}
+                {hint}
               </label>
             )}
           </div>
@@ -912,7 +1056,7 @@ function FeldRenderer({
           <RadioGroup
             id={id}
             className="flex flex-row flex-wrap gap-x-6 gap-y-2 pt-1"
-            aria-label={feld.label}
+            aria-label={label}
             aria-invalid={invalidAttr}
             aria-describedby={describedBy}
             value={wert === true ? "ja" : wert === false ? "nein" : ""}
@@ -953,7 +1097,7 @@ function FeldRenderer({
             id={id}
             value={s}
             onChange={(e) => onChange(e.target.value)}
-            placeholder={feld.hint}
+            placeholder={hint}
             required={feld.required}
             aria-invalid={invalidAttr}
             aria-describedby={describedBy}
@@ -972,7 +1116,7 @@ function FeldRenderer({
             inputMode="numeric"
             pattern={feld.pattern ?? "\\d{5}"}
             maxLength={5}
-            placeholder={feld.hint}
+            placeholder={hint}
             required={feld.required}
             autoComplete="postal-code"
             aria-invalid={invalidAttr}
@@ -989,7 +1133,7 @@ function FeldRenderer({
             onChange={(e) => onChange(e.target.value)}
             min={feld.min}
             max={feld.max}
-            placeholder={feld.hint}
+            placeholder={hint}
             required={feld.required}
             inputMode="numeric"
             aria-invalid={invalidAttr}
@@ -1018,7 +1162,7 @@ function FeldRenderer({
             value={s}
             onChange={(e) => onChange(e.target.value)}
             onBlur={(e) => onRegisterLookup(e.target.value)}
-            placeholder={feld.hint}
+            placeholder={hint}
             required={feld.required}
             autoComplete="email"
             aria-invalid={invalidAttr}
@@ -1033,7 +1177,7 @@ function FeldRenderer({
             type="tel"
             value={s}
             onChange={(e) => onChange(e.target.value)}
-            placeholder={feld.hint}
+            placeholder={hint}
             required={feld.required}
             autoComplete="tel"
             inputMode="tel"
@@ -1050,7 +1194,7 @@ function FeldRenderer({
             value={s}
             onChange={(e) => onChange(e.target.value)}
             onBlur={(e) => onRegisterLookup(e.target.value)}
-            placeholder={feld.hint}
+            placeholder={hint}
             required={feld.required}
             aria-invalid={invalidAttr}
             aria-describedby={describedBy}
@@ -1192,7 +1336,11 @@ function BerechnungKarte<T extends Antragsdaten>({
         </dl>
       )}
 
-      <p className="mt-3 text-sm text-foreground">{berechnung.begruendung}</p>
+      {/* M5 — BÜRGERNAHE Begründung (einfache Sprache, OHNE Paragraphen): `begruendungBuerger` hat Vorrang, sonst
+          die kanonische `begruendung`. Die rechtliche Fassung (`begruendungRecht`) erscheint im Bescheid. */}
+      <p className="mt-3 text-sm text-foreground">
+        {berechnung.begruendungBuerger ?? berechnung.begruendung}
+      </p>
 
       {config.rechtsgrundlagen.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1253,6 +1401,7 @@ function Section({
 function Field({
   htmlFor,
   label,
+  labelFachlich,
   required,
   children,
   wide,
@@ -1265,6 +1414,8 @@ function Field({
 }: {
   htmlFor: string;
   label: string;
+  /** M2 — AMTS-/Fachbezeichnung (Sachbearbeiter-Sicht): als kleiner Zusatz unter dem Bürger-Label. Optional. */
+  labelFachlich?: string | undefined;
   /** Pflichtfeld → sichtbarer „*"-Marker am Label (a11y: aria-hidden + sr-only „Pflichtfeld"). */
   required?: boolean | undefined;
   children: React.ReactNode;
@@ -1295,6 +1446,14 @@ function Field({
             <span className="sr-only"> (Pflichtfeld)</span>
           </>
         ) : null}
+        {labelFachlich ? (
+          // M2 — Amts-/Fachbezeichnung (Sachbearbeiter-Sicht) als dezenter Zusatz, klar als Fachbegriff markiert.
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            <span className="sr-only">Fachbegriff: </span>
+            <span aria-hidden="true">· </span>
+            {labelFachlich}
+          </span>
+        ) : null}
       </Label>
       {children}
       {error ? (
@@ -1324,10 +1483,28 @@ function Field({
   );
 }
 
-function ReviewRow({ label, value }: { label: string; value: string }) {
+function ReviewRow({
+  label,
+  labelFachlich,
+  value,
+}: {
+  label: string;
+  /** M2 — optionale Amts-/Fachbezeichnung (Sachbearbeiter-Sicht) unter dem Bürger-Label. */
+  labelFachlich?: string | undefined;
+  value: string;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-border py-2 last:border-b-0">
-      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dt className="text-sm text-muted-foreground">
+        {label}
+        {labelFachlich ? (
+          <span className="ml-2 text-xs text-muted-foreground/80">
+            <span className="sr-only">Fachbegriff: </span>
+            <span aria-hidden="true">· </span>
+            {labelFachlich}
+          </span>
+        ) : null}
+      </dt>
       <dd className="text-right text-sm font-medium text-foreground">
         {value}
       </dd>

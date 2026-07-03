@@ -5,10 +5,12 @@
 // Der `AntragStepper` RENDERT nur und delegiert jede fachliche Entscheidung hierher — so ist die Subsumtion
 // deterministisch prüfbar (und die Klasse „getippte Zahl kommt als String an, `switch` matcht nie" strukturell
 // ausgeschlossen).
-import type { Codeliste, FeldDef, StepDef } from "../types.js";
+import type { Codeliste, FeldDef, FeldOption, StepDef } from "../types.js";
 
 export type Antragsdaten = Record<string, unknown>;
-export type FeldOption = { value: string; label: string };
+// `FeldOption` ist EINE Wahrheit in ../types (schlank value/label + optionale M1-Codelisten-Signale
+// markierung/merkmale) — hier re-exportiert, damit bestehende Importe aus `lib/antrag-felder` gültig bleiben.
+export type { FeldOption };
 /** Benannte Auswahl-Listen: die schlanke `datenliste` (nur value/label) UND die geerdete `codeliste` (mit
  *  Provenienz) teilen sich EINE Auflösung über `FeldDef.optionsRef`. */
 export type Datenlisten = Record<string, FeldOption[]>;
@@ -64,7 +66,14 @@ export function istDateiWert(v: unknown): v is DateiWert {
 /** Projiziert eine geerdete `Codeliste` auf schlanke Auswahl-Optionen (value/label) — die Provenienz
  *  (`normRef`/`belege`) bleibt in der Codeliste und wird vom Interpreter genutzt, nicht im Selektor. */
 export function codelisteOptionen(codeliste: Codeliste): FeldOption[] {
-  return codeliste.eintraege.map((e) => ({ value: e.value, label: e.label }));
+  return codeliste.eintraege.map((e) => ({
+    value: e.value,
+    label: e.label,
+    // M1 — Markierung/Merkmale durchreichen (der Selektor rendert das Badge/die Farbe; die volle Provenienz
+    // — normRef/belege/ableitungen — bleibt in der Codeliste beim Interpreter). Nur setzen, wenn vorhanden.
+    ...(e.markierung ? { markierung: e.markierung } : {}),
+    ...(e.merkmale ? { merkmale: e.merkmale } : {}),
+  }));
 }
 
 /** Die effektiven Optionen eines Felds: inline (`options`) hat Vorrang, sonst die über `optionsRef` referenzierte
@@ -234,4 +243,33 @@ export function feldAnzeige(feld: FeldDef, wert: unknown): string {
     return feld.options?.find((o) => o.value === s)?.label ?? s;
   }
   return s;
+}
+
+// ── M2: Amts-/Bürger-/Leichte-Sprache-Projektion je Feld ─────────────────────────────────────────
+/** Optionen der Sprach-Projektion: `leicht` = Leichte-Sprache-Modus aktiv (nutzt `leichteSprache`/`hintEinfach`,
+ *  falls vorhanden). Additiv — ohne die neuen Felder liefert alles die bisherige Bürger-Sicht (`label`/`hint`). */
+export interface SprachProjektion {
+  leicht?: boolean | undefined;
+}
+
+/** Das anzuzeigende FELD-LABEL für den/die Bürger:in — im Leichte-Sprache-Modus die `leichteSprache`-Fassung
+ *  (falls gesetzt), sonst das reguläre `label`. NIE die Amts-/Fachbezeichnung (die ist die Sachbearbeiter-Sicht). */
+export function feldLabel(feld: FeldDef, opts?: SprachProjektion): string {
+  if (opts?.leicht && feld.leichteSprache) return feld.leichteSprache;
+  return feld.label;
+}
+
+/** Der anzuzeigende HILFETEXT — im Leichte-Sprache-Modus `hintEinfach` (falls gesetzt), sonst `hint`. */
+export function feldHint(
+  feld: FeldDef,
+  opts?: SprachProjektion,
+): string | undefined {
+  if (opts?.leicht && feld.hintEinfach) return feld.hintEinfach;
+  return feld.hint;
+}
+
+/** Die AMTS-/FACHBEZEICHNUNG (Sachbearbeiter-/Detailsicht) — `labelFachlich`, falls gesetzt, sonst `undefined`
+ *  (der Kit blendet sie nur ein, wenn vorhanden UND die fachliche Sicht angefordert ist). */
+export function feldLabelFachlich(feld: FeldDef): string | undefined {
+  return feld.labelFachlich;
 }

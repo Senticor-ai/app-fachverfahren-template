@@ -38,6 +38,7 @@ export * from "./components/BescheidView.js";
 export * from "./components/AuditTimeline.js";
 export * from "./components/ReportingPanel.js";
 export * from "./components/DateiUpload.js";
+export * from "./components/NachweisAutorisierung.js";
 export * from "./components/DokumentExtraktion.js";
 export * from "./components/AdressValidierung.js";
 export * from "./components/ConsentBanner.js";

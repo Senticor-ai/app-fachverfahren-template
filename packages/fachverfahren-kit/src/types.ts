@@ -33,12 +33,39 @@ export interface Berechnung {
   betrag: number; // in der NATÜRLICHEN Haupteinheit der `einheit` (bei EUR: ganze Euro, 120 = 120,00 €) — kein Cent
   einheit: string; // "EUR/Jahr", "EUR", …
   label: string; // kurzer Ergebnis-Titel
-  begruendung: string; // die belegte fachliche Herleitung
+  begruendung: string; // die belegte fachliche Herleitung (Rechts-/Audit-Detail — bleibt die kanonische Wahrheit)
+  /** M5 — BÜRGERNAHE Begründung in einfacher Sprache (z. B. „Sie zahlen 0 €, weil in Ihrem Fall eine Ausnahme
+   *  greift") — OHNE Paragraphen/Fachkürzel. OPTIONAL/additiv: fehlt sie, zeigt die Bürger-Karte `begruendung`. */
+  begruendungBuerger?: string;
+  /** M5 — RECHTLICHE Begründung (Subsumtion + §/Norm) für Bescheid/Prüfsicht. OPTIONAL/additiv: fehlt sie, gilt
+   *  `begruendung`. Trennt die zwei Ebenen (Bürger vs. Recht), ohne eine bestehende Berechnung zu brechen. */
+  begruendungRecht?: string;
   // ANZEIGE-STATUS (Pflicht): "provisional", solange für die Berechnung nötige Eingaben fehlen (Teil-/Vorschau-Ergebnis),
   // "final", wenn alle nötigen Felder vorliegen. Erzwingt, dass ein vorläufiger Betrag NIE wie ein endgültiger erscheint —
   // der Typ verlangt das Feld, sodass jede berechne-Funktion es liefern MUSS (kein nachgelagerter Repair-Zyklus).
   status: "provisional" | "final";
   positionen?: { label: string; betrag: number }[];
+}
+
+/** M4 — der BEZUGSWEG eines Nachweises: klassischer Datei-`upload` (Default), `register-once-only` (der Nachweis
+ *  liegt bereits in einem Register — der/die Bürger:in autorisiert nur den Abruf, lädt NICHTS hoch, Once-Only-Prinzip)
+ *  oder `gefordert` (nachzureichen; wird später verlangt, jetzt kein Upload). Fehlt der Wert ⇒ `upload`. */
+export type NachweisBezugsweg = "upload" | "register-once-only" | "gefordert";
+
+/** M4 — REGISTER-BEZUG eines `register-once-only`-Nachweises (Once-Only): aus welcher Quelle inbound abgerufen,
+ *  auf welcher Rechtsgrundlage, mit welcher (optionalen) Einwilligung — und der aktuelle Abruf-Status. Trägt die
+ *  Interop-Trias-Richtung `inbound` (Nachweisabruf ≠ outbound Meldung/Zustellung). Alles als DATEN, IP-frei. */
+export interface NachweisRegister {
+  /** Register-/Quellsystem, aus dem der Nachweis abgerufen wird (z. B. „Melderegister", eine NOOTS-Quelle). */
+  quelle: string;
+  /** Interop-Richtung: der Nachweisabruf ist stets `inbound` (getrennt von outbound Meldung/Zustellung). */
+  richtung: "inbound";
+  /** Rechtsgrundlage des Abrufs (Fachrecht + Datenschutz-Befugnis) — als DATEN, kein Kit-Literal. */
+  rechtsgrundlage: string;
+  /** Optionale Einwilligung: bei nutzergesteuertem Abruf `erforderlich` mit dem anzuzeigenden Einwilligungs-`text`. */
+  einwilligung?: { erforderlich: boolean; text: string };
+  /** Abruf-Status (Provenienz): noch nicht abgerufen, vom Bürger autorisiert, oder bereits abgerufen. */
+  status?: "nicht-abgerufen" | "autorisiert" | "abgerufen";
 }
 
 /** Ein hochzuladender/zu erbringender Nachweis. `erforderlich` trägt die Pflicht/optional-Regel als DATEN; die
@@ -56,6 +83,10 @@ export interface Nachweis {
   akzeptierteTypen?: string[];
   /** Maximale Dateigröße in Bytes als DATEN. Fehlt sie ⇒ keine clientseitige Größen-Vorprüfung. */
   maxGroesseBytes?: number;
+  /** M4 — BEZUGSWEG (upload | register-once-only | gefordert). Fehlt er ⇒ `upload` (rückwärtskompatibel). */
+  bezugsweg?: NachweisBezugsweg;
+  /** M4 — REGISTER-BEZUG (nur bei `register-once-only` sinnvoll): Quelle/Rechtsgrundlage/Einwilligung/Status. */
+  register?: NachweisRegister;
 }
 
 /** Der generische Vorgang — `TAntragsdaten` ist der LEISTUNGS-spezifische Antragsinhalt
@@ -113,16 +144,38 @@ export type FeldTyp =
   // Einzelner Datei-Upload (Nachweis) inline im Feld. Der Wert ist { name, groesse } (Datei-Metadaten) oder leer.
   // Der echte Datei-Inhalt wandert in PROD über den Port; das Feld hält nur die Referenz.
   | "file";
+/** Eine Auswahl-Option (Select). Schlank (`value`/`label`), aber ADDITIV um die M1-Codelisten-Signale erweitert:
+ *  `markierung` (optische Hervorhebung, z. B. ein Sonderklasse-Badge) + `merkmale` (fachliche Merkmale des Eintrags) —
+ *  durchgereicht aus der `Codeliste`, sodass der Selektor sie rendern kann. `datenlisten`-Optionen tragen sie nicht
+ *  (rein value/label) — die Felder sind optional, alles degradiert sauber. */
+export interface FeldOption {
+  value: string;
+  label: string;
+  /** M1 — optische Markierung aus dem Codelisten-Eintrag (Badge/Farbe). */
+  markierung?: CodelistenMarkierung;
+  /** M1 — fachliche Merkmale des Codelisten-Eintrags (durchgereicht für die Anzeige). */
+  merkmale?: Record<string, string | number | boolean>;
+}
+
 export interface FeldDef {
   name: string; // Pfad in den Antragsdaten, z.B. "halter.nachname"
-  label: string;
+  label: string; // BÜRGER-Beschriftung (einfache, verständliche Sprache) — die Standard-Sicht
+  /** M2 — AMTS-/FACHBEZEICHNUNG (Sachbearbeiter-Sicht, §/Regel-ID). OPTIONAL/additiv: nur intern/auf Wunsch
+   *  eingeblendet; die Bürger-Sicht nutzt weiter `label`. */
+  labelFachlich?: string;
+  /** M2 — LEICHTE-SPRACHE-Fassung des Labels (DIN SPEC 33429) — ZUSÄTZLICH, nicht ersetzend. Nur aktiv, wenn die
+   *  App den Leichte-Sprache-Modus einschaltet; fehlt sie, bleibt `label` (sauberer Degrade). */
+  leichteSprache?: string;
+  /** M2 — vereinfachter Hilfetext für den Leichte-Sprache-Modus (fällt sonst auf `hint` zurück). */
+  hintEinfach?: string;
   typ: FeldTyp;
   required?: boolean;
   pattern?: string; // z.B. "^\\d{5}$" für PLZ
   min?: number;
   max?: number;
-  /** Auswahl-Optionen (Select) INLINE. Vorrang vor `optionsRef`. */
-  options?: { value: string; label: string }[];
+  /** Auswahl-Optionen (Select) INLINE. Vorrang vor `optionsRef`. Tragen optional Codelisten-Signale
+   *  (`markierung`/`merkmale`), sobald sie aus einer `Codeliste` materialisiert wurden. */
+  options?: FeldOption[];
   /** DATA-DRIVEN Auswahl: Name einer benannten Liste in `LeistungConfig.datenlisten` (z. B. "rassen"). So liefert ein
    *  Verfahren seine Auswahl (Rassenliste, Kategorien, …) als DATEN und mehrere Felder teilen dieselbe Liste — statt
    *  Freitext oder inline-dupliziertem `options`. Wird ignoriert, wenn `options` gesetzt ist. */
@@ -139,12 +192,26 @@ export interface FeldDef {
    *  über die Antragsdaten erfüllt ist (z. B. „Wert ungewöhnlich hoch — bitte prüfen"). Anders als `regeln` blockieren
    *  sie den Antrag NIE. Der reine Interpreter (`feldHinweise`) wertet sie aus; ein Feld ohne `hinweise` ist unverändert. */
   hinweise?: FeldHinweis[];
+  /** M1 — dieses Feld ist AUTOMATISCH ABGELEITET aus einem Codelisten-Merkmal (read-only „automatisch abgeleitet"):
+   *  `ausCodeliste` = die Codeliste (deren `ableitungen` dieses Feld über `setzeFeld` füttern), `merkmal` = das
+   *  Eintrags-Merkmal. Ersetzt ein manuelles Parallel-Flag. OPTIONAL/additiv — ein Feld ohne `abgeleitet` ist normal. */
+  abgeleitet?: FeldAbleitung;
+  /** M3 — SICHTBARKEITS-Bedingung (progressive disclosure): das Feld erscheint nur, wenn `sichtbarWenn` über die
+   *  Antragsdaten erfüllt ist (der reine Interpreter `evalBedingung` wertet aus). Fehlt sie ⇒ immer sichtbar. Ein
+   *  verstecktes Pflichtfeld sperrt den Antrag NICHT (es wird gar nicht validiert). */
+  sichtbarWenn?: Bedingung;
 }
 export interface StepDef {
   id: string;
   titel: string;
   beschreibung?: string;
   felder: FeldDef[];
+  /** M3 — ROLLE des Schritts im Fluss: `kontext` (die konditionierende Vorgangsart — ZUERST), `erhebung`
+   *  (Datenerfassung, Default) oder `pruefung`. Steuert die Reihenfolge (kontext-Schritte werden vorgezogen).
+   *  OPTIONAL/additiv — ohne `rolle` verhält sich der Schritt wie bisher (Erhebung, Original-Reihenfolge). */
+  rolle?: "kontext" | "erhebung" | "pruefung";
+  /** M3 — SICHTBARKEITS-Bedingung des ganzen Schritts (progressive disclosure). Fehlt sie ⇒ immer sichtbar. */
+  sichtbarWenn?: Bedingung;
 }
 
 // ── Once-Only Register (synthetische Vorbefüllung) ──────────────────────────
@@ -343,6 +410,36 @@ export interface CodelistenEintrag {
   herkunft?: string;
   /** Nachweise, die dieser Eintrag auslöst (als Nachweis-Label) — der Interpreter leitet daraus Nachweise ab. */
   belege?: string[];
+  /** M1 — fachliche MERKMALE dieses Eintrags als DATEN (z. B. `{ sonderklasse: true, stufe: 1 }`). Über die
+   *  `ableitungen` der Codeliste projiziert ein Merkmal in ein Antragsfeld — die Subsumtion liest das ABGELEITETE
+   *  Feld statt eines manuellen Parallel-Flags. OPTIONAL/additiv. */
+  merkmale?: Record<string, string | number | boolean>;
+  /** M1 — optische MARKIERUNG dieses Eintrags im Selektor (z. B. ein Warn-Badge für eine Sonderklasse). OPTIONAL. */
+  markierung?: CodelistenMarkierung;
+}
+
+/** M1 — optische Markierung eines Codelisten-Eintrags im Auswahl-Menü (Ton steuert Farbe, `label` das Badge). */
+export interface CodelistenMarkierung {
+  /** Ton der Markierung: neutral erklärend (`info`), aufmerksam (`warn`) oder hervorgehoben (`kritisch`). */
+  ton: "info" | "warn" | "kritisch";
+  /** Badge-Text (z. B. „Sonderklasse"); fehlt er ⇒ nur farbliche Hervorhebung ohne Text. */
+  label?: string;
+}
+
+/** M1 — eine AUTO-ABLEITUNG einer Codeliste: das Merkmal `ausMerkmal` des GEWÄHLTEN Eintrags wird in das
+ *  Antragsfeld `setzeFeld` geschrieben (VOR der Berechnung). `default` greift, wenn der Eintrag das Merkmal nicht
+ *  trägt (oder noch nichts gewählt ist) — so ist z. B. „sonderklasse=false" der saubere Normalfall. */
+export interface CodelistenAbleitung {
+  ausMerkmal: string;
+  setzeFeld: string;
+  default?: string | number | boolean;
+}
+
+/** M1 — Rückverweis eines abgeleiteten FELDS auf die Codeliste + das Merkmal, aus dem es gefüllt wird. Der Kit
+ *  rendert ein Feld mit `abgeleitet` read-only als „automatisch abgeleitet". */
+export interface FeldAbleitung {
+  ausCodeliste: string;
+  merkmal: string;
 }
 
 /** Eine CODELISTE als DATEN: eine benannte Enumeration mit Provenienz je Eintrag. Über `FeldDef.optionsRef`
@@ -353,6 +450,10 @@ export interface Codeliste {
   /** Norm-Provenienz der GESAMTEN Liste (z. B. die Verordnung, deren Anlage die Werte enumeriert). */
   normRef?: NormRef;
   eintraege: CodelistenEintrag[];
+  /** M1 — AUTO-ABLEITUNGEN: je Regel projiziert das Merkmal des gewählten Eintrags in ein Antragsfeld (VOR der
+   *  Berechnung). Ersetzt manuelle Parallel-Flags. OPTIONAL/additiv — eine Codeliste ohne `ableitungen` verhält
+   *  sich wie bisher. */
+  ableitungen?: CodelistenAbleitung[];
 }
 
 /** Art einer norm-abgeleiteten Feldregel: bedingte Pflicht, Format, Bereich, erlaubte Werte. */
@@ -450,7 +551,14 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   kommune: string; // "Stadt Musterstadt"
   rechtsgrundlagen: { norm: string; titel: string; satzung?: boolean }[];
   fimLeistung?: { id: string; status: "belegt" | "annahme-zu-validieren" }; // GROUNDED — nie erfinden
-  antrag: { steps: StepDef[]; einleitung?: string };
+  /** M3 — `konditionierendesFeld`: der P0-Feldpfad der Vorgangsart, der den Rest des Antrags konditioniert; MUSS
+   *  in `steps[0]` (dem `rolle: "kontext"`-Schritt) liegen. Downstream-Schritte/-Felder blenden über `sichtbarWenn`
+   *  darauf ein. OPTIONAL/additiv — fehlt es, gibt es keine progressive Disclosure (Verhalten wie bisher). */
+  antrag: {
+    steps: StepDef[];
+    einleitung?: string;
+    konditionierendesFeld?: string;
+  };
   /** Benannte, wiederverwendbare Auswahl-Listen als DATEN (z. B. `{ rassen: [...], kategorien: [...] }`). Ein Feld
    *  referenziert eine Liste über `FeldDef.optionsRef` und zieht seine Optionen damit aus der Config — die generische
    *  Fähigkeit, dass ein Verfahren z. B. eine Rassenliste liefert, ohne Kit-Code zu ändern. */
