@@ -9,6 +9,8 @@ export * from "./lib/antrag-felder.js";
 export * from "./lib/interpreter.js";
 // KI-Extraktions-PORT (Dokument → Feld-Vorschläge mit Konfidenz) — vendor-neutral, Stub-Default.
 export * from "./lib/dokument-extraktion.js";
+// Nachweis-Upload-Regeln als DATEN: accept-Attribut, Einschränkungs-Text + reine Fail-Fast-Vorprüfung (Typ/Größe).
+export * from "./lib/nachweis-pruefung.js";
 
 // UI-Bausteine (Tailwind + shadcn/ui OSS) — konsumieren ausschließlich den Vertrag (config/port/vorgang).
 export * from "./ui/badge.js";

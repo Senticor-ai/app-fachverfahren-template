@@ -41,12 +41,21 @@ export interface Berechnung {
   positionen?: { label: string; betrag: number }[];
 }
 
-/** Ein hochzuladender/zu erbringender Nachweis. */
+/** Ein hochzuladender/zu erbringender Nachweis. `erforderlich` trägt die Pflicht/optional-Regel als DATEN; die
+ *  optionalen Einschränkungen (Typ/Größe) sind ADDITIV — ein Nachweis ohne sie akzeptiert wie bisher jede Datei.
+ *  Der Server prüft sie verbindlich (server-autoritativ); die Client-Vorprüfung (`lib/nachweis-pruefung`) ist nur
+ *  Fail-Fast-Komfort. Alle Werte kommen aus dem Verfahren/der Config — der Kit trägt KEINE Domänen-Literale. */
 export interface Nachweis {
   id: string;
   label: string;
   hochgeladen: boolean;
   erforderlich?: boolean;
+  /** Erlaubte Datei-Typen als DATEN (native `accept`-Tokens: MIME wie `"application/pdf"`, Wildcard `"image/*"`
+   *  oder Endung `".pdf"`). Steuert den Datei-Dialog + die Vorprüfung + den Einschränkungs-Hinweis. Fehlt sie ⇒
+   *  jeder Typ ist wählbar. */
+  akzeptierteTypen?: string[];
+  /** Maximale Dateigröße in Bytes als DATEN. Fehlt sie ⇒ keine clientseitige Größen-Vorprüfung. */
+  maxGroesseBytes?: number;
 }
 
 /** Der generische Vorgang — `TAntragsdaten` ist der LEISTUNGS-spezifische Antragsinhalt

@@ -14,9 +14,13 @@ const sharedDep = (pkg: string) => path.join(appDir, "node_modules", pkg);
 // `base` laufen — sonst serviert der Dev-Server alle Modul-/Dep-/HMR-Pfade ROOT-absolut (/@vite, /src,
 // /node_modules/.vite) OHNE Präfix; der Proxy kann nur HTML-Attribute (nicht die JS-import-Strings) umschreiben
 // → 404 → WEISSER SCHIRM im Builder. Mit base=<previewPath> präfixiert vite ALLE Pfade → jeder Request trägt
-// /flow/preview/<session>/ → der Proxy trifft ihn. Der einbettende Host reicht den Wert über die stabile
-// Umgebungsvariable CHOS_FLOW_PREVIEW_BASE durch; lokal/standalone bleibt es "/" (kein Regress).
-const previewBase = process.env["CHOS_FLOW_PREVIEW_BASE"] || "/";
+// den Präfix → der Proxy trifft ihn. Ein einbettender Preview-/Proxy-Host reicht den Wert über die
+// vendor-neutrale Umgebungsvariable APP_PREVIEW_BASE durch (der ältere Name CHOS_FLOW_PREVIEW_BASE wird aus
+// Kompatibilität weiter akzeptiert); lokal/standalone bleibt es "/" (kein Regress).
+const previewBase =
+  process.env["APP_PREVIEW_BASE"] ||
+  process.env["CHOS_FLOW_PREVIEW_BASE"] ||
+  "/";
 
 export default defineConfig({
   base: previewBase,

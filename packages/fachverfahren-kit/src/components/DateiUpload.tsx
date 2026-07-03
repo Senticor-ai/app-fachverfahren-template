@@ -32,6 +32,12 @@ import {
 import type { Nachweis } from "../types.js";
 import { cn } from "../lib/utils.js";
 import { formatDateiGroesse } from "../format.js";
+import {
+  nachweisAcceptAttribut,
+  nachweisEinschraenkungenText,
+  pruefeNachweisDatei,
+  type NachweisAblehnungsGrund,
+} from "../lib/nachweis-pruefung.js";
 import { Button } from "../ui/button.js";
 import { Progress } from "../ui/progress.js";
 import { useStatusRegion } from "./StatusRegion.js";
@@ -52,12 +58,9 @@ export type NachweisUploadPhase =
   | "scanning"
   | "rejected";
 
-/** Grund-Kategorie einer Ablehnung (nur für Icon/Wording; der Klartext kommt in `meldung`). */
-export type NachweisAblehnungsGrund =
-  | "format"
-  | "groesse"
-  | "virus"
-  | "sonstiges";
+// Die Ablehnungs-Kategorie `NachweisAblehnungsGrund` ist kanonisch in `../lib/nachweis-pruefung.js` definiert
+// (EINE Wahrheit für die server-autoritative Statusanzeige HIER und die reine Fail-Fast-Vorprüfung dort) und wird
+// über den Paket-Einstieg (index.ts re-exportiert die Lib) öffentlich bereitgestellt.
 
 export interface NachweisUploadStatus {
   /** Aktuelle Phase dieser Position (server-autoritativ). */
@@ -233,6 +236,12 @@ function NachweisZeile({
   const anforderungId = useId();
   const fehlerId = useId();
   const statusFehlerId = useId();
+  const einschraenkungId = useId();
+
+  // DATEN-getriebene Einschränkungen (Typ/Größe): steuern das native `accept`, den sichtbaren Hinweis und die
+  // Fail-Fast-Vorprüfung. Fehlen sie am Nachweis, verhält sich die Position exakt wie bisher.
+  const accept = nachweisAcceptAttribut(nachweis);
+  const einschraenkungenText = nachweisEinschraenkungenText(nachweis);
 
   const { announce } = useStatusRegion();
   const [dragOver, setDragOver] = useState(false);
@@ -263,6 +272,18 @@ function NachweisZeile({
 
   const verarbeiteDatei = (file: File | undefined | null) => {
     if (!file) return;
+    // Fail-Fast gegen die DATEN-Einschränkungen (Typ/Größe) — der Server bleibt autoritativ (Format/Größe/Virus),
+    // aber ein offensichtlich unzulässiger Upload wird gar nicht erst gestartet und sofort erklärt.
+    const pruef = pruefeNachweisDatei(nachweis, {
+      name: file.name,
+      groesse: file.size,
+      typ: file.type,
+    });
+    if (pruef) {
+      setFehler(pruef.meldung);
+      announce(`${nachweis.label}: ${pruef.meldung}`, "assertive");
+      return;
+    }
     setFehler(null);
     onPick({ name: file.name, groesse: file.size });
   };
@@ -329,6 +350,14 @@ function NachweisZeile({
               ? "Beleg hinzugefügt — Sie können ihn ersetzen oder entfernen."
               : "Ziehen Sie eine Datei hierher oder wählen Sie eine Datei aus, um diesen Nachweis zu erbringen."}
           </p>
+          {einschraenkungenText && (
+            <p
+              id={einschraenkungId}
+              className="mt-0.5 text-xs text-muted-foreground"
+            >
+              {einschraenkungenText}
+            </p>
+          )}
         </div>
 
         {/* Status-Badge: laufend/abgelehnt haben Vorrang vor „Hochgeladen" (server-autoritativ). */}
@@ -369,7 +398,11 @@ function NachweisZeile({
         id={inputId}
         type="file"
         className="sr-only"
-        aria-describedby={anforderungId}
+        accept={accept}
+        aria-describedby={cn(
+          anforderungId,
+          einschraenkungenText ? einschraenkungId : undefined,
+        )}
         onChange={(e) => {
           verarbeiteDatei(e.target.files?.[0]);
           // Eingabe leeren, damit dieselbe Datei erneut gewählt werden kann (löst sonst kein change-Event aus).
@@ -530,6 +563,7 @@ function NachweisZeile({
           }
           aria-describedby={cn(
             anforderungId,
+            einschraenkungenText ? einschraenkungId : undefined,
             fehler ? fehlerId : undefined,
             abgelehnt ? statusFehlerId : undefined,
           )}
