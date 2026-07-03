@@ -137,3 +137,47 @@ export * from "./components/DescriptionList.js";
 export * from "./components/SummaryList.js";
 export * from "./components/Timeline.js";
 export * from "./components/Callout.js";
+
+// ── KI-Anbindung (Port-only, EU-AI-Act): transparente Assistenz + Chat-Port + Agenten-UX-Primitives ──
+// Vendor-neutral, kein Netz/Modell im Kit — echte Modelle docken an die Ports an. Mensch entscheidet (reviewErforderlich).
+export * from "./lib/ai-assist.js";
+export * from "./hooks/use-ai-assist.js";
+export * from "./hooks/use-assistent.js";
+export * from "./components/AgentStatusIndicator.js";
+export * from "./components/StreamingText.js";
+export * from "./components/AgentTrace.js";
+export * from "./components/ToolCallCard.js";
+export * from "./components/AssistentPanel.js";
+
+// ── KI-Steuerung: der Mensch schaltet die KI (Präferenz-Schicht), humanOversight unabschaltbar; localStorage-Hook. ──
+export * from "./lib/ki-steuerung.js";
+export * from "./hooks/useKiSteuerung.js";
+export * from "./components/KiSteuerung.js";
+
+// ── Spracheingabe (Voice-PORT): on-device by default, Consent-gated; kein Mikrofon/SpeechRecognition im Kit. ──
+export * from "./lib/voice-input.js";
+export * from "./hooks/use-voice-input.js";
+export * from "./components/VoiceInput.js";
+
+// ── Eingabe-Seite: de-DE Parsen (Betrag/IBAN/Datum) + DATEN-getriebene Feld-Validierung + barrierefreie Feld-Wrapper. ──
+export * from "./lib/eingabe.js";
+export * from "./components/BetragEingabe.js";
+export * from "./components/ValidiertesFeld.js";
+
+// ── Neue generische Bausteine: Ablauf-Diagramm, Vergleich/Diff, Gebühren-Aufstellung, Kalender, Export, Zustellungs-freie
+//    In-App-Hinweise, Vertretung, Sprachvarianten/Leichte Sprache, Druck; Theme- + Barrierefreiheits-Steuerung. ──
+export * from "./lib/status-mermaid.js";
+export * from "./components/WorkflowDiagramm.js";
+export * from "./components/VergleichsAnsicht.js";
+export * from "./components/GebuehrenAnzeige.js";
+export * from "./lib/export-csv.js";
+export * from "./components/ExportDialog.js";
+export * from "./components/NotificationCenter.js";
+export * from "./components/FristenKalender.js";
+export * from "./components/VertretungPanel.js";
+export * from "./components/SprachvariantenText.js";
+export * from "./components/DruckAnsicht.js";
+export * from "./hooks/useTheme.js";
+export * from "./components/ThemeToggle.js";
+export * from "./hooks/useA11ySettings.js";
+export * from "./components/BarrierefreiheitsPanel.js";

@@ -545,6 +545,35 @@ export interface FristTyp {
 }
 
 /** Die EINE Config, die ein Fachverfahren vollständig beschreibt — von der Generierung aus dem Fachkonzept gefüllt. */
+/** DATEN-Signal: das Verfahren BIETET transparente KI-Assistenz an (KiAssistPanel Live-Modus, KiAssistPort).
+ *  Reines Angebot + Obergrenzen — der Mensch schaltet über `KiSteuerung`, ein Port (lib/ai-assist) liefert zur
+ *  Laufzeit. Kein Modell/Netz im Kit. Transparenz nach Art. 50 EU-AI-Act ist Pflicht (Kennzeichnung + „warum"). */
+export interface KiAssistConfig {
+  /** Menschlich lesbarer Zweck (Transparenz) — z. B. „Vorschlag zur Vollständigkeitsprüfung". */
+  zweck: string;
+  /** Herkunft/Modellklasse als Anzeige (Transparenzelement „source"), z. B. „kommunales LLM (EU-Hosting)". */
+  quelle?: string;
+  /** Autonomie-OBERGRENZE: die effektive Schwelle ist max(diese, KiSteuerung.schwelleAutonom) — der Mensch kann
+   *  nur strenger, nie lockerer stellen; unterhalb bleibt die menschliche Freigabe zwingend (humanOversight). */
+  maxSchwelleAutonom?: number;
+}
+
+/** DATEN-Signal: das Verfahren BIETET einen KI-Assistenten/Chat an (AssistentPanel, KiChatPort). */
+export interface KiChatConfig {
+  zweck: string;
+  quelle?: string;
+  /** Optionaler, generischer Begrüßungstext (keine Domänen-Antworten im Kit). */
+  begruessung?: string;
+}
+
+/** DATEN-Signal: das Verfahren BIETET Spracheingabe an (VoiceInput, VoicePort). */
+export interface VoiceConfig {
+  /** Sprache(n) als BCP-47 (z. B. „de-DE") — informativ für die Transkription. */
+  sprachen?: string[];
+  /** Muss die Verarbeitung on-device / EU-ansässig sein? Kit-Default-Erwartung: true (Datenschutz). */
+  euResidenzErforderlich?: boolean;
+}
+
 export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   id: string; // slug, z.B. "leistung"
   label: string; // Anzeigename der Leistung
@@ -592,6 +621,12 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
     schwelleAutonom: number; // ab dieser Konfidenz + 0 Flags = "autonom-fähig" (Aufsichts-Kennzahl)
     /** Gesetzt ⇒ KiAssistPanel (5 Transparenzelemente) statt/zusätzlich zur KiVorschlag-Karte. */
     vorschlag?: KiVorschlagConfig | undefined;
+    /** Gesetzt ⇒ das Verfahren bietet transparente KI-Assistenz an (KiAssistPanel Live-Modus + KiAssistPort). */
+    assist?: KiAssistConfig | undefined;
+    /** Gesetzt ⇒ das Verfahren bietet einen KI-Assistenten/Chat an (AssistentPanel + KiChatPort). */
+    chat?: KiChatConfig | undefined;
+    /** Gesetzt ⇒ das Verfahren bietet Spracheingabe an (VoiceInput + VoicePort). */
+    voice?: VoiceConfig | undefined;
   };
   /** Gesetzt + `berechnung.betrag > 0` ⇒ EPaymentPanel im Bürger-Antrag (verbindliche Gebühr). */
   ePayment?: EPaymentConfig | undefined;
