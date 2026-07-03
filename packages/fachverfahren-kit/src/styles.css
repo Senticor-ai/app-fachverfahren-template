@@ -89,10 +89,29 @@
   --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
   --shadow-lg: var(--shadow-lg);
+
+  /* Motion — EINE Wahrheit (Spec §4.7): 150–200 ms, ease-out, kein Bounce.
+     Diese beiden Theme-Defaults setzen die `transition`-Utility GLOBAL auf 150 ms / ease-out,
+     sodass Flächen KEINE literale Dauer-Klasse mehr tragen müssen (nur noch `transition`). */
+  --ease-fv: var(--fv-ease-out);
+  --default-transition-duration: var(--fv-duration-base);
+  --default-transition-timing-function: var(--fv-ease-out);
+
+  /* Kit-eigene, tokenisierte Keyframe-Utilities (dezent, kein Bounce) → `animate-fv-*`/`animate-accordion-*`. */
+  --animate-fv-shimmer: fv-shimmer 1.5s linear infinite;
+  --animate-fv-fade-in-up: fv-fade-in-up var(--fv-duration-slow) var(--fv-ease-out);
+  --animate-accordion-down: accordion-down var(--fv-duration-slow) var(--fv-ease-out);
+  --animate-accordion-up: accordion-up var(--fv-duration-slow) var(--fv-ease-out);
 }
 
 :root {
   --radius: 0.5rem;
+
+  /* Motion-Tokens — theme-neutral (Spec §4.7): fast=Micro, base=Standard, slow=Enter/Overlay; ease-out, kein Bounce. */
+  --fv-duration-fast: 100ms;
+  --fv-duration-base: 150ms;
+  --fv-duration-slow: 200ms;
+  --fv-ease-out: cubic-bezier(0, 0, 0.2, 1);
 
   /* Neutraler Hintergrund + Tinte */
   --background: hsl(220 20% 97%);
@@ -290,6 +309,75 @@
    Von ErrorSummary UND FormMessage/Inline-Feldfehler geteilt → nie divergent. */
 @utility fv-text-error {
   @apply text-sm font-medium text-destructive;
+}
+
+/* ── Motion (Spec §4.7): dezent, 150–200 ms, ease-out, kein Bounce; global via prefers-reduced-motion aus. ── */
+@keyframes fv-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+@keyframes fv-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+/* Sanfter Übergang — EIN Rezept (ersetzt literale Dauer-Ketten). Reduced-motion hart aus. */
+@utility fv-transition {
+  transition-property:
+    color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: var(--fv-duration-base);
+  transition-timing-function: var(--fv-ease-out);
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+/* Eintritts-Animation (fade-in + 4px) — für erscheinende Flächen (z. B. KI-Marking-Moment). */
+@utility fv-enter {
+  animation: fv-fade-in-up var(--fv-duration-slow) var(--fv-ease-out);
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* Interaktive Karte: dezente Hover-Elevation (kein Scale/Bounce). HC-neutral (Elevation = 1px-Border). */
+@utility fv-card-interactive {
+  transition:
+    box-shadow var(--fv-duration-base) var(--fv-ease-out),
+    border-color var(--fv-duration-base) var(--fv-ease-out);
+  cursor: pointer;
+  &:hover {
+    box-shadow: var(--shadow-md);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 }
 
 /* ── A11y-Nutzer-Schalter (opt-in, nicht standardmäßig aktiv) ── */
