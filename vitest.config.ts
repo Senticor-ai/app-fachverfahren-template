@@ -28,6 +28,8 @@ export default defineConfig({
       "**/dist/**",
       "**/dist-server/**",
       "**/node_modules/**",
+      // E2E baut das reale Bundle (Full-Build-Kosten) — läuft separat via `test:e2e` (vitest.e2e.config.ts).
+      "tests/e2e/**",
     ],
   },
 });

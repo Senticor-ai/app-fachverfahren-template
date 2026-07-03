@@ -105,6 +105,10 @@
     {
       "id": "skill:accessibility-bitv",
       "path": ".agents/skills/accessibility-bitv/SKILL.md"
+    },
+    {
+      "id": "skill:backend-fastify",
+      "path": ".agents/skills/backend-fastify/SKILL.md"
     }
   ],
   "componentLibraries": [
