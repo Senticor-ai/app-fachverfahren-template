@@ -99,9 +99,12 @@
 
   /* Kit-eigene, tokenisierte Keyframe-Utilities (dezent, kein Bounce) → `animate-fv-*`/`animate-accordion-*`. */
   --animate-fv-shimmer: fv-shimmer 1.5s linear infinite;
-  --animate-fv-fade-in-up: fv-fade-in-up var(--fv-duration-slow) var(--fv-ease-out);
-  --animate-accordion-down: accordion-down var(--fv-duration-slow) var(--fv-ease-out);
-  --animate-accordion-up: accordion-up var(--fv-duration-slow) var(--fv-ease-out);
+  --animate-fv-fade-in-up: fv-fade-in-up var(--fv-duration-slow)
+    var(--fv-ease-out);
+  --animate-accordion-down: accordion-down var(--fv-duration-slow)
+    var(--fv-ease-out);
+  --animate-accordion-up: accordion-up var(--fv-duration-slow)
+    var(--fv-ease-out);
 }
 
 :root {

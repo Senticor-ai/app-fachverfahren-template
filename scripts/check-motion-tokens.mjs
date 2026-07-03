@@ -71,7 +71,8 @@ for (const sourceRoot of sourceRoots) {
     const rel = display(file);
     const text = await readFile(file, "utf8");
     const durMatches = text.match(LITERAL_DURATION);
-    if (durMatches && durMatches.length > 0) durationCounts[rel] = durMatches.length;
+    if (durMatches && durMatches.length > 0)
+      durationCounts[rel] = durMatches.length;
     text.split(/\r?\n/).forEach((line, i) => {
       if (BOUNCE.test(line)) bounceHits.push(`${rel}:${i + 1}`);
     });
@@ -98,7 +99,9 @@ const violations = [];
 
 // Regel 1: animate-bounce ist immer verboten.
 for (const hit of bounceHits) {
-  violations.push(`${hit}: animate-bounce ist verboten (verspielt) — dezente Motion-Tokens nutzen`);
+  violations.push(
+    `${hit}: animate-bounce ist verboten (verspielt) — dezente Motion-Tokens nutzen`,
+  );
 }
 
 // Regel 2: Ratchet gegen die Baseline.
