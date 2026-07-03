@@ -55,10 +55,7 @@ export function GebuehrenAnzeige({
   const ueberschrift = titel ?? berechnung.label;
 
   return (
-    <section
-      className={cn("space-y-3", className)}
-      aria-labelledby={titelId}
-    >
+    <section className={cn("space-y-3", className)} aria-labelledby={titelId}>
       <h3 id={titelId} className="text-base font-semibold text-foreground">
         {ueberschrift}
       </h3>

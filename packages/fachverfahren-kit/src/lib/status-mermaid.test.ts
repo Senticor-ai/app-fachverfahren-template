@@ -68,7 +68,9 @@ describe("statusMachineZuMermaid — reine Projektion StatusMachine → stateDia
 
   it("erzeugt je Übergang eine Kante mit Handlungs-Label und Rollen", () => {
     const out = statusMachineZuMermaid(machine);
-    expect(out).toContain("eingegangen --> pruefung : Zur Prüfung · sachbearbeitung");
+    expect(out).toContain(
+      "eingegangen --> pruefung : Zur Prüfung · sachbearbeitung",
+    );
     expect(out).toContain(
       "pruefung --> festgesetzt : Festsetzen · sachbearbeitung/aufsicht [4-Augen]",
     );
@@ -106,6 +108,8 @@ describe("statusMachineZuMermaid — reine Projektion StatusMachine → stateDia
   });
 
   it("ist deterministisch (gleiche Eingabe → gleiche Ausgabe)", () => {
-    expect(statusMachineZuMermaid(machine)).toBe(statusMachineZuMermaid(machine));
+    expect(statusMachineZuMermaid(machine)).toBe(
+      statusMachineZuMermaid(machine),
+    );
   });
 });

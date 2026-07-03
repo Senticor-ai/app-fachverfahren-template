@@ -44,7 +44,8 @@ const BOM = "﻿";
 function zelleZuText(wert: unknown): string {
   if (wert === null || wert === undefined) return "";
   if (typeof wert === "string") return wert;
-  if (typeof wert === "number") return Number.isFinite(wert) ? String(wert) : "";
+  if (typeof wert === "number")
+    return Number.isFinite(wert) ? String(wert) : "";
   if (typeof wert === "boolean") return String(wert);
   if (wert instanceof Date) {
     return Number.isNaN(wert.getTime()) ? "" : wert.toISOString();
@@ -101,9 +102,7 @@ export function zuCsv(
   for (const zeile of zeilen) {
     const zellen = spalten.map((spalte) => {
       const roh = zeile[spalte.key];
-      const text = spalte.format
-        ? spalte.format(roh, zeile)
-        : zelleZuText(roh);
+      const text = spalte.format ? spalte.format(roh, zeile) : zelleZuText(roh);
       return quoteWennNoetig(text, trenner);
     });
     ausgabe.push(zellen.join(trenner));

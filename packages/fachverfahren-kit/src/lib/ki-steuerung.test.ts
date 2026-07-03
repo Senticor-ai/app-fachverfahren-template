@@ -54,7 +54,9 @@ describe("featureAngeboten — reine Angebots-Frage", () => {
 
 describe("istFeatureAktiv — Angebot ∧ Hauptschalter ∧ Feature", () => {
   it("ist true nur, wenn alle drei Bedingungen erfüllt sind", () => {
-    expect(istFeatureAktiv(defaultKiSteuerung(), "assist", angebotVoll)).toBe(true);
+    expect(istFeatureAktiv(defaultKiSteuerung(), "assist", angebotVoll)).toBe(
+      true,
+    );
   });
 
   it("ist false, wenn die Config das Feature NICHT anbietet", () => {
@@ -86,12 +88,18 @@ describe("istFeatureAktiv — Angebot ∧ Hauptschalter ∧ Feature", () => {
 
 describe("effektiveSchwelle — der Mensch stellt nur STRENGER", () => {
   it("ist das Maximum aus Config-Obergrenze und menschlicher Schwelle", () => {
-    const strenger: KiSteuerung = { ...defaultKiSteuerung(), schwelleAutonom: 0.95 };
+    const strenger: KiSteuerung = {
+      ...defaultKiSteuerung(),
+      schwelleAutonom: 0.95,
+    };
     expect(effektiveSchwelle(strenger, angebotVoll)).toBe(0.95);
   });
 
   it("hält die Config-Obergrenze, wenn der Mensch lockerer stellen will", () => {
-    const lockerer: KiSteuerung = { ...defaultKiSteuerung(), schwelleAutonom: 0.5 };
+    const lockerer: KiSteuerung = {
+      ...defaultKiSteuerung(),
+      schwelleAutonom: 0.5,
+    };
     // Menschlich 0,5 < Config 0,9 ⇒ das Maximum hält 0,9 (kein Lockern möglich).
     expect(effektiveSchwelle(lockerer, angebotVoll)).toBe(0.9);
   });
@@ -102,7 +110,9 @@ describe("effektiveSchwelle — der Mensch stellt nur STRENGER", () => {
 
   it("liest die Obergrenze aus assist.maxSchwelleAutonom (nicht aus config.schwelleAutonom)", () => {
     // Config trägt schwelleAutonom 0,8, aber KEIN assist ⇒ Obergrenze 0 ⇒ effektiv 0.
-    expect(effektiveSchwelle(defaultKiSteuerung(), { schwelleAutonom: 0.8 })).toBe(0);
+    expect(
+      effektiveSchwelle(defaultKiSteuerung(), { schwelleAutonom: 0.8 }),
+    ).toBe(0);
   });
 
   it("fällt auf 0 zurück, wenn weder Config noch Mensch etwas setzen", () => {

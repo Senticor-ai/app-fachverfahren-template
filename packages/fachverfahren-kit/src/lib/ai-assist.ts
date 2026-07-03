@@ -173,9 +173,7 @@ export interface StubChatOptions {
  * konfigurierten Token-Chunks (`generator`/`chunks`) und liefert am Ende `quelle` + `kennzeichnung`.
  * So ist der gestreamte Chat vollstaendig testbar und in Stories klickbar, bevor ein echtes Modell andockt.
  */
-export function createStubChatPort(
-  options: StubChatOptions = {},
-): KiChatPort {
+export function createStubChatPort(options: StubChatOptions = {}): KiChatPort {
   const quelle = options.quelle ?? "Stub-Assistent (kein echtes Modell)";
   const kennzeichnung = options.kennzeichnung ?? STANDARD_KI_KENNZEICHNUNG;
   return {

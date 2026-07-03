@@ -242,7 +242,9 @@ export function VertretungPanel({
                 }
               />
             </FormControl>
-            <FormDescription>Leer lassen für eine unbefristete Vollmacht.</FormDescription>
+            <FormDescription>
+              Leer lassen für eine unbefristete Vollmacht.
+            </FormDescription>
             <FormMessage>{bisFehler}</FormMessage>
           </FormField>
         </div>

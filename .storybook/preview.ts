@@ -7,7 +7,8 @@ import "../packages/fachverfahren-kit/src/styles.css";
 const THEME_CLASSES = ["dark", "high-contrast", "large-text"] as const;
 
 function applyTheme(theme: string) {
-  const root = typeof document !== "undefined" ? document.documentElement : null;
+  const root =
+    typeof document !== "undefined" ? document.documentElement : null;
   if (!root) return;
   for (const c of THEME_CLASSES) root.classList.remove(c);
   if (theme === "dark") root.classList.add("dark");

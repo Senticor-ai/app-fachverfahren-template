@@ -88,7 +88,10 @@ describe("createStubChatPort — gestreamte Antwort aus DATEN (kein Modell)", ()
     });
     const { chunks, abschluss } = await stromZuTexten(port.sende(verlauf));
     expect(chunks).toEqual(["Guten ", "Tag."]);
-    expect(abschluss).toEqual({ quelle: "Chat-Test", kennzeichnung: "KI-Chat" });
+    expect(abschluss).toEqual({
+      quelle: "Chat-Test",
+      kennzeichnung: "KI-Chat",
+    });
   });
 
   it("ein generator leitet die Chunks aus dem Verlauf ab (Vorrang vor chunks)", async () => {

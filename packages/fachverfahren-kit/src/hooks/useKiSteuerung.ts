@@ -9,7 +9,11 @@
 // Wahrheit für die Laufzeit.
 import * as React from "react";
 
-import type { KiFeature, KiSteuerung, TransparenzLevel } from "../lib/ki-steuerung.js";
+import type {
+  KiFeature,
+  KiSteuerung,
+  TransparenzLevel,
+} from "../lib/ki-steuerung.js";
 import { defaultKiSteuerung } from "../lib/ki-steuerung.js";
 
 /** Speicher-Schlüssel der Präferenz (ein Eintrag je Nutzer:in/Browser). */
@@ -54,14 +58,19 @@ function istTransparenz(w: unknown): w is TransparenzLevel {
  * Führt einen (evtl. veralteten/manipulierten) gespeicherten Teilwert gegen den aktuellen Default zusammen: fehlende
  * Felder werden aufgefüllt, `humanOversight` bleibt IMMER `true`, `schwelleAutonom` nur, wenn es eine Zahl ist.
  */
-function normalisiere(teil: Partial<KiSteuerung> | null | undefined): KiSteuerung {
+function normalisiere(
+  teil: Partial<KiSteuerung> | null | undefined,
+): KiSteuerung {
   const basis = defaultKiSteuerung();
   if (!teil || typeof teil !== "object") return basis;
   return {
     aktiv: istBoolean(teil.aktiv, basis.aktiv),
     features: {
       assist: istBoolean(teil.features?.assist, basis.features.assist),
-      extraktion: istBoolean(teil.features?.extraktion, basis.features.extraktion),
+      extraktion: istBoolean(
+        teil.features?.extraktion,
+        basis.features.extraktion,
+      ),
       chat: istBoolean(teil.features?.chat, basis.features.chat),
       voice: istBoolean(teil.features?.voice, basis.features.voice),
     },

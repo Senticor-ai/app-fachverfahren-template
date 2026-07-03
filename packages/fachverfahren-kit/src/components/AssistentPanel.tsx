@@ -23,7 +23,10 @@ import {
 } from "../ui/form-field.js";
 import { Callout } from "./Callout.js";
 import { StreamingText } from "./StreamingText.js";
-import { AgentStatusIndicator, type AgentStatus } from "./AgentStatusIndicator.js";
+import {
+  AgentStatusIndicator,
+  type AgentStatus,
+} from "./AgentStatusIndicator.js";
 import { useAssistent } from "../hooks/use-assistent.js";
 import type { KiChatPort } from "../lib/ai-assist.js";
 
@@ -88,7 +91,10 @@ export function AssistentPanel({
       {/* Kopf: Titel + Agenten-Status */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border p-3">
         <h3 className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
-          <Bot className="h-4 w-4 shrink-0 text-status-info" aria-hidden="true" />
+          <Bot
+            className="h-4 w-4 shrink-0 text-status-info"
+            aria-hidden="true"
+          />
           {titel}
         </h3>
         <AgentStatusIndicator status={status} />
@@ -128,7 +134,10 @@ export function AssistentPanel({
                 </span>
                 {istAssistent ? (
                   <>
-                    <StreamingText text={n.text} streaming={n.streamt ?? false} />
+                    <StreamingText
+                      text={n.text}
+                      streaming={n.streamt ?? false}
+                    />
                     {n.abschluss ? (
                       <p className="mt-1.5 border-t border-border/60 pt-1 text-xs text-muted-foreground">
                         {kennzeichnung} · {n.abschluss.quelle}

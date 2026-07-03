@@ -47,7 +47,9 @@ if (!snap.kommune || typeof snap.kommune !== "string")
   fail("contract.kommune fehlt/leer.");
 
 if (!Array.isArray(snap.rechtsgrundlagen) || snap.rechtsgrundlagen.length < 1)
-  fail("contract.rechtsgrundlagen muss mind. 1 Norm enthalten (Geerdet-Prinzip).");
+  fail(
+    "contract.rechtsgrundlagen muss mind. 1 Norm enthalten (Geerdet-Prinzip).",
+  );
 
 const steps = snap.antrag?.steps ?? [];
 if (!Array.isArray(steps) || steps.length < 1)
@@ -108,11 +110,15 @@ if (!sm || !Array.isArray(sm.states) || sm.states.length < 1) {
 }
 
 if (!Array.isArray(snap.detailSektionen) || snap.detailSektionen.length < 1)
-  fail("contract.detailSektionen muss mind. 1 Sektion enthalten (SB-Detailsicht).");
+  fail(
+    "contract.detailSektionen muss mind. 1 Sektion enthalten (SB-Detailsicht).",
+  );
 
 const suchfelder = snap.register?.suchfelder;
 if (!Array.isArray(suchfelder) || suchfelder.length < 1)
-  fail("contract.register.suchfelder muss mind. 1 Once-Only-Suchfeld enthalten.");
+  fail(
+    "contract.register.suchfelder muss mind. 1 Once-Only-Suchfeld enthalten.",
+  );
 
 // ── Ergebnis ──────────────────────────────────────────────────────────────────
 if (fehler.length > 0) {

@@ -12,7 +12,11 @@ import * as React from "react";
 import { ShieldCheck } from "lucide-react";
 
 import type { LeistungConfig } from "../types.js";
-import type { KiFeature, KiSteuerung, TransparenzLevel } from "../lib/ki-steuerung.js";
+import type {
+  KiFeature,
+  KiSteuerung,
+  TransparenzLevel,
+} from "../lib/ki-steuerung.js";
 import { effektiveSchwelle, featureAngeboten } from "../lib/ki-steuerung.js";
 import { cn } from "../lib/utils.js";
 import { Switch } from "../ui/switch.js";
@@ -23,26 +27,35 @@ import { Callout } from "./Callout.js";
 import { StatusRegion } from "./StatusRegion.js";
 
 /** Reihenfolge + generische Beschriftung der Features (keine Domänen-Literale). */
-const FEATURE_META: Record<KiFeature, { label: string; beschreibung: string }> = {
-  assist: {
-    label: "KI-Assistenz",
-    beschreibung: "Vorschläge zur Bearbeitung — jeder Vorschlag wird von einem Menschen bestätigt.",
-  },
-  extraktion: {
-    label: "Dokumenten-Extraktion",
-    beschreibung: "Felder aus hochgeladenen Nachweisen vorschlagen (zur Bestätigung).",
-  },
-  chat: {
-    label: "KI-Assistent (Chat)",
-    beschreibung: "Assistierender Dialog zur Leistung — unverbindliche Auskunft.",
-  },
-  voice: {
-    label: "Spracheingabe",
-    beschreibung: "Diktat statt Tastatureingabe.",
-  },
-};
+const FEATURE_META: Record<KiFeature, { label: string; beschreibung: string }> =
+  {
+    assist: {
+      label: "KI-Assistenz",
+      beschreibung:
+        "Vorschläge zur Bearbeitung — jeder Vorschlag wird von einem Menschen bestätigt.",
+    },
+    extraktion: {
+      label: "Dokumenten-Extraktion",
+      beschreibung:
+        "Felder aus hochgeladenen Nachweisen vorschlagen (zur Bestätigung).",
+    },
+    chat: {
+      label: "KI-Assistent (Chat)",
+      beschreibung:
+        "Assistierender Dialog zur Leistung — unverbindliche Auskunft.",
+    },
+    voice: {
+      label: "Spracheingabe",
+      beschreibung: "Diktat statt Tastatureingabe.",
+    },
+  };
 
-const FEATURE_REIHENFOLGE: readonly KiFeature[] = ["assist", "extraktion", "chat", "voice"];
+const FEATURE_REIHENFOLGE: readonly KiFeature[] = [
+  "assist",
+  "extraktion",
+  "chat",
+  "voice",
+];
 
 /** Transparenz-Stufen mit generischer Erläuterung (Art. 50 EU-AI-Act: Kennzeichnungs-Tiefe). */
 const TRANSPARENZ_META: readonly {
@@ -50,9 +63,21 @@ const TRANSPARENZ_META: readonly {
   label: string;
   beschreibung: string;
 }[] = [
-  { value: "minimal", label: "Minimal", beschreibung: "Nur die Kennzeichnung, dass KI beteiligt war." },
-  { value: "standard", label: "Standard", beschreibung: "Kennzeichnung, Quelle und Konfidenz je Vorschlag." },
-  { value: "ausfuehrlich", label: "Ausführlich", beschreibung: "Zusätzlich Begründung und Fundstellen." },
+  {
+    value: "minimal",
+    label: "Minimal",
+    beschreibung: "Nur die Kennzeichnung, dass KI beteiligt war.",
+  },
+  {
+    value: "standard",
+    label: "Standard",
+    beschreibung: "Kennzeichnung, Quelle und Konfidenz je Vorschlag.",
+  },
+  {
+    value: "ausfuehrlich",
+    label: "Ausführlich",
+    beschreibung: "Zusätzlich Begründung und Fundstellen.",
+  },
 ];
 
 function prozent(anteil: number): number {
@@ -157,11 +182,15 @@ export function KiSteuerungPanel({
             KI-Steuerung
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Sie schalten, welche KI-Funktionen Sie unterstützen. Ausgeschaltet wirkt keine.
+            Sie schalten, welche KI-Funktionen Sie unterstützen. Ausgeschaltet
+            wirkt keine.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          <Label htmlFor={aktivId} className="cursor-pointer text-sm font-medium text-foreground">
+          <Label
+            htmlFor={aktivId}
+            className="cursor-pointer text-sm font-medium text-foreground"
+          >
             KI-Unterstützung
           </Label>
           <span
@@ -187,8 +216,8 @@ export function KiSteuerungPanel({
         icon={<ShieldCheck className="h-5 w-5" aria-hidden="true" />}
         title="Der Mensch entscheidet — KI assistiert nur."
       >
-        Jeder KI-Vorschlag wird von einem Menschen geprüft und freigegeben. Diese Aufsicht lässt
-        sich nicht abschalten.
+        Jeder KI-Vorschlag wird von einem Menschen geprüft und freigegeben.
+        Diese Aufsicht lässt sich nicht abschalten.
       </Callout>
 
       {/* Feature-Schalter — nur die vom Verfahren angebotenen. */}
@@ -214,10 +243,16 @@ export function KiSteuerungPanel({
                 className="flex items-start justify-between gap-4 py-2"
               >
                 <div className="min-w-0 flex-1">
-                  <Label htmlFor={feldId} className="cursor-pointer text-foreground">
+                  <Label
+                    htmlFor={feldId}
+                    className="cursor-pointer text-foreground"
+                  >
                     {meta.label}
                   </Label>
-                  <p id={beschreibungId} className="mt-0.5 text-sm text-muted-foreground">
+                  <p
+                    id={beschreibungId}
+                    className="mt-0.5 text-sm text-muted-foreground"
+                  >
                     {meta.beschreibung}
                   </p>
                 </div>
@@ -234,7 +269,8 @@ export function KiSteuerungPanel({
         )}
         {!steuerung.aktiv && angeboten.length > 0 ? (
           <p className="pt-1 text-sm text-muted-foreground">
-            KI-Unterstützung ist ausgeschaltet — die Funktionen sind derzeit nicht wirksam.
+            KI-Unterstützung ist ausgeschaltet — die Funktionen sind derzeit
+            nicht wirksam.
           </p>
         ) : null}
       </fieldset>
@@ -272,8 +308,9 @@ export function KiSteuerungPanel({
             thumbAriaLabels={["Autonomie-Schwelle in Prozent"]}
           />
           <p className="text-sm text-muted-foreground">
-            Sie können die Schwelle nur strenger (höher) stellen als die Vorgabe des Verfahrens
-            ({prozent(floor)} %). Unterhalb bleibt die menschliche Freigabe ohnehin zwingend.
+            Sie können die Schwelle nur strenger (höher) stellen als die Vorgabe
+            des Verfahrens ({prozent(floor)} %). Unterhalb bleibt die
+            menschliche Freigabe ohnehin zwingend.
           </p>
         </fieldset>
       ) : null}
@@ -298,9 +335,15 @@ export function KiSteuerungPanel({
               const stufeId = `${basisId}-transparenz-${stufe.value}`;
               return (
                 <div key={stufe.value} className="flex items-start gap-3 py-1">
-                  <RadioGroupItem value={stufe.value} id={stufeId} className="mt-1" />
+                  <RadioGroupItem
+                    value={stufe.value}
+                    id={stufeId}
+                    className="mt-1"
+                  />
                   <Label htmlFor={stufeId} className="flex-1 cursor-pointer">
-                    <span className="block font-medium text-foreground">{stufe.label}</span>
+                    <span className="block font-medium text-foreground">
+                      {stufe.label}
+                    </span>
                     <span className="mt-0.5 block text-sm font-normal text-muted-foreground">
                       {stufe.beschreibung}
                     </span>

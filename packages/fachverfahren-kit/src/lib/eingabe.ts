@@ -108,7 +108,20 @@ const DATUM_RE = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/;
 /** Anzahl Tage im Monat (1–12) unter Beachtung des Schaltjahrs — rein, ohne `Date`. */
 function tageImMonat(jahr: number, monat: number): number {
   const schaltjahr = (jahr % 4 === 0 && jahr % 100 !== 0) || jahr % 400 === 0;
-  const tage = [31, schaltjahr ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const tage = [
+    31,
+    schaltjahr ? 29 : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31,
+  ];
   return tage[monat - 1] ?? 31;
 }
 
@@ -181,13 +194,18 @@ function fehlgeschlagen(fehler: string): FeldPruefung {
  * liefert ihre Meldung. Eine leere, NICHT pflichtige Eingabe ist gültig. `eigeneMeldung` überschreibt — falls
  * gesetzt — die jeweilige Standardmeldung.
  */
-export function validiereFeld(regel: EingabeRegel, wert: unknown): FeldPruefung {
+export function validiereFeld(
+  regel: EingabeRegel,
+  wert: unknown,
+): FeldPruefung {
   const text = asString(wert).trim();
   const meldung = (standard: string): string => regel.eigeneMeldung ?? standard;
 
   // 1. Anwesenheit — eine leere optionale Eingabe ist gültig.
   if (text === "") {
-    return regel.pflicht ? fehlgeschlagen(meldung("Pflichtfeld.")) : { ok: true };
+    return regel.pflicht
+      ? fehlgeschlagen(meldung("Pflichtfeld."))
+      : { ok: true };
   }
 
   // 2. Typ-Parsing (liefert für „betrag"/„zahl" die geparste Zahl für die Bereichsprüfung).

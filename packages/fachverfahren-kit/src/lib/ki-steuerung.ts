@@ -34,7 +34,12 @@ export interface KiSteuerung {
   /** Hauptschalter: ist er aus, ist KEIN Feature wirksam (unabhängig von `features`). */
   aktiv: boolean;
   /** Je Fähigkeit an/aus — wirksam nur, wenn das Verfahren die Fähigkeit auch anbietet. */
-  features: { assist: boolean; extraktion: boolean; chat: boolean; voice: boolean };
+  features: {
+    assist: boolean;
+    extraktion: boolean;
+    chat: boolean;
+    voice: boolean;
+  };
   /** OPTIONALE, nur VERSCHÄRFENDE Autonomie-Schwelle (0..1). Wirksam wird `max(diese, config.assist.maxSchwelleAutonom)`
    *  — der Mensch kann nur strenger (höher), nie lockerer stellen. Fehlt sie ⇒ es gilt allein die Config-Obergrenze. */
   schwelleAutonom?: number;
@@ -99,7 +104,10 @@ export function istFeatureAktiv(
  * Maximum von der Config-Obergrenze „nach oben gehalten". Unterhalb dieser Schwelle bleibt die menschliche Freigabe
  * zwingend (`humanOversight`).
  */
-export function effektiveSchwelle(steuerung: KiSteuerung, config?: KiAngebot): number {
+export function effektiveSchwelle(
+  steuerung: KiSteuerung,
+  config?: KiAngebot,
+): number {
   return Math.max(
     config?.assist?.maxSchwelleAutonom ?? 0,
     steuerung.schwelleAutonom ?? 0,

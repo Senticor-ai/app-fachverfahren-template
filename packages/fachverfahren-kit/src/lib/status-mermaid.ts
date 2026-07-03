@@ -111,7 +111,9 @@ export function statusMachineZuMermaid(
     const to = idVon.get(t.to);
     if (!from || !to) continue;
     const label = baueKantenLabel(t, { zeigeRollen, zeigeMarker });
-    zeilen.push(label ? `  ${from} --> ${to} : ${label}` : `  ${from} --> ${to}`);
+    zeilen.push(
+      label ? `  ${from} --> ${to} : ${label}` : `  ${from} --> ${to}`,
+    );
   }
 
   // Terminalzustände markieren.

@@ -26,10 +26,7 @@ import { cn } from "../lib/utils.js";
 import { Button } from "../ui/button.js";
 import { StatusRegion, type Politeness } from "./StatusRegion.js";
 import { useVoiceInput, type VoiceStatus } from "../hooks/use-voice-input.js";
-import type {
-  VoiceDatenschutzProfil,
-  VoicePort,
-} from "../lib/voice-input.js";
+import type { VoiceDatenschutzProfil, VoicePort } from "../lib/voice-input.js";
 
 export interface VoiceInputProps {
   /** Der Sprach-PORT (Stub-Default im Kit; PROD: on-device/EU-Transkription). Ohne Port ist der Baustein deaktiviert. */

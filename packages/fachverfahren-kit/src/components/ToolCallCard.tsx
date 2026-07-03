@@ -6,7 +6,14 @@
 // kommen ausschliesslich als props (keine Domaenen-Literale). Zustand (genehmigt/abgelehnt) traegt Icon + Text,
 // nie nur Farbe (WCAG 1.4.1).
 import * as React from "react";
-import { Wrench, Check, X, ShieldAlert, CircleCheck, CircleX } from "lucide-react";
+import {
+  Wrench,
+  Check,
+  X,
+  ShieldAlert,
+  CircleCheck,
+  CircleX,
+} from "lucide-react";
 
 import { cn } from "../lib/utils.js";
 import { Badge } from "../ui/badge.js";

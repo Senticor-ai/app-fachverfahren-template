@@ -38,20 +38,16 @@ describe("zuCsv — RFC-4180-konforme Serialisierung", () => {
   });
 
   it("serialisiert null/undefined als leeres Feld", () => {
-    const csv = zuCsv(
-      [{ name: null, betrag: undefined }],
-      spalten,
-      { kopfzeile: false },
-    );
+    const csv = zuCsv([{ name: null, betrag: undefined }], spalten, {
+      kopfzeile: false,
+    });
     expect(csv).toBe(";");
   });
 
   it("serialisiert Boolean und nicht-endliche Zahlen neutral", () => {
-    const csv = zuCsv(
-      [{ name: true, betrag: Number.NaN }],
-      spalten,
-      { kopfzeile: false },
-    );
+    const csv = zuCsv([{ name: true, betrag: Number.NaN }], spalten, {
+      kopfzeile: false,
+    });
     // true → "true"; NaN → leeres Feld (kein "NaN" im Export).
     expect(csv).toBe("true;");
   });

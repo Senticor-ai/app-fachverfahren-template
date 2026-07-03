@@ -3,7 +3,13 @@
 // Zeigt den aktuellen Zustand eines KI-Agenten mehrkanalig: Icon PLUS Text (nie nur Farbe, WCAG 1.4.1) und
 // ein sr-only-Praefix, das die Bedeutung fuer Screenreader traegt. Rein praesentierend, generisch — kein
 // Domaenen-Literal. Zielgroesse >= 24px (SC 2.5.8); Bewegung (denkt/handelt) wird unter prefers-reduced-motion still.
-import { Loader2, Cog, CircleDot, AlertTriangle, type LucideIcon } from "lucide-react";
+import {
+  Loader2,
+  Cog,
+  CircleDot,
+  AlertTriangle,
+  type LucideIcon,
+} from "lucide-react";
 
 import { cn } from "../lib/utils.js";
 

@@ -75,7 +75,10 @@ export interface StubVoiceOptions {
    *  wortweise als kumulativer Strom abgeleitet — deterministisch, ohne Timer. */
   chunks?: string[];
   /** Voll eigener Generator (Vorrang vor `text`) — leitet das Ergebnis deterministisch aus dem Deskriptor ab. */
-  generator?: (audio: VoiceAudioEingabe) => { text: string; konfidenz?: number };
+  generator?: (audio: VoiceAudioEingabe) => {
+    text: string;
+    konfidenz?: number;
+  };
 }
 
 /** Datenschutz-Default des Stubs: strengste, privatsphäre-freundliche Annahme (lokal, kein Versand). */

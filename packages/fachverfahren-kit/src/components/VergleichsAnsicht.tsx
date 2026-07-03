@@ -60,7 +60,11 @@ function normWert(w: VergleichsWert): string {
 
 /** Wert für die Anzeige (leer → „—", Boolean → „Ja"/„Nein"). */
 function anzeige(w: VergleichsWert): string {
-  if (w === null || w === undefined || (typeof w === "string" && w.trim() === ""))
+  if (
+    w === null ||
+    w === undefined ||
+    (typeof w === "string" && w.trim() === "")
+  )
     return "—";
   if (typeof w === "boolean") return w ? "Ja" : "Nein";
   return String(w);
@@ -153,12 +157,18 @@ export function VergleichsAnsicht({
                 <TableCell className="align-middle">
                   {z.abweichung ? (
                     <Badge tone="warn">
-                      <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />
+                      <AlertTriangle
+                        className="h-3 w-3 shrink-0"
+                        aria-hidden="true"
+                      />
                       Abweichung
                     </Badge>
                   ) : (
                     <Badge tone="ok">
-                      <CheckCircle2 className="h-3 w-3 shrink-0" aria-hidden="true" />
+                      <CheckCircle2
+                        className="h-3 w-3 shrink-0"
+                        aria-hidden="true"
+                      />
                       Übereinstimmung
                     </Badge>
                   )}

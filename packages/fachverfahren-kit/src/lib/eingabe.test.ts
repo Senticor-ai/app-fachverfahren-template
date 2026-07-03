@@ -156,7 +156,9 @@ describe("validiereFeld — DATEN-getriebene Feldvalidierung pro Regeltyp", () =
       ok: false,
       fehler: "Eingabe entspricht nicht dem erwarteten Format.",
     });
-    expect(validiereFeld({ muster: "^\\d{5}$" }, "12345")).toEqual({ ok: true });
+    expect(validiereFeld({ muster: "^\\d{5}$" }, "12345")).toEqual({
+      ok: true,
+    });
   });
 
   it("defektes Muster blockiert nicht (fail-open)", () => {
@@ -181,9 +183,15 @@ describe("validiereAlle — Fehler-Abbildung für eine Fehlerzusammenfassung", (
       name: { pflicht: true, minLaenge: 2 },
     };
     expect(
-      validiereAlle(regeln, { betrag: "26", iban: "DE89370400440532013000", name: "Ab" }),
+      validiereAlle(regeln, {
+        betrag: "26",
+        iban: "DE89370400440532013000",
+        name: "Ab",
+      }),
     ).toEqual({});
-    expect(validiereAlle(regeln, { betrag: "", iban: "falsch", name: "A" })).toEqual({
+    expect(
+      validiereAlle(regeln, { betrag: "", iban: "falsch", name: "A" }),
+    ).toEqual({
       betrag: "Pflichtfeld.",
       iban: "Bitte eine gültige IBAN eingeben.",
       name: "Bitte mindestens 2 Zeichen eingeben.",

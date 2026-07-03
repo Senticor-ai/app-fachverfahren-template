@@ -16,10 +16,7 @@ import { useId } from "react";
 
 import { cn } from "../lib/utils.js";
 import { Switch } from "../ui/switch.js";
-import {
-  useA11ySettings,
-  type A11yOption,
-} from "../hooks/useA11ySettings.js";
+import { useA11ySettings, type A11yOption } from "../hooks/useA11ySettings.js";
 import { useStatusRegion } from "./StatusRegion.js";
 
 /** Beschriftung + Erläuterung je Präferenz — generische Verwaltungssprache, kein Domänen-Literal. */
