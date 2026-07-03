@@ -286,6 +286,29 @@ Einheitlich `transition-* duration-150 ease-out` (bis 200 ms) auf Farbe/Border/O
 `motion-reduce:transition-none` überall. Stepper-, Toast-/Sonner- und Fehler-Einblendungen teilen
 dieselbe Dauer/Dezenz.
 
+#### 4.7.1 Motion-Token-Layer (umgesetzt)
+
+`styles.css` führt **eine Wahrheit** für Bewegung (kein Bounce/Spring):
+
+| Token | Wert | Zweck |
+|-------|------|-------|
+| `--fv-duration-fast` / `-base` / `-slow` | 100 / 150 / 200 ms | Micro / Standard / Enter+Overlay |
+| `--fv-ease-out` | `cubic-bezier(0,0,.2,1)` | die eine Kurve |
+
+Die Theme-Defaults `--default-transition-duration`/`--default-transition-timing-function`
+setzen die `transition`-Utility **global** auf 150 ms/ease-out — Flächen brauchen daher
+**keine literale `duration-<n>`-Klasse** mehr, nur noch `transition`.
+
+Kanonische Utilities (je mit `prefers-reduced-motion`-Guard):
+
+- `fv-transition` — sanfter Übergang (Farbe/Border/Shadow/Opacity/Transform).
+- `fv-enter` — Eintritt (`fade-in` + 4 px), z. B. für den KI-Marking-Moment.
+- `fv-card-interactive` — dezente Hover-Elevation (kein Scale), HC-neutral.
+- `animate-fv-shimmer` (Skeleton), `animate-fv-fade-in-up`, `animate-accordion-down/up`.
+
+**Gate:** `pnpm run check:motion` verbietet `animate-bounce` hart und friert literale
+`duration-<n>` per Ratchet-Baseline ein (schrumpft pro Welle, steigt nie).
+
 ---
 
 ## 5. NEUE KOMPONENTEN (Auswahl: 5 — höchster Nutzen, kein Duplikat)

@@ -18,6 +18,15 @@ pnpm run build:storybook
 pnpm run check:storybook
 ```
 
+## Theme-/A11y-Modi (Symbolleiste)
+
+`.storybook/preview.ts` stellt einen **Theme-Umschalter** bereit (Symbolleiste →
+„Theme"): _Light · Dark · High Contrast · Groß-Text · Dark + Groß-Text_. Er schaltet
+die vom Kit definierten `<html>`-Klassen (`styles.css`). **Standard für neue Stories:**
+jede Fläche muss in **light, dark und High-Contrast** sauber sein und unter
+`prefers-reduced-motion` still werden — der Umschalter macht das prüfbar (die
+Symbolleiste ersetzt keine manuelle Tastatur-/Screenreader-Prüfung).
+
 ## Struktur
 
 - `.storybook/` enthält die zentrale Konfiguration.
