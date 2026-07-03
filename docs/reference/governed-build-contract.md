@@ -31,18 +31,18 @@ ohne die `.ts`-Config zu importieren.
 
 ## 3. Pflicht-Gates (deterministisch, lokal + CI)
 
-| Gate | Prüft |
-|------|-------|
-| `pnpm run check:leistung-contract` | Snapshot frisch **und** generisch wohlgeformt (id/label, ≥1 Schritt, widerspruchsfreie StatusMachine, Detail-Sektionen, Register-Suchfelder, ≥1 Rechtsgrundlage). |
-| `pnpm run check:esm` | Strikte ESM-/`.js`-Endungs-Politik. |
-| `pnpm run check:typescript-policy` | TypeScript-Quellpolitik. |
-| `pnpm run check:domain-contracts` | Domänen-/Modul-Verträge. |
-| `pnpm run check:css-tokens` | Nur Token-Aliase, kein rohes `var(--…)`. |
-| `pnpm run check:motion` | Dezente Motion (kein `animate-bounce`, keine literalen Dauer-Klassen über Baseline). |
-| `pnpm run check:storybook` | Storybook-/UX-Abdeckung. |
-| `pnpm run typecheck` · `pnpm run test` | Typen + Unit-Tests. |
-| `pnpm run test:e2e` | Reales Bundle wird auf allen Persona-Routen ausgeliefert (`app.inject()`, kein Browser). |
-| `pnpm run test:k8s:render` | K8s-Render-Delivery. |
+| Gate                                   | Prüft                                                                                                                                                             |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm run check:leistung-contract`     | Snapshot frisch **und** generisch wohlgeformt (id/label, ≥1 Schritt, widerspruchsfreie StatusMachine, Detail-Sektionen, Register-Suchfelder, ≥1 Rechtsgrundlage). |
+| `pnpm run check:esm`                   | Strikte ESM-/`.js`-Endungs-Politik.                                                                                                                               |
+| `pnpm run check:typescript-policy`     | TypeScript-Quellpolitik.                                                                                                                                          |
+| `pnpm run check:domain-contracts`      | Domänen-/Modul-Verträge.                                                                                                                                          |
+| `pnpm run check:css-tokens`            | Nur Token-Aliase, kein rohes `var(--…)`.                                                                                                                          |
+| `pnpm run check:motion`                | Dezente Motion (kein `animate-bounce`, keine literalen Dauer-Klassen über Baseline).                                                                              |
+| `pnpm run check:storybook`             | Storybook-/UX-Abdeckung.                                                                                                                                          |
+| `pnpm run typecheck` · `pnpm run test` | Typen + Unit-Tests.                                                                                                                                               |
+| `pnpm run test:e2e`                    | Reales Bundle wird auf allen Persona-Routen ausgeliefert (`app.inject()`, kein Browser).                                                                          |
+| `pnpm run test:k8s:render`             | K8s-Render-Delivery.                                                                                                                                              |
 
 Der Sammel-Lauf `pnpm run check:precommit` bündelt die schnellen Gates;
 `pnpm run check:agent-release` fügt Build + Delivery-Checks hinzu.

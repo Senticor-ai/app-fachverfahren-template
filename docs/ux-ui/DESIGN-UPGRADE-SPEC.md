@@ -290,10 +290,10 @@ dieselbe Dauer/Dezenz.
 
 `styles.css` führt **eine Wahrheit** für Bewegung (kein Bounce/Spring):
 
-| Token | Wert | Zweck |
-|-------|------|-------|
-| `--fv-duration-fast` / `-base` / `-slow` | 100 / 150 / 200 ms | Micro / Standard / Enter+Overlay |
-| `--fv-ease-out` | `cubic-bezier(0,0,.2,1)` | die eine Kurve |
+| Token                                    | Wert                     | Zweck                            |
+| ---------------------------------------- | ------------------------ | -------------------------------- |
+| `--fv-duration-fast` / `-base` / `-slow` | 100 / 150 / 200 ms       | Micro / Standard / Enter+Overlay |
+| `--fv-ease-out`                          | `cubic-bezier(0,0,.2,1)` | die eine Kurve                   |
 
 Die Theme-Defaults `--default-transition-duration`/`--default-transition-timing-function`
 setzen die `transition`-Utility **global** auf 150 ms/ease-out — Flächen brauchen daher

@@ -8,11 +8,11 @@ Adapter-Schritt.
 
 ## 1. Das 3-Schichten-Zustandsmodell
 
-| Schicht | Ort | Bedeutung |
-|--------|-----|-----------|
-| **DATEN** | `LeistungConfig.ki` (`assist`/`chat`/`voice`) | Das Verfahren _bietet_ eine Fähigkeit an + Obergrenzen. |
-| **PRÄFERENZ** | `KiSteuerung` (`useKiSteuerung`, localStorage) | Der Mensch _schaltet_ Fähigkeiten an/aus, setzt Transparenz + Schwelle. |
-| **RUNTIME** | Port-Props (`kiAssistPort`, `chatPort`, `voicePort`) in der App | Die _echte_ Implementierung wird zur Laufzeit injiziert. |
+| Schicht       | Ort                                                             | Bedeutung                                                               |
+| ------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| **DATEN**     | `LeistungConfig.ki` (`assist`/`chat`/`voice`)                   | Das Verfahren _bietet_ eine Fähigkeit an + Obergrenzen.                 |
+| **PRÄFERENZ** | `KiSteuerung` (`useKiSteuerung`, localStorage)                  | Der Mensch _schaltet_ Fähigkeiten an/aus, setzt Transparenz + Schwelle. |
+| **RUNTIME**   | Port-Props (`kiAssistPort`, `chatPort`, `voicePort`) in der App | Die _echte_ Implementierung wird zur Laufzeit injiziert.                |
 
 **Effektiv aktiv** = Config bietet an ∧ Präferenz ≠ aus ∧ Port injiziert.
 **Effektive Autonomie-Schwelle** = `max(config, nutzer)` — der Mensch kann nur
@@ -22,8 +22,12 @@ Adapter-Schritt.
 
 ```ts
 import {
-  type KiAssistPort, type KiChatPort, createStubAiAssistPort, createStubChatPort,
-  type VoicePort, createStubVoicePort,
+  type KiAssistPort,
+  type KiChatPort,
+  createStubAiAssistPort,
+  createStubChatPort,
+  type VoicePort,
+  createStubVoicePort,
 } from "@senticor/fachverfahren-kit";
 ```
 
@@ -41,14 +45,14 @@ ideal für Stories/Demos und den vollständig klickbaren Fluss vor der echten An
 // Der reale Broker/Dienst wird NUR hier angebunden — das Kit bleibt unverändert.
 const kiAssistPort: KiAssistPort = {
   async schlageVor(eingabe) {
-    const r = await meinBroker.assist(eingabe);       // eigener, EU-gehosteter Dienst
+    const r = await meinBroker.assist(eingabe); // eigener, EU-gehosteter Dienst
     return {
       wert: r.text,
-      quelle: r.modell,                                // "source"
-      konfidenz: r.confidence,                         // "confidence"
-      begruendung: r.rationale,                        // "why"
-      kennzeichnung: "KI-generiert (Art. 50)",         // "marking"
-      reviewErforderlich: true,                        // Mensch entscheidet
+      quelle: r.modell, // "source"
+      konfidenz: r.confidence, // "confidence"
+      begruendung: r.rationale, // "why"
+      kennzeichnung: "KI-generiert (Art. 50)", // "marking"
+      reviewErforderlich: true, // Mensch entscheidet
     };
   },
 };
@@ -92,4 +96,3 @@ rg -n "fetch\(|WebSocket|EventSource|SpeechRecognition|MediaRecorder" \
 Aufnahme (ein separates, opt-in Bürger-Feature), **nicht** für KI oder Spracheingabe.
 Der Voice-Pfad (`VoicePort`/`use-voice-input`/`VoiceInput`) besitzt selbst **keine**
 `getUserMedia`-Nutzung — die Mikrofon-Erfassung liegt beim PROD-Adapter.
-
