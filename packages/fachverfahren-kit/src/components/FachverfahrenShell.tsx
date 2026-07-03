@@ -90,8 +90,10 @@ function navFor<T>(
         items.push({
           key: "antrag",
           label: "Antrag stellen",
+          // href MUSS auf eine ECHTE App-Route zeigen (App.tsx): sonst greift die *-Fallback → /buerger und das
+          // Nav-Item ejectet den Nutzer (Audit D3-1: Shell-Nav ≠ App-Routen, 3/6 Items tot). Kanonisch: /buerger/anmelden.
           icon: FileText,
-          href: "/buerger/antrag",
+          href: "/buerger/anmelden",
         });
       }
       return items;
@@ -105,7 +107,9 @@ function navFor<T>(
           key: "register",
           label: "Register",
           icon: Database,
-          href: "/amt/register",
+          // Kein dediziertes Register-Route in der App-Shell → auf den Amt-Eingang zeigen (echte Route), statt
+          // via *-Fallback den Nutzer aus der Amt-Persona zu werfen (Audit D3-1). App.tsx kann später /amt/register ergänzen.
+          href: "/amt",
         });
       }
       return items;
@@ -116,7 +120,9 @@ function navFor<T>(
           key: "kennzahlen",
           label: "Kennzahlen / Audit",
           icon: LineChart,
-          href: "/audit",
+          // Kanonische Aufsicht-Route (App.tsx + PERSONA_HOME.aufsicht) ist /aufsicht — /audit existierte NICHT und warf
+          // die Aufsicht-Persona (ihr EINZIGES Nav-Item) via *-Fallback auf /buerger (Audit D3-1, schlimmster Fall).
+          href: "/aufsicht",
         },
       ];
     default:
