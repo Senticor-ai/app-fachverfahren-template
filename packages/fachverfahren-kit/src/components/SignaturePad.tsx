@@ -285,7 +285,7 @@ export function SignaturePad({
           onPointerLeave={beendeStrich}
           className={cn(
             "block w-full touch-none rounded-md border border-border bg-background text-foreground",
-            "cursor-crosshair transition-colors duration-150 ease-out motion-reduce:transition-none",
+            "cursor-crosshair transition-colors ease-out motion-reduce:transition-none",
           )}
           style={{ height: hoehe }}
         />

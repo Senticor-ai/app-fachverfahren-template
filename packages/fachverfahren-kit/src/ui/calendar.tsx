@@ -68,7 +68,7 @@ function Calendar({
           buttonVariants({ variant: "ghost" }),
           "mx-auto flex h-9 w-9 items-center justify-center p-0 font-normal",
           "aria-selected:opacity-100",
-          "transition-colors duration-150 ease-out motion-reduce:transition-none",
+          "transition-colors ease-out motion-reduce:transition-none",
           "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         ),
         selected: cn(

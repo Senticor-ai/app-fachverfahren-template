@@ -615,7 +615,7 @@ export function MapView({
             onClick={() => setZoom(1)}
             disabled={view.zoom >= maxZoom}
             aria-label="Hineinzoomen"
-            className="h-9 w-9 bg-card shadow-md transition-colors duration-150 ease-out motion-reduce:transition-none"
+            className="h-9 w-9 bg-card shadow-md transition-colors ease-out motion-reduce:transition-none"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
           </Button>
@@ -626,7 +626,7 @@ export function MapView({
             onClick={() => setZoom(-1)}
             disabled={view.zoom <= minZoom}
             aria-label="Herauszoomen"
-            className="h-9 w-9 bg-card shadow-md transition-colors duration-150 ease-out motion-reduce:transition-none"
+            className="h-9 w-9 bg-card shadow-md transition-colors ease-out motion-reduce:transition-none"
           >
             <Minus className="h-4 w-4" aria-hidden="true" />
           </Button>

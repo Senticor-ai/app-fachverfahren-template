@@ -108,7 +108,7 @@ export function MarkdownEditor({
             onClick={t.run}
             title={t.label}
             aria-label={t.label}
-            className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 ease-out motion-reduce:transition-none hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors ease-out motion-reduce:transition-none hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <t.icon className="size-4" aria-hidden />
           </button>

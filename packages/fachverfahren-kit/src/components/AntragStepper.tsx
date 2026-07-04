@@ -751,7 +751,7 @@ function Stepper({
         className="h-1 w-full overflow-hidden rounded-full bg-muted"
       >
         <div
-          className="h-full rounded-full bg-primary transition-[width] duration-150 ease-out motion-reduce:transition-none"
+          className="h-full rounded-full bg-primary transition-[width] ease-out motion-reduce:transition-none"
           style={{ width: `${fortschritt}%` }}
         />
       </div>
@@ -783,14 +783,14 @@ function Stepper({
                 className={cn(
                   "flex items-center gap-2 rounded-full py-0.5 pr-1",
                   "outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-                  "transition-colors duration-150 ease-out motion-reduce:transition-none",
+                  "transition-colors ease-out motion-reduce:transition-none",
                 )}
               >
                 <span
                   aria-hidden="true"
                   className={cn(
                     "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-                    "transition-colors duration-150 ease-out motion-reduce:transition-none",
+                    "transition-colors ease-out motion-reduce:transition-none",
                     active
                       ? "bg-primary text-primary-foreground"
                       : invalid

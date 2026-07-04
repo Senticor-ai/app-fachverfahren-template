@@ -80,7 +80,7 @@ function DatePicker({
           data-empty={value ? undefined : true}
           className={cn(
             "h-9 w-full justify-start gap-2 px-3 text-left font-normal",
-            "transition-colors duration-150 ease-out motion-reduce:transition-none",
+            "transition-colors ease-out motion-reduce:transition-none",
             "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             value ? "text-foreground" : "text-muted-foreground",
             className,
@@ -188,7 +188,7 @@ function DateRangePicker({
           data-empty={label ? undefined : true}
           className={cn(
             "h-9 w-full justify-start gap-2 px-3 text-left font-normal",
-            "transition-colors duration-150 ease-out motion-reduce:transition-none",
+            "transition-colors ease-out motion-reduce:transition-none",
             "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             label ? "text-foreground" : "text-muted-foreground",
             className,

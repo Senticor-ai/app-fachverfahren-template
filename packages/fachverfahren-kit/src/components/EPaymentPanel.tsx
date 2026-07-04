@@ -268,7 +268,7 @@ export function EPaymentPanel({
                       key={z.id}
                       htmlFor={itemId}
                       className={cn(
-                        "flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm transition-colors duration-150 ease-out motion-reduce:transition-none",
+                        "flex min-h-[44px] cursor-pointer items-center gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm transition-colors ease-out motion-reduce:transition-none",
                         "hover:bg-accent has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-background",
                         zahlartId === z.id &&
                           "border-primary bg-status-info-soft",

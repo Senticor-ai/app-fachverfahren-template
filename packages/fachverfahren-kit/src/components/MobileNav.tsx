@@ -161,7 +161,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
                             aria-current={active ? "page" : undefined}
                             className={cn(
                               "flex min-h-[44px] w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm",
-                              "transition-colors duration-150 ease-out motion-reduce:transition-none",
+                              "transition-colors ease-out motion-reduce:transition-none",
                               // Kanonisches Fokus-Rezept (Spec 3.2): weicher 3px-Ring, EIN Rezept kit-weit.
                               "outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
                               active
@@ -224,7 +224,7 @@ const TabButton: React.FC<{ item: MobileNavItem; active: boolean }> = ({
 function tabClasses(active: boolean): string {
   return cn(
     "relative flex min-h-[44px] w-full select-none flex-col items-center justify-center gap-0.5 px-2 py-1.5",
-    "transition-colors duration-150 ease-out motion-reduce:transition-none",
+    "transition-colors ease-out motion-reduce:transition-none",
     // Kanonisches Fokus-Rezept (Spec 3.2): weicher 3px-Ring, EIN Rezept kit-weit.
     "outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
     active ? "text-primary" : "text-muted-foreground hover:text-foreground",

@@ -109,7 +109,7 @@ export function PersonaSwitcher({
         className={cn(
           // Kanonisches Fokus-Rezept (Spec 3.2): weicher 3px-Ring, EIN Rezept kit-weit.
           "flex w-full items-center gap-2.5 rounded-md text-left hover:bg-white/5",
-          "transition-colors duration-150 ease-out motion-reduce:transition-none",
+          "transition-colors ease-out motion-reduce:transition-none",
           "outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
           // Trigger-Höhe h-10 (40px) im ausgeklappten Zustand; kompakt = quadratischer Avatar-Slot.
           compact ? "h-10 w-10 justify-center p-1.5" : "h-10 px-2 py-1.5",
@@ -160,7 +160,7 @@ export function PersonaSwitcher({
                     }}
                     className={cn(
                       "flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left hover:bg-accent/10",
-                      "transition-colors duration-150 ease-out motion-reduce:transition-none",
+                      "transition-colors ease-out motion-reduce:transition-none",
                       "outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
                       isActive && "bg-accent/10",
                     )}

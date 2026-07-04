@@ -95,7 +95,7 @@ export function FileBrowser({
       >
         <div
           className={cn(
-            "group flex items-center gap-1.5 rounded-md py-1 pr-1.5 text-sm transition-colors duration-150 ease-out motion-reduce:transition-none",
+            "group flex items-center gap-1.5 rounded-md py-1 pr-1.5 text-sm transition-colors ease-out motion-reduce:transition-none",
             isSel
               ? "bg-accent text-foreground"
               : "hover:bg-accent/60 text-foreground/90",
@@ -116,7 +116,7 @@ export function FileBrowser({
               <>
                 <ChevronRight
                   className={cn(
-                    "size-3.5 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none",
+                    "size-3.5 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none",
                     isOpen && "rotate-90",
                   )}
                   aria-hidden

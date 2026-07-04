@@ -8,7 +8,7 @@ import { cn } from "../lib/utils.js";
 
 const toggleVariants = cva(
   cn(
-    "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium cursor-pointer transition-colors duration-150 ease-out motion-reduce:transition-none",
+    "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium cursor-pointer transition-colors ease-out motion-reduce:transition-none",
     "hover:bg-muted hover:text-muted-foreground",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
     "disabled:pointer-events-none disabled:opacity-50",

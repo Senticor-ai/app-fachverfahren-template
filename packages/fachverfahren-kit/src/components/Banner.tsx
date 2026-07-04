@@ -27,7 +27,7 @@ import {
 import { cn } from "../lib/utils.js";
 
 const bannerVariants = cva(
-  "relative flex items-start gap-3 rounded-lg border p-4 text-sm transition-colors duration-150 ease-out motion-reduce:transition-none",
+  "relative flex items-start gap-3 rounded-lg border p-4 text-sm transition-colors ease-out motion-reduce:transition-none",
   {
     variants: {
       variant: {
@@ -149,7 +149,7 @@ export const Banner = React.forwardRef<HTMLDivElement, BannerProps>(
             aria-label={dismissLabel}
             className={cn(
               "-mr-1 -mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground",
-              "transition-colors duration-150 ease-out hover:bg-accent hover:text-accent-foreground motion-reduce:transition-none",
+              "transition-colors ease-out hover:bg-accent hover:text-accent-foreground motion-reduce:transition-none",
               // Kanonisches Fokus-Rezept (Spec 3.2): 3px weicher Ring, EINE Quelle über alle interaktiven Elemente.
               "outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
             )}

@@ -86,7 +86,7 @@ function StepMarker({
       aria-hidden="true"
       className={cn(
         "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold",
-        "transition-colors duration-150 ease-out motion-reduce:transition-none",
+        "transition-colors ease-out motion-reduce:transition-none",
         MARKER_TONE[status],
       )}
     >
@@ -171,7 +171,7 @@ export function Stepper({
         className="h-1 w-full overflow-hidden rounded-full bg-muted"
       >
         <div
-          className="h-full rounded-full bg-primary transition-[width] duration-150 ease-out motion-reduce:transition-none"
+          className="h-full rounded-full bg-primary transition-[width] ease-out motion-reduce:transition-none"
           style={{ width: `${percent}%` }}
         />
       </div>
@@ -217,7 +217,7 @@ export function Stepper({
               className={cn(
                 "fv-focus flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 text-left",
                 isVertical && "w-full",
-                "transition-colors duration-150 ease-out motion-reduce:transition-none",
+                "transition-colors ease-out motion-reduce:transition-none",
                 "hover:bg-muted/60",
               )}
             >

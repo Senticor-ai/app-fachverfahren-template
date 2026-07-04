@@ -72,7 +72,7 @@ function ChangeContent({
 /** Gemeinsames Klassen-Rezept für Link/Button der Ändern-Aktion — EINE Wahrheit, kanonischer Fokus. */
 const CHANGE_ACTION_CLASSES = cn(
   "rounded-sm text-sm font-medium text-primary underline decoration-1 underline-offset-2 fv-focus",
-  "transition-colors duration-150 ease-out hover:text-primary/80 motion-reduce:transition-none",
+  "transition-colors ease-out hover:text-primary/80 motion-reduce:transition-none",
 );
 
 /**

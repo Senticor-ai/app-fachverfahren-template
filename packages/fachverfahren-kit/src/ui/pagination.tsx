@@ -47,7 +47,7 @@ type PaginationLinkVariant = "ghost" | "outline";
 type PaginationLinkSize = "default" | "icon";
 
 const linkBase =
-  "inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors duration-150 ease-out motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background aria-disabled:pointer-events-none aria-disabled:opacity-50";
+  "inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors ease-out motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background aria-disabled:pointer-events-none aria-disabled:opacity-50";
 
 const linkVariants: Record<PaginationLinkVariant, string> = {
   // aktive Seite: kräftiger Rahmen; inaktiv: dezenter Hover

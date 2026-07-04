@@ -134,7 +134,7 @@ export const Timeline = forwardRef<HTMLOListElement, TimelineProps>(
                 aria-hidden="true"
                 className={cn(
                   "absolute -start-[2.1875rem] top-0.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-background",
-                  "transition-colors duration-150 ease-out motion-reduce:transition-none",
+                  "transition-colors ease-out motion-reduce:transition-none",
                 )}
               >
                 <span

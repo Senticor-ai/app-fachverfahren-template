@@ -241,7 +241,7 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
                       className={cn(
                         "flex h-9 items-center gap-2.5 rounded-md px-2.5 text-sm",
                         // Kanonisches Fokus-Rezept (Spec 3.2): weicher 3px-Ring, EIN Rezept kit-weit.
-                        "transition-colors duration-150 ease-out motion-reduce:transition-none",
+                        "transition-colors ease-out motion-reduce:transition-none",
                         "outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
                         isActive
                           ? "bg-sidebar-accent/20 font-medium text-sidebar-foreground"

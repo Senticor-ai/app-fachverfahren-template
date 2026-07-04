@@ -153,7 +153,7 @@ export const FilterBar = React.forwardRef<HTMLDivElement, FilterBarProps>(
               className={cn(
                 // Feld-Muster (Spec 4.1): h-10 default, klare Feldfläche (bg-input-bg), weiche Elevation.
                 "h-10 w-full rounded-md border border-input bg-input-bg pl-9 pr-9 text-sm text-foreground shadow-xs",
-                "placeholder:text-muted-foreground transition-colors duration-150 ease-out motion-reduce:transition-none",
+                "placeholder:text-muted-foreground transition-colors ease-out motion-reduce:transition-none",
                 // Kanonisches Fokus-Rezept (Spec 3.2): EIN Rezept, 3px weicher Ring.
                 "outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
                 // Native Such-Lösch-Kreuze ausblenden — wir liefern einen eigenen, barrierefreien Knopf.
@@ -167,7 +167,7 @@ export const FilterBar = React.forwardRef<HTMLDivElement, FilterBarProps>(
                 aria-label="Suche leeren"
                 className={cn(
                   "absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground",
-                  "transition-colors duration-150 ease-out hover:bg-accent hover:text-accent-foreground motion-reduce:transition-none",
+                  "transition-colors ease-out hover:bg-accent hover:text-accent-foreground motion-reduce:transition-none",
                   "outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
                 )}
               >

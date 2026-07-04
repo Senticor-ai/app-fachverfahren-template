@@ -423,7 +423,7 @@ function SortToggle<TData, TValue>({
       onClick={() => column.toggleSorting(sorted === "asc")}
       className={cn(
         "-ml-2 inline-flex h-8 min-h-6 items-center gap-1.5 rounded-md px-2 text-left font-semibold text-foreground",
-        "transition-colors duration-150 ease-out motion-reduce:transition-none hover:bg-accent hover:text-accent-foreground",
+        "transition-colors ease-out motion-reduce:transition-none hover:bg-accent hover:text-accent-foreground",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
       )}
     >
@@ -490,7 +490,7 @@ function ColumnVisibilityItem<TData, TValue>({
         htmlFor={id}
         className={cn(
           "flex min-h-9 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground",
-          "transition-colors duration-150 ease-out motion-reduce:transition-none hover:bg-accent hover:text-accent-foreground",
+          "transition-colors ease-out motion-reduce:transition-none hover:bg-accent hover:text-accent-foreground",
         )}
       >
         <Checkbox
@@ -610,7 +610,7 @@ function Pagination<TData>({
           onChange={(e) => table.setPageSize(Number(e.target.value))}
           className={cn(
             "h-8 rounded-md border border-border bg-card px-2 text-sm text-foreground",
-            "transition-colors duration-150 ease-out motion-reduce:transition-none",
+            "transition-colors ease-out motion-reduce:transition-none",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
           )}
         >

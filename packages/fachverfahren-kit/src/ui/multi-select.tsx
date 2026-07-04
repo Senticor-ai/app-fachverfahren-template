@@ -235,7 +235,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
           }}
           className={cn(
             "flex min-h-[2.25rem] w-full flex-wrap items-center gap-1.5 rounded-md border border-input bg-transparent px-2 py-1 text-sm shadow-sm",
-            "transition-colors duration-150 ease-out motion-reduce:transition-none",
+            "transition-colors ease-out motion-reduce:transition-none",
             "focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
             disabled && "cursor-not-allowed opacity-50",
             className,
@@ -256,7 +256,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
                 className={cn(
                   // Zielgröße ≥ 24px (WCAG 2.2 AA SC 2.5.8): 24×24px Trefferfläche, Icon bleibt klein.
                   "inline-flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground",
-                  "transition-colors duration-150 ease-out motion-reduce:transition-none",
+                  "transition-colors ease-out motion-reduce:transition-none",
                   "hover:bg-destructive hover:text-destructive-foreground",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 )}
@@ -375,7 +375,7 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({
                   }}
                   className={cn(
                     "flex min-h-[2rem] cursor-pointer select-none items-center gap-2 rounded-sm px-3 py-1.5 text-sm",
-                    "transition-colors duration-150 ease-out motion-reduce:transition-none",
+                    "transition-colors ease-out motion-reduce:transition-none",
                     isActive &&
                       !effectivelyDisabled &&
                       "bg-accent text-accent-foreground",

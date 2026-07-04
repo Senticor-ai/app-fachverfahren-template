@@ -53,7 +53,7 @@ export interface BreadcrumbLinkProps extends React.ComponentPropsWithoutRef<"a">
 const BreadcrumbLink = React.forwardRef<HTMLAnchorElement, BreadcrumbLinkProps>(
   ({ className, asChild, children, ...props }, ref) => {
     const classes = cn(
-      "inline-flex min-h-6 items-center rounded-md px-1 py-1 transition-colors duration-150 ease-out motion-reduce:transition-none hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+      "inline-flex min-h-6 items-center rounded-md px-1 py-1 transition-colors ease-out motion-reduce:transition-none hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
       className,
     );
     if (asChild && React.isValidElement(children)) {

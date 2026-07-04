@@ -453,7 +453,7 @@ export function RichTextEditor({
               onMouseDown={(e) => e.preventDefault()}
               className={cn(
                 "inline-flex h-9 w-9 items-center justify-center rounded-md border border-transparent text-foreground",
-                "transition-colors duration-150 ease-out motion-reduce:transition-none",
+                "transition-colors ease-out motion-reduce:transition-none",
                 "hover:bg-accent hover:text-accent-foreground",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 "disabled:pointer-events-none disabled:opacity-50",

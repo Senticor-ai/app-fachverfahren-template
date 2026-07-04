@@ -10,7 +10,7 @@
 //
 // Barrierefreiheit (BITV 2.0 / WCAG 2.2 AA):
 //  - role="region" + aria-labelledby/aria-describedby; sichtbarer Titel + erklärender Text
-//  - alle Bedienelemente sind echte <button> mit aria-label/sichtbarem Text, Zielgröße >= 24px (h-9)
+//  - alle Bedienelemente sind echte <button> mit aria-label/sichtbarem Text, Zielgröße >= 44px
 //  - sichtbarer Fokus-Ring (focus-visible:ring-2 ring-ring ring-offset-2), Tastatur voll bedienbar
 //  - Farbe ist NIE alleiniger Bedeutungsträger (Icon + Text), Kontrast token-getrieben (>= 4.5:1)
 //  - keine verspielte Bewegung; Übergänge respektieren prefers-reduced-motion (motion-reduce:*)
@@ -150,7 +150,10 @@ export function InstallPrompt({
       role="region"
       aria-labelledby={titelId}
       aria-describedby={beschreibungId}
-      className={cn("border border-border shadow-md", className)}
+      className={cn(
+        "fv-surface-enter border border-border shadow-md",
+        className,
+      )}
     >
       <CardContent className="flex items-start gap-3 p-4">
         <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground">
@@ -188,8 +191,8 @@ export function InstallPrompt({
           onClick={ablehnen}
           aria-label={`${ablehnenLabel} — ${titel} ausblenden`}
           className={cn(
-            "-mr-1 -mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground",
-            "transition-colors duration-150 ease-out hover:bg-accent hover:text-accent-foreground motion-reduce:transition-none",
+            "-mr-2 -mt-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground",
+            "transition-colors ease-out hover:bg-accent hover:text-accent-foreground motion-reduce:transition-none",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
           )}
         >

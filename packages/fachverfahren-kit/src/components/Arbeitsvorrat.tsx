@@ -333,7 +333,7 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                       }
                       className={cn(
                         // Chip = rounded-full, text-xs Minimum; kanonisches Fokus-Rezept (Spec 3.2).
-                        "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors duration-150 ease-out motion-reduce:transition-none",
+                        "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ease-out motion-reduce:transition-none",
                         "outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
                         on
                           ? "border-accent bg-accent/15 text-foreground"
@@ -352,7 +352,7 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                   <button
                     type="button"
                     onClick={() => setActive(new Set(alleStatusKeys))}
-                    className="shrink-0 rounded-md px-1 text-xs text-muted-foreground underline-offset-2 outline-none transition-colors duration-150 ease-out hover:text-foreground hover:underline focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] motion-reduce:transition-none"
+                    className="shrink-0 rounded-md px-1 text-xs text-muted-foreground underline-offset-2 outline-none transition-colors ease-out hover:text-foreground hover:underline focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] motion-reduce:transition-none"
                   >
                     Alle anzeigen
                   </button>
@@ -426,7 +426,7 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                           }}
                           onFocus={() => setActiveRow(index)}
                           onKeyDown={(e) => handleRowKeyDown(e, index, v.id)}
-                          className="group cursor-pointer border-t border-border outline-none transition-colors duration-150 ease-out hover:bg-secondary/40 focus:bg-secondary/40 focus-visible:ring-inset focus-visible:ring-ring/50 focus-visible:ring-[3px] motion-reduce:transition-none"
+                          className="group cursor-pointer border-t border-border outline-none transition-colors ease-out hover:bg-secondary/40 focus:bg-secondary/40 focus-visible:ring-inset focus-visible:ring-ring/50 focus-visible:ring-[3px] motion-reduce:transition-none"
                         >
                           <TableCell className="align-top">
                             <span className="font-mono text-xs font-medium text-primary group-hover:underline">
@@ -545,7 +545,7 @@ function Th({
       <button
         type="button"
         onClick={() => onSort(cKey)}
-        className="inline-flex items-center gap-1 rounded-md px-1 uppercase tracking-wide outline-none transition-colors duration-150 ease-out hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:text-foreground motion-reduce:transition-none"
+        className="inline-flex items-center gap-1 rounded-md px-1 uppercase tracking-wide outline-none transition-colors ease-out hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:text-foreground motion-reduce:transition-none"
         aria-label={`${label} sortieren`}
       >
         {label}

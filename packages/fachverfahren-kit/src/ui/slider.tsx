@@ -41,7 +41,7 @@ const Slider = React.forwardRef<
           aria-label={thumbAriaLabels?.[i]}
           className={cn(
             "block h-5 w-5 rounded-full border border-primary/50 bg-card shadow-sm",
-            "transition-colors duration-150 ease-out motion-reduce:transition-none",
+            "transition-colors ease-out motion-reduce:transition-none",
             "hover:border-primary",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             "disabled:pointer-events-none disabled:opacity-50",

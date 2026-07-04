@@ -208,7 +208,7 @@ export const Combobox: React.FC<ComboboxProps> = ({
           onKeyDown={onTriggerKeyDown}
           className={cn(
             "flex h-9 min-h-[2.25rem] w-full items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 py-1 text-left text-sm shadow-sm",
-            "transition-colors duration-150 ease-out motion-reduce:transition-none",
+            "transition-colors ease-out motion-reduce:transition-none",
             "hover:bg-accent hover:text-accent-foreground",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             "disabled:cursor-not-allowed disabled:opacity-50",
@@ -297,7 +297,7 @@ export const Combobox: React.FC<ComboboxProps> = ({
                   }}
                   className={cn(
                     "flex min-h-[2rem] cursor-pointer select-none items-center gap-2 rounded-sm px-3 py-1.5 text-sm",
-                    "transition-colors duration-150 ease-out motion-reduce:transition-none",
+                    "transition-colors ease-out motion-reduce:transition-none",
                     isActive &&
                       !opt.disabled &&
                       "bg-accent text-accent-foreground",

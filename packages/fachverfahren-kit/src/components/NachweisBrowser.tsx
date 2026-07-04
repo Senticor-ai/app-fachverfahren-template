@@ -297,7 +297,7 @@ function NachweisZeile({
     <li
       className={cn(
         "flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border bg-surface p-3",
-        "transition-colors duration-150 ease-out motion-reduce:transition-none",
+        "transition-colors ease-out motion-reduce:transition-none",
         "focus-within:ring-2 focus-within:ring-ring",
         blockierend && "border-status-block/40 bg-status-block-soft",
       )}

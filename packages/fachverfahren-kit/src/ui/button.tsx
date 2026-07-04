@@ -9,7 +9,7 @@ import { cn } from "../lib/utils.js";
 const buttonVariants = cva(
   cn(
     "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer",
-    "transition-colors duration-150 ease-out motion-reduce:transition-none",
+    "transition-colors ease-out motion-reduce:transition-none",
     // Kanonisches Fokus-Rezept (Spec 3.2): weicher 3px-Ring, EIN Rezept kit-weit.
     "outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
     "disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed",

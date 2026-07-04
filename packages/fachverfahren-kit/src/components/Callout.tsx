@@ -30,7 +30,7 @@ import {
 import { cn } from "../lib/utils.js";
 
 const calloutVariants = cva(
-  "relative flex items-start gap-3 rounded-md border border-l-4 p-4 text-sm transition-colors duration-150 ease-out motion-reduce:transition-none",
+  "relative flex items-start gap-3 rounded-md border border-l-4 p-4 text-sm transition-colors ease-out motion-reduce:transition-none",
   {
     variants: {
       tone: {

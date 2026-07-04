@@ -206,7 +206,7 @@ function DownloadLink({
       download={name}
       className={cn(
         "inline-flex h-8 min-h-[24px] shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground",
-        "transition-colors duration-150 ease-out hover:bg-accent motion-reduce:transition-none",
+        "transition-colors ease-out hover:bg-accent motion-reduce:transition-none",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
       )}
     >

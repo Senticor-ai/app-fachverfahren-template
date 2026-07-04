@@ -105,7 +105,7 @@ export const ErrorSummary = React.forwardRef<HTMLDivElement, ErrorSummaryProps>(
                     className={cn(
                       // Fehler-Link == Inline-Feldfehler: 14px (fv-text-error), Signal über Farbe/Gewicht/Icon, nie Größe.
                       "fv-text-error rounded-sm underline decoration-2 underline-offset-2",
-                      "transition-colors duration-150 ease-out hover:text-destructive/80 motion-reduce:transition-none",
+                      "transition-colors ease-out hover:text-destructive/80 motion-reduce:transition-none",
                       "outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
                     )}
                   >
