@@ -1,0 +1,25 @@
+# Codesphere-Deploy-Pipeline (GovTech-DE-Plattform, vendorportal.gtplatforms.org).
+# Dies ist die Laufzeit-Wahrheit, die `cs start pipeline prepare test run` ausführt — sie SPIEGELT das Dockerfile
+# (dasselbe Build-Rezept: corepack→pnpm install→build:packages/app/server), damit Codesphere-Deploy und Container-Build
+# NICHT auseinanderlaufen (eine Wahrheit). Der Server lauscht auf $PORT (Default 8080; Codesphere setzt $PORT) und
+# einem internen Port 9090. Kein floating Tag / kein `latest` — reproduzierbar wie der Dockerfile-Build.
+schemaVersion: v0.2
+
+prepare:
+  steps:
+    - name: Enable pnpm
+      command: corepack enable pnpm && corepack prepare pnpm@11.1.0 --activate
+    - name: Install (frozen lockfile)
+      command: pnpm install --frozen-lockfile
+    - name: Build packages + app + server
+      command: pnpm run build:packages && pnpm run build:app && pnpm run build:server
+
+test:
+  steps:
+    - name: Validate (typecheck + unit)
+      command: pnpm run --if-present typecheck && pnpm run --if-present test
+
+run:
+  steps:
+    - name: Fachverfahren-Server
+      command: node apps/fachverfahren/dist-server/index.js
