@@ -29,6 +29,11 @@ not carry copied component templates.
 - `ResponsiveContainer`
 - `PersonaSwitcher`
 - `KommuneTheme`
+- `ResponsiveWorkspaceShell` (public-sector-ui)
+- `CaseContextPanel` (public-sector-ui)
+- `ProcessTimeline` (public-sector-ui)
+- `StickyActionBar` (public-sector-ui)
+- `SavedViewsToolbar` (public-sector-ui)
 
 ### Citizen Intake And Self-Service
 
@@ -41,6 +46,8 @@ not carry copied component templates.
 - `EPaymentPanel`
 - `StatusVerfolgung`
 - `Postfach`
+- `CommunicationThread` (public-sector-ui)
+- `ProcessTimeline` (public-sector-ui)
 - `BescheidView`
 - `HilfePanel`
 - `InstallPrompt`
@@ -49,8 +56,18 @@ not carry copied component templates.
 
 - `Arbeitsvorrat`
 - `VorgangDetail`
+- `CaseContextPanel` (public-sector-ui)
+- `ProcessTimeline` (public-sector-ui)
 - `ReviewWorkspace`
 - `EntscheidungPanel`
+- `DecisionComposer` (public-sector-ui)
+- `CalculationTrace` (public-sector-ui)
+- `CommunicationThread` (public-sector-ui)
+- `ReadinessGatePanel` (public-sector-ui)
+- `EvidenceReviewGrid` (public-sector-ui)
+- `ResponsiveWorkspaceShell` (public-sector-ui)
+- `SavedViewsToolbar` (public-sector-ui)
+- `StickyActionBar` (public-sector-ui)
 - `FourEyesReview`
 - `AufsichtDashboard`
 - `AuditTimeline`
@@ -59,6 +76,8 @@ not carry copied component templates.
 
 ### Evidence, Documents And Rich Content
 
+- `CommunicationThread` (public-sector-ui)
+- `EvidenceReviewGrid` (public-sector-ui)
 - `NachweisBrowser`
 - `DocumentPreview`
 - `PdfViewer`
@@ -71,6 +90,11 @@ not carry copied component templates.
 
 ### AI, Status And Feedback
 
+- `CaseContextPanel` (public-sector-ui)
+- `ProcessTimeline` (public-sector-ui)
+- `DecisionComposer` (public-sector-ui)
+- `CalculationTrace` (public-sector-ui)
+- `ReadinessGatePanel` (public-sector-ui)
 - `KiVorschlag`
 - `KiAssistPanel`
 - `EvidenceCard`
