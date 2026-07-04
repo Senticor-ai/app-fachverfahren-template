@@ -8,9 +8,11 @@
 # Hundesteuer als GTC-Builder-Vorhaben-Brief
 
 `agent-prompt.md` und `app.spec.yaml` in diesem Verzeichnis sind für einen Coding
-Agenten geschrieben, der direkt im Root dieses Template-Repositories arbeitet (Package-
-Scripts `agent:discover`/`agent:context`/`app:new`, Ausgabe unter `modules/dog-tax/`).
-GTC Builder (`Senticor-ai/gtc-builder`, betrieben über CHOS-CODE-Innovation) ist ein
+Agenten geschrieben, der direkt im Root dieses Template-Repositories arbeitet
+(Package-Scripts `agent:discover`/`agent:context`, optional `app:new` für den
+Generator-Pfad, Ausgabe unter `modules/dog-tax/` (PLAN — existiert erst nach einem
+Lauf von `app:new`, siehe `modules/README.md`)). GTC Builder (`Senticor-ai/gtc-builder`,
+betrieben über CHOS-CODE-Innovation) ist ein
 anderes Werkzeug: es nimmt keinen mehrteiligen Spec/Prompt-Satz entgegen, sondern genau
 ein freitextliches **Vorhaben**-Feld beim Anlegen eines neuen Projekts, aus dem seine
 eigene governte Pipeline (Intake → Grounding → Fachkonzept → Build → …) das restliche
