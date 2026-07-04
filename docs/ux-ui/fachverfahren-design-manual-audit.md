@@ -13,7 +13,8 @@ Coverage-Vertrag abgebildet:
 - Sachbearbeitung nutzt eine Fachanwendungs-Shell mit linker Navigation,
   Countern, Profil-/Einstellungsmenü, Breadcrumbs und Master-Detail-Arbeitsraum.
 - Die Vorgangstabelle zeigt Sticky Header, zwei gefrorene Leitspalten,
-  Sortier-/Filter-Affordances, Status-Badges mit Text/Icon und Tastaturzeilen.
+  Sortier-/Filter-Affordances, Suche, gespeicherte Ansichten, Pagination,
+  Bulk-Auswahl, Status-Badges mit Text/Icon und Tastaturzeilen.
 - Bürger:in-Regeln sind dort codifiziert, wo sie für das Bürgerportal gelten:
   geführter Flow, einfache Sprache, Once-Only, Review/Bestätigung und
   personalisierbare Accessibility.
@@ -23,17 +24,17 @@ Coverage-Vertrag abgebildet:
 
 ## Sachbearbeitung
 
-| Manual-Callout                                        |               Status | App-/Storybook-Nachweis                                                                                                                                                                              |
-| ----------------------------------------------------- | -------------------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Persona-gerechte Dichte, fachlich präzise Sprache     |              Erfüllt | Sachbearbeitung zeigt Arbeitsvorrat, Vorgangsliste, Detailpanel, Fristen und Review ohne Bürgerportal-Copy.                                                                                          |
-| Persistente Shell mit Navigation, Profil und Settings |              Erfüllt | Linke Fachnavigation, Profilmenü, Icon-Rail, verzögertes Hover-Ausklappen, statischer Modus und persistierte Einstellung sind in der App.                                                            |
-| Rollen-/Rechte-Gating                                 |              Erfüllt | Bürgerin und Sachbearbeitung erhalten getrennte Navigation und Datenoberfläche. Serverseitige Policy bleibt maßgeblich.                                                                              |
-| Breadcrumbs und Wayfinding                            | Erfüllt für Referenz | Sachbearbeitung zeigt `Vorgänge / Ansicht / Vorgang`. Storybook codifiziert den Detailpfad.                                                                                                          |
-| Unabhängig scrollende Panels                          |              Erfüllt | Caseworker-Content scrollt im Arbeitsbereich, Tabelle im eigenen Frame, Detailpanel bleibt daneben sichtbar.                                                                                         |
-| Tabellen/List-Detail                                  |              Erfüllt | App und Storybook zeigen Master-Detail, Sticky Header, zwei gefrorene Leitspalten, Status-Badges, Tastaturzeilen und Filter-Affordances. Pagination und gespeicherte Filter sind Erweiterungspunkte. |
-| Bulk-Review                                           |   Erfüllt als Muster | Review-Bedarf und Vier-Augen-Aktion sind sichtbar; Mehrfachauswahl mit Sammelaktion ist als Erweiterungspunkt im Design-Manual-Vertrag dokumentiert.                                                 |
-| HCAI/KI-Patterns                                      |     Nicht zutreffend | Die fachneutrale Template-App enthält keine KI-Funktion. Domain-Module mit KI müssen Kennzeichnung, Quelle, Konfidenz, Warum, Override und Audit liefern.                                            |
-| Zustände und Feedback                                 |              Erfüllt | Storybook codifiziert Loading, Empty, Error und Success; die laufende App hat Login-, Session-, leere Postfach- und Fehlerzustände für die vorhandenen Arbeitsbereiche.                              |
+| Manual-Callout                                        |               Status | App-/Storybook-Nachweis                                                                                                                                                 |
+| ----------------------------------------------------- | -------------------: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Persona-gerechte Dichte, fachlich präzise Sprache     |              Erfüllt | Sachbearbeitung zeigt Arbeitsvorrat, Vorgangsliste, Detailpanel, Fristen und Review ohne Bürgerportal-Copy.                                                             |
+| Persistente Shell mit Navigation, Profil und Settings |              Erfüllt | Linke Fachnavigation, Profilmenü, Icon-Rail, verzögertes Hover-Ausklappen, statischer Modus und persistierte Einstellung sind in der App.                               |
+| Rollen-/Rechte-Gating                                 |              Erfüllt | Bürgerin und Sachbearbeitung erhalten getrennte Navigation und Datenoberfläche. Serverseitige Policy bleibt maßgeblich.                                                 |
+| Breadcrumbs und Wayfinding                            | Erfüllt für Referenz | Sachbearbeitung zeigt `Vorgänge / Ansicht / Vorgang`. Storybook codifiziert den Detailpfad.                                                                             |
+| Unabhängig scrollende Panels                          |              Erfüllt | Caseworker-Content scrollt im Arbeitsbereich, Tabelle im eigenen Frame, Detailpanel bleibt daneben sichtbar.                                                            |
+| Tabellen/List-Detail                                  |              Erfüllt | App und Storybook zeigen Master-Detail, Sticky Header, zwei gefrorene Leitspalten, Status-Badges, Tastaturzeilen, Filter, Suche, gespeicherte Ansichten und Pagination. |
+| Bulk-Review                                           |   Erfüllt als Muster | Review-Bedarf und Vier-Augen-Aktion sind sichtbar; Arbeitslisten unterstützen seitenbezogene Mehrfachauswahl mit deaktivierten Sammelaktionen ohne Auswahl.             |
+| HCAI/KI-Patterns                                      |     Nicht zutreffend | Die fachneutrale Template-App enthält keine KI-Funktion. Domain-Module mit KI müssen Kennzeichnung, Quelle, Konfidenz, Warum, Override und Audit liefern.               |
+| Zustände und Feedback                                 |              Erfüllt | Storybook codifiziert Loading, Empty, Error und Success; die laufende App hat Login-, Session-, leere Postfach- und Fehlerzustände für die vorhandenen Arbeitsbereiche. |
 
 ## Bürgerportal
 
@@ -63,10 +64,9 @@ Diese Punkte bleiben bewusst als fach- oder produktabhängige Erweiterungen
 sichtbar:
 
 1. Dedizierte Settings-Route statt Einstellungen nur im Profilmenü.
-2. Gespeicherte Tabellenfilter, Pagination und echte Bulk-Auswahl.
-3. Generischer Formular-Blueprint als Domain-Modul-Skeleton mit Stepper,
+2. Generischer Formular-Blueprint als Domain-Modul-Skeleton mit Stepper,
    Once-Only, Review, Draft-Recovery und err/warn/ok-Validierung.
-4. Manuelle Abnahme für Screenreader, 400-Prozent-Zoom und Tastaturpfade.
+3. Manuelle Abnahme für Screenreader, 400-Prozent-Zoom und Tastaturpfade.
 
 ## Konflikt zur Entscheidung
 

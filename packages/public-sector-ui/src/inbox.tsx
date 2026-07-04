@@ -1,5 +1,18 @@
-import { type KeyboardEvent, type ReactNode, useMemo, useState } from "react";
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { CaseStatus, DeadlineIndicator } from "./components.js";
+import {
+  BulkActionBar,
+  QuickFilterChips,
+  type BulkAction,
+  type QuickFilterOption,
+} from "./worklist-controls.js";
+import { SavedViewsToolbar, type SavedView } from "./workspace.js";
 
 // Sachbearbeitungs-Posteingang (Master-Detail). Setzt den fachverfahren-ux-contract um:
 // dicht, tastatureffizient, List-Detail, sticky Header, zwei eingefrorene Leitspalten (Desktop),
@@ -35,6 +48,22 @@ export interface CaseInboxProps {
   /** Mehrfachauswahl: aktive Filterwerte (mind. einer bleibt bei Mehrfachauswahl bestehen). */
   activeFilters: string[];
   onToggleFilter: (value: string) => void;
+  /** Einträge je Seite. Ohne Wert wird mit 10 Einträgen je Seite paginiert. */
+  pageSize?: number;
+  /** Auswahlbare Seitengrößen für die Arbeitsliste. */
+  pageSizeOptions?: number[];
+  /** Kontrollierte Mehrfachauswahl. Wenn nicht gesetzt, verwaltet die Komponente die Auswahl intern. */
+  selectedIds?: string[];
+  onSelectionChange?: (ids: string[]) => void;
+  /** Aktionen für ausgewählte Einträge. Bleiben ohne Auswahl deaktiviert. */
+  bulkActions?: BulkAction[];
+  /** Optionaler Satz gespeicherter Ansichten. Persistenz liegt beim Aufrufer. */
+  savedViews?: SavedView[];
+  activeSavedViewId?: string;
+  onSelectSavedView?: (id: string) => void;
+  /** Kontrollierte Suche. Filtert Vorgang-ID, Antragsteller:in, Betreff und Statuslabel. */
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
 }
 
 /** Sortierbare Spalten des Posteingangs. */
@@ -73,18 +102,116 @@ export function CaseInbox({
   filters,
   activeFilters,
   onToggleFilter,
+  pageSize = 10,
+  pageSizeOptions = [10, 25, 50],
+  selectedIds,
+  onSelectionChange,
+  bulkActions = [],
+  savedViews = [],
+  activeSavedViewId,
+  onSelectSavedView,
+  searchValue,
+  onSearchChange,
 }: CaseInboxProps) {
   const [sortKey, setSortKey] = useState<SortKey>("dueAt");
   const [ascending, setAscending] = useState(true);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [currentPageSize, setCurrentPageSize] = useState(() =>
+    normalisePageSize(pageSize),
+  );
+  const [internalSelectedIds, setInternalSelectedIds] = useState<string[]>([]);
+  const effectivePageSize = normalisePageSize(currentPageSize);
+  const availablePageSizeOptions = useMemo(
+    () => normalisePageSizes([effectivePageSize, pageSize, ...pageSizeOptions]),
+    [effectivePageSize, pageSize, pageSizeOptions],
+  );
+  const selectionEnabled =
+    Boolean(selectedIds) ||
+    Boolean(onSelectionChange) ||
+    bulkActions.length > 0;
+  const activeSelection = selectedIds ?? internalSelectedIds;
+  const selectedSet = useMemo(
+    () => new Set(activeSelection),
+    [activeSelection],
+  );
+  const query = (searchValue ?? "").trim().toLocaleLowerCase("de");
 
   const visible = useMemo(() => {
     const filtered =
       activeFilters.length === 0
         ? cases
         : cases.filter((row) => activeFilters.includes(row.status));
+    const searched =
+      query.length === 0
+        ? filtered
+        : filtered.filter((row) => matchesSearch(row, query));
     const direction = ascending ? 1 : -1;
-    return [...filtered].sort((a, b) => direction * compareRows(a, b, sortKey));
-  }, [cases, activeFilters, sortKey, ascending]);
+    return [...searched].sort((a, b) => direction * compareRows(a, b, sortKey));
+  }, [cases, activeFilters, query, sortKey, ascending]);
+
+  const pageCount = Math.max(1, Math.ceil(visible.length / effectivePageSize));
+  const safePageIndex = Math.min(pageIndex, pageCount - 1);
+  const pageStart = safePageIndex * effectivePageSize;
+  const pageRows = visible.slice(pageStart, pageStart + effectivePageSize);
+  const pageStatus =
+    visible.length === 0
+      ? "0 von 0"
+      : `${pageStart + 1}-${pageStart + pageRows.length} von ${visible.length}`;
+  const allPageIds = pageRows.map((row) => row.id);
+  const selectedOnPage = allPageIds.filter((id) => selectedSet.has(id)).length;
+  const allPageSelected =
+    allPageIds.length > 0 && selectedOnPage === allPageIds.length;
+  const showPagination =
+    visible.length > effectivePageSize || availablePageSizeOptions.length > 1;
+
+  useEffect(() => {
+    setCurrentPageSize(normalisePageSize(pageSize));
+  }, [pageSize]);
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [activeFilters, query, sortKey, ascending, currentPageSize]);
+
+  useEffect(() => {
+    if (pageIndex > pageCount - 1) {
+      setPageIndex(pageCount - 1);
+    }
+  }, [pageCount, pageIndex]);
+
+  useEffect(() => {
+    if (!selectionEnabled) {
+      return;
+    }
+    const visibleIds = new Set(visible.map((row) => row.id));
+    const next = activeSelection.filter((id) => visibleIds.has(id));
+    if (!sameStringArray(next, activeSelection)) {
+      updateSelection(next);
+    }
+  }, [selectionEnabled, visible, activeSelection]);
+
+  function updateSelection(ids: string[]) {
+    const unique = Array.from(new Set(ids));
+    if (!selectedIds) {
+      setInternalSelectedIds(unique);
+    }
+    onSelectionChange?.(unique);
+  }
+
+  function toggleRowSelection(id: string) {
+    updateSelection(
+      selectedSet.has(id)
+        ? activeSelection.filter((entry) => entry !== id)
+        : [...activeSelection, id],
+    );
+  }
+
+  function selectCurrentPage() {
+    updateSelection([...activeSelection, ...allPageIds]);
+  }
+
+  function clearSelection() {
+    updateSelection([]);
+  }
 
   function toggleSort(key: SortKey) {
     if (key === sortKey) {
@@ -111,35 +238,34 @@ export function CaseInbox({
 
   return (
     <div className="ps-inbox">
-      <div
-        className="ps-inbox__filters"
-        role="group"
-        aria-label="Schnellfilter"
-      >
-        {filters.map((filter) => {
-          const active = activeFilters.includes(filter.value);
-          const locked = active && activeFilters.length === 1;
-          return (
-            <button
-              key={filter.value}
-              type="button"
-              className={
-                active
-                  ? "ps-inbox__chip ps-inbox__chip--active"
-                  : "ps-inbox__chip"
-              }
-              aria-pressed={active}
-              disabled={locked}
-              onClick={() => onToggleFilter(filter.value)}
-            >
-              <span>{filter.label}</span>
-              <span className="ps-inbox__chip-count ps-num">
-                {filter.count}
-              </span>
-            </button>
-          );
+      {savedViews.length > 0 || onSearchChange ? (
+        <SavedViewsToolbar
+          views={savedViews}
+          activeId={activeSavedViewId ?? savedViews[0]?.id ?? ""}
+          onSelect={onSelectSavedView ?? (() => undefined)}
+          searchLabel="Arbeitsliste durchsuchen"
+          {...(searchValue !== undefined ? { searchValue } : {})}
+          {...(onSearchChange ? { onSearchChange } : {})}
+        />
+      ) : null}
+
+      <QuickFilterChips
+        title="Schnellfilter"
+        description="Filtern Sie die Arbeitsliste über mehrere Status gleichzeitig."
+        filters={filters.map((filter) => {
+          const allActive = activeFilters.length === 0;
+          const active = allActive || activeFilters.includes(filter.value);
+          const option: QuickFilterOption = {
+            id: filter.value,
+            label: filter.label,
+            count: filter.count,
+            active,
+            tone: filterTone(filter.value),
+          };
+          return option;
         })}
-      </div>
+        onToggleFilter={(filter) => onToggleFilter(filter.id)}
+      />
 
       <label className="ps-inbox__mobile-sort">
         <span>Sortieren</span>
@@ -159,14 +285,60 @@ export function CaseInbox({
       </label>
 
       <div className="ps-inbox__cards" aria-label="Vorgänge">
-        {visible.length === 0 ? (
+        {pageRows.length === 0 ? (
           <p className="ps-inbox__mobile-empty" role="status">
             Keine Vorgänge für die aktuelle Auswahl.
           </p>
         ) : (
-          visible.map((row) => {
+          pageRows.map((row) => {
             const selected = row.id === selectedId;
-            return (
+            return selectionEnabled ? (
+              <article
+                key={row.id}
+                className={
+                  selected
+                    ? "ps-inbox__mobile-card ps-inbox__mobile-card--selected"
+                    : "ps-inbox__mobile-card"
+                }
+                aria-label={`Vorgang ${row.id}, ${row.applicant}`}
+              >
+                <span className="ps-inbox__mobile-card-head">
+                  <label className="ps-inbox__select">
+                    <input
+                      type="checkbox"
+                      checked={selectedSet.has(row.id)}
+                      onChange={() => toggleRowSelection(row.id)}
+                    />
+                    <span>Auswählen</span>
+                  </label>
+                  <CaseStatus
+                    label={statusLabel[row.status]}
+                    tone={statusTone[row.status]}
+                  />
+                </span>
+                <span className="ps-inbox__mobile-card-title">
+                  {row.applicant}
+                </span>
+                <span className="ps-inbox__mobile-card-subject">
+                  {row.subject}
+                </span>
+                <span className="ps-inbox__mobile-card-meta ps-num">
+                  <DeadlineIndicator
+                    label="Frist"
+                    dueAt={row.dueAt}
+                    overdue={Boolean(row.overdue)}
+                  />
+                </span>
+                <button
+                  type="button"
+                  className="ps-btn ps-btn--ghost"
+                  aria-label={`Vorgang ${row.id} öffnen`}
+                  onClick={() => onSelect(row.id)}
+                >
+                  Vorgang öffnen
+                </button>
+              </article>
+            ) : (
               <button
                 key={row.id}
                 type="button"
@@ -206,12 +378,35 @@ export function CaseInbox({
       </div>
 
       <div className="ps-inbox__scroll ps-inbox__responsive-table">
-        <table className="ps-inbox__table">
+        <table
+          className={
+            selectionEnabled
+              ? "ps-inbox__table ps-inbox__table--selectable"
+              : "ps-inbox__table"
+          }
+        >
           <caption className="ps-visually-hidden">
             Posteingang der Sachbearbeitung
           </caption>
           <thead className="ps-inbox__head">
             <tr>
+              {selectionEnabled ? (
+                <th scope="col" className="ps-inbox__col ps-inbox__col--select">
+                  <label className="ps-inbox__select ps-inbox__select--head">
+                    <input
+                      type="checkbox"
+                      checked={allPageSelected}
+                      aria-label="Alle sichtbaren Vorgänge auswählen"
+                      onClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                      onChange={() =>
+                        allPageSelected ? clearSelection() : selectCurrentPage()
+                      }
+                    />
+                    <span>Auswahl</span>
+                  </label>
+                </th>
+              ) : null}
               <th
                 scope="col"
                 className="ps-inbox__col ps-inbox__col--lead ps-inbox__col--lead-1"
@@ -275,14 +470,17 @@ export function CaseInbox({
             </tr>
           </thead>
           <tbody>
-            {visible.length === 0 ? (
+            {pageRows.length === 0 ? (
               <tr className="ps-inbox__empty-row">
-                <td colSpan={5} className="ps-inbox__empty">
+                <td
+                  colSpan={selectionEnabled ? 6 : 5}
+                  className="ps-inbox__empty"
+                >
                   Keine Vorgänge für die aktuelle Auswahl.
                 </td>
               </tr>
             ) : (
-              visible.map((row) => {
+              pageRows.map((row) => {
                 const selected = row.id === selectedId;
                 return (
                   <tr
@@ -298,6 +496,23 @@ export function CaseInbox({
                     onClick={() => onSelect(row.id)}
                     onKeyDown={(event) => rowKeyDown(event, row.id)}
                   >
+                    {selectionEnabled ? (
+                      <td className="ps-inbox__cell ps-inbox__col--select">
+                        <label className="ps-inbox__select">
+                          <input
+                            type="checkbox"
+                            checked={selectedSet.has(row.id)}
+                            aria-label={`Vorgang ${row.id} auswählen`}
+                            onClick={(event) => event.stopPropagation()}
+                            onKeyDown={(event) => event.stopPropagation()}
+                            onChange={() => toggleRowSelection(row.id)}
+                          />
+                          <span className="ps-visually-hidden">
+                            Vorgang {row.id} auswählen
+                          </span>
+                        </label>
+                      </td>
+                    ) : null}
                     <td className="ps-inbox__cell ps-inbox__col--lead ps-inbox__col--lead-1 ps-num">
                       {row.id}
                     </td>
@@ -325,6 +540,44 @@ export function CaseInbox({
           </tbody>
         </table>
       </div>
+
+      {showPagination ? (
+        <PaginationControls
+          page={safePageIndex}
+          pageCount={pageCount}
+          pageSize={effectivePageSize}
+          pageSizeOptions={availablePageSizeOptions}
+          status={pageStatus}
+          onPageChange={setPageIndex}
+          onPageSizeChange={setCurrentPageSize}
+        />
+      ) : (
+        <p className="ps-inbox__page-status" role="status">
+          {pageStatus}
+        </p>
+      )}
+
+      {selectionEnabled ? (
+        <BulkActionBar
+          selectedCount={activeSelection.length}
+          totalCount={visible.length}
+          title="Auswahl"
+          description="Aktionen gelten für ausgewählte Vorgänge in der aktuellen Trefferliste."
+          detailLabel={`${selectedOnPage} auf dieser Seite ausgewählt.`}
+          selectAllAction={{
+            id: "select-page",
+            label: "Aktuelle Seite auswählen",
+            onClick: selectCurrentPage,
+            disabled: allPageSelected || allPageIds.length === 0,
+          }}
+          clearSelectionAction={{
+            id: "clear-selection",
+            label: "Auswahl leeren",
+            onClick: clearSelection,
+          }}
+          actions={bulkActions}
+        />
+      ) : null}
     </div>
   );
 }
@@ -334,6 +587,104 @@ export interface SortButtonProps {
   active: boolean;
   ascending: boolean;
   onClick: () => void;
+}
+
+function normalisePageSize(value: number): number {
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 10;
+}
+
+function normalisePageSizes(values: number[]): number[] {
+  return Array.from(new Set(values.map(normalisePageSize))).sort(
+    (a, b) => a - b,
+  );
+}
+
+function matchesSearch(row: CaseRow, query: string) {
+  return [
+    row.id,
+    row.applicant,
+    row.subject,
+    statusLabel[row.status],
+    row.dueAt,
+  ].some((value) => value.toLocaleLowerCase("de").includes(query));
+}
+
+function sameStringArray(a: string[], b: string[]) {
+  if (a.length !== b.length) {
+    return false;
+  }
+  return a.every((value, index) => value === b[index]);
+}
+
+function filterTone(value: string): NonNullable<QuickFilterOption["tone"]> {
+  if (/entschieden|bereit|erledigt|done|ok/i.test(value)) {
+    return "success";
+  }
+  if (/offen|frist|due|warn/i.test(value)) {
+    return "warning";
+  }
+  if (/block|kritisch|overdue|risk/i.test(value)) {
+    return "critical";
+  }
+  return "neutral";
+}
+
+function PaginationControls({
+  page,
+  pageCount,
+  pageSize,
+  pageSizeOptions,
+  status,
+  onPageChange,
+  onPageSizeChange,
+}: {
+  page: number;
+  pageCount: number;
+  pageSize: number;
+  pageSizeOptions: number[];
+  status: string;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
+}) {
+  return (
+    <nav className="ps-inbox__pagination" aria-label="Seitennavigation">
+      <p className="ps-inbox__page-status" role="status" aria-live="polite">
+        {status} · Seite <span className="ps-num">{page + 1}</span> von{" "}
+        <span className="ps-num">{pageCount}</span>
+      </p>
+      <label className="ps-inbox__page-size">
+        <span>Einträge pro Seite</span>
+        <select
+          value={pageSize}
+          onChange={(event) => onPageSizeChange(Number(event.target.value))}
+        >
+          {pageSizeOptions.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="ps-inbox__page-actions">
+        <button
+          type="button"
+          className="ps-btn ps-btn--ghost"
+          disabled={page === 0}
+          onClick={() => onPageChange(Math.max(0, page - 1))}
+        >
+          Zurück
+        </button>
+        <button
+          type="button"
+          className="ps-btn ps-btn--ghost"
+          disabled={page >= pageCount - 1}
+          onClick={() => onPageChange(Math.min(pageCount - 1, page + 1))}
+        >
+          Weiter
+        </button>
+      </div>
+    </nav>
+  );
 }
 
 /** Spalten-Sortierschalter im Tabellenkopf (Klick wechselt Spalte bzw. Richtung). */

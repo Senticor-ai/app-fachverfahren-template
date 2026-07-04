@@ -91,7 +91,14 @@ not carry copied component templates.
 `Arbeitsvorrat` rendert Desktop als sortierbare Tabelle mit sticky Header und
 auf Mobil als touchfähige Kartenliste mit eigener Sortierkontrolle. Die
 Schnellfilter bleiben mehrfach aktivierbar und lassen den letzten aktiven
-Status nicht abwählen.
+Status nicht abwählen. Optional aktiviert `Arbeitsvorrat` Pagination und
+seitenbezogene Bulk-Auswahl über Props; ohne diese Props bleibt das bestehende
+Einzelauswahl-Verhalten erhalten.
+
+`CaseInbox` in `packages/public-sector-ui` deckt denselben Arbeitslistenvertrag
+für generische Master-Detail-Flächen ab: Suche über ID, Antragsteller:in,
+Betreff und Status, gespeicherte Ansichten, Pagination, mobile Auswahlkarten
+und deaktivierte Bulk-Actions ohne Auswahl.
 
 ### Evidence, Documents And Rich Content
 

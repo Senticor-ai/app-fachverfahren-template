@@ -41,6 +41,10 @@ export interface ArbeitsvorratProps<T = Record<string, unknown>> {
   port: VorgangPort<T>;
   /** Wird beim Aktivieren einer Zeile (Klick/Enter/Space) mit der Vorgang-Id gerufen. */
   onOpen: (id: string) => void;
+  /** Einträge je Seite im Arbeitsvorrat. */
+  pageSize?: number;
+  /** Optionale Sammelaktionen für ausgewählte Vorgänge. Ohne Aktionen bleibt die Liste ohne Auswahlspalte. */
+  bulkActions?: ArbeitsvorratBulkAction[];
   /**
    * Lädt der Bestand gerade? Zeigt additiv einen layout-treuen Tabellen-Platzhalter (SkeletonTable)
    * und sagt den Ladezustand zentral an. Default false (bestehendes Verhalten unverändert).
@@ -51,6 +55,14 @@ export interface ArbeitsvorratProps<T = Record<string, unknown>> {
    * als Recovery-Affordance angeboten. Ohne diese Prop bleibt der Leerzustand rein informativ.
    */
   onReload?: (() => void) | undefined;
+}
+
+export interface ArbeitsvorratBulkAction {
+  id: string;
+  label: string;
+  tone?: "primary" | "secondary" | "danger";
+  disabled?: boolean;
+  onClick: (ids: string[]) => void;
 }
 
 // ── Sort-State (inlined, generisch — keine externe Util-Abhängigkeit) ────────
@@ -106,12 +118,22 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
   config,
   port,
   onOpen,
+  pageSize = 10,
+  bulkActions = [],
   loading = false,
   onReload,
 }: ArbeitsvorratProps<T>): ReactElement {
   const { announce } = useStatusRegion();
   const alle = port.list();
   const states = config.statusMachine.states;
+  const [pageIndex, setPageIndex] = React.useState(0);
+  const [currentPageSize, setCurrentPageSize] = React.useState(() =>
+    normalisePageSize(pageSize),
+  );
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
+  const effectivePageSize = normalisePageSize(currentPageSize);
+  const selectionEnabled = bulkActions.length > 0;
+  const selectedSet = React.useMemo(() => new Set(selectedIds), [selectedIds]);
 
   // Roving-Tabindex für die Tabellen-Navigation: nur die aktive Zeile ist im Tab-Fokus,
   // Pfeiltasten/Home/End wandern durch die Liste (WAI-ARIA Grid-Muster).
@@ -187,6 +209,25 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
     });
   }, [sichtbar, sortKey, sortDir, getter]);
 
+  const pageCount = Math.max(1, Math.ceil(rows.length / effectivePageSize));
+  const safePageIndex = Math.min(pageIndex, pageCount - 1);
+  const pageStart = safePageIndex * effectivePageSize;
+  const pageRows = rows.slice(pageStart, pageStart + effectivePageSize);
+  const pageStatus =
+    rows.length === 0
+      ? "0 von 0"
+      : `${pageStart + 1}-${pageStart + pageRows.length} von ${rows.length}`;
+  const pageSizeOptions = React.useMemo(
+    () => uniqueSortedNumbers([effectivePageSize, pageSize, 10, 25, 50]),
+    [effectivePageSize, pageSize],
+  );
+  const allPageIds = pageRows.map((vorgang) => vorgang.id);
+  const selectedOnPage = allPageIds.filter((id) => selectedSet.has(id)).length;
+  const allPageSelected =
+    allPageIds.length > 0 && selectedOnPage === allPageIds.length;
+  const showPagination =
+    rows.length > effectivePageSize || pageSizeOptions.length > 1;
+
   const toggleSort = (key: ColKey) => {
     if (sortKey !== key) {
       setSortKey(key);
@@ -226,12 +267,55 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
     setSortDir(nextDir === "desc" ? "desc" : "asc");
   };
 
+  React.useEffect(() => {
+    setCurrentPageSize(normalisePageSize(pageSize));
+  }, [pageSize]);
+
+  React.useEffect(() => {
+    setPageIndex(0);
+  }, [active, sortKey, sortDir, currentPageSize]);
+
+  React.useEffect(() => {
+    if (pageIndex > pageCount - 1) {
+      setPageIndex(pageCount - 1);
+    }
+  }, [pageCount, pageIndex]);
+
+  React.useEffect(() => {
+    if (!selectionEnabled) {
+      return;
+    }
+    const rowIds = new Set(rows.map((vorgang) => vorgang.id));
+    setSelectedIds((current) => current.filter((id) => rowIds.has(id)));
+  }, [rows, selectionEnabled]);
+
+  function toggleSelection(id: string) {
+    setSelectedIds((current) =>
+      current.includes(id)
+        ? current.filter((entry) => entry !== id)
+        : [...current, id],
+    );
+  }
+
+  function selectCurrentPage() {
+    setSelectedIds((current) =>
+      Array.from(new Set([...current, ...allPageIds])),
+    );
+  }
+
+  function clearSelection() {
+    setSelectedIds([]);
+  }
+
   // Aktive Zeile gültig halten, wenn sich Filter/Sortierung die Zeilenzahl ändern.
   React.useEffect(() => {
-    setActiveRow((cur) =>
-      rows.length === 0 ? 0 : Math.min(cur, rows.length - 1),
-    );
-  }, [rows.length]);
+    setActiveRow((cur) => {
+      if (rows.length === 0) return 0;
+      const pageEnd = pageStart + pageRows.length - 1;
+      if (cur < pageStart || cur > pageEnd) return pageStart;
+      return Math.min(cur, rows.length - 1);
+    });
+  }, [rows.length, pageRows.length, pageStart]);
 
   // Lade-/Ergebnis-Zustand zentral ansagen (eine Ansage-Wahrheit, nicht je Widget).
   React.useEffect(() => {
@@ -241,11 +325,8 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
   }, [loading, announce]);
   React.useEffect(() => {
     if (loading) return;
-    announce(
-      `${sichtbar.length} von ${alle.length} Vorgängen angezeigt`,
-      "polite",
-    );
-  }, [loading, sichtbar.length, alle.length, announce]);
+    announce(`${rows.length} von ${alle.length} Vorgängen angezeigt`, "polite");
+  }, [loading, rows.length, alle.length, announce]);
 
   // Pfeiltasten-Navigation der Tabellenzeilen (Roving-Tabindex). Enter/Space öffnen bleiben erhalten.
   const handleRowKeyDown = React.useCallback(
@@ -260,18 +341,19 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
         return;
       }
       let next: number;
+      const pageEnd = pageStart + pageRows.length - 1;
       switch (event.key) {
         case "ArrowDown":
-          next = Math.min(index + 1, rows.length - 1);
+          next = Math.min(index + 1, pageEnd);
           break;
         case "ArrowUp":
-          next = Math.max(index - 1, 0);
+          next = Math.max(index - 1, pageStart);
           break;
         case "Home":
-          next = 0;
+          next = pageStart;
           break;
         case "End":
-          next = rows.length - 1;
+          next = pageEnd;
           break;
         default:
           return;
@@ -280,7 +362,7 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
       setActiveRow(next);
       rowRefs.current[next]?.focus();
     },
-    [onOpen, rows.length],
+    [onOpen, pageRows.length, pageStart],
   );
 
   const allActive = active.size === alleStatusKeys.length;
@@ -427,19 +509,83 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                       })}
                 />
               ) : (
-                rows.map((v, index) => {
+                pageRows.map((v, pageOffset) => {
                   const ber = berechnungText(v.berechnung);
-                  return (
+                  const rowIndex = pageStart + pageOffset;
+                  const checked = selectedSet.has(v.id);
+                  return selectionEnabled ? (
+                    <article
+                      key={v.id}
+                      className="ps-inbox__mobile-card"
+                      aria-label={`Vorgang ${v.vorgangsnummer}`}
+                      onFocus={() => setActiveRow(rowIndex)}
+                    >
+                      <span className="ps-inbox__mobile-card-head">
+                        <label className="ps-inbox__select">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleSelection(v.id)}
+                          />
+                          <span>Auswählen</span>
+                        </label>
+                        <StatusPill status={v.status} states={states} />
+                      </span>
+                      <span className="ps-inbox__mobile-card-title ps-num text-primary">
+                        {v.vorgangsnummer}
+                      </span>
+                      <span className="ps-inbox__mobile-card-meta">
+                        <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                        {eingangText(v.eingangIso)}
+                      </span>
+                      <span className="ps-inbox__mobile-card-fields">
+                        {schluesselFelder.map((f) => (
+                          <span key={f.pfad}>
+                            <span>{f.label}</span>
+                            <strong>
+                              {readPfad(v.antragsdaten, f.pfad) || "—"}
+                            </strong>
+                          </span>
+                        ))}
+                      </span>
+                      <span className="ps-inbox__mobile-card-footer">
+                        <span>
+                          <span>Berechnung</span>
+                          <strong className="ps-num">
+                            {ber ? ber.betrag : "—"}
+                          </strong>
+                        </span>
+                        {v.ki.flags.length > 0 && (
+                          <span className="ps-inbox__mobile-card-flags">
+                            {v.ki.flags.map((flag) => (
+                              <FlagIndikator key={flag} flag={flag} />
+                            ))}
+                          </span>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        className="ps-btn ps-btn--ghost"
+                        aria-label={`Vorgang ${v.vorgangsnummer} öffnen`}
+                        onClick={() => {
+                          setActiveRow(rowIndex);
+                          onOpen(v.id);
+                        }}
+                      >
+                        Vorgang öffnen
+                      </button>
+                    </article>
+                  ) : (
                     <button
                       key={v.id}
                       type="button"
                       className="ps-inbox__mobile-card"
                       aria-label={`Vorgang ${v.vorgangsnummer} öffnen`}
                       onClick={() => {
-                        setActiveRow(index);
+                        setActiveRow(rowIndex);
                         onOpen(v.id);
                       }}
-                      onFocus={() => setActiveRow(index)}
+                      onFocus={() => setActiveRow(rowIndex)}
                     >
                       <span className="ps-inbox__mobile-card-head">
                         <span className="ps-num text-primary">
@@ -488,6 +634,30 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                 <Table className="min-w-[760px] text-sm">
                   <TableHeader className="sticky top-0 z-20 bg-secondary text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <TableRow>
+                      {selectionEnabled ? (
+                        <TableHead className="w-14 px-4 py-2">
+                          <label className="ps-inbox__select ps-inbox__select--head">
+                            <input
+                              type="checkbox"
+                              checked={allPageSelected}
+                              aria-label="Alle sichtbaren Vorgänge auswählen"
+                              aria-checked={
+                                selectedOnPage > 0 && !allPageSelected
+                                  ? "mixed"
+                                  : allPageSelected
+                              }
+                              onClick={(event) => event.stopPropagation()}
+                              onKeyDown={(event) => event.stopPropagation()}
+                              onChange={() =>
+                                allPageSelected
+                                  ? clearSelection()
+                                  : selectCurrentPage()
+                              }
+                            />
+                            <span className="ps-visually-hidden">Auswahl</span>
+                          </label>
+                        </TableHead>
+                      ) : null}
                       <Th
                         label="Vorgangsnummer"
                         cKey="vorgang"
@@ -529,27 +699,51 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rows.map((v, index) => {
+                    {pageRows.map((v, pageOffset) => {
                       const ber = berechnungText(v.berechnung);
+                      const rowIndex = pageStart + pageOffset;
+                      const checked = selectedSet.has(v.id);
                       return (
                         <TableRow
                           key={v.id}
                           ref={(el: HTMLTableRowElement | null) => {
-                            rowRefs.current[index] = el;
+                            rowRefs.current[rowIndex] = el;
                           }}
                           // Roving-Tabindex: nur die aktive Zeile ist im Tab-Fokus; Pfeiltasten wandern
                           // (statt jede Zeile einzeln in die Tab-Reihenfolge zu legen).
-                          tabIndex={index === activeRow ? 0 : -1}
+                          tabIndex={rowIndex === activeRow ? 0 : -1}
                           role="link"
                           aria-label={`Vorgang ${v.vorgangsnummer} öffnen`}
                           onClick={() => {
-                            setActiveRow(index);
+                            setActiveRow(rowIndex);
                             onOpen(v.id);
                           }}
-                          onFocus={() => setActiveRow(index)}
-                          onKeyDown={(e) => handleRowKeyDown(e, index, v.id)}
-                          className="group cursor-pointer border-t border-border outline-none transition-colors ease-out hover:bg-secondary/40 focus:bg-secondary/40 focus-visible:ring-inset focus-visible:ring-ring/50 focus-visible:ring-[3px] motion-reduce:transition-none"
+                          onFocus={() => setActiveRow(rowIndex)}
+                          onKeyDown={(e) => handleRowKeyDown(e, rowIndex, v.id)}
+                          className={cn(
+                            "group cursor-pointer border-t border-border outline-none transition-colors ease-out hover:bg-secondary/40 focus:bg-secondary/40 focus-visible:ring-inset focus-visible:ring-ring/50 focus-visible:ring-[3px] motion-reduce:transition-none",
+                            checked && "bg-secondary/30",
+                          )}
                         >
+                          {selectionEnabled ? (
+                            <TableCell className="w-14 align-top">
+                              <label
+                                className="ps-inbox__select"
+                                onClick={(event) => event.stopPropagation()}
+                                onKeyDown={(event) => event.stopPropagation()}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  aria-label={`Vorgang ${v.vorgangsnummer} auswählen`}
+                                  onChange={() => toggleSelection(v.id)}
+                                />
+                                <span className="ps-visually-hidden">
+                                  Vorgang {v.vorgangsnummer} auswählen
+                                </span>
+                              </label>
+                            </TableCell>
+                          ) : null}
                           <TableCell className="align-top">
                             <span className="font-mono text-xs font-medium text-primary group-hover:underline">
                               {v.vorgangsnummer}
@@ -601,7 +795,11 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                     {rows.length === 0 && (
                       <TableRow>
                         <TableCell
-                          colSpan={4 + schluesselFelder.length}
+                          colSpan={
+                            4 +
+                            schluesselFelder.length +
+                            (selectionEnabled ? 1 : 0)
+                          }
                           className="p-6"
                         >
                           {/* Leerer FILTER (Bestand ist nicht leer) — mit Recovery „Filter zurücksetzen". */}
@@ -629,11 +827,203 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                 </Table>
               </div>
             </div>
+
+            {showPagination ? (
+              <ArbeitsvorratPagination
+                page={safePageIndex}
+                pageCount={pageCount}
+                pageSize={effectivePageSize}
+                pageSizeOptions={pageSizeOptions}
+                status={pageStatus}
+                onPageChange={setPageIndex}
+                onPageSizeChange={setCurrentPageSize}
+              />
+            ) : (
+              <p className="ps-inbox__page-status" role="status">
+                {pageStatus}
+              </p>
+            )}
+
+            {selectionEnabled ? (
+              <ArbeitsvorratBulkActions
+                selectedCount={selectedIds.length}
+                totalCount={rows.length}
+                selectedOnPage={selectedOnPage}
+                allPageSelected={allPageSelected}
+                canSelectPage={allPageIds.length > 0}
+                actions={bulkActions}
+                selectedIds={selectedIds}
+                onSelectCurrentPage={selectCurrentPage}
+                onClearSelection={clearSelection}
+              />
+            ) : null}
           </>
         )}
       </div>
     </section>
   );
+}
+
+function normalisePageSize(value: number): number {
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 10;
+}
+
+function uniqueSortedNumbers(values: number[]): number[] {
+  return Array.from(
+    new Set(
+      values
+        .map(normalisePageSize)
+        .filter((value) => Number.isFinite(value) && value > 0),
+    ),
+  ).sort((a, b) => a - b);
+}
+
+function ArbeitsvorratPagination({
+  page,
+  pageCount,
+  pageSize,
+  pageSizeOptions,
+  status,
+  onPageChange,
+  onPageSizeChange,
+}: {
+  page: number;
+  pageCount: number;
+  pageSize: number;
+  pageSizeOptions: number[];
+  status: string;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
+}): ReactElement {
+  return (
+    <nav className="ps-inbox__pagination" aria-label="Seitennavigation">
+      <p className="ps-inbox__page-status" role="status" aria-live="polite">
+        {status} · Seite <span className="ps-num">{page + 1}</span> von{" "}
+        <span className="ps-num">{pageCount}</span>
+      </p>
+      <label className="ps-inbox__page-size">
+        <span>Einträge pro Seite</span>
+        <select
+          value={pageSize}
+          onChange={(event) => onPageSizeChange(Number(event.target.value))}
+        >
+          {pageSizeOptions.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="ps-inbox__page-actions">
+        <button
+          type="button"
+          className="ps-btn ps-btn--ghost"
+          disabled={page === 0}
+          onClick={() => onPageChange(Math.max(0, page - 1))}
+        >
+          Zurück
+        </button>
+        <button
+          type="button"
+          className="ps-btn ps-btn--ghost"
+          disabled={page >= pageCount - 1}
+          onClick={() => onPageChange(Math.min(pageCount - 1, page + 1))}
+        >
+          Weiter
+        </button>
+      </div>
+    </nav>
+  );
+}
+
+function ArbeitsvorratBulkActions({
+  selectedCount,
+  totalCount,
+  selectedOnPage,
+  allPageSelected,
+  canSelectPage,
+  actions,
+  selectedIds,
+  onSelectCurrentPage,
+  onClearSelection,
+}: {
+  selectedCount: number;
+  totalCount: number;
+  selectedOnPage: number;
+  allPageSelected: boolean;
+  canSelectPage: boolean;
+  actions: ArbeitsvorratBulkAction[];
+  selectedIds: string[];
+  onSelectCurrentPage: () => void;
+  onClearSelection: () => void;
+}): ReactElement {
+  const hasSelection = selectedCount > 0;
+  return (
+    <section
+      className={cn(
+        "ps-bulk-action-bar",
+        hasSelection && "ps-bulk-action-bar--active",
+      )}
+      aria-label="Sammelaktionen"
+    >
+      <div className="ps-bulk-action-bar__content">
+        <div className="ps-bulk-action-bar__header">
+          <div>
+            <h2>Auswahl</h2>
+            <p className="ps-bulk-action-bar__status" aria-live="polite">
+              <span className="ps-num">{selectedCount}</span> von{" "}
+              <span className="ps-num">{totalCount}</span> Vorgängen ausgewählt
+            </p>
+          </div>
+          <p className="ps-bulk-action-bar__detail">
+            <span className="ps-num">{selectedOnPage}</span> auf dieser Seite
+            ausgewählt.
+          </p>
+        </div>
+        <div className="ps-bulk-action-bar__footer">
+          <p>
+            Aktionen bleiben deaktiviert, bis mindestens ein sichtbarer Vorgang
+            ausgewählt ist.
+          </p>
+        </div>
+      </div>
+      <div className="ps-bulk-action-bar__actions">
+        <button
+          type="button"
+          className="ps-btn ps-btn--ghost"
+          disabled={allPageSelected || !canSelectPage}
+          onClick={onSelectCurrentPage}
+        >
+          Aktuelle Seite auswählen
+        </button>
+        <button
+          type="button"
+          className="ps-btn ps-btn--ghost"
+          disabled={!hasSelection}
+          onClick={onClearSelection}
+        >
+          Auswahl leeren
+        </button>
+        {actions.map((action) => (
+          <button
+            key={action.id}
+            type="button"
+            className={cn("ps-btn", bulkActionClass(action.tone))}
+            disabled={!hasSelection || action.disabled}
+            onClick={() => action.onClick(selectedIds)}
+          >
+            {action.label}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function bulkActionClass(tone: ArbeitsvorratBulkAction["tone"]): string {
+  if (tone === "primary") return "ps-btn--primary";
+  if (tone === "danger") return "ps-btn--danger";
+  return "ps-btn--ghost";
 }
 
 // ── Sortierbarer Spalten-Header (a11y: Button mit aria-sort am TableHead) ────
