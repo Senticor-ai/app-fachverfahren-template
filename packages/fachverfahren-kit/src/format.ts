@@ -34,6 +34,25 @@ export function formatBetrag(betrag: number, einheit: string): string {
   return `${new Intl.NumberFormat("de-DE").format(betrag)} ${einheit ?? ""}`.trim();
 }
 
+/** Betrag + Anzeige-STATUS als EINE Wahrheit für alle Sichten (Bürger-Bestätigung, Bescheid, Sachbearbeiter-Detail):
+ *  der formatierte Betrag PLUS die Kennzeichnung, ob er nur VORLÄUFIG ist. Solange `status === "provisional"` (nötige
+ *  Eingaben fehlen bzw. ein als Annahme markierter/0-Platzhalterwert einfließt), darf KEINE Sicht den Betrag als
+ *  endgültige Festsetzung darstellen — genau dieser Fehler (0 € als „final" gezeigt) trat im tiefen App-Audit auf.
+ *  Zentral hier, damit nicht jede Sicht den Betrag eigenständig (und status-blind) rendert. */
+export function formatBetragStatus(b: {
+  betrag: number;
+  einheit: string;
+  status: "provisional" | "final";
+}): { betrag: string; text: string; vorlaeufig: boolean } {
+  const betrag = formatBetrag(b.betrag, b.einheit);
+  const vorlaeufig = b.status === "provisional";
+  return {
+    betrag,
+    vorlaeufig,
+    text: vorlaeufig ? `${betrag} (vorläufig)` : betrag,
+  };
+}
+
 /** Datei-Größe menschenlesbar (de-DE) — EINE Wahrheit für Datei-Uploads (inline `file`-Feld + DateiUpload). */
 export function formatDateiGroesse(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) return "—";

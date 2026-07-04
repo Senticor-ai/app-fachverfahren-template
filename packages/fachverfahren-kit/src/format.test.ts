@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatBetrag } from "./format.js";
+import { formatBetrag, formatBetragStatus } from "./format.js";
 const n = (x: string) => x.replace(/[\u00a0\u202f]/g, " ");
 
 describe("formatBetrag — Betrag in der natürlichen Haupteinheit", () => {
@@ -26,5 +26,28 @@ describe("formatBetrag — Betrag in der natürlichen Haupteinheit", () => {
 
   it("fällt bei ungültigem Währungscode defensiv auf EUR zurück", () => {
     expect(n(formatBetrag(120, "EUR"))).toBe("120,00 €");
+  });
+});
+
+describe("formatBetragStatus — provisorisch ≠ endgültig (tiefer App-Audit P2)", () => {
+  it("markiert einen provisorischen Betrag als (vorläufig)", () => {
+    const r = formatBetragStatus({
+      betrag: 0,
+      einheit: "EUR/Jahr",
+      status: "provisional",
+    });
+    expect(r.vorlaeufig).toBe(true);
+    expect(n(r.betrag)).toBe("0,00 €/Jahr");
+    expect(n(r.text)).toBe("0,00 €/Jahr (vorläufig)");
+  });
+  it("zeigt einen endgültigen Betrag OHNE Vorläufig-Marker", () => {
+    const r = formatBetragStatus({
+      betrag: 120,
+      einheit: "EUR/Jahr",
+      status: "final",
+    });
+    expect(r.vorlaeufig).toBe(false);
+    expect(n(r.text)).toBe("120,00 €/Jahr");
+    expect(r.text).not.toContain("vorläufig");
   });
 });

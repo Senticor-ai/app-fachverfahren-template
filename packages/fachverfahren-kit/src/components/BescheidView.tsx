@@ -122,7 +122,23 @@ export function BescheidView<T = Record<string, unknown>>({
             Tenor
           </h2>
 
-          {berechnung ? (
+          {berechnung && berechnung.status === "provisional" ? (
+            // VORLÄUFIG ⇒ KEIN verbindlicher Tenor: ein Bescheid ist die ENDGÜLTIGE Festsetzung. Solange die Berechnung
+            // provisorisch ist (Eingaben stehen aus / Annahme-/Platzhalterwert), darf hier kein festsetzender Betrag
+            // erscheinen (tiefer App-Audit: 0 € wurde als definitive Festsetzung gezeigt).
+            <div className="mt-3">
+              <p className="text-sm leading-relaxed text-foreground print:text-black">
+                Noch keine endgültige Festsetzung — die Berechnung ist vorläufig
+                (erforderliche Angaben stehen aus). Ein verbindlicher Bescheid
+                wird erst nach abgeschlossener Prüfung erteilt.
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground print:text-black">
+                {berechnung.label}:{" "}
+                {formatBetrag(berechnung.betrag, berechnung.einheit)}{" "}
+                (vorläufig)
+              </p>
+            </div>
+          ) : berechnung ? (
             <div className="mt-3">
               <p className="text-sm leading-relaxed text-foreground print:text-black">
                 Es wird festgesetzt:

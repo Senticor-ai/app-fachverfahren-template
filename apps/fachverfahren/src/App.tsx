@@ -18,6 +18,7 @@ import {
   AufsichtDashboard,
   FachverfahrenShell,
   ReviewWorkspace,
+  formatBetragStatus,
   type Persona,
   type ShellNavItem,
 } from "@senticor/fachverfahren-kit";
@@ -130,10 +131,17 @@ function BuergerBestaetigung(): React.JSX.Element {
               aufgenommen und wird geprüft.
             </p>
             {v.berechnung ? (
-              <p className="mt-3 text-sm text-foreground">
-                {v.berechnung.label}: {v.berechnung.betrag}{" "}
-                {v.berechnung.einheit}
-              </p>
+              <>
+                <p className="mt-3 text-sm text-foreground">
+                  {v.berechnung.label}: {formatBetragStatus(v.berechnung).text}
+                </p>
+                {formatBetragStatus(v.berechnung).vorlaeufig ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Vorläufige Angabe — die endgültige Festsetzung erfolgt nach
+                    Prüfung; dieser Betrag ist noch nicht verbindlich.
+                  </p>
+                ) : null}
+              </>
             ) : null}
             <button
               type="button"

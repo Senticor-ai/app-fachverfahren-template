@@ -11,6 +11,7 @@ import type {
   Vorgang,
 } from "../types.js";
 import { cn } from "../lib/cn.js";
+import { formatBetrag as formatBetragKit } from "../format.js";
 import { KiVorschlag } from "./KiVorschlag.js";
 import { KiAssistPanel } from "./KiAssistPanel.js";
 
@@ -37,9 +38,10 @@ export function formatWert(value: unknown): string {
   return String(value);
 }
 
-/** Betrag + Einheit aus der Berechnung lesbar machen (z.B. „120 EUR/Jahr"). */
+/** Betrag + Einheit lesbar machen — delegiert an den EINEN Kit-Formatierer (kein zweiter, divergierender Formatierer:
+ *  die lokale Variante zeigte „120 EUR" statt „120,00 €"). Der Status-Hinweis erfolgt separat am Render-Ort. */
 function formatBetrag(betrag: number, einheit: string): string {
-  return `${new Intl.NumberFormat("de-DE").format(betrag)} ${einheit}`.trim();
+  return formatBetragKit(betrag, einheit);
 }
 
 /** Ein Label/Wert-Paar — wie `Info` in der Referenz. */
@@ -108,6 +110,11 @@ function BerechnungsKarte({
             <>
               <div className="mt-3 text-3xl font-semibold text-foreground">
                 {formatBetrag(b.betrag, b.einheit)}
+                {b.status === "provisional" ? (
+                  <span className="ml-2 align-middle text-sm font-medium text-muted-foreground">
+                    (vorläufig)
+                  </span>
+                ) : null}
               </div>
               <p className="mt-1 text-sm font-medium text-foreground">
                 {b.label}

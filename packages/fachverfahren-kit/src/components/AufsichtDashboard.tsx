@@ -263,8 +263,10 @@ export function AufsichtDashboard<T = Record<string, unknown>>({
                         <div className="text-3xl font-semibold tabular-nums text-foreground">
                           {formatBetrag(s.betrag, s.einheit)}
                         </div>
+                        {/* formatBetrag trägt die Einheit bereits (z.B. „0,00 €/Jahr") — Untertitel labelt die Summe
+                            semantisch statt die Einheit doppelt zu zeigen (Audit: duplizierte Einheit). */}
                         <div className="mt-1 text-sm text-muted-foreground">
-                          {s.einheit}
+                          Summe (festgesetzt)
                         </div>
                       </li>
                     ))}
