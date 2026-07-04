@@ -44,7 +44,11 @@ export interface Berechnung {
   // "final", wenn alle nötigen Felder vorliegen. Erzwingt, dass ein vorläufiger Betrag NIE wie ein endgültiger erscheint —
   // der Typ verlangt das Feld, sodass jede berechne-Funktion es liefern MUSS (kein nachgelagerter Repair-Zyklus).
   status: "provisional" | "final";
-  positionen?: { label: string; betrag: number }[];
+  // PFLICHT (wie `status`, gleiche Begründung): jede berechne-Funktion erzeugt `positionen` (mind. `[]`) — der Typ
+  // verlangt das Feld, damit `erg.positionen` NIE „possibly undefined" ist. Vorher optional → jeder generierte
+  // berechnung.test.ts brach mit tsc18048 (`'erg.positionen' is possibly 'undefined'`) und erzwang einen Self-Heal-
+  // Repair-Zyklus (Regression). Non-optional stellt diese Wurzel ab: die Naht liefert positionen, der Test kompiliert.
+  positionen: { label: string; betrag: number }[];
 }
 
 /** M4 — der BEZUGSWEG eines Nachweises: klassischer Datei-`upload` (Default), `register-once-only` (der Nachweis
