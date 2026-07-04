@@ -2,6 +2,7 @@ stages:
   - validate
   - pages
   - image
+  - supply-chain
 
 variables:
   KUBECTL_VERSION: v1.34.9
@@ -55,3 +56,25 @@ container-image:
   script:
     - export IMAGE_TAG="${CI_COMMIT_TAG:-$CI_COMMIT_SHORT_SHA}"
     - /kaniko/executor --context "${CI_PROJECT_DIR}" --dockerfile "${CI_PROJECT_DIR}/Dockerfile" --destination "${CI_REGISTRY_IMAGE}:${IMAGE_TAG}" --cache=true --cache-repo "${CI_REGISTRY_IMAGE}/cache"
+
+# LIEFERKETTEN-NACHWEIS (BSI OPS / SLSA): CycloneDX-SBOM der pnpm-Abhängigkeiten — die auditierbare Stückliste, die bei
+# Freigabe/Deploy mitgeht. Selbst-enthalten (cdxgen via npx im vorhandenen Node-Image, kein zusätzliches Registry-Image
+# zu spiegeln); als GitLab-CycloneDX-Report + Artefakt exponiert (Security-Dashboard + langfristig aufbewahrt). Generisch:
+# kein Verfahrens-Wert. Deploy-HITL/GitLab-Push (der EINE HITL) sieht den SBOM als Freigabe-Artefakt.
+sbom:
+  extends: .node-base
+  stage: supply-chain
+  needs:
+    - validate
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+  script:
+    - npx --yes @cyclonedx/cdxgen@^11 -t pnpm --spec-version 1.5 -o sbom.cdx.json . || npx --yes @cyclonedx/cdxgen@^11 -o sbom.cdx.json .
+  artifacts:
+    paths:
+      - sbom.cdx.json
+    reports:
+      cyclonedx:
+        - sbom.cdx.json
+    expire_in: 1 year
