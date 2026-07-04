@@ -66,4 +66,26 @@ describe("domain app rendering", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  // GUARD (CHOS-CODE#68): the scaffold must refuse to render FROM a live/governed consumer project (one carrying a
+  // `.chos/` dir or a `cognitive-hive.*` symlink). Scaffolding from there would follow that symlink and flip the shared
+  // source governance (parallel app + broken gates). It renders from the pristine template only.
+  it("refuses to scaffold FROM a live/governed consumer project (.chos present)", async () => {
+    const root = await mkdtemp(join(tmpdir(), "template-guard-test-"));
+    try {
+      const fakeConsumer = join(root, "consumer");
+      const { mkdir } = await import("node:fs/promises");
+      await mkdir(join(fakeConsumer, ".chos"), { recursive: true });
+      await expect(
+        renderDomainApp(fakeConsumer, join(root, "out"), {
+          domain: "demo-k8s",
+          displayName: "Demo",
+          force: true,
+          allowDirty: true,
+        }),
+      ).rejects.toThrow(/live\/governed consumer project|CHOS-CODE#68/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
 });
