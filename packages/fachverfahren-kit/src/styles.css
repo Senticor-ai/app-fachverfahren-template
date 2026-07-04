@@ -1690,6 +1690,45 @@
       grid-template-columns: 1fr;
     }
   }
+
+  /* ── Vollständigkeit: Lang-Schwanz-ps-*-Klassen (Tabellenzeilen, Leerzustände, aria-hidden-Marker, Login-Details) ──
+     Damit KEINE genutzte ps-*-Klasse ungestylt bleibt. Token-basiert (dieselbe Vokabular wie oben); der Basis-Look
+     kommt oft schon von ps-btn/ps-muted oder dem gestylten Eltern-Block — hier nur die ergänzende Feinjustierung. */
+  .ps-audit-trail__row {
+    border-top: 1px solid var(--color-border);
+  }
+  .ps-audit-trail__empty-row,
+  .ps-inbox__empty-row {
+    border-top: none;
+  }
+  .ps-dashboard__kpis-empty {
+    padding: 1rem 0;
+  }
+  .ps-inbox__sort-marker {
+    margin-left: 0.25rem;
+    color: var(--color-muted-foreground);
+    font-size: 0.75rem;
+  }
+  .ps-ki-vorschlag__sources {
+    margin-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+  .ps-login__error-badge,
+  .ps-login__trust-badge {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+  }
+  .ps-login__trust-text {
+    font-size: 0.875rem;
+    line-height: 1.4;
+  }
+  .ps-login__submit {
+    width: 100%;
+  }
 }
 
 /* ── A11y-Nutzer-Schalter (opt-in, nicht standardmäßig aktiv) ── */
