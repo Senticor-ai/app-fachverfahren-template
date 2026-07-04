@@ -28,10 +28,15 @@ not carry copied component templates.
 - `PageHeader`
 - `ResponsiveContainer`
 - `PersonaSwitcher`
+- `BarrierefreiheitsPanel`
 - `KommuneTheme`
 - `ResponsiveWorkspaceShell` (public-sector-ui)
 - `CaseContextPanel` (public-sector-ui)
 - `ProcessTimeline` (public-sector-ui)
+- `TaskQueuePanel` (public-sector-ui)
+- `DeadlinePanel` (public-sector-ui)
+- `QuickFilterChips` (public-sector-ui)
+- `BulkActionBar` (public-sector-ui)
 - `StickyActionBar` (public-sector-ui)
 - `SavedViewsToolbar` (public-sector-ui)
 
@@ -48,6 +53,7 @@ not carry copied component templates.
 - `Postfach`
 - `CommunicationThread` (public-sector-ui)
 - `ProcessTimeline` (public-sector-ui)
+- `DocumentChecklistPanel` (public-sector-ui)
 - `BescheidView`
 - `HilfePanel`
 - `InstallPrompt`
@@ -64,7 +70,15 @@ not carry copied component templates.
 - `CalculationTrace` (public-sector-ui)
 - `CommunicationThread` (public-sector-ui)
 - `ReadinessGatePanel` (public-sector-ui)
+- `TaskQueuePanel` (public-sector-ui)
+- `DeadlinePanel` (public-sector-ui)
+- `HandoffPanel` (public-sector-ui)
+- `QuickFilterChips` (public-sector-ui)
+- `BulkActionBar` (public-sector-ui)
 - `EvidenceReviewGrid` (public-sector-ui)
+- `DocumentChecklistPanel` (public-sector-ui)
+- `AssumptionRegisterPanel` (public-sector-ui)
+- `SourceCoveragePanel` (public-sector-ui)
 - `ResponsiveWorkspaceShell` (public-sector-ui)
 - `SavedViewsToolbar` (public-sector-ui)
 - `StickyActionBar` (public-sector-ui)
@@ -74,10 +88,17 @@ not carry copied component templates.
 - `ReportingPanel`
 - `TerminFristPanel`
 
+`Arbeitsvorrat` rendert Desktop als sortierbare Tabelle mit sticky Header und
+auf Mobil als touchfähige Kartenliste mit eigener Sortierkontrolle. Die
+Schnellfilter bleiben mehrfach aktivierbar und lassen den letzten aktiven
+Status nicht abwählen.
+
 ### Evidence, Documents And Rich Content
 
 - `CommunicationThread` (public-sector-ui)
 - `EvidenceReviewGrid` (public-sector-ui)
+- `DocumentChecklistPanel` (public-sector-ui)
+- `SourceCoveragePanel` (public-sector-ui)
 - `NachweisBrowser`
 - `DocumentPreview`
 - `PdfViewer`
@@ -95,6 +116,11 @@ not carry copied component templates.
 - `DecisionComposer` (public-sector-ui)
 - `CalculationTrace` (public-sector-ui)
 - `ReadinessGatePanel` (public-sector-ui)
+- `TaskQueuePanel` (public-sector-ui)
+- `HandoffPanel` (public-sector-ui)
+- `DeadlinePanel` (public-sector-ui)
+- `AssumptionRegisterPanel` (public-sector-ui)
+- `SourceCoveragePanel` (public-sector-ui)
 - `KiVorschlag`
 - `KiAssistPanel`
 - `EvidenceCard`
@@ -117,6 +143,7 @@ not carry copied component templates.
 - `SignaturePad`
 - `KommandoPalette`
 - `LanguageSwitch`
+- `BarrierefreiheitsPanel`
 - `Barrierefreiheitserklaerung`
 - `pwa`
 

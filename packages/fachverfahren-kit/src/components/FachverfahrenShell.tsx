@@ -239,7 +239,7 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
                       aria-current={isActive ? "page" : undefined}
                       onClick={handleNav(item)}
                       className={cn(
-                        "flex h-9 items-center gap-2.5 rounded-md px-2.5 text-sm",
+                        "flex min-h-11 items-center gap-2.5 rounded-md px-2.5 text-sm",
                         // Kanonisches Fokus-Rezept (Spec 3.2): weicher 3px-Ring, EIN Rezept kit-weit.
                         "transition-colors ease-out motion-reduce:transition-none",
                         "outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
@@ -301,7 +301,7 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
         </header>
 
         {/* Persona-Wechsler auch im Header (mobil, wo die Sidebar verborgen ist). */}
-        <div className="border-b border-border bg-card px-2 py-1.5 md:hidden">
+        <div className="border-b border-sidebar-border bg-sidebar px-2 py-1.5 md:hidden">
           <PersonaSwitcher
             persona={persona}
             onPersonaChange={onPersonaChange}

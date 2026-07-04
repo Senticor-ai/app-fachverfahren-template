@@ -1,6 +1,7 @@
 import type { Preview } from "@storybook/react";
 // Das Design-System lebt im Kit — Storybook lädt DIE Kit-Tokens (keine App-eigene zweite Wahrheit).
 import "../packages/fachverfahren-kit/src/styles.css";
+import "../packages/fachverfahren-kit/src/public-sector-ui.css";
 
 // A11y-/Theme-Modi über die Symbolleiste: schaltet die vom Kit definierten Klassen (styles.css) an <html>.
 // So lässt sich JEDE Story in light / dark / High-Contrast und mit Groß-Text prüfen (WCAG 2.2, BITV, EN 301 549).

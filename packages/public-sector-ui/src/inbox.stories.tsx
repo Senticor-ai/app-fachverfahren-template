@@ -13,7 +13,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Sachbearbeitungs-Posteingang (Master-Detail): dichte, tastatureffiziente Tabelle mit sticky Header, zwei eingefrorenen Leitspalten, Spaltensortierung, mehrfach wählbaren Schnellfilter-Chips und einem Detail-Panel mit Aktions-Slot. Setzt den fachverfahren-ux-contract um.",
+          "Sachbearbeitungs-Posteingang (Master-Detail): dichte, tastatureffiziente Tabelle mit sticky Header, zwei eingefrorenen Leitspalten, mobilem Karten-Reflow, Sortierkontrolle, mehrfach wählbaren Schnellfilter-Chips und einem Detail-Panel mit Aktions-Slot. Setzt den fachverfahren-ux-contract um.",
       },
     },
   },

@@ -59,10 +59,16 @@ function lese(): A11ySettings {
 export interface UseA11ySettingsResult {
   /** Der aktuelle Präferenz-Zustand. */
   settings: A11ySettings;
+  /** Alle Präferenzen explizit setzen. */
+  setSettings: (next: A11ySettings) => void;
   /** Eine Präferenz explizit setzen. */
   setOption: (key: A11yOption, value: boolean) => void;
   /** Eine Präferenz umschalten. */
   toggle: (key: A11yOption) => void;
+  /** Auf Standarddarstellung zurücksetzen. */
+  reset: () => void;
+  /** Sind alle Präferenzen im Standardzustand? */
+  isDefault: boolean;
 }
 
 /**
@@ -90,6 +96,14 @@ export function useA11ySettings(): UseA11ySettingsResult {
     }
   }, []);
 
+  const setAllSettings = React.useCallback(
+    (next: A11ySettings) => {
+      setSettings(next);
+      persistiere(next);
+    },
+    [persistiere],
+  );
+
   const setOption = React.useCallback(
     (key: A11yOption, value: boolean) => {
       setSettings((s) => {
@@ -112,5 +126,22 @@ export function useA11ySettings(): UseA11ySettingsResult {
     [persistiere],
   );
 
-  return { settings, setOption, toggle };
+  const reset = React.useCallback(() => {
+    const next = { ...STANDARD };
+    setSettings(next);
+    persistiere(next);
+  }, [persistiere]);
+
+  const isDefault = (Object.keys(STANDARD) as A11yOption[]).every(
+    (key) => settings[key] === STANDARD[key],
+  );
+
+  return {
+    settings,
+    setSettings: setAllSettings,
+    setOption,
+    toggle,
+    reset,
+    isDefault,
+  };
 }

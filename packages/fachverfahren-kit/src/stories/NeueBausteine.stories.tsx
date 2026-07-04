@@ -337,9 +337,9 @@ export const BarrierefreiheitsPanelStory: Story = {
   name: "BarrierefreiheitsPanel",
   render: () => (
     <StatusRegionProvider>
-      <div className="max-w-md">
+      <main className="sb-page">
         <BarrierefreiheitsPanel />
-      </div>
+      </main>
     </StatusRegionProvider>
   ),
 };

@@ -199,6 +199,33 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
     }
   };
 
+  const mobileSortOptions = useMemo(
+    () => [
+      { key: "eingang" as ColKey, label: "Eingang" },
+      { key: "vorgang" as ColKey, label: "Vorgangsnummer" },
+      ...schluesselFelder.map((f) => ({
+        key: `feld:${f.pfad}` as ColKey,
+        label: f.label,
+      })),
+      { key: "berechnung" as ColKey, label: "Berechnung" },
+      { key: "status" as ColKey, label: "Status" },
+    ],
+    [schluesselFelder],
+  );
+
+  const mobileSortValue = sortKey && sortDir ? `${sortKey}|${sortDir}` : "none";
+
+  const updateMobileSort = (value: string) => {
+    if (value === "none") {
+      setSortKey(null);
+      setSortDir(null);
+      return;
+    }
+    const [nextKey, nextDir] = value.split("|");
+    setSortKey(nextKey as ColKey);
+    setSortDir(nextDir === "desc" ? "desc" : "asc");
+  };
+
   // Aktive Zeile gültig halten, wenn sich Filter/Sortierung die Zeilenzahl ändern.
   React.useEffect(() => {
     setActiveRow((cur) =>
@@ -333,16 +360,17 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                       }
                       className={cn(
                         // Chip = rounded-full, text-xs Minimum; kanonisches Fokus-Rezept (Spec 3.2).
+                        "ps-inbox__chip",
                         "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-colors ease-out motion-reduce:transition-none",
                         "outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
                         on
-                          ? "border-accent bg-accent/15 text-foreground"
+                          ? "ps-inbox__chip--active border-accent bg-accent/15 text-foreground"
                           : "border-border bg-card text-muted-foreground hover:text-foreground",
                         isLastOn && "cursor-not-allowed opacity-80",
                       )}
                     >
                       <span>{s.label}</span>
-                      <span className="rounded-full bg-secondary px-1.5 py-px text-xs tabular-nums text-foreground">
+                      <span className="ps-inbox__chip-count rounded-full bg-secondary px-1.5 py-px text-xs tabular-nums text-foreground">
                         {countByStatus[s.key] ?? 0}
                       </span>
                     </button>
@@ -352,7 +380,7 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                   <button
                     type="button"
                     onClick={() => setActive(new Set(alleStatusKeys))}
-                    className="shrink-0 rounded-md px-1 text-xs text-muted-foreground underline-offset-2 outline-none transition-colors ease-out hover:text-foreground hover:underline focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] motion-reduce:transition-none"
+                    className="ps-inbox__filter-reset shrink-0 rounded-md px-1 text-xs text-muted-foreground underline-offset-2 outline-none transition-colors ease-out hover:text-foreground hover:underline focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] motion-reduce:transition-none"
                   >
                     Alle anzeigen
                   </button>
@@ -360,8 +388,102 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
               </div>
             </div>
 
+            <label className="ps-inbox__mobile-sort">
+              <span>Sortieren</span>
+              <select
+                value={mobileSortValue}
+                onChange={(event) => updateMobileSort(event.target.value)}
+              >
+                <option value="none">Standardreihenfolge</option>
+                {mobileSortOptions.map((option) => (
+                  <React.Fragment key={option.key}>
+                    <option value={`${option.key}|asc`}>
+                      {option.label} aufsteigend
+                    </option>
+                    <option value={`${option.key}|desc`}>
+                      {option.label} absteigend
+                    </option>
+                  </React.Fragment>
+                ))}
+              </select>
+            </label>
+
+            <div className="ps-inbox__cards mt-4" aria-label="Vorgänge">
+              {rows.length === 0 ? (
+                <EmptyState
+                  as="p"
+                  icon={InboxIcon}
+                  title="Keine Vorgänge im aktuellen Filter"
+                  description="Für die gewählten Statusfilter gibt es keine Treffer. Setzen Sie die Filter zurück, um alle Vorgänge zu sehen."
+                  className="border-0 bg-transparent py-4"
+                  {...(allActive
+                    ? {}
+                    : {
+                        action: {
+                          label: "Alle anzeigen",
+                          onClick: () => setActive(new Set(alleStatusKeys)),
+                          variant: "outline",
+                        },
+                      })}
+                />
+              ) : (
+                rows.map((v, index) => {
+                  const ber = berechnungText(v.berechnung);
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      className="ps-inbox__mobile-card"
+                      aria-label={`Vorgang ${v.vorgangsnummer} öffnen`}
+                      onClick={() => {
+                        setActiveRow(index);
+                        onOpen(v.id);
+                      }}
+                      onFocus={() => setActiveRow(index)}
+                    >
+                      <span className="ps-inbox__mobile-card-head">
+                        <span className="ps-num text-primary">
+                          {v.vorgangsnummer}
+                        </span>
+                        <StatusPill status={v.status} states={states} />
+                      </span>
+                      <span className="ps-inbox__mobile-card-meta">
+                        <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                        {eingangText(v.eingangIso)}
+                      </span>
+                      <span className="ps-inbox__mobile-card-fields">
+                        {schluesselFelder.map((f) => (
+                          <span key={f.pfad}>
+                            <span>{f.label}</span>
+                            <strong>
+                              {readPfad(v.antragsdaten, f.pfad) || "—"}
+                            </strong>
+                          </span>
+                        ))}
+                      </span>
+                      <span className="ps-inbox__mobile-card-footer">
+                        <span>
+                          <span>Berechnung</span>
+                          <strong className="ps-num">
+                            {ber ? ber.betrag : "—"}
+                          </strong>
+                        </span>
+                        {v.ki.flags.length > 0 && (
+                          <span className="ps-inbox__mobile-card-flags">
+                            {v.ki.flags.map((flag) => (
+                              <FlagIndikator key={flag} flag={flag} />
+                            ))}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
             {/* Tabellen-Container: Card-Ebene (border + shadow-sm), innen-scrollend, sticky Header */}
-            <div className="mt-4 flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+            <div className="ps-inbox__responsive-table mt-4 flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
               <div className="min-h-0 flex-1 overflow-auto">
                 <Table className="min-w-[760px] text-sm">
                   <TableHeader className="sticky top-0 z-20 bg-secondary text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -545,7 +667,7 @@ function Th({
       <button
         type="button"
         onClick={() => onSort(cKey)}
-        className="inline-flex items-center gap-1 rounded-md px-1 uppercase tracking-wide outline-none transition-colors ease-out hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:text-foreground motion-reduce:transition-none"
+        className="ps-inbox__sort inline-flex items-center gap-1 rounded-md px-1 uppercase tracking-wide outline-none transition-colors ease-out hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:text-foreground motion-reduce:transition-none"
         aria-label={`${label} sortieren`}
       >
         {label}

@@ -707,17 +707,20 @@ function Stepper({
           <ChevronLeft className="h-4 w-4" />
         </Button>
 
-        <p className="min-w-0 flex-1 text-sm font-medium text-foreground">
+        <h1 className="min-w-0 flex-1 text-sm font-medium text-foreground">
           Schritt <span className="tabular-nums">{stepIdx + 1}</span> von{" "}
           <span className="tabular-nums">{total}</span>
           <span className="text-muted-foreground"> — </span>
           <span className="truncate">{aktuellerName}</span>
           {aktuellUnvollstaendig && (
-            <span className="ml-2 text-xs font-medium text-status-block">
-              · unvollständig
-            </span>
+            <>
+              {" "}
+              <span className="ml-2 text-xs font-medium text-status-block">
+                · unvollständig
+              </span>
+            </>
           )}
-        </p>
+        </h1>
 
         <Button
           variant="ghost"
@@ -781,6 +784,7 @@ function Stepper({
                 onClick={() => setStepIdx(i)}
                 aria-current={active ? "step" : undefined}
                 className={cn(
+                  "ps-form-stepper__crumb",
                   "flex items-center gap-2 rounded-full py-0.5 pr-1",
                   "outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
                   "transition-colors ease-out motion-reduce:transition-none",

@@ -95,6 +95,13 @@ export function CaseInbox({
     }
   }
 
+  function updateMobileSort(value: string) {
+    const [nextKey, nextDirection] = value.split(":");
+    if (!isSortKey(nextKey)) return;
+    setSortKey(nextKey);
+    setAscending(nextDirection !== "desc");
+  }
+
   function rowKeyDown(event: KeyboardEvent<HTMLTableRowElement>, id: string) {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -134,7 +141,71 @@ export function CaseInbox({
         })}
       </div>
 
-      <div className="ps-inbox__scroll">
+      <label className="ps-inbox__mobile-sort">
+        <span>Sortieren</span>
+        <select
+          value={`${sortKey}:${ascending ? "asc" : "desc"}`}
+          onChange={(event) => updateMobileSort(event.target.value)}
+        >
+          <option value="dueAt:asc">Frist aufsteigend</option>
+          <option value="dueAt:desc">Frist absteigend</option>
+          <option value="id:asc">Vorgang-ID aufsteigend</option>
+          <option value="id:desc">Vorgang-ID absteigend</option>
+          <option value="applicant:asc">Antragsteller:in A-Z</option>
+          <option value="applicant:desc">Antragsteller:in Z-A</option>
+          <option value="status:asc">Status aufsteigend</option>
+          <option value="status:desc">Status absteigend</option>
+        </select>
+      </label>
+
+      <div className="ps-inbox__cards" aria-label="Vorgänge">
+        {visible.length === 0 ? (
+          <p className="ps-inbox__mobile-empty" role="status">
+            Keine Vorgänge für die aktuelle Auswahl.
+          </p>
+        ) : (
+          visible.map((row) => {
+            const selected = row.id === selectedId;
+            return (
+              <button
+                key={row.id}
+                type="button"
+                className={
+                  selected
+                    ? "ps-inbox__mobile-card ps-inbox__mobile-card--selected"
+                    : "ps-inbox__mobile-card"
+                }
+                aria-pressed={selected}
+                aria-label={`Vorgang ${row.id}, ${row.applicant}, ${statusLabel[row.status]}, Frist ${row.dueAt}`}
+                onClick={() => onSelect(row.id)}
+              >
+                <span className="ps-inbox__mobile-card-head">
+                  <span className="ps-num">{row.id}</span>
+                  <CaseStatus
+                    label={statusLabel[row.status]}
+                    tone={statusTone[row.status]}
+                  />
+                </span>
+                <span className="ps-inbox__mobile-card-title">
+                  {row.applicant}
+                </span>
+                <span className="ps-inbox__mobile-card-subject">
+                  {row.subject}
+                </span>
+                <span className="ps-inbox__mobile-card-meta ps-num">
+                  <DeadlineIndicator
+                    label="Frist"
+                    dueAt={row.dueAt}
+                    overdue={Boolean(row.overdue)}
+                  />
+                </span>
+              </button>
+            );
+          })
+        )}
+      </div>
+
+      <div className="ps-inbox__scroll ps-inbox__responsive-table">
         <table className="ps-inbox__table">
           <caption className="ps-visually-hidden">
             Posteingang der Sachbearbeitung
@@ -352,6 +423,16 @@ function compareRows(a: CaseRow, b: CaseRow, key: SortKey): number {
     return statusOrder[a.status] - statusOrder[b.status];
   }
   return a[key].localeCompare(b[key], "de");
+}
+
+function isSortKey(value: string | undefined): value is SortKey {
+  return (
+    value === "id" ||
+    value === "applicant" ||
+    value === "subject" ||
+    value === "status" ||
+    value === "dueAt"
+  );
 }
 
 function ariaSort(

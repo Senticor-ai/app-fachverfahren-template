@@ -27,6 +27,9 @@ describe("fachverfahren runtime", () => {
       expect(root.headers["content-security-policy"]).toContain(
         "object-src 'none'",
       );
+      expect(root.headers["content-security-policy"]).toContain(
+        "style-src-elem 'self' 'unsafe-inline'",
+      );
       expect(root.headers["strict-transport-security"]).toContain(
         "max-age=31536000",
       );

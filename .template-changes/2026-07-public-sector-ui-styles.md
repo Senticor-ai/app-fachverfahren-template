@@ -15,4 +15,14 @@ migration: none
 - ergänzt `ReadinessGatePanel` als Prüfstand für Entscheidungsreife, blockierende Gates, Zuständigkeiten und nächste Aktionen
 - ergänzt `CaseContextPanel` als kompakten Aktenkopf für Vorgangs-ID, Status, Phase, Zuständigkeit, Fristen, Signale und Aktionen
 - ergänzt `ProcessTimeline` für erledigte, aktuelle, ausstehende und blockierte Verfahrensschritte mit nächster Aktion
+- ergänzt `TaskQueuePanel` für konkrete Arbeitsaufgaben mit Priorität, Frist, Zuständigkeit, Auswahl, Blockaden und nächsten Aktionen
+- ergänzt `HandoffPanel` für Übergaben, Freigaben, Rückgaben und blockierte Übergabewege mit Audit-Hinweis
+- ergänzt `DeadlinePanel` für Fristensteuerung mit Überfälligkeit, Restzeit, Zuständigkeit, Eskalationspfad und Aktionen
+- ergänzt `QuickFilterChips` und `BulkActionBar` für mehrfach aktive Arbeitslistenfilter, Auswahlstatus und Mehrfachaktionen
+- ergänzt `DocumentChecklistPanel` für Pflicht- und optionale Unterlagen mit Vollständigkeit, Quelle, Eingang, Gültigkeit und Nachforderung
+- ergänzt `AssumptionRegisterPanel` für offene Fachannahmen, Quellenvalidierung, Zuständigkeit, Fristen und blockierende Freigabefragen
+- ergänzt `SourceCoveragePanel` für belegte, offene, veraltete und widersprüchliche Quellenanforderungen in agentisch erzeugten Fachverfahren
+- ergänzt mobile Arbeitsvorrat-/Inbox-Karten mit Sortierkontrolle als touchfähigen Reflow der Desktop-Tabelle
+- modernisiert `BarrierefreiheitsPanel` mit Statuszusammenfassung, Reset-Aktion, größeren Touch-Zielen und `ps-*`-Tokenstil
+- hebt Muted-, Sidebar-, Status- und Dark-Mode-Texttokens auf WCAG-AA-Kontrastniveau
 - hält die Änderung migrationsfrei, weil bestehende Konsumenten nur das aktualisierte Stylesheet erhalten

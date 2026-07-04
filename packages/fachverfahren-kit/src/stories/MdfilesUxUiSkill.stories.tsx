@@ -36,7 +36,7 @@ const sourceRows = [
     source: "Public-Sector-UX-Methodik",
     requirement: "Problem, Rolle, HCAI, Shell, Tabellen, Formulare, A11y",
     evidence:
-      "UX-Methodik/Public Sector, Screen Contracts, Bürgerin- und Sachbearbeitungs-States sowie persistierte Einstellungen.",
+      "UX-Methodik/Public Sector, Screen Contracts, Bürgerin- und Sachbearbeitungs-States sowie persistierte Einstellungen über BarrierefreiheitsPanel.",
   },
   {
     source: "Fachliches Beispiel",
@@ -54,7 +54,7 @@ const sourceRows = [
     source: "Coding-Agent UI und Design-System",
     requirement: "Doc 3 Design-System und Build Console",
     evidence:
-      "Doc 3 ist Token-Quelle. Public-sector-ui exportiert GovernanceBar, ContextRail, WorkspacePanel, Run Cards, Findings, GateStatus und WorkingTabs.",
+      "Doc 3 ist Token-Quelle. Public-sector-ui exportiert GovernanceBar, ContextRail, WorkspacePanel, Run Cards, Findings, GateStatus, WorkingTabs und fachneutrale Arbeitssteuerung wie TaskQueuePanel, DeadlinePanel und HandoffPanel.",
   },
 ] as const;
 

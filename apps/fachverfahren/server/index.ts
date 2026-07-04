@@ -464,7 +464,7 @@ function applySecurityHeaders(reply: FastifyReply, config: RuntimeConfig) {
     "default-src 'self'",
     "script-src 'self'",
     "style-src 'self'",
-    "style-src-elem 'self'",
+    "style-src-elem 'self' 'unsafe-inline'",
     "style-src-attr 'unsafe-inline'",
     "img-src 'self' data:",
     "font-src 'self' data:",

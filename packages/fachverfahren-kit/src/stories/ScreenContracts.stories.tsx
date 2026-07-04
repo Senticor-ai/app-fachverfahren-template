@@ -30,13 +30,13 @@ export const ScreenContract: Story = {
           <dd>loading, empty, error, ready, stale-index-warning</dd>
           <dt>A11y</dt>
           <dd>
-            Landmark main, H1, Tastaturpfad durch die Tabelle, sichtbarer Fokus,
-            Status nicht nur über Farbe.
+            Landmark main, H1, Tastaturpfad durch Tabelle oder mobile
+            Kartenliste, sichtbarer Fokus, Status nicht nur über Farbe.
           </dd>
           <dt>Tests zuerst</dt>
           <dd>
             Zuerst scheiternde Tests für rollenbasierte Navigation und
-            Tastaturaktivierung der Tabelle schreiben.
+            Tastaturaktivierung der Vorgangsliste schreiben.
           </dd>
         </dl>
       </section>

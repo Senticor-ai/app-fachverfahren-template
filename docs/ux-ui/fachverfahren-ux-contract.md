@@ -59,8 +59,9 @@ Alle Fachverfahren nutzen dieselbe Informationsarchitektur:
 - Breadcrumbs in Detail- und Workspace-Sichten.
 - Unabhängig scrollende Panels, keine fachlichen Arbeitsseiten mit Body-Scroll
   als Hauptmechanik.
-- Mobile Navigation über Sheet/Drawer; Tabellen auf Mobil horizontal scrollend,
-  ohne eingefrorene Spalten.
+- Mobile Navigation über Sheet/Drawer; dichte Tabellen reflowen auf Mobil zuerst
+  in touchfähige Kartenlisten oder bleiben horizontal scrollend, ohne
+  eingefrorene Spalten.
 - Einklappbare Navigation braucht statischen Modus und optionalen verzögerten
   Hover-Modus ohne Flackern. Umschalten wirkt live und respektiert reduzierte
   Bewegung.
@@ -138,7 +139,9 @@ Vertrag. ShadCN-Primitives bleiben austauschbares Implementierungsdetail.
 
 - Desktop: sticky Header, horizontaler Scroll, zwei eingefrorene Leitspalten wo
   fachlich sinnvoll.
-- Mobil: keine eingefrorenen Spalten.
+- Mobil: keine eingefrorenen Spalten; für Arbeitsvorräte ist eine Kartenliste
+  mit den wichtigsten Vorgangsdaten, Status, Frist und Sortierkontrolle der
+  bevorzugte Reflow.
 - Pro Spalte Sortierung und Filter.
 - Schnellfilter-Chips sind mehrfach wählbar, zeigen Anzahl und lassen den
   letzten aktiven Filter nicht abwählen.

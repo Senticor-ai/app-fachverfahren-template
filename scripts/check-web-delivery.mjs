@@ -13,6 +13,12 @@ const requiredPublicFiles = [
   "manifest.webmanifest",
   "favicon.svg",
   "icon.svg",
+  "icon-192.png",
+  "icon-512.png",
+  "icon-maskable.svg",
+  "icon-maskable-192.png",
+  "icon-maskable-512.png",
+  "apple-touch-icon.png",
   ".well-known/security.txt",
   "preview-reporter.js",
   "service-worker.js",
@@ -35,6 +41,19 @@ if (sourceIndex) {
   if (!sourceIndex.includes('rel="manifest"')) {
     failures.push("index.html must link manifest.webmanifest");
   }
+  if (!sourceIndex.includes("viewport-fit=cover")) {
+    failures.push("index.html viewport must include viewport-fit=cover");
+  }
+  for (const required of [
+    'name="mobile-web-app-capable"',
+    'name="apple-mobile-web-app-capable"',
+    'name="apple-mobile-web-app-title"',
+    'rel="apple-touch-icon"',
+  ]) {
+    if (!sourceIndex.includes(required)) {
+      failures.push(`index.html missing PWA metadata ${required}`);
+    }
+  }
 }
 
 const robots = read(join(publicRoot, "robots.txt"));
@@ -50,6 +69,30 @@ if (manifest) {
   }
   if (!Array.isArray(parsed.icons) || parsed.icons.length === 0) {
     failures.push("manifest.webmanifest must declare at least one icon");
+  } else {
+    const pngIcons = parsed.icons.filter((icon) => icon.type === "image/png");
+    if (!pngIcons.some((icon) => icon.sizes === "192x192")) {
+      failures.push("manifest.webmanifest must declare a 192x192 PNG icon");
+    }
+    if (!pngIcons.some((icon) => icon.sizes === "512x512")) {
+      failures.push("manifest.webmanifest must declare a 512x512 PNG icon");
+    }
+    if (
+      !pngIcons.some(
+        (icon) =>
+          icon.sizes === "512x512" &&
+          String(icon.purpose ?? "").includes("maskable"),
+      )
+    ) {
+      failures.push(
+        "manifest.webmanifest must declare a maskable 512x512 PNG icon",
+      );
+    }
+  }
+  for (const required of ["id", "lang", "start_url", "scope", "theme_color"]) {
+    if (!parsed[required]) {
+      failures.push(`manifest.webmanifest missing ${required}`);
+    }
   }
 }
 
@@ -75,6 +118,7 @@ if (server) {
   for (const required of [
     "Content-Security-Policy",
     "Content-Security-Policy-Report-Only",
+    "style-src-elem 'self' 'unsafe-inline'",
     "Strict-Transport-Security",
     "X-Content-Type-Options",
     "Referrer-Policy",
