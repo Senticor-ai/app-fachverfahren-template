@@ -1,10 +1,35 @@
 #!/usr/bin/env sh
 set -eu
 
+# Nur diese Naht-Dateien betreffen den Leistungsvertrag. Unstaged Edits daran werden VOR der Prüfung
+# weggestasht (--keep-index laesst den Index unangetastet), damit wir gegen den STAGED Zustand pruefen —
+# nicht gegen den Worktree. Sonst kann ein bereits gestagter, aber zur unstaged Config nicht mehr passender
+# Contract-Snapshot den Commit unbemerkt passieren (der Vertrag wird ja aus dem WORKTREE emittiert).
+STASH_BEFORE=$(git rev-parse -q --verify refs/stash 2>/dev/null || true)
+git stash push --keep-index --quiet -m "precommit: staged-only leistung-contract check" -- \
+  apps/fachverfahren/src/leistung.config.ts apps/fachverfahren/leistung.contract.json \
+  2>/dev/null || true
+STASH_AFTER=$(git rev-parse -q --verify refs/stash 2>/dev/null || true)
+STASHED=0
+[ "$STASH_BEFORE" = "$STASH_AFTER" ] || STASHED=1
+
+cleanup() {
+  code=$?
+  set +e
+  if [ "$STASHED" = "1" ]; then
+    git stash pop --quiet
+  fi
+  # Worktree nach der Pruefung wieder auf den eigenen (ggf. wiederhergestellten) Stand bringen — geprueft
+  # wurde oben bereits gegen den STAGED Zustand, nicht gegen diesen abschliessenden Re-Emit.
+  pnpm --filter @senticor/fachverfahren emit:contract >/dev/null 2>&1
+  exit "$code"
+}
+trap cleanup EXIT
+
 pnpm --filter @senticor/fachverfahren emit:contract
 if ! git diff --quiet -- apps/fachverfahren/leistung.contract.json; then
-  echo "leistung.contract.json war nicht frisch — wurde soeben neu erzeugt (emit:contract)." >&2
-  echo "Bitte Diff pruefen, 'git add apps/fachverfahren/leistung.contract.json' ausfuehren und den Commit erneut versuchen." >&2
+  echo "leistung.contract.json ist gegenueber dem STAGED Zustand nicht frisch." >&2
+  echo "Bitte 'pnpm --filter @senticor/fachverfahren emit:contract' ausfuehren, 'git add apps/fachverfahren/leistung.contract.json' (und ggf. leistung.config.ts) ausfuehren und den Commit erneut versuchen." >&2
   exit 1
 fi
 
