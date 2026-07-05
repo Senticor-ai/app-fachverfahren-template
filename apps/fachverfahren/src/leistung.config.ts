@@ -79,6 +79,7 @@ export const leistungConfig: LeistungConfig = {
           {
             name: "antragsteller.vorname",
             label: "Vorname",
+            leichteSprache: "Ihr Vorname",
             typ: "text",
             required: true,
             onceOnly: true,
@@ -97,6 +98,7 @@ export const leistungConfig: LeistungConfig = {
             required: true,
             pattern: "^\\d{5}$",
             hint: "5-stellig",
+            hintEinfach: "Ihre Postleitzahl hat 5 Ziffern.",
             onceOnly: true,
           },
           {

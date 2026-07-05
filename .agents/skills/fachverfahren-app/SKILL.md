@@ -39,14 +39,16 @@ Komponenten-Bibliothek gebaut — die neutrale Fastify-Web-Runtime existiert in
 3. `apps/fachverfahren/src/leistung.config.ts` mit den Werten des
    freigegebenen Fachkonzepts füllen: `id/label/kommune`,
    `rechtsgrundlagen` (nur belegt), `antrag.steps` (Pflichtfelder mit
-   Validierung), `statusMachine` (Endzustände `terminal: true`, kritische
-   Übergänge `vierAugen: true`), `berechne` (rein, deterministisch, GANZE
-   EURO, jede Tarifstufe/Befreiung/Ermäßigung als eigene Verzweigung,
-   `status: "provisional" | "final"`), `register`, `detailSektionen` sowie
-   `ki` und `seed` (im Typ optional — setzen, damit Aufsicht und
-   Sachbearbeitung sofort arbeiten). Optionale Signale (`ePayment`,
-   `zustellung`, `termin`, `adressValidierung`, `personas`, `fimLeistung`,
-   `nachweise`) nur setzen, wenn das Fachkonzept sie vorsieht.
+   Validierung; Bürger-Felder zusätzlich mit `leichteSprache`/`hintEinfach`
+   im selben Schritt — siehe „Bürger-Sprache" unten), `statusMachine`
+   (Endzustände `terminal: true`, kritische Übergänge `vierAugen: true`),
+   `berechne` (rein, deterministisch, GANZE EURO, jede
+   Tarifstufe/Befreiung/Ermäßigung als eigene Verzweigung, `status:
+"provisional" | "final"`), `register`, `detailSektionen` sowie `ki` und
+   `seed` (im Typ optional — setzen, damit Aufsicht und Sachbearbeitung
+   sofort arbeiten). Optionale Signale (`ePayment`, `zustellung`, `termin`,
+   `adressValidierung`, `personas`, `fimLeistung`, `nachweise`) nur setzen,
+   wenn das Fachkonzept sie vorsieht.
 4. Unbekannte Satzungswerte als markierte Annahme-DATEN führen
    (`// annahme <wert> EUR — TBD-<QUELLE>`), nie als Fakt in
    Anzeige-Strings.
@@ -63,6 +65,46 @@ Komponenten-Bibliothek gebaut — die neutrale Fastify-Web-Runtime existiert in
    pnpm run test
    pnpm run dev
    ```
+
+## Bürger-Sprache: Leichte Sprache und Fachbegriffe
+
+`FeldDef` trägt zwei optionale, ADDITIVE Sprachvarianten
+(`packages/fachverfahren-kit/src/types.ts`), die niemals `label`/`hint`
+ersetzen, sondern bei fehlendem Wert sauber darauf zurückfallen:
+
+- `leichteSprache` — LEICHTE-SPRACHE-Fassung des Labels (DIN SPEC 33429).
+- `hintEinfach` — vereinfachter Hilfetext für den Leichte-Sprache-Modus.
+
+```ts
+{
+  name: "antragsteller.vorname",
+  label: "Vorname",
+  leichteSprache: "Ihr Vorname",
+  typ: "text",
+  required: true,
+}
+```
+
+Das Gegenstück `labelFachlich` (Amts-/Fachbezeichnung) geht in die
+ENTGEGENGESETZTE Richtung — es blendet für die Sachbearbeitung den Fachbegriff
+ein, nie eine vereinfachte Fassung. Beide Felder nicht verwechseln.
+
+**Nur Bürger-Seite.** `leichteSprache`/`hintEinfach` werden ausschließlich von
+`AntragStepper` gelesen, das ausschließlich unter `/buerger*` gemountet ist
+(`apps/fachverfahren/src/App.tsx`). Sachbearbeitung (`/amt*`) liest diese
+Felder nie — für Fachbegriffe in der Sachbearbeitung ist `labelFachlich`
+zuständig. Kein Sachbearbeitung-Anwendungsfall für Leichte Sprache erfinden.
+
+**Reihenfolge.** `leichteSprache`/`hintEinfach` gehören in GENAU DEN
+Naht-Write, der das Feld anlegt — nie in eine spätere, getrennte
+Anreicherungsphase. Läuft eine Anreicherung trotzdem separat, MUSS
+`emit:contract` (Schritt 5) strikt danach laufen, nie davor: sonst ist
+`leistung.contract.json` gegenüber der Config veraltet und
+`check:leistung-contract` schlägt fehl. Ein lokaler Git-Hook regeneriert den
+Snapshot zusätzlich vor jedem Commit (`docs/reference/precommit-hooks.md`) —
+das ist nur ein Sicherheitsnetz für Commits durch dieses Repo hindurch, kein
+Ersatz für die richtige Reihenfolge in einer externen Generierungs-Pipeline,
+die eigene Commits ohne diese Git-Hooks erzeugt.
 
 ## Quellen-Lookup
 

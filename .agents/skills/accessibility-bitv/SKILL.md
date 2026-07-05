@@ -28,6 +28,11 @@ A11y-Prüf-Schleife.
 - **Formulare**: Label fest verknüpft (`for`/`id`), Fehler programmatisch +
   lösungsorientiert, Pflichtfelder ausgezeichnet, Once-Only-Felder markiert +
   editierbar.
+- **Leichte Sprache** (DIN SPEC 33429, Bürger-Formulare): additive
+  `FeldDef.leichteSprache`/`hintEinfach` neben `label`/`hint` — NUR für
+  Bürger-Felder (`/buerger*`); Mechanik + Pflicht-Beispiel siehe
+  `.agents/skills/fachverfahren-app/SKILL.md` („Bürger-Sprache: Leichte
+  Sprache und Fachbegriffe").
 
 ## Prüf-Schleife (Beleg, kein Overclaim)
 

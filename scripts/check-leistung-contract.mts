@@ -11,7 +11,11 @@
 //
 // Läuft ohne Bundler via `node --experimental-strip-types` — direkt auf die .ts-Quellen (wie scripts/emit-contract.mts).
 import { readFileSync } from "node:fs";
-import { toContractSnapshot } from "../packages/fachverfahren-kit/src/contract-snapshot.ts";
+import {
+  diffNurEinfacheSprache,
+  toContractSnapshot,
+  type LeistungContractSnapshot,
+} from "../packages/fachverfahren-kit/src/contract-snapshot.ts";
 import { leistungConfig } from "../apps/fachverfahren/src/leistung.config.ts";
 
 const CONTRACT_URL = new URL(
@@ -34,9 +38,28 @@ try {
   );
 }
 if (committed && committed !== frisch) {
-  fail(
-    "leistung.contract.json ist NICHT frisch (Config geändert?) — `pnpm --filter @senticor/fachverfahren emit:contract` ausführen und committen.",
-  );
+  let committedObj: LeistungContractSnapshot | undefined;
+  try {
+    committedObj = JSON.parse(committed);
+  } catch {
+    committedObj = undefined;
+  }
+  const drift = committedObj
+    ? diffNurEinfacheSprache(committedObj, snap)
+    : null;
+  if (drift && drift.length > 0) {
+    const details = drift.map((d) => `${d.feld} (${d.schluessel})`).join(", ");
+    fail(
+      `leistung.contract.json ist NICHT frisch — NUR Einfache-Sprache-Felder unterscheiden sich: ${details}. ` +
+        "Reihenfolge-Fehler: `emit:contract` lief VOR der Einfache-Sprache-Anreicherung der Config " +
+        '(siehe .agents/skills/fachverfahren-app/SKILL.md, "Bürger-Sprache"). ' +
+        "Fix: `pnpm --filter @senticor/fachverfahren emit:contract` ERNEUT ausführen (NACH der Anreicherung) und committen.",
+    );
+  } else {
+    fail(
+      "leistung.contract.json ist NICHT frisch (Config geändert?) — `pnpm --filter @senticor/fachverfahren emit:contract` ausführen und committen.",
+    );
+  }
 }
 
 // ── 2) STRUKTUR (generisch) ───────────────────────────────────────────────────

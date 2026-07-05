@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import type { LeistungConfig } from "./types.js";
-import { toContractSnapshot } from "./contract-snapshot.js";
+import {
+  diffNurEinfacheSprache,
+  toContractSnapshot,
+} from "./contract-snapshot.js";
 
 /** Minimal-Config-Basis (die Pflichtfelder des Vertrags), die einzelne Tests gezielt anreichern. */
 const basis: LeistungConfig = {
@@ -126,5 +129,99 @@ describe("toContractSnapshot — Business-Logik als ECHTE Zeilen, nicht '[functi
     expect(snap.nachweise).toBeUndefined();
     expect(snap.id).toBe("leistung");
     expect(snap._snapshot).toBe(true);
+  });
+});
+
+describe("diffNurEinfacheSprache — self-diagnosing FRISCHE-Fehlermeldung", () => {
+  const mitFeld: LeistungConfig = {
+    ...basis,
+    antrag: {
+      steps: [
+        {
+          id: "s",
+          titel: "S",
+          felder: [
+            { name: "antragsteller.vorname", label: "Vorname", typ: "text" },
+          ],
+        },
+      ],
+    },
+  };
+
+  it("liefert [], wenn beide Snapshots identisch sind", () => {
+    const snap = toContractSnapshot(mitFeld);
+    expect(diffNurEinfacheSprache(snap, snap)).toEqual([]);
+  });
+
+  it("liefert die konkreten Feld/Schlüssel-Paare, wenn NUR leichteSprache/hintEinfach abweichen", () => {
+    const committed = toContractSnapshot(mitFeld);
+    const frisch = toContractSnapshot({
+      ...mitFeld,
+      antrag: {
+        steps: [
+          {
+            id: "s",
+            titel: "S",
+            felder: [
+              {
+                name: "antragsteller.vorname",
+                label: "Vorname",
+                leichteSprache: "Ihr Vorname",
+                hintEinfach: "So heißen Sie.",
+                typ: "text",
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    const drift = diffNurEinfacheSprache(committed, frisch);
+    expect(drift).toEqual([
+      {
+        feld: "antragsteller.vorname",
+        schluessel: "leichteSprache",
+        committed: undefined,
+        frisch: "Ihr Vorname",
+      },
+      {
+        feld: "antragsteller.vorname",
+        schluessel: "hintEinfach",
+        committed: undefined,
+        frisch: "So heißen Sie.",
+      },
+    ]);
+  });
+
+  it("liefert null, wenn zusätzlich echte Drift (z. B. label) vorliegt", () => {
+    const committed = toContractSnapshot(mitFeld);
+    const frisch = toContractSnapshot({
+      ...mitFeld,
+      antrag: {
+        steps: [
+          {
+            id: "s",
+            titel: "S",
+            felder: [
+              {
+                name: "antragsteller.vorname",
+                label: "Vorname (geändert)",
+                leichteSprache: "Ihr Vorname",
+                typ: "text",
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(diffNurEinfacheSprache(committed, frisch)).toBeNull();
+  });
+
+  it("liefert null, wenn sich die Schritt-/Feld-Struktur unterscheidet", () => {
+    const committed = toContractSnapshot(basis);
+    const frisch = toContractSnapshot(mitFeld);
+
+    expect(diffNurEinfacheSprache(committed, frisch)).toBeNull();
   });
 });
