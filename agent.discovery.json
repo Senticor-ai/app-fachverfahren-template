@@ -109,6 +109,18 @@
     {
       "id": "skill:backend-fastify",
       "path": ".agents/skills/backend-fastify/SKILL.md"
+    },
+    {
+      "id": "skill:codesphere-vendorportal",
+      "path": ".agents/skills/codesphere-vendorportal/SKILL.md"
+    },
+    {
+      "id": "skill:govtech-deutschland-sdk",
+      "path": ".agents/skills/govtech-deutschland-sdk/SKILL.md"
+    },
+    {
+      "id": "skill:deutschland-plattform-anforderungen",
+      "path": ".agents/skills/deutschland-plattform-anforderungen/SKILL.md"
     }
   ],
   "componentLibraries": [
