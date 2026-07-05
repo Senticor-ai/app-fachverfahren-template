@@ -1,10 +1,42 @@
 #!/usr/bin/env sh
 set -eu
 
-pnpm --filter @senticor/fachverfahren emit:contract
-if ! git diff --quiet -- apps/fachverfahren/leistung.contract.json; then
-  echo "leistung.contract.json war nicht frisch — wurde soeben neu erzeugt (emit:contract)." >&2
-  echo "Bitte Diff pruefen, 'git add apps/fachverfahren/leistung.contract.json' ausfuehren und den Commit erneut versuchen." >&2
+# Prueft, ob leistung.contract.json zum STAGED Zustand passt, OHNE den Worktree/Index anzufassen (kein
+# Stash/Pop): `git stash push --keep-index` rundet bei einer echt teilweise gestagten Datei (MM) NICHT
+# sauber — der Pop kann auch bei sofortigem Aufruf ohne jede Zwischen-Aenderung in einen echten
+# Merge-Konflikt mit Konflikt-Markern in der Quelle laufen (Git-Limitierung, kein Bug in diesem Skript).
+# Stattdessen wird die komplette Laufzeit-Closure von emit:contract (Config + Generator-Quellen, siehe deren
+# tatsaechliche Imports) per `git show :pfad` aus dem INDEX extrahiert und isoliert in einem Temp-Verzeichnis
+# ausgefuehrt — beide Generator-Dateien importieren nur sich gegenseitig plus Node-Builtins zur Laufzeit
+# (alles andere sind `import type`, zur Laufzeit von node --experimental-strip-types ohnehin geloescht), ein
+# node_modules-Setup im Temp-Verzeichnis ist also nicht noetig.
+TMP=$(mktemp -d)
+cleanup() {
+  code=$?
+  rm -rf "$TMP"
+  exit "$code"
+}
+trap cleanup EXIT
+
+mkdir -p \
+  "$TMP/apps/fachverfahren/scripts" \
+  "$TMP/apps/fachverfahren/src" \
+  "$TMP/packages/fachverfahren-kit/src"
+
+git show :apps/fachverfahren/scripts/emit-contract.mts \
+  >"$TMP/apps/fachverfahren/scripts/emit-contract.mts"
+git show :apps/fachverfahren/src/leistung.config.ts \
+  >"$TMP/apps/fachverfahren/src/leistung.config.ts"
+git show :packages/fachverfahren-kit/src/contract-snapshot.ts \
+  >"$TMP/packages/fachverfahren-kit/src/contract-snapshot.ts"
+git show :apps/fachverfahren/leistung.contract.json \
+  >"$TMP/staged-leistung.contract.json"
+
+node --experimental-strip-types "$TMP/apps/fachverfahren/scripts/emit-contract.mts" >/dev/null
+
+if ! diff -q "$TMP/apps/fachverfahren/leistung.contract.json" "$TMP/staged-leistung.contract.json" >/dev/null; then
+  echo "leistung.contract.json ist gegenueber dem STAGED Zustand nicht frisch." >&2
+  echo "Bitte 'pnpm --filter @senticor/fachverfahren emit:contract' ausfuehren, 'git add apps/fachverfahren/leistung.contract.json' ausfuehren und den Commit erneut versuchen." >&2
   exit 1
 fi
 
