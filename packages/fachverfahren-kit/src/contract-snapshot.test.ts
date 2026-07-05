@@ -99,6 +99,7 @@ describe("toContractSnapshot — Business-Logik als ECHTE Zeilen, nicht '[functi
         label: "x",
         begruendung: "y",
         status: "final",
+        positionen: [],
       }),
       nachweise: () => [],
     });
@@ -118,6 +119,7 @@ describe("toContractSnapshot — Business-Logik als ECHTE Zeilen, nicht '[functi
         label: "x",
         begruendung: "y",
         status: "final",
+        positionen: [],
       }),
     });
     expect(snap.berechne).toBe("[function]");

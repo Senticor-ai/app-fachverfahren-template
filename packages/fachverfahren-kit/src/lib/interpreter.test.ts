@@ -453,6 +453,7 @@ describe("effektiveBerechnung — berechne (Escape-Hatch) ODER tarif (Default)",
         label: "Custom",
         begruendung: "Escape-Hatch",
         status: "final" as const,
+        positionen: [],
       }),
       tarif,
     };
