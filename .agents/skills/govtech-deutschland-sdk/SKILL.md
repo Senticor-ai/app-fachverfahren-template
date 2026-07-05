@@ -18,8 +18,8 @@ content it governs must NOT — see the hard rule below.
 
 ## The architecture in one paragraph
 
-The SDK is a generalized, externally-safe projection of this repo's internal skills
-(`codesphere-vendorportal`, `codesphere-managed-services`, `keycloak`, `grafana`, …). Its
+The SDK is a generalized, externally-safe projection of this repo's internal platform/DevOps
+skills. Its
 centerpiece is the agent-agnostic deploy contract `core/platform-validate.py`, enforced at
 three call sites (agent loop, git pre-commit, CI). On merge to main the workflow builds a
 `tar.gz` (+ SBOM + checksums + `cosign.pub`), cosign-signs it, and `oras push`es it to the

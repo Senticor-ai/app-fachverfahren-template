@@ -25,8 +25,7 @@ gleiche Steuersätze, Rollen und FIM-Bezüge wie oben, nur als ein einzelner Abs
 als Prompt+Spec-Paar. Es ist die Quelle, an der sich der Hundesteuer-Vorhaben-Text in
 der Hundesteuer-E2E-Suite des externen Repositories
 [`Senticor-ai/infrastructure`](https://github.com/Senticor-ai/infrastructure)
-(Pfad dort: `codesphere-vendorportal/chos-code-opencode/e2e/lib/hundesteuer-fixture.ts`,
-außerhalb dieses Scaffolds) orientiert. Bei einer Änderung hier bitte dort gegenprüfen
+(in der dortigen E2E-Suite, außerhalb dieses Scaffolds) orientiert. Bei einer Änderung hier bitte dort gegenprüfen
 (und umgekehrt).
 
 ## Vorhaben-Text
