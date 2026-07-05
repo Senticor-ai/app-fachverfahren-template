@@ -17,7 +17,15 @@ cleanup() {
   code=$?
   set +e
   if [ "$STASHED" = "1" ]; then
-    git stash pop --quiet
+    # Der Check-Body oben ueberschreibt leistung.contract.json (emit:contract). Vor dem Pop MUSS der
+    # Worktree wieder exakt dem Stand entsprechen, gegen den der Stash geschnuert wurde (= der Index-Stand
+    # von vorhin) — sonst sieht `git stash pop` "lokale Aenderungen" und bricht mit "would be overwritten
+    # by merge" ab, obwohl der Inhalt oft zufaellig identisch ist. Explizit auf den Index zuruecksetzen macht
+    # den Pop deterministisch konfliktfrei.
+    git checkout -- apps/fachverfahren/src/leistung.config.ts apps/fachverfahren/leistung.contract.json
+    if ! git stash pop --quiet; then
+      echo "WARNUNG: 'git stash pop' ist fehlgeschlagen. Deine Aenderungen liegen sicher im Stash — 'git stash list' pruefen und manuell mit 'git stash pop' wiederherstellen." >&2
+    fi
   fi
   # Worktree nach der Pruefung wieder auf den eigenen (ggf. wiederhergestellten) Stand bringen — geprueft
   # wurde oben bereits gegen den STAGED Zustand, nicht gegen diesen abschliessenden Re-Emit.
