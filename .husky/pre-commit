@@ -1,43 +1,42 @@
 #!/usr/bin/env sh
 set -eu
 
-# Nur diese Naht-Dateien betreffen den Leistungsvertrag. Unstaged Edits daran werden VOR der Prüfung
-# weggestasht (--keep-index laesst den Index unangetastet), damit wir gegen den STAGED Zustand pruefen —
-# nicht gegen den Worktree. Sonst kann ein bereits gestagter, aber zur unstaged Config nicht mehr passender
-# Contract-Snapshot den Commit unbemerkt passieren (der Vertrag wird ja aus dem WORKTREE emittiert).
-STASH_BEFORE=$(git rev-parse -q --verify refs/stash 2>/dev/null || true)
-git stash push --keep-index --quiet -m "precommit: staged-only leistung-contract check" -- \
-  apps/fachverfahren/src/leistung.config.ts apps/fachverfahren/leistung.contract.json \
-  2>/dev/null || true
-STASH_AFTER=$(git rev-parse -q --verify refs/stash 2>/dev/null || true)
-STASHED=0
-[ "$STASH_BEFORE" = "$STASH_AFTER" ] || STASHED=1
-
+# Prueft, ob leistung.contract.json zum STAGED Zustand passt, OHNE den Worktree/Index anzufassen (kein
+# Stash/Pop): `git stash push --keep-index` rundet bei einer echt teilweise gestagten Datei (MM) NICHT
+# sauber — der Pop kann auch bei sofortigem Aufruf ohne jede Zwischen-Aenderung in einen echten
+# Merge-Konflikt mit Konflikt-Markern in der Quelle laufen (Git-Limitierung, kein Bug in diesem Skript).
+# Stattdessen wird die komplette Laufzeit-Closure von emit:contract (Config + Generator-Quellen, siehe deren
+# tatsaechliche Imports) per `git show :pfad` aus dem INDEX extrahiert und isoliert in einem Temp-Verzeichnis
+# ausgefuehrt — beide Generator-Dateien importieren nur sich gegenseitig plus Node-Builtins zur Laufzeit
+# (alles andere sind `import type`, zur Laufzeit von node --experimental-strip-types ohnehin geloescht), ein
+# node_modules-Setup im Temp-Verzeichnis ist also nicht noetig.
+TMP=$(mktemp -d)
 cleanup() {
   code=$?
-  set +e
-  if [ "$STASHED" = "1" ]; then
-    # Der Check-Body oben ueberschreibt leistung.contract.json (emit:contract). Vor dem Pop MUSS der
-    # Worktree wieder exakt dem Stand entsprechen, gegen den der Stash geschnuert wurde (= der Index-Stand
-    # von vorhin) — sonst sieht `git stash pop` "lokale Aenderungen" und bricht mit "would be overwritten
-    # by merge" ab, obwohl der Inhalt oft zufaellig identisch ist. Explizit auf den Index zuruecksetzen macht
-    # den Pop deterministisch konfliktfrei.
-    git checkout -- apps/fachverfahren/src/leistung.config.ts apps/fachverfahren/leistung.contract.json
-    if ! git stash pop --quiet; then
-      echo "WARNUNG: 'git stash pop' ist fehlgeschlagen. Deine Aenderungen liegen sicher im Stash — 'git stash list' pruefen und manuell mit 'git stash pop' wiederherstellen." >&2
-    fi
-  fi
-  # Worktree nach der Pruefung wieder auf den eigenen (ggf. wiederhergestellten) Stand bringen — geprueft
-  # wurde oben bereits gegen den STAGED Zustand, nicht gegen diesen abschliessenden Re-Emit.
-  pnpm --filter @senticor/fachverfahren emit:contract >/dev/null 2>&1
+  rm -rf "$TMP"
   exit "$code"
 }
 trap cleanup EXIT
 
-pnpm --filter @senticor/fachverfahren emit:contract
-if ! git diff --quiet -- apps/fachverfahren/leistung.contract.json; then
+mkdir -p \
+  "$TMP/apps/fachverfahren/scripts" \
+  "$TMP/apps/fachverfahren/src" \
+  "$TMP/packages/fachverfahren-kit/src"
+
+git show :apps/fachverfahren/scripts/emit-contract.mts \
+  >"$TMP/apps/fachverfahren/scripts/emit-contract.mts"
+git show :apps/fachverfahren/src/leistung.config.ts \
+  >"$TMP/apps/fachverfahren/src/leistung.config.ts"
+git show :packages/fachverfahren-kit/src/contract-snapshot.ts \
+  >"$TMP/packages/fachverfahren-kit/src/contract-snapshot.ts"
+git show :apps/fachverfahren/leistung.contract.json \
+  >"$TMP/staged-leistung.contract.json"
+
+node --experimental-strip-types "$TMP/apps/fachverfahren/scripts/emit-contract.mts" >/dev/null
+
+if ! diff -q "$TMP/apps/fachverfahren/leistung.contract.json" "$TMP/staged-leistung.contract.json" >/dev/null; then
   echo "leistung.contract.json ist gegenueber dem STAGED Zustand nicht frisch." >&2
-  echo "Bitte 'pnpm --filter @senticor/fachverfahren emit:contract' ausfuehren, 'git add apps/fachverfahren/leistung.contract.json' (und ggf. leistung.config.ts) ausfuehren und den Commit erneut versuchen." >&2
+  echo "Bitte 'pnpm --filter @senticor/fachverfahren emit:contract' ausfuehren, 'git add apps/fachverfahren/leistung.contract.json' ausfuehren und den Commit erneut versuchen." >&2
   exit 1
 fi
 
