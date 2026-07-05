@@ -80,6 +80,13 @@ optional):
 | `seed?`            | Deterministische Demo-Vorgänge, damit die Sachbearbeitungs-Sicht sofort arbeitet; im Typ optional, im Template-Default gesetzt                                                                                                                                        |
 | optional           | `fimLeistung`, `nachweise`, `ePayment`, `zustellung`, `termin`, `adressValidierung`, `personas` — NUR setzen, wenn das Fachkonzept es vorsieht                                                                                                                        |
 
+`FeldDef.leichteSprache`/`hintEinfach` (DIN SPEC 33429, additiv zu
+`label`/`hint`) gehören zum selben Naht-Write wie der Rest des Feldes — nie
+eine spätere Anreicherungsphase, sonst veraltet `leistung.contract.json`
+gegenüber der Config. Gilt NUR für Bürger-Felder (`/buerger*`); die
+Sachbearbeitung nutzt stattdessen `labelFachlich`. Details:
+`.agents/skills/fachverfahren-app/SKILL.md` („Bürger-Sprache").
+
 NACH JEDEM Write auf die Naht den Vertrags-Snapshot neu erzeugen und mit
 committen:
 

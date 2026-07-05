@@ -1,4 +1,11 @@
 #!/usr/bin/env sh
 set -eu
 
+pnpm --filter @senticor/fachverfahren emit:contract
+if ! git diff --quiet -- apps/fachverfahren/leistung.contract.json; then
+  echo "leistung.contract.json war nicht frisch — wurde soeben neu erzeugt (emit:contract)." >&2
+  echo "Bitte Diff pruefen, 'git add apps/fachverfahren/leistung.contract.json' ausfuehren und den Commit erneut versuchen." >&2
+  exit 1
+fi
+
 pnpm run check:precommit

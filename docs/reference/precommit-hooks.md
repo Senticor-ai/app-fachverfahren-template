@@ -22,7 +22,14 @@ pnpm run check:push
 
 ## Pre-Commit-Gate
 
-`.husky/pre-commit` ruft `pnpm run check:precommit` auf. Der Check umfasst:
+`.husky/pre-commit` erzeugt zuerst den Vertrags-Snapshot neu
+(`pnpm --filter @senticor/fachverfahren emit:contract`). Hat sich
+`apps/fachverfahren/leistung.contract.json` dadurch geändert (Config
+geändert, aber `emit:contract` vergessen — z. B. eine
+Leichte-Sprache-Anreicherung nach dem letzten Snapshot), bricht der Commit
+ab: Diff prüfen, `git add apps/fachverfahren/leistung.contract.json`,
+Commit erneut versuchen. Erst danach läuft `pnpm run check:precommit`. Der
+Check umfasst:
 
 - staged Git-Hygiene (`git diff --cached --check`)
 - Secret-Smoke-Scan

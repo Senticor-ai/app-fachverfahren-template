@@ -79,3 +79,63 @@ export function toContractSnapshot<T = Record<string, unknown>>(
     _snapshot: true,
   };
 }
+
+const EINFACHE_SPRACHE_SCHLUESSEL = ["leichteSprache", "hintEinfach"] as const;
+type EinfacheSpracheSchluessel = (typeof EINFACHE_SPRACHE_SCHLUESSEL)[number];
+
+export interface EinfacheSpracheDrift {
+  /** `FeldDef.name`, z. B. "antragsteller.vorname". */
+  feld: string;
+  schluessel: EinfacheSpracheSchluessel;
+  committed: string | undefined;
+  frisch: string | undefined;
+}
+
+function ohneEinfacheSprache(snap: LeistungContractSnapshot): string {
+  return JSON.stringify(snap, function (key, value) {
+    if (
+      (EINFACHE_SPRACHE_SCHLUESSEL as readonly string[]).includes(key) &&
+      this &&
+      typeof this === "object" &&
+      "name" in this &&
+      "typ" in this
+    ) {
+      return undefined;
+    }
+    return value;
+  });
+}
+
+/**
+ * Vergleicht zwei Contract-Snapshots. Liefert `null`, wenn IRGENDEIN Unterschied AUSSERHALB der additiven
+ * Einfache-Sprache-Felder (`leichteSprache`/`hintEinfach`) eines `FeldDef` liegt (= echte Drift — der Aufrufer
+ * zeigt dann die generische FRISCHE-Fehlermeldung). Liefert sonst die Liste der konkret geänderten
+ * Feld/Schlüssel-Paare (leer, wenn beide Snapshots identisch sind). Rein / seiteneffektfrei.
+ */
+export function diffNurEinfacheSprache(
+  committed: LeistungContractSnapshot,
+  frisch: LeistungContractSnapshot,
+): EinfacheSpracheDrift[] | null {
+  if (ohneEinfacheSprache(committed) !== ohneEinfacheSprache(frisch))
+    return null;
+
+  const drifts: EinfacheSpracheDrift[] = [];
+  const cSteps = committed.antrag?.steps ?? [];
+  const fSteps = frisch.antrag?.steps ?? [];
+  for (let i = 0; i < Math.max(cSteps.length, fSteps.length); i++) {
+    const cFelder = cSteps[i]?.felder ?? [];
+    const fFelder = fSteps[i]?.felder ?? [];
+    for (let j = 0; j < Math.max(cFelder.length, fFelder.length); j++) {
+      const cFeld = cFelder[j];
+      const fFeld = fFelder[j];
+      const feld = fFeld?.name ?? cFeld?.name ?? `steps[${i}].felder[${j}]`;
+      for (const schluessel of EINFACHE_SPRACHE_SCHLUESSEL) {
+        const cWert = cFeld?.[schluessel];
+        const fWert = fFeld?.[schluessel];
+        if (cWert !== fWert)
+          drifts.push({ feld, schluessel, committed: cWert, frisch: fWert });
+      }
+    }
+  }
+  return drifts;
+}

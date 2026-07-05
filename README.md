@@ -87,7 +87,8 @@ pnpm --filter @senticor/fachverfahren emit:contract
 Die verbindliche Arbeitsanweisung für Menschen und Coding Agents steht in
 `AGENTS.md` (inklusive kanonischer Pfad-Karte und PLAN-vs-IST-Markierungen).
 
-`pnpm install` richtet in Git-Checkouts Husky ein. Der Pre-Commit-Hook startet
+`pnpm install` richtet in Git-Checkouts Husky ein. Der Pre-Commit-Hook
+regeneriert zuerst den Vertrags-Snapshot (`emit:contract`) und startet danach
 `pnpm run check:precommit`; vor Pushes laeuft `pnpm run check:push`. Details
 stehen in `docs/reference/precommit-hooks.md`.
 
