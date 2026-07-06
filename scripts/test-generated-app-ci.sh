@@ -25,9 +25,15 @@ if [ "${SCAFFOLD_GENERATED_APP_CI_RUNNING:-0}" = "1" ]; then
   exit 0
 fi
 export SCAFFOLD_GENERATED_APP_CI_RUNNING=1
+# SKIP_SCAFFOLD_CI ist ein LOKALER Escape-Hatch — in CI (GitHub/GitLab setzen CI=true) NICHT
+# honorieren, sonst könnte eine gesetzte Repo-/Gruppen-CI-Variable das Gate still abschalten.
 if [ "${SKIP_SCAFFOLD_CI:-0}" = "1" ]; then
-  echo "skip: SKIP_SCAFFOLD_CI=1 (lokaler Escape-Hatch; CI erzwingt es weiterhin)"
-  exit 0
+  if [ "${CI:-}" = "true" ]; then
+    echo "warn: SKIP_SCAFFOLD_CI=1 in CI ignoriert — das Gate läuft trotzdem." >&2
+  else
+    echo "skip: SKIP_SCAFFOLD_CI=1 (lokaler Escape-Hatch; CI erzwingt es weiterhin)"
+    exit 0
+  fi
 fi
 
 PROFILE="${PROFILE:-core}"
@@ -68,19 +74,35 @@ run_one() {
   domain="$1"
   # Sicheres, kollisionsfreies Zielverzeichnis (mktemp), außer der Aufrufer gibt TARGET explizit vor
   # (z.B. TARGET=/tmp/app-beispiel, um das exakte User-Kommando zu reproduzieren).
-  # Unsicheres Ziel (leer, `/`, oder innerhalb des Repos) NIE anfassen — schützt vor `TARGET=$PWD`,
-  # das sonst vor jedem Guard das Repo löschen würde.
+  # Unsicher ist ein Ziel, das leer/`/` ist, IM Repo liegt ODER ein VORFAHR des Repos ist — sonst
+  # löschte `TARGET=$PWD`, `TARGET=..` oder `TARGET=apps/x` vor jedem Guard Checkout-Inhalte.
   target_is_unsafe() {
     case "$1" in
       "" | "/" | "$REPO_ROOT" | "$REPO_ROOT"/*) return 0 ;;
-      *) return 1 ;;
     esac
+    # Vorfahr des Repos? (REPO_ROOT liegt unterhalb von $1)
+    case "$REPO_ROOT" in
+      "$1"/*) return 0 ;;
+    esac
+    return 1
+  }
+
+  # TARGET auf einen ABSOLUTEN, physischen Pfad auflösen (relativ, `..`, Symlinks), BEVOR geprüft/
+  # gelöscht wird — die rohe Zeichenkette allein umginge den Guard (Codex P2).
+  resolve_target() {
+    _rt_parent="$(dirname -- "$1")"
+    _rt_base="$(basename -- "$1")"
+    _rt_absparent="$(cd "$_rt_parent" 2>/dev/null && pwd -P)" || return 1
+    printf '%s/%s\n' "$_rt_absparent" "$_rt_base"
   }
 
   if [ -n "${TARGET:-}" ] && [ "${MATRIX:-0}" != "1" ]; then
-    target="$TARGET"
+    target="$(resolve_target "$TARGET")" || {
+      echo "refuse: TARGET=$TARGET — Elternverzeichnis existiert nicht" >&2
+      return 1
+    }
     if target_is_unsafe "$target"; then
-      echo "refuse: TARGET=$target ist leer, '/' oder liegt im Repo — außerhalb des Checkouts wählen" >&2
+      echo "refuse: TARGET=$TARGET (-> $target) ist leer/'/'/im Repo/Repo-Vorfahr — außerhalb des Checkouts wählen" >&2
       return 1
     fi
     rm -rf "$target"

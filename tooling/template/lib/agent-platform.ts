@@ -1250,16 +1250,19 @@ async function validateDomainLeakage(root: string) {
   const failures: string[] = [];
   // Die eigene Identität der generierten App (aus .template/answers.json) ist KEIN geleaktes
   // Domänen-Vokabular: heißt die App selbst „Hundesteuer", trägt ihre Shell (Paketname, Chart, …)
-  // legitim „Hundesteuer"/„Hund". Terme, die in der App-Identität enthalten sind, von der Leakage-
-  // Prüfung ausnehmen — so lässt sich eine hundesteuer-App scaffolden, klar unterscheidbar vom
-  // gleichnamigen Vorlagen-BEISPIEL (docs/examples/hundesteuer). Die pristine Vorlage hat kein
-  // answers.json -> keine Ausnahme, Prüf-Verhalten unverändert.
+  // legitim „Hundesteuer". NUR das GANZE Identitäts-Token (Domain/Display) ausnehmen — NICHT als
+  // Teilstring, sonst fiele mit „hundesteuer" auch der eigenständige Begriff „Hund" global weg und
+  // dog-spezifischer Code in SHARED packages käme durch. So bleibt „Hundesteuer" erlaubt, während
+  // „Hund"/„Befreiung"/… weiter (wortgenau) erzwungen werden. Pristine Vorlage: kein answers.json
+  // -> keine Ausnahme, Verhalten unverändert.
   const identity = await readJson<{ domain?: string; displayName?: string }>(
     join(root, ".template", "answers.json"),
   ).catch(() => null);
-  const identityText = identity
-    ? `${identity.domain ?? ""}\n${identity.displayName ?? ""}`.toLowerCase()
-    : "";
+  const identityTokens = [identity?.domain, identity?.displayName]
+    .filter(
+      (value): value is string => typeof value === "string" && value.length > 0,
+    )
+    .map((value) => value.toLowerCase());
   const specFiles = await collectFiles(join(root, "docs/examples"), [".yaml"]);
   const specs = [];
   for (const file of specFiles.filter((path) =>
@@ -1286,7 +1289,8 @@ async function validateDomainLeakage(root: string) {
   ).flat();
   for (const { spec } of specs) {
     const terms = spec.domainVocabulary.filter(
-      (term) => term.length >= 4 && !identityText.includes(term.toLowerCase()),
+      (term) =>
+        term.length >= 4 && !identityTokens.includes(term.toLowerCase()),
     );
     for (const file of files) {
       const rel = relative(root, file);
@@ -1295,7 +1299,9 @@ async function validateDomainLeakage(root: string) {
       }
       const text = await readFile(file, "utf8").catch(() => "");
       for (const term of terms) {
-        if (new RegExp(escapeRegExp(term), "i").test(text)) {
+        // Wortgenau (\b…\b): sonst matcht „Hund" innerhalb von „Hundesteuer" und meldet die App-
+        // Identität fälschlich als Leckage.
+        if (new RegExp(`\\b${escapeRegExp(term)}\\b`, "i").test(text)) {
           failures.push(
             `${rel} contains domain term ${term} outside ${spec.module.destination}`,
           );
