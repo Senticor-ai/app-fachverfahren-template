@@ -41,22 +41,11 @@ scaffold-health:
     - if: $CI_PIPELINE_SOURCE == "schedule"
       when: never
     - when: on_success
-  variables:
-    KEEP: "1"
   script:
+    # Kein Artefakt: das generierte App ist deterministisch reproduzierbar (`scaffold:domain-app`) und
+    # die fehlerhaften Dateien stehen bereits im Job-Log.
     - export TMPDIR="${CI_PROJECT_DIR}/../.tmp-generated-app-ci"
     - pnpm run test:generated-app-ci
-  after_script:
-    # Generiertes App liegt außerhalb des Checkouts (Pflicht) — bei Fehler zum Artefakt hineinkopieren.
-    - |
-      if [ "$CI_JOB_STATUS" = "failed" ]; then
-        cp -r "${CI_PROJECT_DIR}/../.tmp-generated-app-ci" "${CI_PROJECT_DIR}/generated-app-debug" || true
-      fi
-  artifacts:
-    when: on_failure
-    expire_in: 7 days
-    paths:
-      - generated-app-debug/
 
 # Volle Parität nächtlich: über eine Domain-Matrix scaffolden und je generiertem App CI_PROFILE=full +
 # Runtime-Smoke fahren. Braucht eine GitLab-Pipeline-*Schedule* (Projekt-Einstellungen → CI/CD → Schedules).
@@ -66,21 +55,9 @@ scaffold-nightly:
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
   timeout: 1h
-  variables:
-    KEEP: "1"
   script:
     - export TMPDIR="${CI_PROJECT_DIR}/../.tmp-generated-app-ci"
     - pnpm run test:generated-app-ci:matrix
-  after_script:
-    - |
-      if [ "$CI_JOB_STATUS" = "failed" ]; then
-        cp -r "${CI_PROJECT_DIR}/../.tmp-generated-app-ci" "${CI_PROJECT_DIR}/generated-app-debug" || true
-      fi
-  artifacts:
-    when: on_failure
-    expire_in: 7 days
-    paths:
-      - generated-app-debug/
 
 pages:
   extends: .node-base
