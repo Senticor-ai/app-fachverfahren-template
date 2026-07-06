@@ -1,3 +1,8 @@
+# set -e: ein fehlgeschlagenes `check:push` MUSS den Hook stoppen. Ohne es bestimmte das letzte
+# Kommando (test:generated-app-ci) den Exit-Status — das self-skippt in Konsumenten (exit 0) und
+# könnte ein rotes Push-Gate stillschweigend durchlassen.
+set -e
+
 if [ "${HUSKY_SKIP_PRE_PUSH:-0}" = "1" ]; then
   echo "Skipping pre-push gate because HUSKY_SKIP_PRE_PUSH=1."
   exit 0

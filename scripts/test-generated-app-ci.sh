@@ -68,8 +68,21 @@ run_one() {
   domain="$1"
   # Sicheres, kollisionsfreies Zielverzeichnis (mktemp), außer der Aufrufer gibt TARGET explizit vor
   # (z.B. TARGET=/tmp/app-beispiel, um das exakte User-Kommando zu reproduzieren).
+  # Unsicheres Ziel (leer, `/`, oder innerhalb des Repos) NIE anfassen — schützt vor `TARGET=$PWD`,
+  # das sonst vor jedem Guard das Repo löschen würde.
+  target_is_unsafe() {
+    case "$1" in
+      "" | "/" | "$REPO_ROOT" | "$REPO_ROOT"/*) return 0 ;;
+      *) return 1 ;;
+    esac
+  }
+
   if [ -n "${TARGET:-}" ] && [ "${MATRIX:-0}" != "1" ]; then
     target="$TARGET"
+    if target_is_unsafe "$target"; then
+      echo "refuse: TARGET=$target ist leer, '/' oder liegt im Repo — außerhalb des Checkouts wählen" >&2
+      return 1
+    fi
     rm -rf "$target"
   else
     target="$(mktemp -d "${TMPDIR}/generated-${domain}.XXXXXX")"
@@ -77,11 +90,11 @@ run_one() {
 
   cleanup_target() {
     [ "${KEEP:-0}" = "1" ] && return 0
-    case "$1" in
-      "" | "/" | "$REPO_ROOT" | "$REPO_ROOT"/*)
-        echo "refuse to delete unsafe TARGET=$1" >&2 ;;
-      *) rm -rf "$1" ;;
-    esac
+    if target_is_unsafe "$1"; then
+      echo "refuse to delete unsafe TARGET=$1" >&2
+    else
+      rm -rf "$1"
+    fi
   }
 
   echo "=================================================================="
@@ -95,7 +108,7 @@ run_one() {
   # 2) No-Residue: keine alte Vorlagen-Identität im generierten App (außerhalb der verbatim Engine).
   # `apps/fachverfahren` nur als GANZES Segment werten (gefolgt von Nicht-[-A-Za-z0-9] oder Zeilenende),
   # sonst schlägt eine Domain wie `fachverfahren-demo` fälschlich an (apps/fachverfahren-demo ist korrekt).
-  if grep -rIlE "apps/fachverfahren([^-A-Za-z0-9]|$)|@senticor/fachverfahren[\"/]|senticor-app-fachverfahren-template" "$target" \
+  if grep -rIlE "apps/fachverfahren([^-A-Za-z0-9]|$)|@senticor/fachverfahren[\"/]|senticor-app-fachverfahren-template|senticor\.fachverfahren([^-A-Za-z0-9]|$)|app\.kubernetes\.io/part-of: *fachverfahren([^-A-Za-z0-9]|$)" "$target" \
     --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.template --exclude-dir=template 2>/dev/null; then
     echo "generated-app-ci: Residue der Basis-Vorlagen-Identität gefunden (siehe Dateien oben)" >&2
     cleanup_target "$target"

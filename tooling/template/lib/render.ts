@@ -371,6 +371,15 @@ function createReplacements(
     [`apps/${from}`, `apps/${domain}`],
     [`deploy/helm/${from}`, `deploy/helm/${domain}`],
     [`senticor/${from}`, `senticor/${domain}`],
+    // Punkt-Identitäten, die NICHT von der quotierten `"${from}.`-Regel erfasst werden: die
+    // Agent-Discovery-ID (`senticor.<domain>`) und das UNquotierte k8s-Label `part-of: <domain>`
+    // (im Helm-_helpers.tpl). Ohne diese blieben sie beim Re-Scaffold aus einem Konsumenten stale
+    // (z.B. `senticor.beispiel` / `part-of: beispiel`), obwohl answers.json die neue Domain nennt.
+    [`senticor.${from}`, `senticor.${domain}`],
+    [
+      `app.kubernetes.io/part-of: ${from}`,
+      `app.kubernetes.io/part-of: ${domain}`,
+    ],
     [`"${from}.`, `"${domain}.`],
     [`${from}.example.invalid`, `${domain}.example.invalid`],
     [`name: ${from}`, `name: ${domain}`],
