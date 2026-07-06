@@ -100,14 +100,17 @@ run_one() {
     return 1
   fi
   # 3) Health-Gate im generierten App über DESSEN eigenes ci-validate.sh (Single Source of Truth).
-  (
-    cd "$target"
-    git init -q
-    git add -A
-    git -c user.email=ci@example.invalid -c user.name=ci commit -qm "generated baseline"
+  # WICHTIG: JEDER Schritt trägt `|| exit 1`. Ein Subshell `( … )` als Operand von `||`/`if` schaltet
+  # `set -e` INTERN ab (POSIX) — ohne die expliziten `|| exit 1` liefe die Subshell über einen
+  # ci-validate-Fehler HINWEG weiter und meldete am Ende fälschlich OK (False Green).
+  if (
+    cd "$target" || exit 1
+    git init -q || exit 1
+    git add -A || exit 1
+    git -c user.email=ci@example.invalid -c user.name=ci commit -qm "generated baseline" || exit 1
 
-    pnpm install --frozen-lockfile
-    CI_PROFILE="$CI_PROFILE" scripts/ci-validate.sh
+    pnpm install --frozen-lockfile || exit 1
+    CI_PROFILE="$CI_PROFILE" scripts/ci-validate.sh || exit 1
 
     # 4) No-Mutation: das Gate darf Metadaten/Lockfile nicht still umschreiben.
     git diff --exit-code -- package.json pnpm-lock.yaml pnpm-workspace.yaml \
@@ -115,12 +118,17 @@ run_one() {
 
     # 5) Optionaler Runtime-Smoke (Server bootet, /readyz, Frontend, Secret-Leak).
     if [ "$RUNTIME" = "1" ]; then
-      DOMAIN="$domain" sh "${REPO_ROOT}/scripts/smoke-generated-app.sh"
+      DOMAIN="$domain" sh "${REPO_ROOT}/scripts/smoke-generated-app.sh" || exit 1
     fi
-  ) || { cleanup_target "$target"; return 1; }
-
-  cleanup_target "$target"
-  echo "generated-app-ci: domain=${domain} OK ✅"
+  ); then
+    cleanup_target "$target"
+    echo "generated-app-ci: domain=${domain} OK ✅"
+    return 0
+  else
+    cleanup_target "$target"
+    echo "generated-app-ci: domain=${domain} health gate FAILED ❌" >&2
+    return 1
+  fi
 }
 
 status=0

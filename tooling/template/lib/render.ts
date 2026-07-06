@@ -430,6 +430,12 @@ function shouldCopy(path: string, sourceRoot: string) {
   if (repositoryOnlyPaths.has(relativePath)) {
     return false;
   }
+  // TypeScript-Inkrementell-State (`*.tsbuildinfo`, git-ignoriert, liegt NEBEN der tsconfig statt in
+  // dist/) NIE mitkopieren: aus einem gebauten Arbeitsbaum (genau der Fall beim lokalen `scaffold`)
+  // täuschte er `tsc -b` „schon gebaut" vor, dist/ fehlt aber -> TS6305 im generierten App.
+  if (basename(relativePath).endsWith(".tsbuildinfo")) {
+    return false;
+  }
   return !relativePath.split("/").some((part) => ignoredNames.has(part));
 }
 
