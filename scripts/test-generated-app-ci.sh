@@ -140,17 +140,38 @@ run_one() {
   # WICHTIG: JEDER Schritt trägt `|| exit 1`. Ein Subshell `( … )` als Operand von `||`/`if` schaltet
   # `set -e` INTERN ab (POSIX) — ohne die expliziten `|| exit 1` liefe die Subshell über einen
   # ci-validate-Fehler HINWEG weiter und meldete am Ende fälschlich OK (False Green).
+  # Prüfsummen statt Baseline-Commit für die No-Mutation-Prüfung: `cksum` ist POSIX und braucht kein
+  # Repo. Das GitLab-Node-Image (registry.opencode.de/open-code/oci/nodejs) hat KEIN `git` installiert.
+  snapshot_metadata_files() {
+    for f in package.json pnpm-lock.yaml pnpm-workspace.yaml; do
+      if [ -f "$f" ]; then
+        cksum -- "$f" || exit 1
+      fi
+    done
+  }
+
   if (
     cd "$target" || exit 1
-    git init -q || exit 1
-    git add -A || exit 1
-    git -c user.email=ci@example.invalid -c user.name=ci commit -qm "generated baseline" || exit 1
+    baseline="$(snapshot_metadata_files)" || exit 1
+
+    # check:git-hygiene (Teil von check:precommit) erkennt fehlendes `git` selbst (`command -v git`)
+    # und überspringt sich dann sauber — ABER nur, wenn es gar nicht erst versucht, `git diff --cached`
+    # gegen ein nicht-existentes Repo zu fahren. Ist `git` vorhanden (GitHub-Runner, lokal), braucht es
+    # ein echtes Repo mit HEAD, sonst scheitert `git diff --cached` mit "unknown option" statt zu skippen.
+    # Daher: Baseline-Commit NUR anlegen, wenn `git` überhaupt da ist; fehlt es (GitLab), bleibt der
+    # generierte App absichtlich ohne .git — check:git-hygiene skippt dann über seinen eigenen Guard.
+    if command -v git >/dev/null 2>&1; then
+      git init -q || exit 1
+      git add -A || exit 1
+      git -c user.email=ci@example.invalid -c user.name=ci commit -qm "generated baseline" || exit 1
+    fi
 
     pnpm install --frozen-lockfile || exit 1
     CI_PROFILE="$CI_PROFILE" scripts/ci-validate.sh || exit 1
 
     # 4) No-Mutation: das Gate darf Metadaten/Lockfile nicht still umschreiben.
-    git diff --exit-code -- package.json pnpm-lock.yaml pnpm-workspace.yaml \
+    after="$(snapshot_metadata_files)" || exit 1
+    [ "$baseline" = "$after" ] \
       || { echo "generated-app-ci: Gate hat package.json/pnpm-lock/workspace verändert" >&2; exit 1; }
 
     # 5) Optionaler Runtime-Smoke (Server bootet, /readyz, Frontend, Secret-Leak).
