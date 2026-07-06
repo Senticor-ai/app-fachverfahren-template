@@ -7,6 +7,11 @@ on:
   schedule:
     - cron: "0 3 * * *"
   workflow_dispatch:
+  # TEMPORÄR (vor Merge entfernen): validiert die Nightly auf dem PR-Branch, weil workflow_dispatch
+  # erst greift, wenn die Datei auf dem Default-Branch liegt.
+  push:
+    branches:
+      - fix/scaffolded-app-ci-health
 
 permissions:
   contents: read
