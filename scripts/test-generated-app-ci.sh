@@ -93,7 +93,9 @@ run_one() {
   pnpm run scaffold:domain-app -- --domain "$domain" --target "$target" --allow-dirty --force
 
   # 2) No-Residue: keine alte Vorlagen-Identität im generierten App (außerhalb der verbatim Engine).
-  if grep -rIlE "apps/fachverfahren|@senticor/fachverfahren[\"/]|senticor-app-fachverfahren-template" "$target" \
+  # `apps/fachverfahren` nur als GANZES Segment werten (gefolgt von Nicht-[-A-Za-z0-9] oder Zeilenende),
+  # sonst schlägt eine Domain wie `fachverfahren-demo` fälschlich an (apps/fachverfahren-demo ist korrekt).
+  if grep -rIlE "apps/fachverfahren([^-A-Za-z0-9]|$)|@senticor/fachverfahren[\"/]|senticor-app-fachverfahren-template" "$target" \
     --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.template --exclude-dir=template 2>/dev/null; then
     echo "generated-app-ci: Residue der Basis-Vorlagen-Identität gefunden (siehe Dateien oben)" >&2
     cleanup_target "$target"

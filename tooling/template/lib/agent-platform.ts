@@ -1248,6 +1248,18 @@ async function validateSkillShims(root: string) {
 
 async function validateDomainLeakage(root: string) {
   const failures: string[] = [];
+  // Die eigene Identität der generierten App (aus .template/answers.json) ist KEIN geleaktes
+  // Domänen-Vokabular: heißt die App selbst „Hundesteuer", trägt ihre Shell (Paketname, Chart, …)
+  // legitim „Hundesteuer"/„Hund". Terme, die in der App-Identität enthalten sind, von der Leakage-
+  // Prüfung ausnehmen — so lässt sich eine hundesteuer-App scaffolden, klar unterscheidbar vom
+  // gleichnamigen Vorlagen-BEISPIEL (docs/examples/hundesteuer). Die pristine Vorlage hat kein
+  // answers.json -> keine Ausnahme, Prüf-Verhalten unverändert.
+  const identity = await readJson<{ domain?: string; displayName?: string }>(
+    join(root, ".template", "answers.json"),
+  ).catch(() => null);
+  const identityText = identity
+    ? `${identity.domain ?? ""}\n${identity.displayName ?? ""}`.toLowerCase()
+    : "";
   const specFiles = await collectFiles(join(root, "docs/examples"), [".yaml"]);
   const specs = [];
   for (const file of specFiles.filter((path) =>
@@ -1273,7 +1285,9 @@ async function validateDomainLeakage(root: string) {
     )
   ).flat();
   for (const { spec } of specs) {
-    const terms = spec.domainVocabulary.filter((term) => term.length >= 4);
+    const terms = spec.domainVocabulary.filter(
+      (term) => term.length >= 4 && !identityText.includes(term.toLowerCase()),
+    );
     for (const file of files) {
       const rel = relative(root, file);
       if (rel.startsWith(spec.module.destination)) {
