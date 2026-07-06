@@ -1248,6 +1248,21 @@ async function validateSkillShims(root: string) {
 
 async function validateDomainLeakage(root: string) {
   const failures: string[] = [];
+  // Die eigene Identität der generierten App (aus .template/answers.json) ist KEIN geleaktes
+  // Domänen-Vokabular: heißt die App selbst „Hundesteuer", trägt ihre Shell (Paketname, Chart, …)
+  // legitim „Hundesteuer". NUR das GANZE Identitäts-Token (Domain/Display) ausnehmen — NICHT als
+  // Teilstring, sonst fiele mit „hundesteuer" auch der eigenständige Begriff „Hund" global weg und
+  // dog-spezifischer Code in SHARED packages käme durch. So bleibt „Hundesteuer" erlaubt, während
+  // „Hund"/„Befreiung"/… weiter (wortgenau) erzwungen werden. Pristine Vorlage: kein answers.json
+  // -> keine Ausnahme, Verhalten unverändert.
+  const identity = await readJson<{ domain?: string; displayName?: string }>(
+    join(root, ".template", "answers.json"),
+  ).catch(() => null);
+  const identityTokens = [identity?.domain, identity?.displayName]
+    .filter(
+      (value): value is string => typeof value === "string" && value.length > 0,
+    )
+    .map((value) => value.toLowerCase());
   const specFiles = await collectFiles(join(root, "docs/examples"), [".yaml"]);
   const specs = [];
   for (const file of specFiles.filter((path) =>
@@ -1273,7 +1288,10 @@ async function validateDomainLeakage(root: string) {
     )
   ).flat();
   for (const { spec } of specs) {
-    const terms = spec.domainVocabulary.filter((term) => term.length >= 4);
+    const terms = spec.domainVocabulary.filter(
+      (term) =>
+        term.length >= 4 && !identityTokens.includes(term.toLowerCase()),
+    );
     for (const file of files) {
       const rel = relative(root, file);
       if (rel.startsWith(spec.module.destination)) {
@@ -1281,7 +1299,9 @@ async function validateDomainLeakage(root: string) {
       }
       const text = await readFile(file, "utf8").catch(() => "");
       for (const term of terms) {
-        if (new RegExp(escapeRegExp(term), "i").test(text)) {
+        // Wortgenau (\b…\b): sonst matcht „Hund" innerhalb von „Hundesteuer" und meldet die App-
+        // Identität fälschlich als Leckage.
+        if (new RegExp(`\\b${escapeRegExp(term)}\\b`, "i").test(text)) {
           failures.push(
             `${rel} contains domain term ${term} outside ${spec.module.destination}`,
           );

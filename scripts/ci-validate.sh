@@ -17,13 +17,25 @@ case "$tmp_root" in
     ;;
 esac
 
+# CI_PROFILE steuert den Umfang. `full` (Default) ist das VOLLE Gate wie bisher — die reale
+# GitLab-Pipeline bleibt unverändert. `core` lässt die Schritte weg, die schwere Extra-Werkzeuge
+# (kubeconform/conftest/syft/trivy) und Netz brauchen; es bleibt das schnelle Health-Gate
+# (Vorlage/Konsument-Checks, Builds, Web-Delivery), das der Scaffolded-App-CI-Harness pro PR fährt.
+CI_PROFILE="${CI_PROFILE:-full}"
+
 pnpm run check:precommit
 pnpm run check:dockerfile-paths
 pnpm run build:packages
 pnpm run build:app
 pnpm run build:server
 pnpm run check:web-delivery
-pnpm run test:k8s:render
-pnpm run check:k8s-delivery
-pnpm run test:supply-chain
-pnpm run evidence:build
+
+if [ "$CI_PROFILE" = "full" ]; then
+  pnpm run test:k8s:render
+  pnpm run check:k8s-delivery
+  pnpm run test:supply-chain
+  pnpm run evidence:build
+elif [ "$CI_PROFILE" != "core" ]; then
+  echo "unknown CI_PROFILE: $CI_PROFILE (expected 'core' or 'full')" >&2
+  exit 1
+fi

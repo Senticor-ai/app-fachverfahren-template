@@ -23,12 +23,12 @@ jobs:
       NODE_ENV: test
     steps:
       - name: Checkout
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
 
       - name: Setup Node
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 24
           package-manager-cache: false
@@ -53,3 +53,39 @@ jobs:
       # `docker build` HIER ist unzuverlässig, weil GitHub-Runner die opencode-Registry (S3-Backend) nicht
       # stabil erreichen (TLS-Timeout). Stattdessen fängt `check:dockerfile-paths` (Teil von ci-validate.sh)
       # die reale Fehlerklasse — stale Pfade nach einem Rename — deterministisch und netzwerkfrei ab.
+
+  # Scaffolded-App-Health (core, eine kanonische Domain): scaffoldet `beispiel` und fährt in der
+  # generierten App DEREN eigenes ci-validate.sh (CI_PROFILE=core). Fängt genau die Fehlerklasse ab,
+  # bei der die Vorlage grün ist, eine frisch gescaffoldete App aber rot pusht. Läuft PARALLEL zu
+  # `build`, damit die Nested-Install/Build-Kosten die Haupt-Validierung nicht serialisieren.
+  scaffold-health:
+    name: Scaffolded App Health (core)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NODE_ENV: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Enable pnpm
+        run: |
+          export CI_PROJECT_DIR="$GITHUB_WORKSPACE"
+          export TMPDIR="$RUNNER_TEMP/app-fachverfahren-template"
+          scripts/ci-setup-node.sh
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Scaffolded app CI (core, domain=beispiel)
+        env:
+          # TMPDIR außerhalb des Checkouts. Kein Artefakt: das generierte App ist deterministisch
+          # reproduzierbar (`scaffold:domain-app`) und die fehlerhaften Dateien stehen bereits im Log.
+          TMPDIR: ${{ runner.temp }}/generated-app-ci
+        run: |
+          mkdir -p "$TMPDIR"
+          pnpm run test:generated-app-ci

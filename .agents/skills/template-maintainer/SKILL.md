@@ -23,7 +23,14 @@ pnpm run test:template
 pnpm run check:template-invariants
 pnpm run check:scaffold
 pnpm run check:scaffold-reproducible
+pnpm run test:generated-app-ci        # scaffoldet beispiel + fährt DESSEN ci-validate.sh (core)
 ```
+
+`test:render-contracts` (Teil von `test:template`) prüft schnell den Umschreib-Vertrag
+(kein Residue, verbatim Engine, re-scaffold aus Konsument). `test:generated-app-ci`
+beweist Ende-zu-Ende, dass eine frisch gescaffoldete App ihre eigene CI besteht — die
+volle Domain-Matrix + `CI_PROFILE=full` + Runtime-Smoke laufen via
+`pnpm run test:generated-app-ci:matrix` (nächtlich in CI).
 
 ## Rules
 

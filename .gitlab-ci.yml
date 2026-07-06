@@ -30,11 +30,46 @@ validate:
   script:
     - scripts/ci-validate.sh
 
+# Scaffolded-App-Health (core, eine kanonische Domain): scaffoldet `beispiel` und fährt in der generierten
+# App DEREN eigenes ci-validate.sh (CI_PROFILE=core). Fängt genau die Fehlerklasse ab, bei der die Vorlage
+# grün ist, eine frisch gescaffoldete App aber rot pusht. Läuft auf Branches/MRs, nicht in Schedules
+# (dort übernimmt scaffold-nightly die volle Matrix). Self-Skip in Konsumenten via .template/lock.json.
+scaffold-health:
+  extends: .node-base
+  stage: validate
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - when: on_success
+  script:
+    # Kein Artefakt: das generierte App ist deterministisch reproduzierbar (`scaffold:domain-app`) und
+    # die fehlerhaften Dateien stehen bereits im Job-Log.
+    - export TMPDIR="${CI_PROJECT_DIR}/../.tmp-generated-app-ci"
+    - pnpm run test:generated-app-ci
+
+# Volle Parität nächtlich: über eine Domain-Matrix scaffolden und je generiertem App CI_PROFILE=full +
+# Runtime-Smoke fahren. Braucht eine GitLab-Pipeline-*Schedule* (Projekt-Einstellungen → CI/CD → Schedules).
+scaffold-nightly:
+  extends: .node-base
+  stage: validate
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  timeout: 1h
+  script:
+    - export TMPDIR="${CI_PROJECT_DIR}/../.tmp-generated-app-ci"
+    - pnpm run test:generated-app-ci:matrix
+
 pages:
   extends: .node-base
   stage: pages
   needs:
     - validate
+    # Nicht veröffentlichen, wenn das Scaffold-Health-Gate rot ist (optional: greift, je nach
+    # Pipeline-Typ, scaffold-health auf Branch/Tag bzw. scaffold-nightly im Schedule).
+    - job: scaffold-health
+      optional: true
+    - job: scaffold-nightly
+      optional: true
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
@@ -50,6 +85,10 @@ container-image:
   stage: image
   needs:
     - validate
+    - job: scaffold-health
+      optional: true
+    - job: scaffold-nightly
+      optional: true
   rules:
     - if: $CI_COMMIT_BRANCH
     - if: $CI_COMMIT_TAG
@@ -66,6 +105,10 @@ sbom:
   stage: supply-chain
   needs:
     - validate
+    - job: scaffold-health
+      optional: true
+    - job: scaffold-nightly
+      optional: true
   rules:
     - if: $CI_COMMIT_BRANCH
     - if: $CI_COMMIT_TAG

@@ -111,6 +111,10 @@
     "test:template-upgrade-atomic": "pnpm run template -- test:template-upgrade-atomic",
     "test:template-adopt": "pnpm run template -- test:template-adopt",
     "test:template": "vitest run tooling/template && pnpm run check:template-types",
+    "test:render-contracts": "vitest run tooling/template/lib/render.contract.test.ts",
+    "test:generated-app-ci": "scripts/test-generated-app-ci.sh",
+    "test:generated-app-ci:full": "PROFILE=full scripts/test-generated-app-ci.sh",
+    "test:generated-app-ci:matrix": "MATRIX=1 PROFILE=full scripts/test-generated-app-ci.sh",
     "scaffold:domain-app": "pnpm run template -- scaffold",
     "scaffold:standalone": "node scripts/scaffold-standalone-app.mjs",
     "db:migrate": "pnpm --filter @senticor/app-store-postgres db:migrate"
