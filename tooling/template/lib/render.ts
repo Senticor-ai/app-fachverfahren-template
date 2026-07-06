@@ -52,13 +52,24 @@ const ignoredNames = new Set([
 
 const repositoryOnlyPaths = new Set([".gitlab/CODEOWNERS"]);
 
+// Die generische Template-Engine wird VERBATIM kopiert — NIE textersetzt. Sie enthält ihre eigene
+// Ersetzungs-Tabelle sowie Identitäts-/Provenienz-Konstanten als DATEN (z.B. `fachverfahren-template`,
+// `senticor-app-fachverfahren-template`, `Musterantrag`). Würde man sie ersetzen, zerlegte sich die
+// Engine im Konsumenten selbst (aus `["fachverfahren-template", domain]` würde `["beispiel", domain]`
+// — eine nackte Ersetzungsregel, die Identifier zerbricht) und der "bin ich die Vorlage?"-Selbsttest
+// (`sourcePackage.name.includes("fachverfahren-template")`) kippte. Umbenennung/Ersetzung im
+// Konsumenten laufen stattdessen generisch über die zur Laufzeit erkannte Basis-Domain (`${from}`).
+const substitutionExcludedPrefixes = ["tooling/template/"];
+
 const textExtensions = new Set([
   ".css",
+  ".cts",
   ".html",
   ".js",
   ".json",
   ".md",
   ".mjs",
+  ".mts",
   ".rego",
   ".sh",
   ".svg",
@@ -73,12 +84,21 @@ const textExtensions = new Set([
 ]);
 
 const textFileNames = new Set([
+  ".dockerignore",
   ".editorconfig",
+  ".env.example",
   ".env.local.example",
   ".gitignore",
   ".gitlab-ci.yml",
   ".npmrc",
+  ".prettierignore",
+  ".prettierrc",
   "Dockerfile",
+  // Husky-Hooks (kein Datei-Suffix): referenzieren App-Pfade (apps/<domain>/…), müssen daher
+  // mit-umgeschrieben werden, sonst bricht z.B. der Leistungsvertrag-Hook in der generierten App.
+  "commit-msg",
+  "pre-commit",
+  "pre-push",
 ]);
 
 /** Is `dir` a LIVE/governed consumer project (not the pristine template)? Such a project carries CHOS-overlay markers:
@@ -147,22 +167,34 @@ export async function renderDomainApp(
     filter: (path) => shouldCopy(path, source),
   });
 
-  const appSource = join(target, "apps", "fachverfahren");
+  // Basis-Identität der QUELLE: die pristine Vorlage ist `fachverfahren`/`Fachverfahren`; ein bereits
+  // scaffoldeter Konsument trägt seine eigene Domain in `.template/answers.json`. Ohne diese Erkennung
+  // könnte eine generierte App (apps/<domain>) sich selbst NICHT erneut scaffolden — die mitgelieferte
+  // render.test.ts / `check:scaffold` würden dort `apps/fachverfahren` suchen und fehlschlagen. Der
+  // CHOS-Durchstich fährt aber genau diesen `pnpm run test:template`-Gate in generierten Apps.
+  const base = await detectBaseIdentity(source);
+
+  const appSource = join(target, "apps", base.domain);
   const appTarget = join(target, "apps", answers.domain);
   if ((await exists(appSource)) && appSource !== appTarget) {
     await rm(appTarget, { recursive: true, force: true });
     await rename(appSource, appTarget);
   }
-  const chartSource = join(appTarget, "deploy", "helm", "fachverfahren");
+  const chartSource = join(appTarget, "deploy", "helm", base.domain);
   const chartTarget = join(appTarget, "deploy", "helm", answers.domain);
   if ((await exists(chartSource)) && chartSource !== chartTarget) {
     await rm(chartTarget, { recursive: true, force: true });
     await rename(chartSource, chartTarget);
   }
 
-  const replacements = createReplacements(answers);
-  await rewriteTextFiles(target, replacements);
+  const replacements = createReplacements(base, answers);
+  const rewritten = await rewriteTextFiles(target, replacements);
   await writeEnvExample(target);
+  // Domain-Ersetzung ändert Zeilenlängen (z.B. `apps/fachverfahren` -> `apps/<domain>`), wodurch
+  // Prettiers opinionated Umbruch/Markdown-Tabellen-Ausrichtung nicht mehr passt und `format:check`
+  // in der generierten App bricht. Deshalb die umgeschriebenen Dateien einmal deterministisch
+  // nachformatieren (respektiert .prettierignore, z.B. den emit-generierten Leistungsvertrag).
+  await formatRewrittenFiles(target, rewritten);
 
   const rootPackage = await readJson<PackageJson>(join(source, "package.json"));
   const commit = await getGitCommit(source);
@@ -203,10 +235,11 @@ export async function listMigrationIds(root: string): Promise<string[]> {
 async function rewriteTextFiles(
   root: string,
   replacements: Array<[string, string]>,
-) {
+): Promise<string[]> {
   const files = await collectFiles(root);
+  const changed: string[] = [];
   for (const file of files) {
-    if (!isTextFile(file)) {
+    if (!isTextFile(file) || isSubstitutionExcluded(file, root)) {
       continue;
     }
     let content;
@@ -224,6 +257,54 @@ async function rewriteTextFiles(
     }
     if (next !== content) {
       await writeFile(file, next);
+      changed.push(file);
+    }
+  }
+  return changed;
+}
+
+/** Formatiert die durch die Domain-Ersetzung veränderten Dateien mit Prettier nach. Nur Dateien, die
+ *  Prettier kennt (inferredParser gesetzt) und die NICHT via .prettierignore ausgenommen sind, werden
+ *  angefasst — deterministisch (gleiche Prettier-Version + Config => byte-gleich, `check:scaffold-
+ *  reproducible` bleibt grün). Prettier wird lazy importiert, damit reine CLI-Importe von cli.ts nicht
+ *  die große Prettier-Modulgraph-Ladezeit zahlen. */
+async function formatRewrittenFiles(root: string, files: string[]) {
+  if (files.length === 0) {
+    return;
+  }
+  const prettier = (await import("prettier")).default;
+  const ignorePath = join(root, ".prettierignore");
+  for (const file of files) {
+    const info = await prettier.getFileInfo(file, {
+      ignorePath,
+      resolveConfig: true,
+    });
+    if (info.ignored || !info.inferredParser) {
+      continue;
+    }
+    let content: string;
+    try {
+      content = await readFile(file, "utf8");
+    } catch {
+      continue;
+    }
+    const config = await prettier.resolveConfig(file);
+    let formatted: string;
+    try {
+      formatted = await prettier.format(content, {
+        ...config,
+        filepath: file,
+      });
+    } catch (error) {
+      // Kann Prettier eine Datei nicht parsen, dann könnte `format:check` sie ohnehin nicht erzwingen
+      // — die generierte Datei unformatiert lassen statt das ganze Scaffold abzubrechen. Sichtbar
+      // machen, damit echte Ersetzungs-Fehler (Substitution erzeugt ungültige Syntax) auffallen.
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`prettier skip (nicht parsebar): ${file} — ${message}`);
+      continue;
+    }
+    if (formatted !== content) {
+      await writeFile(file, formatted);
     }
   }
 }
@@ -236,36 +317,66 @@ async function rewriteTextFiles(
 const KIT_GUARD = "@@senticor-kit-guard@@";
 const SKILL_GUARD = "@@fachverfahren-app-skill-guard@@";
 
-function createReplacements(answers: {
+interface BaseIdentity {
   domain: string;
   displayName: string;
-}): Array<[string, string]> {
+}
+
+/** Identität der QUELL-App, aus der gerendert wird. Die pristine Vorlage kennzeichnet sich NICHT als
+ *  Konsument (kein `.template/answers.json`) und ist per Definition `fachverfahren`/`Fachverfahren`.
+ *  Ein bereits scaffoldeter Konsument trägt seine Domain in `.template/answers.json` — von dort lesen
+ *  wir sie, damit apps/<domain>-Umbenennung und Textersetzung generisch (nicht auf `fachverfahren`
+ *  festgenagelt) funktionieren und ein generierter App sich selbst erneut scaffolden kann. */
+async function detectBaseIdentity(source: string): Promise<BaseIdentity> {
+  try {
+    const answers = await readJson<Partial<BaseIdentity>>(
+      join(source, ".template", "answers.json"),
+    );
+    if (answers.domain && answers.displayName) {
+      return { domain: answers.domain, displayName: answers.displayName };
+    }
+  } catch {
+    /* pristine Vorlage: kein .template/answers.json — Fallback unten */
+  }
+  return { domain: "fachverfahren", displayName: "Fachverfahren" };
+}
+
+function createReplacements(
+  base: BaseIdentity,
+  answers: { domain: string; displayName: string },
+): Array<[string, string]> {
   const domain = answers.domain;
   const displayName = answers.displayName;
+  const from = base.domain;
+  const fromDisplay = base.displayName;
   return [
     // SCHUTZ zuerst (siehe oben) — dann Reihenfolge: längste/spezifischste Muster zuerst,
     // sonst zerlegt ein kürzeres Muster die längeren Treffer.
     ["fachverfahren-kit", KIT_GUARD],
     ["fachverfahren-app", SKILL_GUARD],
+    // Vorlagen-spezifische Verbund-Tokens: existieren NUR in der pristinen Vorlage (im Konsumenten
+    // bereits zu seiner Domain konsumiert → hier No-ops). Müssen vor den Basis-Identitätsregeln stehen.
     ["senticor-app-fachverfahren-template", `senticor-app-${domain}`],
     ["fachverfahren-template", domain],
     ["Fachverfahren Template", displayName],
     ["Fachverfahren Vorlage", displayName],
-    // App-IDENTITÄT (Paketname, Pfade, Helm-Chart/-Helper, Registry/Host, Anzeige-Name) — bewusst
-    // KEINE nackte fachverfahren-Regel: das Wort ist zugleich Gattungsbegriff der Doku und Bestandteil
-    // von Kit-Bezeichnern (FachverfahrenShell/FachverfahrenStore bleiben unangetastet).
-    ["@senticor/fachverfahren", `@senticor/${domain}`],
-    ["apps/fachverfahren", `apps/${domain}`],
-    ["deploy/helm/fachverfahren", `deploy/helm/${domain}`],
-    ["senticor/fachverfahren", `senticor/${domain}`],
-    ['"fachverfahren.', `"${domain}.`],
-    ["fachverfahren.example.invalid", `${domain}.example.invalid`],
-    ["name: fachverfahren", `name: ${domain}`],
-    ['"Fachverfahren"', `"${displayName}"`],
-    ["Fachverfahren - Referenz-App", `${displayName} - Referenz-App`],
-    ["Fachverfahren Referenz-App", `${displayName} Referenz-App`],
     // Die neutrale Demo-Leistung der Vorlage wird beim Scaffold zum konkreten Verfahren.
     ["Musterantrag", displayName],
+    // App-IDENTITÄT (Paketname, Pfade, Helm-Chart/-Helper, Registry/Host, Anzeige-Name) — parametrisiert
+    // über die ERKANNTE Basis-Domain (`from`): Vorlage=fachverfahren, sonst die Konsumenten-Domain.
+    // Bewusst KEINE nackte from-Regel: das Wort ist zugleich Gattungsbegriff der Doku und Bestandteil
+    // von Kit-Bezeichnern (FachverfahrenShell/FachverfahrenStore bleiben unangetastet).
+    [`senticor-app-${from}`, `senticor-app-${domain}`],
+    [`@senticor/${from}`, `@senticor/${domain}`],
+    [`apps/${from}`, `apps/${domain}`],
+    [`deploy/helm/${from}`, `deploy/helm/${domain}`],
+    [`senticor/${from}`, `senticor/${domain}`],
+    [`"${from}.`, `"${domain}.`],
+    [`${from}.example.invalid`, `${domain}.example.invalid`],
+    [`name: ${from}`, `name: ${domain}`],
+    [`"${fromDisplay}"`, `"${displayName}"`],
+    [`${fromDisplay} - Referenz-App`, `${displayName} - Referenz-App`],
+    [`${fromDisplay} Referenz-App`, `${displayName} Referenz-App`],
     // Schutz wieder aufheben:
     [KIT_GUARD, "fachverfahren-kit"],
     [SKILL_GUARD, "fachverfahren-app"],
@@ -324,6 +435,13 @@ function shouldCopy(path: string, sourceRoot: string) {
 
 function isTextFile(path: string) {
   return textExtensions.has(extname(path)) || textFileNames.has(basename(path));
+}
+
+function isSubstitutionExcluded(path: string, root: string) {
+  const relativePath = relative(root, path).split("\\").join("/");
+  return substitutionExcludedPrefixes.some((prefix) =>
+    relativePath.startsWith(prefix),
+  );
 }
 
 async function exists(path: string) {

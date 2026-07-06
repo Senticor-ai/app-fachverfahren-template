@@ -1476,6 +1476,7 @@ async function validateInvariants(root) {
     requireScript(scripts, "check:capability-catalog", failures);
     requireScript(scripts, "check:source-registry", failures);
     requireScript(scripts, "test:golden-generated-app", failures);
+    requireScript(scripts, "test:generated-app-ci", failures);
     if (
       !scripts["build:packages"]?.includes(
         'pnpm --filter "./packages/**" run --if-present build',
@@ -1535,6 +1536,9 @@ async function validateInvariants(root) {
     "policy/k8s-delivery.rego",
     "scripts/check-web-delivery.mjs",
     "scripts/check-k8s-delivery.mjs",
+    "scripts/ci-validate.sh",
+    "scripts/test-generated-app-ci.sh",
+    "scripts/smoke-generated-app.sh",
   ]) {
     if (!(await exists(join(root, requiredPath)))) {
       failures.push(`missing ${requiredPath}`);

@@ -1,0 +1,134 @@
+#!/usr/bin/env sh
+# Scaffolded-App-CI-Harness: beweist, dass `pnpm run scaffold:domain-app -- --domain <d> --target <t>`
+# eine GESUNDE App erzeugt — indem sie scaffoldet und in der generierten App deren EIGENES
+# scripts/ci-validate.sh fährt (die exakte Quelle, die auch die reale GitLab-Pipeline nutzt). Damit
+# kann die Vorlage nie wieder grün sein, während eine frisch gescaffoldete App rot pusht.
+#
+# Profile (PROFILE):
+#   core     (Default) CI_PROFILE=core im generierten App: schnelles Gate ohne k8s/Supply-Chain-Werkzeug.
+#   runtime  wie core + Runtime-Smoke (Server bootet, /readyz, Frontend, kein Secret-Leak).
+#   full     CI_PROFILE=full (volle Parität zur GitLab-Pipeline) + Runtime-Smoke; braucht ci-setup-node.sh.
+# MATRIX=1   iteriert eine kleine Domain-Matrix (kebab/Ziffern/Schutzbegriff), statt nur `beispiel`.
+# Env: DOMAIN, TARGET, KEEP=1 (Zielverzeichnis behalten), SKIP_SCAFFOLD_CI=1 (lokal überspringen).
+set -eu
+
+# --- Selbst-Skip: NUR in der Vorlage laufen, nie in einem generierten Konsumenten -------------------
+# Ein generierter Konsument trägt .template/lock.json; die pristine Vorlage nicht. Da precommit:check
+# und .gitlab-ci.yml in Konsumenten mitkopiert werden, würde die Harness sich sonst dort rekursiv
+# selbst scaffolden. Zusätzlich ein Rekursions-Guard über eine Env-Marke.
+if [ -f .template/lock.json ]; then
+  echo "skip: generated consumer app detected via .template/lock.json"
+  exit 0
+fi
+if [ "${SCAFFOLD_GENERATED_APP_CI_RUNNING:-0}" = "1" ]; then
+  echo "skip: recursive generated-app CI invocation"
+  exit 0
+fi
+export SCAFFOLD_GENERATED_APP_CI_RUNNING=1
+if [ "${SKIP_SCAFFOLD_CI:-0}" = "1" ]; then
+  echo "skip: SKIP_SCAFFOLD_CI=1 (lokaler Escape-Hatch; CI erzwingt es weiterhin)"
+  exit 0
+fi
+
+PROFILE="${PROFILE:-core}"
+case "$PROFILE" in
+  core) CI_PROFILE=core; RUNTIME=0 ;;
+  runtime) CI_PROFILE=core; RUNTIME=1 ;;
+  full) CI_PROFILE=full; RUNTIME=1 ;;
+  *) echo "unknown PROFILE: $PROFILE (expected core|runtime|full)" >&2; exit 1 ;;
+esac
+
+REPO_ROOT="$(pwd -P)"
+
+# TMPDIR außerhalb des Repos erzwingen (wie ci-validate.sh) — Scaffold-Ziele dürfen nicht im Checkout liegen.
+if [ -z "${TMPDIR:-}" ]; then
+  TMPDIR="${REPO_ROOT}/../.tmp-generated-app-ci"
+fi
+mkdir -p "$TMPDIR"
+TMPDIR="$(cd "$TMPDIR" && pwd -P)"
+case "$TMPDIR" in
+  "$REPO_ROOT" | "$REPO_ROOT"/*)
+    echo "TMPDIR muss außerhalb des Repos liegen: $TMPDIR" >&2
+    exit 1
+    ;;
+esac
+export TMPDIR
+
+# Prettier-Binary der Vorlage (die generierte App hat noch keine node_modules) — für keine der
+# delegierten Schritte nötig, aber ci-setup-node.sh braucht Node/pnpm; das stellt der Aufrufer bereit.
+
+if [ "${MATRIX:-0}" = "1" ]; then
+  # Domains, die unterschiedliche Umschreib-Flächen stressen: Bindestrich, Ziffern, Schutzbegriff.
+  DOMAINS="beispiel hundesteuer kfz-steuer verwaltung2026 fachverfahren-demo"
+else
+  DOMAINS="${DOMAIN:-beispiel}"
+fi
+
+run_one() {
+  domain="$1"
+  # Sicheres, kollisionsfreies Zielverzeichnis (mktemp), außer der Aufrufer gibt TARGET explizit vor
+  # (z.B. TARGET=/tmp/app-beispiel, um das exakte User-Kommando zu reproduzieren).
+  if [ -n "${TARGET:-}" ] && [ "${MATRIX:-0}" != "1" ]; then
+    target="$TARGET"
+    rm -rf "$target"
+  else
+    target="$(mktemp -d "${TMPDIR}/generated-${domain}.XXXXXX")"
+  fi
+
+  cleanup_target() {
+    [ "${KEEP:-0}" = "1" ] && return 0
+    case "$1" in
+      "" | "/" | "$REPO_ROOT" | "$REPO_ROOT"/*)
+        echo "refuse to delete unsafe TARGET=$1" >&2 ;;
+      *) rm -rf "$1" ;;
+    esac
+  }
+
+  echo "=================================================================="
+  echo "generated-app-ci: domain=${domain} profile=${PROFILE} (CI_PROFILE=${CI_PROFILE})"
+  echo "  target=${target}"
+  echo "=================================================================="
+
+  # 1) Scaffold — exakt wie der User es tut.
+  pnpm run scaffold:domain-app -- --domain "$domain" --target "$target" --allow-dirty --force
+
+  # 2) No-Residue: keine alte Vorlagen-Identität im generierten App (außerhalb der verbatim Engine).
+  if grep -rIlE "apps/fachverfahren|@senticor/fachverfahren[\"/]|senticor-app-fachverfahren-template" "$target" \
+    --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.template --exclude-dir=template 2>/dev/null; then
+    echo "generated-app-ci: Residue der Basis-Vorlagen-Identität gefunden (siehe Dateien oben)" >&2
+    cleanup_target "$target"
+    return 1
+  fi
+  # 3) Health-Gate im generierten App über DESSEN eigenes ci-validate.sh (Single Source of Truth).
+  (
+    cd "$target"
+    git init -q
+    git add -A
+    git -c user.email=ci@example.invalid -c user.name=ci commit -qm "generated baseline"
+
+    pnpm install --frozen-lockfile
+    CI_PROFILE="$CI_PROFILE" scripts/ci-validate.sh
+
+    # 4) No-Mutation: das Gate darf Metadaten/Lockfile nicht still umschreiben.
+    git diff --exit-code -- package.json pnpm-lock.yaml pnpm-workspace.yaml \
+      || { echo "generated-app-ci: Gate hat package.json/pnpm-lock/workspace verändert" >&2; exit 1; }
+
+    # 5) Optionaler Runtime-Smoke (Server bootet, /readyz, Frontend, Secret-Leak).
+    if [ "$RUNTIME" = "1" ]; then
+      DOMAIN="$domain" sh "${REPO_ROOT}/scripts/smoke-generated-app.sh"
+    fi
+  ) || { cleanup_target "$target"; return 1; }
+
+  cleanup_target "$target"
+  echo "generated-app-ci: domain=${domain} OK ✅"
+}
+
+status=0
+for d in $DOMAINS; do
+  if ! run_one "$d"; then
+    status=1
+    echo "generated-app-ci: domain=${d} FAILED ❌"
+    [ "${MATRIX:-0}" = "1" ] || exit 1
+  fi
+done
+exit "$status"
