@@ -39,9 +39,10 @@ Sitzung `401` (schema-gültiger Body zuerst, sonst `400`). RBAC serverseitig.
 
 - Unit gegen synthetisches `STATIC_DIR` + `app.inject()`: `apps/fachverfahren/server/index.test.ts`.
 - End-to-End gegen das **reale** Bundle (baut in `beforeAll`, prüft Persona-Routen + Liveness):
+  `tests/e2e/personas.e2e.test.ts` via `vitest.e2e.config.ts`:
 
 ```bash
-pnpm run test:e2e        # tests/e2e/personas.e2e.test.ts (vitest.e2e.config.ts)
+pnpm run test:e2e
 ```
 
 Nach jeder Änderung an der Austausch-Naht zusätzlich den Vertrag erneuern:
