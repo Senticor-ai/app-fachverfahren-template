@@ -13,6 +13,9 @@ const CURRENCY_RE = /\b(EUR|USD|CHF|GBP)\b/i;
 
 /** Formatiert `betrag` (natürliche Haupteinheit der `einheit`) für die Anzeige. `einheit` z. B. "EUR/Jahr", "EUR", "Stück". */
 export function formatBetrag(betrag: number, einheit: string): string {
+  // WURZEL-FIX (Live-Audit Wohngeld): fehlende Pflicht-Eingaben ergeben NaN in der berechne → „NaN €" auf dem leeren
+  // Erstformular. KEIN Betrag darf je als NaN/Infinity rendern → „—" (wie formatDateiGroesse). EINE Wahrheit für alle Apps.
+  if (!Number.isFinite(betrag)) return "—";
   const m = (einheit ?? "").match(CURRENCY_RE);
   if (m) {
     const currency = m[1].toUpperCase();

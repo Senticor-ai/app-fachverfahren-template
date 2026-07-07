@@ -15,6 +15,12 @@ describe("formatBetrag — Betrag in der natürlichen Haupteinheit", () => {
     expect(n(formatBetrag(0, "EUR"))).toBe("0,00 €");
   });
 
+  it("rendert NIE NaN/Infinity als Betrag → '—' (leere Pflicht-Eingaben auf dem Erstformular)", () => {
+    expect(formatBetrag(NaN, "EUR")).toBe("—");
+    expect(formatBetrag(Number.POSITIVE_INFINITY, "EUR/Jahr")).toBe("—");
+    expect(formatBetrag(undefined as unknown as number, "EUR")).toBe("—");
+  });
+
   it("hängt einen Nicht-Währungs-Suffix an", () => {
     expect(n(formatBetrag(120, "EUR/Monat"))).toBe("120,00 €/Monat");
   });
