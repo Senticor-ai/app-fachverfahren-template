@@ -67,4 +67,8 @@ jobs:
           esac
 
           git remote add gitlab "$mirror_url"
-          git push gitlab "HEAD:main"
+          # Voll qualifizierter Ziel-Ref: HEAD:main scheitert, wenn das Ziel-Repo noch KEIN
+          # main hat (frisch/leer) — git kann den unqualifizierten Ziel-Ref dann nicht auflösen
+          # ("not a full refname"). HEAD:refs/heads/main legt main beim Erstpush an und
+          # aktualisiert es danach genauso.
+          git push gitlab "HEAD:refs/heads/main"
