@@ -50,7 +50,7 @@ jobs:
       - name: Push to GitLab
         if: ${{ steps.mirror-config.outputs.enabled == 'true' }}
         env:
-          GITLAB_MIRROR_URL: ${{ secrets.GITLAB_MIRROR_URL || 'https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-platform/senticor/senticor-app-fachverfahren-template.git' }}
+          GITLAB_MIRROR_URL: ${{ secrets.GITLAB_MIRROR_URL || 'https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-platform/govtech-ai/govtech-ai-app-fachverfahren-template.git' }}
           GITLAB_MIRROR_TOKEN: ${{ secrets.GITLAB_MIRROR_TOKEN }}
         run: |
           test -n "$GITLAB_MIRROR_URL"

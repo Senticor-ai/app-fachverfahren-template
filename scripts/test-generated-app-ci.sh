@@ -20,7 +20,7 @@ set -eu
 # ACHTUNG bei Repo-Umzug/-Umbenennung: Diese Konstanten MÜSSEN mitgezogen werden, sonst skippt das
 # Gate der Vorlage selbst still (permanentes False Green). test-generated-app-ci.guard.test.ts
 # dupliziert die Werte absichtlich und schlägt bei Drift fehl.
-TEMPLATE_GITLAB_PATH="govtech-deutschland/platform-instances/deutschland-platform/senticor/senticor-app-fachverfahren-template"
+TEMPLATE_GITLAB_PATH="govtech-deutschland/platform-instances/deutschland-platform/govtech-ai/govtech-ai-app-fachverfahren-template"
 TEMPLATE_GITHUB_REPO="Senticor-ai/app-fachverfahren-template"
 if [ -n "${CI_PROJECT_PATH:-}" ] && [ "${CI_PROJECT_PATH}" != "${TEMPLATE_GITLAB_PATH}" ]; then
   echo "skip: not the template's own GitLab project (CI_PROJECT_PATH=${CI_PROJECT_PATH})"
