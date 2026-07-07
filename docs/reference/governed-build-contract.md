@@ -18,10 +18,11 @@ schreibt **nur** diese Config; er erfindet keine Kit-Dateien.
 
 ## 2. Emit → committeter Vertrags-Snapshot
 
-Nach jeder Config-Änderung wird der JSON-Vertrag neu erzeugt und **mitcommittet**:
+Nach jeder Config-Änderung wird der JSON-Vertrag
+(`apps/fachverfahren/leistung.contract.json`) neu erzeugt und **mitcommittet**:
 
 ```bash
-pnpm --filter @senticor/fachverfahren emit:contract   # → apps/fachverfahren/leistung.contract.json
+pnpm --filter @senticor/fachverfahren emit:contract
 ```
 
 `leistung.contract.json` serialisiert die Business-Logik als DATEN (Tarif-Staffeln,

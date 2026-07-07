@@ -23,7 +23,7 @@ pnpm run test:template
 pnpm run check:template-invariants
 pnpm run check:scaffold
 pnpm run check:scaffold-reproducible
-pnpm run test:generated-app-ci        # scaffoldet beispiel + fährt DESSEN ci-validate.sh (core)
+pnpm run test:generated-app-ci
 ```
 
 `test:render-contracts` (Teil von `test:template`) prüft schnell den Umschreib-Vertrag
