@@ -1603,8 +1603,8 @@ async function readMetadataOrSourceDefaults(root = process.cwd()) {
   const packageJson = await readJson<PackageJson>(join(root, "package.json"));
   return {
     answers: {
-      domain: "fachverfahren-template",
-      displayName: "Fachverfahren Template",
+      domain: "fachverfahren",
+      displayName: "Fachverfahren",
       features: { postgres: true, mockAuth: true },
     },
     lock: {

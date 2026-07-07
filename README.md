@@ -1,6 +1,6 @@
 # Fachverfahren App Platform Template
 
-[![CI pipeline](https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-platform/senticor/senticor-app-fachverfahren-template/badges/main/pipeline.svg)](https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-platform/senticor/senticor-app-fachverfahren-template/-/pipelines)
+[![CI pipeline](https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-platform/govtech-ai/govtech-ai-app-fachverfahren-template/badges/main/pipeline.svg)](https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-platform/govtech-ai/govtech-ai-app-fachverfahren-template/-/pipelines)
 [![License: EUPL-1.2](https://img.shields.io/badge/license-EUPL--1.2-blue)](LICENSE)
 
 **English summary:** This repository provides a reusable public-sector
@@ -138,7 +138,7 @@ GitHub `main` ist die kanonische Quelle. Nach erfolgreicher GitHub-CI wird der
 validierte Commit automatisch nach GitLab/openCode gespiegelt:
 
 ```text
-https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-platform/senticor/senticor-app-fachverfahren-template
+https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-platform/govtech-ai/govtech-ai-app-fachverfahren-template
 ```
 
 Der Mirror-Workflow nutzt `GITLAB_MIRROR_TOKEN`; optional kann

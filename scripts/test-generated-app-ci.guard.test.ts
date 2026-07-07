@@ -12,7 +12,7 @@ const script = join(process.cwd(), "scripts", "test-generated-app-ci.sh");
 // Bewusst dupliziert: ändert jemand die Konstanten im Skript (z.B. nach einem Repo-Umzug),
 // schlägt dieser Test fehl, statt dass das Gate der Vorlage still zu skippen beginnt.
 const TEMPLATE_GITLAB_PATH =
-  "govtech-deutschland/platform-instances/deutschland-platform/senticor/senticor-app-fachverfahren-template";
+  "govtech-deutschland/platform-instances/deutschland-platform/govtech-ai/govtech-ai-app-fachverfahren-template";
 const TEMPLATE_GITHUB_REPO = "Senticor-ai/app-fachverfahren-template";
 
 // Neutrales cwd pro Test statt Repo-Root: diese Datei wird in generierte Konsumenten MITKOPIERT
