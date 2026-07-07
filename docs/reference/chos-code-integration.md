@@ -46,9 +46,11 @@ rendered, and it is held to a strict module contract. See `modules/README.md`.
 
 2. **Keep grounding/scratch out of gated paths.** `.chos/`, `korpus-bindung`,
    `compliance-regeln` and similar phase artifacts must live under `.chos/` or
-   `docs/domain/` — never `modules/<domain>/`. If you must stage under `modules/`,
-   use an underscore-prefixed dir (`modules/_scratch/…`), which the checker
-   ignores. Give files real extensions (`.md`), not bare names.
+   `docs/domain/` — **never anywhere under `modules/`**. There is no CI-safe
+   scratch location inside `modules/`: `check:domain-contracts` validates every
+   non-`_` directory as a full module, and `check:module-contracts` validates
+   **every** directory (including `_`-prefixed ones) and flags a missing
+   `module.contract.yaml`. Give files real extensions (`.md`), not bare names.
 
 3. **Gate each phase before pushing to `main`.** After each `chos-phase`, run:
 
@@ -65,7 +67,7 @@ rendered, and it is held to a strict module contract. See `modules/README.md`.
 4. **If you genuinely intend a formal module**, generate it — don't hand-write it:
 
    ```bash
-   pnpm run app:new -- --task <app-spec>
+   pnpm run app:new -- --spec <app.spec.yaml>
    ```
 
    This emits the complete, CI-valid contract set (`domain.module.yaml`,
