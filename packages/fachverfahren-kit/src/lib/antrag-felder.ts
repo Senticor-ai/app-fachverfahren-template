@@ -18,29 +18,62 @@ export type Codelisten = Record<string, Codeliste>;
 /** Datei-Metadaten eines `file`-Felds — der echte Inhalt wandert in PROD über den Port. */
 export type DateiWert = { name: string; groesse: number };
 
-// ── Pfad-Zugriff auf das verschachtelte Antragsdaten-Objekt über "a.b.c"-Feldpfade ───────────────
-/** Liest einen Wert aus dem verschachtelten Objekt anhand des Feldpfads (z. B. "person.nachname"). */
+// ── Pfad-Zugriff auf das verschachtelte Antragsdaten-Objekt über "a.b.c"- UND "a[0].b"-Feldpfade ───────────────
+// WURZEL-FIX (Live-Audit): Feldpfade tragen ARRAY-INDIZES der Form "posten[0].wert" — der Antrag erhebt je LISTEN-
+// EINTRAG (je Objekt) mehrere Felder. Ein reines split(".") speicherte/las den LITERAL-Key "posten[0]" statt posten[0]
+// → a.posten blieb undefined, die Eingabe erreichte die Berechnung nie (immer 0/provisional). parsePath zerlegt jeden
+// Pfad in Tokens (String-Key | numerischer Index), sodass get/set Objekte UND Arrays korrekt traversieren + aufbauen.
+type PathToken = string | number;
+/** Zerlegt "posten[0].wert" → ["posten", 0, "wert"]; "a.b" → ["a","b"]; "x[1][2]" → ["x",1,2]. Rein, testbar. */
+export function parsePath(path: string): PathToken[] {
+  const tokens: PathToken[] = [];
+  for (const seg of path.split(".")) {
+    const m = seg.match(/^([^[\]]*)((?:\[\d+\])*)$/);
+    if (!m) {
+      tokens.push(seg);
+      continue;
+    } // untypisches Segment → als Literal-Key (rückwärtskompatibel)
+    if (m[1]) tokens.push(m[1]);
+    for (const idx of m[2].match(/\d+/g) ?? []) tokens.push(Number(idx));
+  }
+  return tokens;
+}
+
+/** Liest einen Wert aus dem verschachtelten Objekt/Array anhand des Feldpfads (z. B. "posten[0].wert"). */
 export function getPath(obj: Antragsdaten, path: string): unknown {
-  return path.split(".").reduce<unknown>((acc, key) => {
-    if (acc && typeof acc === "object") return (acc as Antragsdaten)[key];
-    return undefined;
+  return parsePath(path).reduce<unknown>((acc, key) => {
+    if (acc == null || typeof acc !== "object") return undefined;
+    if (typeof key === "number")
+      return Array.isArray(acc) ? (acc as unknown[])[key] : undefined;
+    return (acc as Antragsdaten)[key];
   }, obj);
 }
 
-/** Setzt einen Wert im verschachtelten Objekt (immutabel) anhand des Feldpfads. */
+/** Setzt einen Wert im verschachtelten Objekt/Array (immutabel) anhand des Feldpfads — legt Zwischen-Knoten je
+ *  Token-Typ an (numerischer Token → Array, String-Token → Objekt). */
 export function setPath(
   obj: Antragsdaten,
   path: string,
   value: unknown,
 ): Antragsdaten {
-  const keys = path.split(".");
-  const [head, ...rest] = keys;
-  if (head === undefined) return obj;
-  if (rest.length === 0) return { ...obj, [head]: value };
-  const child = obj[head];
-  const childObj =
-    child && typeof child === "object" ? (child as Antragsdaten) : {};
-  return { ...obj, [head]: setPath(childObj, rest.join("."), value) };
+  const tokens = parsePath(path);
+  if (tokens.length === 0) return obj;
+  const setAt = (node: unknown, i: number): unknown => {
+    const key = tokens[i];
+    const last = i === tokens.length - 1;
+    if (typeof key === "number") {
+      const arr = Array.isArray(node) ? [...(node as unknown[])] : [];
+      arr[key] = last ? value : setAt(arr[key], i + 1);
+      return arr;
+    }
+    const base: Antragsdaten =
+      node && typeof node === "object" && !Array.isArray(node)
+        ? { ...(node as Antragsdaten) }
+        : {};
+    base[key] = last ? value : setAt(base[key], i + 1);
+    return base;
+  };
+  return setAt(obj, 0) as Antragsdaten;
 }
 
 /** Feldwert als String (für Text-Inputs/Validierung) — undefined/null → "", boolean → "true"/"false",

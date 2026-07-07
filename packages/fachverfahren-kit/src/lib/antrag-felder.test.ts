@@ -10,6 +10,7 @@ import {
   feldLabelFachlich,
   feldOptionen,
   getPath,
+  parsePath,
   istBeantwortet,
   istDateiWert,
   resolveFeld,
@@ -35,6 +36,37 @@ describe("getPath / setPath — verschachtelter, immutabler Zugriff", () => {
     expect(getPath(b, "posten.anzahl")).toBe("2");
     expect(getPath(a, "posten.anzahl")).toBeUndefined(); // Original unberührt
     expect(getPath(b, "halter.nachname")).toBe("Muster"); // Nachbarpfad erhalten
+  });
+
+  it("ARRAY-INDIZES: liest und setzt 'posten[0].wert' als Array (Wurzel des 0-Bugs: Eingabe erreicht die Berechnung nie)", () => {
+    // Antrag erhebt je Listeneintrag mehrere Felder → die Berechnung liest a.posten als ARRAY. Der Pfad MUSS als
+    // Array-Index landen, nicht als Literal-Key "posten[0]" (sonst a.posten=undefined → immer 0/provisional).
+    let d = setPath({}, "posten[0].name", "A");
+    d = setPath(d, "posten[0].wert", "10");
+    d = setPath(d, "posten[1].name", "B");
+    expect(Array.isArray((d as { posten?: unknown }).posten)).toBe(true);
+    expect(getPath(d, "posten[0].name")).toBe("A");
+    expect(getPath(d, "posten[1].name")).toBe("B");
+    // Die Berechnung liest a.posten als echtes Array (Länge + Feldzugriff):
+    const posten = (d as { posten: { name: string; wert?: string }[] }).posten;
+    expect(posten.length).toBe(2);
+    expect(posten[0].wert).toBe("10");
+    // Seed-Richtung (Detailsicht): getPath auf ein vorbelegtes Array-Objekt liest korrekt (war vorher leer).
+    const seed = { posten: [{ name: "Seed", wert: "5" }] };
+    expect(getPath(seed, "posten[0].wert")).toBe("5");
+    // Immutabilität + Nachbarpfad-Erhalt bei Array-Set:
+    const base = { posten: [{ name: "A" }], halter: { nachname: "X" } };
+    const upd = setPath(base, "posten[0].name", "B");
+    expect(getPath(upd, "posten[0].name")).toBe("B");
+    expect(getPath(base, "posten[0].name")).toBe("A"); // Original unberührt
+    expect(getPath(upd, "halter.nachname")).toBe("X"); // Nachbarzweig erhalten
+  });
+
+  it("parsePath: zerlegt Punkt- und Index-Pfade robust", () => {
+    expect(parsePath("posten[0].wert")).toEqual(["posten", 0, "wert"]);
+    expect(parsePath("a.b.c")).toEqual(["a", "b", "c"]);
+    expect(parsePath("x[1][2]")).toEqual(["x", 1, 2]);
+    expect(parsePath("plain")).toEqual(["plain"]);
   });
 });
 
