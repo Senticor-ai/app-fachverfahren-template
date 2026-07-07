@@ -57,13 +57,16 @@ if (failures.length > 0) {
   for (const failure of failures) {
     console.error(`- ${failure}`);
   }
+  console.error(
+    "\nEvery directory under modules/ must be a complete domain module. Build a Fachverfahren via apps/fachverfahren/src/leistung.config.ts, generate a module with `pnpm run app:new`, and keep grounding/scratch out of modules/ (see modules/README.md).",
+  );
   process.exit(1);
 }
 
 console.log("Domain contract check passed.");
 
 async function listDomainModuleNames() {
-  const entries = await readdir(modulesRoot, { withFileTypes: true });
+  const entries = await safeReaddir(modulesRoot, { withFileTypes: true });
   return entries
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
@@ -71,7 +74,7 @@ async function listDomainModuleNames() {
 }
 
 async function checkModuleDirectories(moduleName, moduleDir) {
-  const entries = await readdir(moduleDir, { withFileTypes: true });
+  const entries = await safeReaddir(moduleDir, { withFileTypes: true });
   const directories = new Set(
     entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name),
   );
@@ -112,7 +115,7 @@ async function checkDomainManifest(moduleName, moduleDir) {
 
 async function checkScreenContracts(moduleName, moduleDir) {
   const contractsDir = join(moduleDir, "contracts");
-  const contractFiles = (await readdir(contractsDir))
+  const contractFiles = (await safeReaddir(contractsDir))
     .filter((fileName) => fileName.endsWith(".screen.yaml"))
     .sort();
 
@@ -157,6 +160,17 @@ async function checkScreenContracts(moduleName, moduleDir) {
     requireNestedKey(contractPath, contract, "tests", "unit");
     requireNestedKey(contractPath, contract, "tests", "integration");
     requireNestedKey(contractPath, contract, "tests", "storybook");
+  }
+}
+
+async function safeReaddir(path, options) {
+  try {
+    return await readdir(path, options);
+  } catch (error) {
+    if (error && error.code === "ENOENT") {
+      return [];
+    }
+    throw error;
   }
 }
 
