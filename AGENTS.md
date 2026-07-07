@@ -261,6 +261,15 @@ Lifecycle-Befehle laufen über `tooling/template/cli.ts`
 `.template/`-Provenienz ohne Zeitstempel und lokale Pfade. Runbook-Befehle
 enthalten keine Inline-Shell-Kommentare (`check:runbook-commands`).
 
+**Provisionierungs-Vertrag für Builder und Agenten:** Konsumenten entstehen
+über `scaffold:domain-app` — NIEMALS durch `git clone` + Kopieren des Baums.
+Eine Rohkopie behält die Vorlagen-Identität, hat keine `.template/lock.json`
+(kein `template:update`-Migrationspfad) und lässt Template-eigene CI-Jobs wie
+`scaffold-health` im Konsumenten mitlaufen (Issue #13; der zusätzliche
+CI-Identitäts-Guard in `scripts/test-generated-app-ci.sh` fängt nur diesen
+letzten Punkt ab). Für bereits roh kopierte Bäume ist `template:adopt` der
+Reparaturpfad.
+
 ## CI und Container-Builds
 
 GitHub `main` ist die kanonische Quelle; nach grüner CI wird nach

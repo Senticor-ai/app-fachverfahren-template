@@ -146,11 +146,27 @@ Der Mirror-Workflow nutzt `GITLAB_MIRROR_TOKEN`; optional kann
 mit Notice übersprungen, damit die eigentliche Validierungs-CI nicht wegen
 fehlender Repository-Secrets rot wird.
 
-Vollständige neue App-Repositories werden über den Template-Lifecycle erzeugt:
+## Verwendung als Template
+
+Dieses Repository ist ein **versioniertes Template**, keine kopierbare
+Vorlage. Neue Fachverfahren-Repositories entstehen ausschließlich über die
+Scaffold-CLI:
 
 ```bash
 pnpm run scaffold:domain-app -- --domain beispiel --target /tmp/app-beispiel
 ```
+
+Die CLI schreibt die Domain-Identität um (Paketname, `apps/<domain>`,
+Helm-Charts) und legt `.template/lock.json` als Provenienz an — die Basis für
+spätere `template:update`-Migrationen und dafür, dass Template-eigene CI-Jobs
+(z.B. `scaffold-health`) sich im Konsumenten selbst überspringen.
+
+**Den Baum roh zu kopieren oder zu klonen ist als Konsumenten-Provisionierung
+nicht unterstützt.** Eine Rohkopie behält die Vorlagen-Identität
+(`senticor-app-fachverfahren-template`), erhält keine `.template/`-Provenienz
+(und damit keinen Update-/Migrationspfad) und schleppt Template-eigene
+CI-Jobs mit. Für bereits roh kopierte Bäume ist `template:adopt` der
+Reparaturpfad.
 
 Provenienz, Ownership, Updates, Migrationen und Fleet-Befehle stehen in
 `docs/reference/template-lifecycle.md`.

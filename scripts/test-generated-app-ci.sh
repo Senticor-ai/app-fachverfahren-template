@@ -13,9 +13,27 @@
 set -eu
 
 # --- Selbst-Skip: NUR in der Vorlage laufen, nie in einem generierten Konsumenten -------------------
-# Ein generierter Konsument trägt .template/lock.json; die pristine Vorlage nicht. Da precommit:check
-# und .gitlab-ci.yml in Konsumenten mitkopiert werden, würde die Harness sich sonst dort rekursiv
-# selbst scaffolden. Zusätzlich ein Rekursions-Guard über eine Env-Marke.
+# Erster Guard: CI-Identität. Kein Datei-Inhalt kann "pristine Vorlage" von "roh kopierter Vorlage"
+# unterscheiden — jede committete Markierung wird mitkopiert (Issue #13: der CHOS-Builder kopiert den
+# Baum ohne scaffold-CLI, .template/lock.json existiert dort nie). CI_PROJECT_PATH (GitLab) bzw.
+# GITHUB_REPOSITORY (GitHub Actions) kommen vom Runner und lassen sich nicht mitkopieren.
+# ACHTUNG bei Repo-Umzug/-Umbenennung: Diese Konstanten MÜSSEN mitgezogen werden, sonst skippt das
+# Gate der Vorlage selbst still (permanentes False Green). test-generated-app-ci.guard.test.ts
+# dupliziert die Werte absichtlich und schlägt bei Drift fehl.
+TEMPLATE_GITLAB_PATH="govtech-deutschland/platform-instances/deutschland-platform/senticor/senticor-app-fachverfahren-template"
+TEMPLATE_GITHUB_REPO="Senticor-ai/app-fachverfahren-template"
+if [ -n "${CI_PROJECT_PATH:-}" ] && [ "${CI_PROJECT_PATH}" != "${TEMPLATE_GITLAB_PATH}" ]; then
+  echo "skip: not the template's own GitLab project (CI_PROJECT_PATH=${CI_PROJECT_PATH})"
+  exit 0
+fi
+if [ -n "${GITHUB_REPOSITORY:-}" ] && [ "${GITHUB_REPOSITORY}" != "${TEMPLATE_GITHUB_REPO}" ]; then
+  echo "skip: not the template's own GitHub repository (GITHUB_REPOSITORY=${GITHUB_REPOSITORY})"
+  exit 0
+fi
+# Zweiter Guard (lokal, ohne CI-Identität): Ein per CLI generierter Konsument trägt
+# .template/lock.json; die pristine Vorlage nicht. Da precommit:check und .gitlab-ci.yml in
+# Konsumenten mitkopiert werden, würde die Harness sich sonst dort rekursiv selbst scaffolden.
+# Zusätzlich ein Rekursions-Guard über eine Env-Marke.
 if [ -f .template/lock.json ]; then
   echo "skip: generated consumer app detected via .template/lock.json"
   exit 0
