@@ -57,7 +57,7 @@ describe("toContractSnapshot — Business-Logik als ECHTE Zeilen, nicht '[functi
           id: "widerspruch",
           label: "Widerspruch",
           dauer: 1,
-          einheit: "monate",
+          einheit: "monat",
           anker: "bekanntgabe",
         },
       ],
@@ -81,7 +81,7 @@ describe("toContractSnapshot — Business-Logik als ECHTE Zeilen, nicht '[functi
       { feld: "kontakt.plz", register: "Melderegister", richtung: "inbound" },
     ]);
     expect(snap.fimRefs?.[0]?.fimId).toBe("L100001");
-    expect(snap.fristenTypen?.[0]?.einheit).toBe("monate");
+    expect(snap.fristenTypen?.[0]?.einheit).toBe("monat");
 
     // Kein berechne/nachweise-Marker, weil das Verfahren rein daten-getrieben ist.
     expect(snap.berechne).toBeUndefined();

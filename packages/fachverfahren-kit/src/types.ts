@@ -311,6 +311,11 @@ export interface FristItemConfig {
   /** Fälligkeit als ISO-8601-Zeitstempel. */
   faelligIso: string;
   status?: "offen" | "gewahrt";
+  /** OPTIONAL — die typisierte NOMINAL-Dauer der Frist (z. B. `{ wert: 1, einheit: "monat" }`). Wird, falls gesetzt,
+   *  zusätzlich zum konkreten Fälligkeitsdatum als „1 Monat" angezeigt (NIE als „1 Tag"). Additiv/rückwärts-
+   *  kompatibel: fehlt sie, rendert die Frist unverändert. Die Fälligkeit selbst wird generierungsseitig über
+   *  `faelligkeitAb` kalendergenau aus dieser Dauer + einem Ankerdatum abgeleitet (kein Tage×30). */
+  dauer?: FristDauer;
 }
 
 /** Ein buchbarer Terminslot (spiegelt TerminFristPanel `TerminSlot`). */
@@ -543,10 +548,25 @@ export interface FimRef {
   status: "belegt" | "annahme-zu-validieren";
 }
 
-/** Zeit-Einheit eines Fristen-Typs. */
-export type FristEinheit = "tage" | "werktage" | "wochen" | "monate" | "jahre";
+/** Zeit-Einheit einer Frist bzw. Frist-Dauer. SINGULAR-Schlüssel — die Anzeige pluralisiert (`formatFristDauer`:
+ *  1 → „1 Monat", 4 → „4 Monate"). Die Einheit wird als DATEN geführt, damit eine Monatsfrist NICHT als roher
+ *  Tage-Wert modelliert werden muss (sonst kollabiert „1 Monat" zu „1 Tag" bzw. wird über „30 Tage" genähert). */
+export type FristEinheit = "tag" | "woche" | "monat" | "jahr";
 /** Ereignis, ab dem eine Frist läuft. */
 export type FristAnker = "eingang" | "bekanntgabe" | "bescheid" | "ereignis";
+
+/** Eine typisierte Frist-DAUER als DATEN: Anzahl (`wert`) + Zeit-`einheit` — z. B. eine Monatsfrist als
+ *  `{ wert: 1, einheit: "monat" }`. `einheit` ist OPTIONAL; fehlt sie, gilt der Default "tag" (so bleibt ein reiner
+ *  Zahl-Wert rückwärts-kompatibel als Tage lesbar). `lib/frist` rendert die Dauer (korrektes Deutsch, Singular/
+ *  Plural via `formatFristDauer`) und leitet aus einem Ankerdatum die Fälligkeit über ECHTE Kalender-Arithmetik ab
+ *  (`faelligkeitAb` — Monate/Jahre kalendergenau mit Monatsende-Klemmung, kein Tage×30). Verhindert die Wurzel des
+ *  Content-Audits: Monatsfrist ≠ Tage-Wert. */
+export interface FristDauer {
+  /** Anzahl der Einheiten (z. B. 1 für „1 Monat", 4 für „4 Jahre"). */
+  wert: number;
+  /** Zeit-Einheit; fehlt sie ⇒ "tag". */
+  einheit?: FristEinheit;
+}
 
 /** Ein FRISTEN-TYP als DATEN (die Norm-Regel „X ab Ankerdatum"), unabhängig von einer konkreten Instanz
  *  (`FristItemConfig`). Der Interpreter kann daraus ab einem Ankerdatum eine konkrete Fälligkeit berechnen. */

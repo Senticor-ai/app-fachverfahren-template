@@ -159,6 +159,9 @@ export * from "./lib/voice-input.js";
 export * from "./hooks/use-voice-input.js";
 export * from "./components/VoiceInput.js";
 
+// ── Fristen als DATEN: typisierte Dauer (Tag/Woche/Monat/Jahr) rendern + kalendergenaue Fälligkeit ableiten. ──
+export * from "./lib/frist.js";
+
 // ── Eingabe-Seite: de-DE Parsen (Betrag/IBAN/Datum) + DATEN-getriebene Feld-Validierung + barrierefreie Feld-Wrapper. ──
 export * from "./lib/eingabe.js";
 export * from "./components/BetragEingabe.js";

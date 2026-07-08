@@ -19,7 +19,9 @@ import {
   TriangleAlert,
 } from "lucide-react";
 
+import type { FristDauer } from "../types.js";
 import { cn } from "../lib/utils.js";
+import { formatFristDauer } from "../lib/frist.js";
 import { Button } from "../ui/button.js";
 import { Badge } from "../ui/badge.js";
 import {
@@ -40,6 +42,9 @@ export interface FristItem {
   /** Fälligkeit als ISO-8601-Zeitstempel (z. B. "2026-07-01T12:00:00+02:00"). */
   faelligIso: string;
   status?: "offen" | "gewahrt";
+  /** OPTIONAL — die typisierte NOMINAL-Dauer der Frist (z. B. `{ wert: 1, einheit: "monat" }`) → als „1 Monat"
+   *  angezeigt (NIE als „1 Tag"). Additiv: fehlt sie, rendert die Frist unverändert. */
+  dauer?: FristDauer;
 }
 
 /** Ein buchbarer Terminslot. */
@@ -294,6 +299,17 @@ export function TerminFristPanel({
                       <p className="truncate font-medium text-foreground">
                         {frist.titel}
                       </p>
+                      {/* Typisierte NOMINAL-Dauer als DATEN (z. B. „Frist: 1 Monat") — die Einheit steuert das Wort,
+                          eine Monatsfrist erscheint NIE als „1 Tag"/„30 Tage". Additiv: nur wenn `dauer` gesetzt ist. */}
+                      {frist.dauer && (
+                        <p className="text-sm text-muted-foreground">
+                          Frist:{" "}
+                          {formatFristDauer(
+                            frist.dauer.wert,
+                            frist.dauer.einheit,
+                          )}
+                        </p>
+                      )}
                       {datierbar ? (
                         <p className="text-sm text-muted-foreground">
                           Fällig{" "}
