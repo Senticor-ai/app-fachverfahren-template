@@ -41,6 +41,11 @@ export interface ReviewWorkspaceProps<T = Record<string, unknown>> {
   onClose: () => void;
   /** Optionale Übersetzung eines KI-Flag-Schlüssels (data-driven aus der Leistung). */
   flagLabel?: (flag: string) => string;
+  /** Der HANDELNDE (pseudonyme Person-Kennung, ≠ Rolle) — führt den Vier-Augen-Nachweis (history[].akteur) und
+   *  erzwingt, dass eine vierAugen-Transition von einer ANDEREN Person als der Ersteller ausgelöst wird. Fehlt sie,
+   *  bleibt es (abwärtskompatibel) beim History-Vermerk ohne erzwungene Vier-Augen-Prüfung. Die App-Shell liefert
+   *  idealerweise die angemeldete Person. */
+  akteur?: string;
   className?: string;
 }
 
@@ -61,6 +66,7 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
   rolle,
   onClose,
   flagLabel,
+  akteur,
   className,
 }: ReviewWorkspaceProps<T>) {
   const vorgang = port.get(vorgangId);
@@ -119,6 +125,22 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
         : undefined,
     [config.statusMachine, vorgang, rolle],
   );
+
+  // Reject-/Rückfrage-Übergang für den „Ablehnen"-Button der Vier-Augen-Karte: ein aus dem aktuellen Status für diese
+  // Rolle erlaubter Übergang, der in einen block-Zustand führt ODER dessen Handlungs-Label eine Ablehnung/Rückfrage
+  // benennt. Rein data-driven aus der statusMachine (kein Domänen-Literal) — fehlt einer, bleibt der Ablehnen-Weg über
+  // das EntscheidungPanel erreichbar (dort erscheinen ALLE erlaubten Übergänge).
+  const ablehnTransition = useMemo(() => {
+    if (!vorgang) return undefined;
+    const states = new Map((config.statusMachine?.states ?? []).map((s) => [s.key, s]));
+    return (config.statusMachine?.transitions ?? []).find(
+      (t) =>
+        t.from === vorgang.status &&
+        t.rollen.includes(rolle) &&
+        (states.get(t.to)?.tone === "block" ||
+          /ablehn|abweis|zur(ü|ue)ck|r(ü|ue)ck(frage|weis)|nachfrage/i.test(t.label)),
+    );
+  }, [config.statusMachine, vorgang, rolle]);
 
   if (!vorgang) {
     return (
@@ -341,7 +363,23 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
                       ? { begruendung: vorgang.berechnung.begruendung }
                       : {}),
                   }}
-                  pruefer={{ aktuelleNutzerId: rolle }}
+                  pruefer={{ aktuelleNutzerId: akteur ?? rolle }}
+                  // FREIGABE/ABLEHNUNG VERDRAHTET (Wurzel-Fix „Sachbearbeiter kann nicht freigeben"): die prominenten
+                  // Vier-Augen-Buttons lösen jetzt WIRKLICH den Übergang aus (denselben Port wie das EntscheidungPanel) —
+                  // mit `akteur`, sodass der Vier-Augen-Schutz (store: andere Person als der Ersteller) greift. Danach
+                  // schließt die Sicht (zurück in den Arbeitsvorrat).
+                  onFreigeben={async () => {
+                    port.uebergang(vorgang.id, vierAugenTransition.to, rolle, undefined, akteur);
+                    onClose();
+                  }}
+                  {...(ablehnTransition
+                    ? {
+                        onAblehnen: async (grund: string) => {
+                          port.uebergang(vorgang.id, ablehnTransition.to, rolle, grund, akteur);
+                          onClose();
+                        },
+                      }
+                    : {})}
                 />
               ) : null}
 
@@ -350,6 +388,7 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
                 port={port}
                 vorgang={vorgang}
                 rolle={rolle}
+                {...(akteur ? { akteur } : {})}
                 onEntschieden={onClose}
               />
             </div>
