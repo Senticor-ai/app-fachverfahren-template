@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Info,
   Paperclip,
+  ShieldCheck,
   Sparkles,
   Trash2,
   UploadCloud,
@@ -1304,6 +1305,11 @@ function BerechnungKarte<T extends Antragsdaten>({
   config: LeistungConfig<T>;
   live?: boolean | undefined;
 }) {
+  // DATA-DRIVEN Kennzeichnung (KEIN Overfit): die HERKUNFT der Berechnung bestimmt die Anzeige. Regelfall
+  // "deterministisch" (evidence-getriebenes, §-belegtes Prüfschema — KEIN Vorschlag); "ki" NUR, wenn der Wert
+  // tatsaechlich von einem KI-Assistenten stammt (spaetere Stufe, aus dem DAG abgeleitet) → dann ehrlich als
+  // KI-Vorschlag (Funke). Fehlt herkunft, gilt deterministisch.
+  const kiVorschlag = berechnung.herkunft === "ki";
   return (
     // Zweite Ebene (Spec 4.2): bg-surface-2 + Border + rounded-md, KEIN eigener Schatten
     // (Elevation trägt nur die äußere Card).
@@ -1311,9 +1317,13 @@ function BerechnungKarte<T extends Antragsdaten>({
       <div className="flex items-baseline justify-between gap-4">
         <div className="min-w-0">
           <div className="text-xs uppercase tracking-wide text-muted-foreground">
-            {live
-              ? "Live-Berechnung · aktueller Stand"
-              : "Ergebnis · Vorschlag"}
+            {kiVorschlag
+              ? live
+                ? "Live-Einschätzung · KI-Vorschlag (Mensch entscheidet)"
+                : "KI-Vorschlag · durch Mensch zu prüfen"
+              : live
+                ? "Live-Berechnung nach Prüfschema · aktueller Stand"
+                : "Ergebnis nach Prüfschema (§-belegt, deterministisch)"}
           </div>
           <div className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
             {formatBetrag(berechnung)}{" "}
@@ -1322,8 +1332,22 @@ function BerechnungKarte<T extends Antragsdaten>({
             </span>
           </div>
         </div>
+        {/* DATA-DRIVEN: KI-Funke NUR bei echter KI-Herkunft (herkunft==="ki"); sonst das DETERMINISTISCHE, §-belegte
+            Pruef-/Berechnungsschema (ShieldCheck) — kein pauschales „Vorschlag". status "provisional" = nur
+            Zwischenstand bis die noetigen Eingaben vollstaendig sind (die Behoerde setzt final fest), NICHT geraten. */}
         <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-status-info/30 bg-status-info-soft px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-status-info">
-          <Sparkles className="h-3 w-3" aria-hidden="true" /> Vorschlag
+          {kiVorschlag ? (
+            <>
+              <Sparkles className="h-3 w-3" aria-hidden="true" /> KI-Vorschlag
+            </>
+          ) : (
+            <>
+              <ShieldCheck className="h-3 w-3" aria-hidden="true" />{" "}
+              {berechnung.status === "provisional"
+                ? "vorläufig · §-belegt"
+                : "§-belegt · Prüfschema"}
+            </>
+          )}
         </span>
       </div>
 

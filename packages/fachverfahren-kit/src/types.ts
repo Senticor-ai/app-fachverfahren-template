@@ -49,6 +49,11 @@ export interface Berechnung {
   // berechnung.test.ts brach mit tsc18048 (`'erg.positionen' is possibly 'undefined'`) und erzwang einen Self-Heal-
   // Repair-Zyklus (Regression). Non-optional stellt diese Wurzel ab: die Naht liefert positionen, der Test kompiliert.
   positionen: { label: string; betrag: number }[];
+  /** HERKUNFT der Berechnung (DATA-DRIVEN — kein Anzeige-Hardcode): "deterministisch" = evidence-getriebenes, §-belegtes
+   *  Pruef-/Berechnungsschema aus der Naht (DMN/Regeln/Subsumtion; der Regelfall) → KEIN „Vorschlag". "ki" = ein
+   *  KI-Assistent hat den Wert vorgeschlagen/geschaetzt (spaetere Feature-Stufe) → als KI-Vorschlag kennzeichnen. Fehlt
+   *  das Feld, gilt "deterministisch". Der Produzent/DAG setzt es; die Anzeige leitet die Kennzeichnung NUR daraus ab. */
+  herkunft?: "deterministisch" | "ki";
 }
 
 /** M4 — der BEZUGSWEG eines Nachweises: klassischer Datei-`upload` (Default), `register-once-only` (der Nachweis
