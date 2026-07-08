@@ -87,7 +87,11 @@ export interface NachweisRegister {
 export interface Nachweis {
   id: string;
   label: string;
-  hochgeladen: boolean;
+  /** LAUFZEIT-Zustand (ob die Datei erbracht wurde), NICHT Teil der Config-DEFINITION der geforderten Nachweise.
+   *  Deshalb OPTIONAL (fehlt ⇒ nicht hochgeladen): der Interpreter/Store setzt ihn beim Einreichen (reconcile). So
+   *  muss die generierte `leistung.config` eine SOLL-Nachweisliste NICHT mit Runtime-State anreichern — das vermeidet
+   *  den wiederkehrenden Build-Repair „TS2741: Property 'hochgeladen' is missing" (Config-Definition ≠ Runtime-State). */
+  hochgeladen?: boolean;
   erforderlich?: boolean;
   /** Erlaubte Datei-Typen als DATEN (native `accept`-Tokens: MIME wie `"application/pdf"`, Wildcard `"image/*"`
    *  oder Endung `".pdf"`). Steuert den Datei-Dialog + die Vorprüfung + den Einschränkungs-Hinweis. Fehlt sie ⇒

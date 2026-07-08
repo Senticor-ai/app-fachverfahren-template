@@ -161,7 +161,7 @@ export function DateiUpload({
       ? !!autorisiert[n.id]
       : istGefordert(n)
         ? false
-        : !!dateien[n.id] || n.hochgeladen;
+        : !!dateien[n.id] || !!n.hochgeladen;
 
   const offenePflicht = nachweise.filter(
     (n) => n.erforderlich && !istGefordert(n) && !istErledigt(n),
@@ -231,7 +231,7 @@ export function DateiUpload({
                 <NachweisZeile
                   nachweis={nachweis}
                   datei={dateien[nachweis.id]}
-                  bereitsHochgeladen={nachweis.hochgeladen}
+                  bereitsHochgeladen={!!nachweis.hochgeladen}
                   status={uploadStatus?.[nachweis.id]}
                   onPick={(datei) => setDatei(nachweis, datei)}
                   onRemove={() => setDatei(nachweis, null)}
