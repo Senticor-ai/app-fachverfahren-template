@@ -57,11 +57,15 @@ const STATUS_TEXT: Record<StepperStepStatus, string> = {
   invalid: "unvollständig",
 };
 
-/** Marker-Klassen je Zustand — Farbe ist Verstärkung, das Icon/die Nummer trägt die Information mit. */
+/** Marker-Klassen je Zustand — Farbe ist Verstärkung, das Icon/die Nummer trägt die Information mit.
+ *  Offene Schritte sind bewusst OUTLINE (bg-transparent + dünner Ring) statt gefüllt — so entstehen keine
+ *  „schwebenden weißen Ovale" auf der Karte; der aktuelle Schritt bekommt einen dezenten Halo (ring), der
+ *  ihn ohne zusätzliche Fläche hervorhebt. */
 const MARKER_TONE: Record<StepperStepStatus, string> = {
   done: "border-transparent bg-status-ok text-primary-foreground",
-  current: "border-transparent bg-primary text-primary-foreground",
-  upcoming: "border-border bg-muted text-muted-foreground",
+  current:
+    "border-transparent bg-primary text-primary-foreground ring-2 ring-primary/25 ring-offset-2 ring-offset-background",
+  upcoming: "border-border bg-transparent text-muted-foreground",
   invalid: "border-transparent bg-status-block text-primary-foreground",
 };
 
@@ -196,7 +200,7 @@ export function Stepper({
             <span
               className={cn(
                 "truncate text-sm",
-                isVertical ? "min-w-0" : "max-w-[12ch]",
+                isVertical ? "min-w-0" : "max-w-[16ch]",
                 LABEL_TONE[step.status],
               )}
             >
@@ -216,14 +220,17 @@ export function Stepper({
               onClick={() => onStepSelect!(i)}
               aria-current={active ? "step" : undefined}
               className={cn(
-                "fv-focus flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 text-left",
+                // KEIN Pill/Oval-Container: nur Fokus-Radius (rounded-md) + dezente Textreaktion beim Hover.
+                // So bleibt der Schritt klickbar, ohne die „schwebenden weißen Ovale" hinter Nummer+Label.
+                "fv-focus group flex min-w-0 items-center gap-2 rounded-md py-1 text-left",
                 isVertical && "w-full",
                 "transition-colors ease-out motion-reduce:transition-none",
-                "hover:bg-muted/60",
               )}
             >
               {marker}
-              {label}
+              <span className="min-w-0 transition-colors group-hover:text-foreground motion-reduce:transition-none">
+                {label}
+              </span>
               {srStatus}
             </button>
           ) : (
@@ -249,11 +256,16 @@ export function Stepper({
               )}
             >
               {inner}
-              {/* Horizontaler Konnektor zwischen Segmenten (nur horizontal, nicht nach dem letzten). */}
+              {/* Horizontaler Konnektor zwischen Segmenten (nur horizontal, nicht nach dem letzten).
+                  Progress-eingefärbt: bereits absolvierte Strecken in bg-primary, kommende in bg-border —
+                  gibt dem Pfad einen ruhigen „Track"-Charakter statt loser Striche. */}
               {!isVertical && i < steps.length - 1 ? (
                 <span
                   aria-hidden="true"
-                  className="h-px w-4 shrink-0 bg-border"
+                  className={cn(
+                    "h-0.5 w-5 shrink-0 rounded-full transition-colors motion-reduce:transition-none",
+                    i < safeIndex ? "bg-primary" : "bg-border",
+                  )}
                 />
               ) : null}
             </li>

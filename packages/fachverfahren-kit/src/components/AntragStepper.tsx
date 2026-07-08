@@ -787,8 +787,11 @@ function Stepper({
                 onClick={() => setStepIdx(i)}
                 aria-current={active ? "step" : undefined}
                 className={cn(
-                  "ps-form-stepper__crumb",
-                  "flex items-center gap-2 rounded-full py-0.5 pr-1",
+                  // KEIN Pill/Oval-Container mehr (früher .ps-form-stepper__crumb + rounded-full = „schwebendes weißes
+                  // Oval" hinter Nummer+Label): nur Fokus-Radius + dezente Text-Reaktion. Nummernkreis, Label und der
+                  // eingefärbte Konnektor tragen die Information — ruhiger, moderner Fortschritts-Pfad (EINE Wahrheit
+                  // mit dem Stepper-Primitiv). Kein `ps-form-stepper__crumb` mehr → keine gemeinsame Chip-Pille.
+                  "group flex min-w-0 items-center gap-2 rounded-md py-1",
                   "outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
                   "transition-colors ease-out motion-reduce:transition-none",
                 )}
@@ -798,15 +801,17 @@ function Stepper({
                   className={cn(
                     // tabular-nums + leading-none: die Ziffer optisch exakt in der Kreis-Mitte (Inter setzt „1" sonst
                     // leicht links/tief; Tabellenziffern zentrieren in ihrer Laufweite, leading-none nimmt den Zeilen-Offset).
-                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold leading-none tabular-nums",
+                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold leading-none tabular-nums",
                     "transition-colors ease-out motion-reduce:transition-none",
                     active
-                      ? "bg-primary text-primary-foreground"
+                      ? // aktueller Schritt: gefüllt + dezenter Halo (ring) statt Pill-Fläche
+                        "border-transparent bg-primary text-primary-foreground ring-2 ring-primary/25 ring-offset-2 ring-offset-background"
                       : invalid
-                        ? "bg-status-block text-primary-foreground"
+                        ? "border-transparent bg-status-block text-primary-foreground"
                         : done
-                          ? "bg-status-ok text-primary-foreground"
-                          : "bg-muted text-muted-foreground",
+                          ? "border-transparent bg-status-ok text-primary-foreground"
+                          : // offener Schritt: OUTLINE (transparent + dünner Ring) statt gefülltem grauem Kreis → kein „weißes Oval"
+                            "border-border bg-transparent text-muted-foreground",
                   )}
                 >
                   {invalid ? (
@@ -819,7 +824,7 @@ function Stepper({
                 </span>
                 <span
                   className={cn(
-                    "max-w-[12ch] truncate text-xs font-medium",
+                    "max-w-[16ch] truncate text-xs font-medium transition-colors group-hover:text-foreground motion-reduce:transition-none",
                     active
                       ? "text-foreground"
                       : invalid
@@ -834,9 +839,14 @@ function Stepper({
                 </span>
               </button>
               {i < total - 1 && (
-                <ChevronRight
+                // Konnektor als eingefärbter „Track" (absolvierte Strecke = primary, kommende = border) statt Chevron —
+                // gibt dem Pfad Richtung/Fortschritt ohne die losen „>"-Zeichen zwischen den Pillen.
+                <span
                   aria-hidden="true"
-                  className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                  className={cn(
+                    "h-0.5 w-5 shrink-0 rounded-full transition-colors motion-reduce:transition-none",
+                    visited ? "bg-primary" : "bg-border",
+                  )}
                 />
               )}
             </li>

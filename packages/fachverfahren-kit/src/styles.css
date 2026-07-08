@@ -485,7 +485,6 @@
   .ps-btn:focus-visible,
   .ps-field select:focus-visible,
   .ps-field__input:focus-visible,
-  .ps-form-stepper__crumb:focus-visible,
   .ps-login__tab:focus-visible,
   .ps-inbox__chip:focus-visible,
   .ps-dashboard__chip:focus-visible,
@@ -515,7 +514,6 @@
   }
 
   .ps-btn,
-  .ps-form-stepper__crumb,
   .ps-login__tab,
   .ps-inbox__chip,
   .ps-dashboard__chip,
@@ -985,7 +983,8 @@
     list-style: none;
   }
 
-  .ps-form-stepper__crumb,
+  /* .ps-form-stepper__crumb wurde entkoppelt: der Antrags-Stepper trägt keine Chip-Pille mehr (keine „weißen Ovale");
+     seine Segmente stylen sich rein über Utilities in AntragStepper. Diese Pille bleibt für echte Chips/Tabs. */
   .ps-inbox__chip,
   .ps-dashboard__chip,
   .ps-login__tab,
@@ -1007,9 +1006,6 @@
       box-shadow var(--fv-duration-base) var(--fv-ease-out);
   }
 
-  .ps-form-stepper__progress [aria-current="step"] .ps-form-stepper__crumb,
-  .ps-form-stepper__progress .is-current .ps-form-stepper__crumb,
-  .ps-form-stepper__progress .is-done .ps-form-stepper__crumb,
   .ps-inbox__chip--active,
   .ps-dashboard__chip--active,
   .ps-login__tab.is-active,

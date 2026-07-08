@@ -188,6 +188,10 @@ function AmtVorgang(): React.JSX.Element {
         port={store}
         vorgangId={id}
         rolle="sachbearbeitung"
+        // AKTEUR (Person, nicht Rolle): in PROD die angemeldete BundID-Identität. Im DEV-Demo (keine Anmeldung)
+        // eine stabile pseudonyme Person, damit die Vier-Augen-Prüfung greift und die History WER-nachweisbar wird
+        // (history[].akteur) — der Store erzwingt dann „andere Person als der letzte Akteur" bei vierAugen-Übergängen.
+        akteur="sb.angemeldet"
         onClose={() => navigate("/amt")}
       />
     </Shell>
