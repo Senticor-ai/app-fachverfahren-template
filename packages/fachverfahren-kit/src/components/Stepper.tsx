@@ -85,7 +85,8 @@ function StepMarker({
     <span
       aria-hidden="true"
       className={cn(
-        "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold",
+        // tabular-nums + leading-none: Ziffer optisch exakt mittig (Inter setzt „1" sonst leicht links/tief).
+        "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold leading-none tabular-nums",
         "transition-colors ease-out motion-reduce:transition-none",
         MARKER_TONE[status],
       )}

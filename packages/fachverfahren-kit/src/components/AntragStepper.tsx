@@ -794,7 +794,9 @@ function Stepper({
                 <span
                   aria-hidden="true"
                   className={cn(
-                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+                    // tabular-nums + leading-none: die Ziffer optisch exakt in der Kreis-Mitte (Inter setzt „1" sonst
+                    // leicht links/tief; Tabellenziffern zentrieren in ihrer Laufweite, leading-none nimmt den Zeilen-Offset).
+                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold leading-none tabular-nums",
                     "transition-colors ease-out motion-reduce:transition-none",
                     active
                       ? "bg-primary text-primary-foreground"
