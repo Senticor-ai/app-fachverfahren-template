@@ -20,6 +20,8 @@ export default defineConfig({
     // Subprozess-Arbeit. Auf den langsameren opencode.de-CI-Runnern reißt Vitests 5s-Default unter Last
     // (nicht-deterministisch mal 2, mal 6 Timeouts) — GitHubs schnellere Runner treffen die Grenze nie.
     // Ein großzügigeres Budget stabilisiert die GitLab-Pipeline, ohne echte Hänger zu verstecken.
+    // Die Full-Repo-Render-Tests (render.test.ts, render.contract.test.ts) tragen zusätzlich ein
+    // eigenes 60s-Budget pro Test — 20s riss dort unter Runner-Last erneut (RC1: 20014ms).
     testTimeout: 20000,
     hookTimeout: 20000,
     exclude: [
