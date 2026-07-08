@@ -48,7 +48,10 @@ export interface Berechnung {
   // verlangt das Feld, damit `erg.positionen` NIE „possibly undefined" ist. Vorher optional → jeder generierte
   // berechnung.test.ts brach mit tsc18048 (`'erg.positionen' is possibly 'undefined'`) und erzwang einen Self-Heal-
   // Repair-Zyklus (Regression). Non-optional stellt diese Wurzel ab: die Naht liefert positionen, der Test kompiliert.
-  positionen: { label: string; betrag: number }[];
+  // `norm` (optional): die MATERIELLE Rechtsgrundlage dieser Rechenposition (z. B. „§ 11 Abs. 1 GewStG", eine
+  // Satzungs-/Tarif-Norm) — damit die Fachkonzept-/DMN-Emission je Rechenschritt die belegende Norm zeigen kann
+  // (statt „—"). Rein deskriptiv, data-driven, domänen-agnostisch.
+  positionen: { label: string; betrag: number; norm?: string }[];
   /** HERKUNFT der Berechnung (DATA-DRIVEN — kein Anzeige-Hardcode): "deterministisch" = evidence-getriebenes, §-belegtes
    *  Pruef-/Berechnungsschema aus der Naht (DMN/Regeln/Subsumtion; der Regelfall) → KEIN „Vorschlag". "ki" = ein
    *  KI-Assistent hat den Wert vorgeschlagen/geschaetzt (spaetere Feature-Stufe) → als KI-Vorschlag kennzeichnen. Fehlt
@@ -288,8 +291,15 @@ export interface EPaymentConfig {
 export interface ZustellungConfig {
   /** ISO-Datum der rechtlichen Bekanntgabe (§ 41 VwVfG) — maßgeblich für den Fristlauf. */
   bekanntgabeIso?: string | undefined;
-  /** true = Bekanntgabe kraft Fiktion (z. B. 3-Tages-Fiktion) — wird als Hinweis ausgewiesen. */
+  /** true = Bekanntgabe kraft Fiktion (Zugangs-/Bekanntgabefiktion) — wird als Hinweis ausgewiesen. */
   fiktion?: boolean | undefined;
+  /** Bekanntgabefiktion in TAGEN nach Aufgabe zur Post. Default 4: seit PostModG (01.01.2025) betragen sowohl
+   *  § 122 Abs. 2 AO als auch § 41 Abs. 2 VwVfG VIER Tage (zuvor drei). EINE Wahrheit — die Rechtsbehelfsbelehrung
+   *  (BescheidView) rendert diesen Wert, statt eine Frist im Prosatext zu backen. */
+  fiktionTage?: number | undefined;
+  /** Norm der Bekanntgabefiktion — Default „§ 41 Abs. 2 VwVfG" (allgemeines Verfahren). Ein Steuer-/AO-Verfahren
+   *  setzt „§ 122 Abs. 2 AO" (das VwVfG ist über § 2 Abs. 2 AO ausgeschlossen). Data-driven, kein Regime-Hardcode. */
+  fiktionNorm?: string | undefined;
   /** URL des Bescheid-PDFs — gesetzt ⇒ Bescheid-Tab (PdfViewer) + Postfach-Dokument. */
   bescheidUrl?: string | undefined;
 }

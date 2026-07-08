@@ -4,10 +4,11 @@
 // rechts das gewählte Element mit Metadaten, Zustellnachweis und Dokument-Vorschau-Link. Bescheide zeigen den
 // Zustellnachweis inkl. Bekanntgabedatum und — bei zustellung.fiktion — den Hinweis auf die Bekanntgabefiktion.
 //
-// RECHTLICH RELEVANT: Das Bekanntgabedatum (§ 41 VwVfG) bestimmt den Beginn der Rechtsbehelfsfrist. Bei
-// Zustellungsfiktion (z. B. 3-Tages-Fiktion bei Bekanntgabe durch die Post) gilt der Bescheid als am
-// fiktiven Tag bekanntgegeben — der Fristlauf hängt an diesem Datum. Diese Komponente STELLT das Datum nur
-// dar; die Berechnung/Setzung der Frist ist Sache des aufrufenden Fachverfahrens.
+// RECHTLICH RELEVANT: Das Bekanntgabedatum bestimmt den Beginn der Rechtsbehelfsfrist. Die maßgebliche Norm ist
+// regimeabhängig (allgemeines Verfahren § 41 VwVfG, Steuer/Abgabe § 122 AO) und kommt aus zustellung.fiktionNorm.
+// Bei Zustellungsfiktion (seit PostModG 01.01.2025 4-Tage-Fiktion, zuvor drei) gilt der Bescheid als am fiktiven
+// Tag bekanntgegeben — der Fristlauf hängt an diesem Datum. Diese Komponente STELLT das Datum nur dar; die
+// Berechnung/Setzung der Frist ist Sache des aufrufenden Fachverfahrens.
 //
 // GENERISCH + DEP-FREI: keine Domänen-Literale, alle Inhalte kommen aus props. Datums-Formatierung via Intl,
 // stabil-absolut (kein Date.now → keine Hydration-Diskrepanz).
@@ -38,8 +39,11 @@ export interface PostfachZustellung {
   zugestelltAmIso: string;
   /** ISO-Datum der rechtlichen Bekanntgabe (§ 41 VwVfG) — maßgeblich für den Fristlauf. */
   bekanntgabeAmIso?: string;
-  /** true = Bekanntgabe gilt kraft Fiktion (z. B. 3-Tages-Fiktion); wird als Hinweis ausgewiesen. */
+  /** true = Bekanntgabe gilt kraft Fiktion (z. B. 4-Tage-Fiktion seit PostModG 01.01.2025); wird als Hinweis ausgewiesen. */
   fiktion?: boolean;
+  /** Norm der Bekanntgabefiktion — Default „§ 41 Abs. 2 VwVfG"; ein Steuer-/AO-Verfahren reicht „§ 122 Abs. 2 AO" durch
+   *  (VwVfG via § 2 Abs. 2 AO ausgeschlossen). Data-driven, kein Regime-Hardcode. */
+  fiktionNorm?: string;
 }
 
 /** Eine Postfach-Nachricht. Bescheide tragen i. d. R. einen Zustellnachweis. */
@@ -107,7 +111,7 @@ interface PostfachDetailProps {
   nachricht: PostfachNachricht;
 }
 
-/** Zustellnachweis-Block: technische Zustellung + Bekanntgabedatum (§ 41 VwVfG) + ggf. Fiktions-Hinweis. */
+/** Zustellnachweis-Block: technische Zustellung + Bekanntgabedatum (Norm regimeabhängig, s. fiktionNorm) + ggf. Fiktions-Hinweis. */
 function Zustellnachweis({
   zustellung,
 }: {
@@ -152,7 +156,8 @@ function Zustellnachweis({
           />
           <span>
             <span className="font-semibold">
-              Hinweis zur Bekanntgabefiktion (§ 41 VwVfG):
+              Hinweis zur Bekanntgabefiktion (
+              {zustellung.fiktionNorm ?? "§ 41 Abs. 2 VwVfG"}):
             </span>{" "}
             Der Bescheid gilt am genannten Tag als bekanntgegeben. Ab diesem
             Datum läuft die Rechtsbehelfsfrist, auch wenn Sie ihn später zur

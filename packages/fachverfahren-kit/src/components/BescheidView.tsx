@@ -28,6 +28,22 @@ function formatBetrag(betrag: number, einheit: string): string {
   return formatBetragKit(betrag, einheit);
 }
 
+/** Ordinalzahl-Wort für die Bekanntgabefiktion („gilt am {n}. Tag als bekannt gegeben"): 1–7 ausgeschrieben,
+ *  sonst „N." als Fallback. Speist sich aus config.zustellung.fiktionTage (Default 4 seit PostModG) — EINE Wahrheit,
+ *  statt eine Frist im Prosatext zu backen. */
+function ordinalTag(n: number): string {
+  const w: Record<number, string> = {
+    1: "ersten",
+    2: "zweiten",
+    3: "dritten",
+    4: "vierten",
+    5: "fünften",
+    6: "sechsten",
+    7: "siebten",
+  };
+  return w[n] ?? `${n}.`;
+}
+
 /** ISO-Zeitstempel stabil-absolut als Datum rendern (kein Date.now() → keine Hydration-Diskrepanz). */
 function formatDatum(iso: string): string {
   const d = new Date(iso);
@@ -263,9 +279,10 @@ export function BescheidView<T = Record<string, unknown>>({
             Niederschrift bei der erlassenden Stelle ({config.kommune})
             einzulegen. Die Frist beginnt mit dem Tag der Bekanntgabe dieses
             Bescheides. Erfolgt die Bekanntgabe durch die Post im Inland, gilt
-            der Bescheid am dritten Tag nach Aufgabe zur Post als bekannt
-            gegeben. Wird der Widerspruch nicht oder nicht fristgerecht erhoben,
-            wird der Bescheid bestandskräftig.
+            der Bescheid am {ordinalTag(config.zustellung?.fiktionTage ?? 4)}{" "}
+            Tag nach Aufgabe zur Post als bekannt gegeben. Wird der Widerspruch
+            nicht oder nicht fristgerecht erhoben, wird der Bescheid
+            bestandskräftig.
           </p>
         </section>
 
