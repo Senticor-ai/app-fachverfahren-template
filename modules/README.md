@@ -18,7 +18,7 @@ ein neues Fachverfahren in diesem Repository (siehe `AGENTS.md`,
 
 ## Generator-Pfad (PLAN für die App-Einbindung)
 
-Der Generator `pnpm run app:new -- --task <app-spec>` erzeugt aus einer
+Der Generator `pnpm run app:new -- --spec <app.spec.yaml>` erzeugt aus einer
 App-Spezifikation (`docs/examples/*/app.spec.yaml`) ein Modul-Gerüst unter
 `modules/<domain>/` mit `AGENTS.md`, `module.contract.yaml`,
 `domain.module.yaml`, Screen Contracts, Form-Schema, Permissions, Events,
