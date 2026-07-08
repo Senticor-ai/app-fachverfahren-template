@@ -423,7 +423,9 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
     setSummaryErrors([]);
     // WIRKSAM einreichen (typisiert + M1-abgeleitet) — der Port/das Backend erhält fachlich korrekte, konsistente
     // Werte inkl. der abgeleiteten Felder (der Store leitet defensiv nochmals ab; die Ableitung ist idempotent).
-    const vorgang = port.einreichen(effektiveDaten as T);
+    // Die tatsächlich hochgeladenen Nachweis-Dateien (keyed by Nachweis-Id) MIT einreichen — sonst verpuffen sie und der
+    // Sachbearbeiter sieht für jeden Nachweis „Fehlt" (Wurzel-Fix „Upload landet nicht beim Sachbearbeiter").
+    const vorgang = port.einreichen(effektiveDaten as T, nachweisDateien.current);
     onDone(vorgang);
   }
 

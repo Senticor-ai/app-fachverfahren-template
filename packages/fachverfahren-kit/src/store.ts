@@ -63,8 +63,13 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
     list: () => use.getState().vorgaenge,
     get: (id) => use.getState().vorgaenge.find((v) => v.id === id),
 
-    einreichen: (antragsdaten) => {
+    einreichen: (antragsdaten, erbrachteNachweise) => {
       const ki = { confidence: 0, flags: [] as string[] };
+      // DEFENSIV wie transitionsFrom (fail-closed gegen unvollständig generierte Config): OHNE Initial-Status kann kein
+      // Vorgang eröffnet werden — sprechender Fehler statt stiller TypeError, der die Bürger-Navigation verschluckt.
+      const initialStatus = config.statusMachine?.initial;
+      if (!initialStatus)
+        throw new Error("LeistungConfig ohne statusMachine.initial — Vorgang kann nicht eröffnet werden.");
       // M1 — ABGELEITETE Felder (Codelisten-Merkmal → Antragsfeld) VOR der Berechnung anwenden (defensiv &
       // idempotent: der Stepper reicht i. d. R. schon abgeleitete Daten ein, ein direkter Port-Aufruf nicht). Die
       // abgeleiteten Werte werden mit eingereicht, damit sie im Vorgang/Detail sichtbar sind.
@@ -80,11 +85,17 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
         vorgangsnummer: vorgangsnummer(),
         eingangIso: now(),
         antragsdaten: wirksam,
-        status: config.statusMachine.initial,
+        status: initialStatus,
         // berechnung ist optional — unter exactOptionalPropertyTypes nur setzen, wenn vorhanden.
         ...(berechnung ? { berechnung } : {}),
         ki,
-        nachweise: effektiveNachweise(config, wirksam),
+        // NACHWEIS-RECONCILE (Wurzel-Fix „hochgeladener Nachweis landet nicht beim Sachbearbeiter"): die aus der Config
+        // abgeleitete SOLL-Liste mit den TATSÄCHLICH eingereichten Dateien (keyed by Nachweis-Id) mergen — wo ein Upload
+        // existiert, hochgeladen:true + Datei-Metadaten ablegen. Rein data-driven über die Id, kein Verfahrens-Literal.
+        nachweise: effektiveNachweise(config, wirksam).map((n) => {
+          const datei = erbrachteNachweise?.[n.id];
+          return datei ? { ...n, hochgeladen: true, datei } : n;
+        }),
         history: [
           { ts: now(), aktion: "Antrag eingegangen", rolle: "buerger" },
         ],

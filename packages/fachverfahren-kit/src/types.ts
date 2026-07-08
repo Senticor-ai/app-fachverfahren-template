@@ -99,6 +99,9 @@ export interface Nachweis {
   bezugsweg?: NachweisBezugsweg;
   /** M4 — REGISTER-BEZUG (nur bei `register-once-only` sinnvoll): Quelle/Rechtsgrundlage/Einwilligung/Status. */
   register?: NachweisRegister;
+  /** Die TATSÄCHLICH beim Antrag hochgeladene Datei (Metadaten). Wird beim Einreichen aus dem Bürger-Upload
+   *  reconciled (hochgeladen:true) — so sieht der Sachbearbeiter im ReviewWorkspace echte „Hochgeladen"-Zustände. */
+  datei?: { name: string; groesse: number };
 }
 
 /** Der generische Vorgang — `TAntragsdaten` ist der LEISTUNGS-spezifische Antragsinhalt
@@ -689,8 +692,10 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
 export interface VorgangPort<TAntragsdaten = Record<string, unknown>> {
   list(): Vorgang<TAntragsdaten>[];
   get(id: string): Vorgang<TAntragsdaten> | undefined;
-  /** Bürger-Antrag absenden → neuer Vorgang im Initialstatus + History-Eintrag. */
-  einreichen(antragsdaten: TAntragsdaten): Vorgang<TAntragsdaten>;
+  /** Bürger-Antrag absenden → neuer Vorgang im Initialstatus + History-Eintrag. `erbrachteNachweise` (optional, generisch)
+   *  = die vom Bürger hochgeladenen Dateien, keyed by Nachweis-Id → der Vorgang trägt sie als „hochgeladen" (sonst
+   *  zeigte der Sachbearbeiter für JEDEN Nachweis „Fehlt", egal was hochgeladen wurde). */
+  einreichen(antragsdaten: TAntragsdaten, erbrachteNachweise?: Record<string, { name: string; groesse: number } | null>): Vorgang<TAntragsdaten>;
   /** Status-Übergang (SB-Entscheidung) — prüft die Transition + schreibt History (4-Augen serverseitig in PROD).
    *  `akteur` (optional): pseudonyme Kennung des Handelnden → landet als `history[].akteur` und macht Vier-Augen
    *  nachweisbar; bei `vierAugen`-Transitionen prüft schon der DEV-Store, dass ZWEI VERSCHIEDENE Akteure handeln. */
