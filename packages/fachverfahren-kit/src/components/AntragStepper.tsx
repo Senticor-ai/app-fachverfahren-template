@@ -1021,7 +1021,10 @@ function FeldRenderer({
               aria-invalid={invalidAttr}
               aria-describedby={describedBy}
             >
-              <SelectValue placeholder={hint ?? "Bitte auswählen"} />
+              {/* Select-Platzhalter = kurzer Auswahl-Prompt, NIE der (ggf. lange) Hilfetext: der wird im engen
+                  Control abgeschnitten („Entscheidet, welche Angaben danach a·") UND steht ohnehin als
+                  FormDescription darunter. hint erscheint so genau EINMAL (EINE Wahrheit). */}
+              <SelectValue placeholder="Bitte auswählen" />
             </SelectTrigger>
             <SelectContent>
               {(feld.options ?? []).map((opt) => (
