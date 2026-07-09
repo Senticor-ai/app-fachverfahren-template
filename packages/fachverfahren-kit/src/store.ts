@@ -69,7 +69,9 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
       // Vorgang eröffnet werden — sprechender Fehler statt stiller TypeError, der die Bürger-Navigation verschluckt.
       const initialStatus = config.statusMachine?.initial;
       if (!initialStatus)
-        throw new Error("LeistungConfig ohne statusMachine.initial — Vorgang kann nicht eröffnet werden.");
+        throw new Error(
+          "LeistungConfig ohne statusMachine.initial — Vorgang kann nicht eröffnet werden.",
+        );
       // M1 — ABGELEITETE Felder (Codelisten-Merkmal → Antragsfeld) VOR der Berechnung anwenden (defensiv &
       // idempotent: der Stepper reicht i. d. R. schon abgeleitete Daten ein, ein direkter Port-Aufruf nicht). Die
       // abgeleiteten Werte werden mit eingereicht, damit sie im Vorgang/Detail sichtbar sind.

@@ -132,13 +132,17 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
   // das EntscheidungPanel erreichbar (dort erscheinen ALLE erlaubten Übergänge).
   const ablehnTransition = useMemo(() => {
     if (!vorgang) return undefined;
-    const states = new Map((config.statusMachine?.states ?? []).map((s) => [s.key, s]));
+    const states = new Map(
+      (config.statusMachine?.states ?? []).map((s) => [s.key, s]),
+    );
     return (config.statusMachine?.transitions ?? []).find(
       (t) =>
         t.from === vorgang.status &&
         t.rollen.includes(rolle) &&
         (states.get(t.to)?.tone === "block" ||
-          /ablehn|abweis|zur(ü|ue)ck|r(ü|ue)ck(frage|weis)|nachfrage/i.test(t.label)),
+          /ablehn|abweis|zur(ü|ue)ck|r(ü|ue)ck(frage|weis)|nachfrage/i.test(
+            t.label,
+          )),
     );
   }, [config.statusMachine, vorgang, rolle]);
 
@@ -369,13 +373,25 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
                   // mit `akteur`, sodass der Vier-Augen-Schutz (store: andere Person als der Ersteller) greift. Danach
                   // schließt die Sicht (zurück in den Arbeitsvorrat).
                   onFreigeben={async () => {
-                    port.uebergang(vorgang.id, vierAugenTransition.to, rolle, undefined, akteur);
+                    port.uebergang(
+                      vorgang.id,
+                      vierAugenTransition.to,
+                      rolle,
+                      undefined,
+                      akteur,
+                    );
                     onClose();
                   }}
                   {...(ablehnTransition
                     ? {
                         onAblehnen: async (grund: string) => {
-                          port.uebergang(vorgang.id, ablehnTransition.to, rolle, grund, akteur);
+                          port.uebergang(
+                            vorgang.id,
+                            ablehnTransition.to,
+                            rolle,
+                            grund,
+                            akteur,
+                          );
                           onClose();
                         },
                       }

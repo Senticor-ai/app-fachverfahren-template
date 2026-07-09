@@ -16,14 +16,17 @@ const cfg = leistungConfig as unknown as {
   berechne?: (antragsdaten: unknown) => unknown;
   tarif?: unknown;
   tarife?: unknown;
-  seed?: (ctx: { vorgangsnummer: () => string }) => Array<{ antragsdaten?: unknown; berechnung?: unknown }>;
+  seed?: (ctx: {
+    vorgangsnummer: () => string;
+  }) => Array<{ antragsdaten?: unknown; berechnung?: unknown }>;
 };
 
 /** Sammelt alle numerischen Betraege aus einer tarif/tarife-Struktur (Zahl, {..:Zahl}, verschachtelt). */
 function tarifBetraege(t: unknown): number[] {
   if (typeof t === "number") return Number.isFinite(t) ? [t] : [];
   if (Array.isArray(t)) return t.flatMap(tarifBetraege);
-  if (t && typeof t === "object") return Object.values(t).flatMap(tarifBetraege);
+  if (t && typeof t === "object")
+    return Object.values(t).flatMap(tarifBetraege);
   return [];
 }
 
@@ -33,7 +36,10 @@ describe("Berechnung — Naht-Vertrag (leistungConfig.berechne)", () => {
   });
 
   it("die Tarif-/Betrags-DATEN (falls deklariert) sind endliche, nicht-negative Zahlen", () => {
-    const betraege = [...tarifBetraege(cfg.tarif), ...tarifBetraege(cfg.tarife)];
+    const betraege = [
+      ...tarifBetraege(cfg.tarif),
+      ...tarifBetraege(cfg.tarife),
+    ];
     // Kein Tarif deklariert (z. B. reines Ja/Nein-Verfahren) ist zulaessig — dann nichts zu pruefen.
     for (const b of betraege) {
       expect(Number.isFinite(b)).toBe(true);
@@ -43,7 +49,10 @@ describe("Berechnung — Naht-Vertrag (leistungConfig.berechne)", () => {
 
   it("berechne() liefert fuer die eigenen Seed-Beispiele der Naht eine konsistente Berechnung (wirft nicht, gleicher Input → gleicher Betrag)", () => {
     if (typeof cfg.berechne !== "function") return;
-    const seed = typeof cfg.seed === "function" ? cfg.seed({ vorgangsnummer: () => "FV-TEST-0001" }) : [];
+    const seed =
+      typeof cfg.seed === "function"
+        ? cfg.seed({ vorgangsnummer: () => "FV-TEST-0001" })
+        : [];
     const beispiele = (Array.isArray(seed) ? seed : [])
       .map((v) => v?.antragsdaten)
       .filter((a) => a && typeof a === "object")
@@ -54,7 +63,10 @@ describe("Berechnung — Naht-Vertrag (leistungConfig.berechne)", () => {
       const berechnung = cfg.berechne(antragsdaten);
       // (1) wirft nicht (schon oben aufgerufen). (2) DETERMINISTISCH: derselbe Input liefert denselben Betrag.
       const wieder = cfg.berechne(antragsdaten);
-      const betrag = (b: unknown): unknown => (b && typeof b === "object" ? (b as { betrag?: unknown }).betrag ?? b : b);
+      const betrag = (b: unknown): unknown =>
+        b && typeof b === "object"
+          ? ((b as { betrag?: unknown }).betrag ?? b)
+          : b;
       expect(betrag(wieder)).toStrictEqual(betrag(berechnung));
     }
   });
