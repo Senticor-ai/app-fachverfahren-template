@@ -81,6 +81,12 @@ for (const component of publicComponents) {
   }
 }
 
+if (!/<WissensPanel[\s/>]/.test(storyText)) {
+  failures.push(
+    "Kit-Komponente ohne echte Storybook-Abdeckung: WissensPanel",
+  );
+}
+
 if (!storyText.includes("Screen Contract")) {
   failures.push("stories must expose at least one Screen Contract example");
 }

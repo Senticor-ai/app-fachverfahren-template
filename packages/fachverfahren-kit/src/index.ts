@@ -38,6 +38,7 @@ export * from "./components/HilfePanel.js";
 export * from "./components/BundIDLoginForm.js";
 export * from "./components/BescheidView.js";
 export * from "./components/AuditTimeline.js";
+export * from "./components/WissensPanel.js";
 export * from "./components/ReportingPanel.js";
 export * from "./components/DateiUpload.js";
 export * from "./components/NachweisAutorisierung.js";
