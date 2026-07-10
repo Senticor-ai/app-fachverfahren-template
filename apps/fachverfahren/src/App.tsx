@@ -29,6 +29,7 @@ import {
   ReviewWorkspace,
   StatCard,
   VerfahrenInspektor,
+  WissensPanel,
   leiteWorkspaceBenachrichtigungen,
   StatusRegionProvider,
   TriageInbox,
@@ -116,6 +117,7 @@ function AmtSubNav(): React.JSX.Element {
     { href: "/amt/kalender", label: "Fristen" },
     { href: "/amt/regeln", label: "Regelwerk" },
     { href: "/amt/verfahren", label: "Verfahren" },
+    { href: "/amt/wissen", label: "Wissen" },
     { href: "/amt/benachrichtigungen", label: "Meldungen" },
     { href: "/amt", label: "Eingangskorb" },
     { href: "/amt/einstellungen", label: "Einstellungen" },
@@ -625,6 +627,18 @@ function AmtRegeln(): React.JSX.Element {
   );
 }
 
+/** /amt/wissen — die interne WISSENSBASIS/WIKI: die `wissen`-Artikel (DATEN) des Workspace als Master-Detail
+ *  (kategorisierte Navigation + Markdown-Ansicht). Neutrale Arbeitshilfen zum System selbst. */
+function AmtWissen(): React.JSX.Element {
+  useStoreVersion();
+  return (
+    <Shell persona="sachbearbeitung" activeNavKey="eingang">
+      <AmtSubNav />
+      <WissensPanel artikel={workspace.config.wissen ?? []} />
+    </Shell>
+  );
+}
+
 /** /amt/verfahren — der VERFAHREN-INSPEKTOR: die eine Naht (`LeistungConfig`) je aktivem Verfahren browsbar +
  *  strukturell validierbar (Steckbrief · Befunde · Kennzahlen · Prozess-Diagramm). Hilft beim Entwickeln neuer und
  *  Integrieren bestehender Fachverfahren. */
@@ -758,6 +772,7 @@ export function App(): React.JSX.Element {
         <Route path="/amt/kalender" element={<AmtKalender />} />
         <Route path="/amt/regeln" element={<AmtRegeln />} />
         <Route path="/amt/verfahren" element={<AmtVerfahren />} />
+        <Route path="/amt/wissen" element={<AmtWissen />} />
         <Route
           path="/amt/benachrichtigungen"
           element={<AmtBenachrichtigungen />}

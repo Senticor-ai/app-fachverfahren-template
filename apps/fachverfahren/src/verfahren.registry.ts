@@ -93,4 +93,58 @@ export const workspaceConfig: WorkspaceConfig = {
       aktiv: false,
     },
   ],
+  // INTERNE WISSENSBASIS/WIKI als DATEN (Wiki.js-inspiriert) — neutrale Arbeitshilfen zum System selbst, keine
+  // verfahrens-spezifischen Rechtsaussagen. Ein generierendes Verfahren bringt eigene Artikel mit.
+  wissen: [
+    {
+      id: "handbuch.arbeitsvorrat",
+      kategorie: "Handbuch",
+      titel: "Der verfahrensübergreifende Arbeitsvorrat",
+      standIso: "2026-07-10T00:00:00.000Z",
+      markdown: [
+        "# Arbeitsvorrat",
+        "",
+        "Der **Arbeitsvorrat** bündelt alle Aufgaben über **alle Verfahren** in einer Sicht.",
+        "",
+        "- **Alle Verfahren** — verfahrensübergreifende Liste mit Priorität, Zuweisung und Labels.",
+        "- **Board** — Kanban nach Status; Karten per Drag&Drop **oder** per Tastatur-Aktionsmenü verschieben.",
+        "- **Eingang** — die Triage-Inbox: Eingänge annehmen (→ Vorgang) oder zurückstellen.",
+        "",
+        "> Ein Board-Move ändert **nie** einen fachlichen Status — Statuswechsel laufen ausschließlich über die",
+        "> geprüfte Entscheidung (Rolle · Vier-Augen · Begründung).",
+      ].join("\n"),
+    },
+    {
+      id: "prozesse.vier-augen",
+      kategorie: "Prozesse",
+      titel: "Vier-Augen-Prinzip",
+      standIso: "2026-07-10T00:00:00.000Z",
+      markdown: [
+        "# Vier-Augen-Prinzip",
+        "",
+        "Kritische Übergänge sind **vier-augen-pflichtig**: der Vorbereiter der Entscheidung und die freigebende",
+        "Person müssen **verschiedene** Akteure sein.",
+        "",
+        "1. Person A bereitet die Entscheidung vor (`decision.prepared`).",
+        "2. Person B gibt frei — **nicht** dieselbe Kennung wie A.",
+        "",
+        "Serverseitig wird dies gegen das append-only Audit erzwungen; die KI ist **nie** eines der zwei Augen.",
+      ].join("\n"),
+    },
+    {
+      id: "prozesse.fristen",
+      kategorie: "Prozesse",
+      titel: "Fristen & Eskalation",
+      standIso: "2026-07-10T00:00:00.000Z",
+      markdown: [
+        "# Fristen & Eskalation",
+        "",
+        "Fristen werden aus dem **Fristentyp** des Verfahrens und dem Eingang abgeleitet (nicht frei gesetzt).",
+        "",
+        "- Der **Fristenkalender** zeigt anstehende Fälligkeiten.",
+        "- Die **Meldungen** warnen vor überschrittenen/bald fälligen Fristen.",
+        "- Das **Regelwerk** kann bei Fristablauf automatisch eskalieren (server-autoritativ).",
+      ].join("\n"),
+    },
+  ],
 };

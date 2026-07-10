@@ -60,6 +60,7 @@ export * from "./components/AuditTimeline.js";
 export * from "./components/KommentarThread.js";
 export * from "./components/RegelwerkPanel.js";
 export * from "./components/VerfahrenInspektor.js";
+export * from "./components/WissensPanel.js";
 export * from "./components/AktivitaetsFeed.js";
 export * from "./components/RelationPanel.js";
 export * from "./components/TriageInbox.js";

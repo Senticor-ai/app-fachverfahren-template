@@ -96,6 +96,7 @@ const requiredKitComponents = [
   "ReviewWorkspace",
   "RegelwerkPanel",
   "VerfahrenInspektor",
+  "WissensPanel",
 ];
 for (const component of requiredKitComponents) {
   if (!new RegExp(`<${component}[\\s/>]`).test(storyText)) {

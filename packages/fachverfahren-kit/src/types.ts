@@ -1013,6 +1013,19 @@ export interface VerfahrenEintrag<TAntragsdaten = Record<string, unknown>> {
   aktiv?: boolean;
 }
 
+/** Ein WISSENS-/WIKI-Artikel als DATEN (Wiki.js-inspiriert) — die interne Wissensbasis des Workspace: Handbuch,
+ *  Rechtsgrundlagen-Erläuterungen, Arbeitshilfen. `markdown` wird über die EINE Markdown-Render-Schicht (GFM +
+ *  Mermaid) gerendert; `kategorie` gruppiert die Navigation. Verfahrens-neutral: Inhalte kommen aus der Config. */
+export interface WissensArtikel {
+  id: string;
+  titel: string;
+  markdown: string;
+  /** Optionale Gruppierung in der Wissens-Navigation (z. B. „Handbuch", „Recht", „Prozesse"). */
+  kategorie?: string;
+  /** Optionaler ISO-Zeitstempel der letzten Änderung. */
+  standIso?: string;
+}
+
 /** Die WORKSPACE-KONFIGURATION — die neue, N-wertige „Naht": EIN Sachbearbeiter-Workspace über MEHRERE Verfahren,
  *  mit gemeinsamem Vokabular (Prioritäten/Labels), Board, gespeicherten Views und komponierbarem Layout. Der
  *  Mandanten-Scope ist Teil der Config (DEV: synthetischer Einzeltenant; PROD: aus der Server-Session). */
@@ -1028,6 +1041,8 @@ export interface WorkspaceConfig {
   layout?: WorkspaceLayout;
   /** Workspace-weite Automations-Regeln (zusätzlich zu den verfahrensspezifischen `LeistungConfig.automationen`). */
   automationenGlobal?: AutomationRule[];
+  /** Interne Wissensbasis/Wiki als DATEN — Handbuch, Arbeitshilfen, Rechtsgrundlagen-Erläuterungen. */
+  wissen?: WissensArtikel[];
 }
 
 /** FILTER der verfahrensübergreifenden Aufgabenliste — rein additiv: fehlt ein Kriterium, ist es unbeschränkt.
