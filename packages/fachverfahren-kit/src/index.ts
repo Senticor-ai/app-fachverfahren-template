@@ -21,6 +21,8 @@ export * from "./lib/rank.js";
 export * from "./lib/automation.js";
 // Collaboration: reine Ableitung von In-App-Benachrichtigungen (Zuweisung/Frist) aus dem Aufgabenbestand.
 export * from "./lib/benachrichtigungen.js";
+// Builder-Aspekt: reine strukturelle Prüfung + Kennzahlen einer `LeistungConfig` (Verfahren-Inspektor).
+export * from "./lib/verfahren-pruefung.js";
 export * from "./lib/automation-run.js";
 // KI-Extraktions-PORT (Dokument → Feld-Vorschläge mit Konfidenz) — vendor-neutral, Stub-Default.
 export * from "./lib/dokument-extraktion.js";
@@ -57,6 +59,7 @@ export * from "./components/BescheidView.js";
 export * from "./components/AuditTimeline.js";
 export * from "./components/KommentarThread.js";
 export * from "./components/RegelwerkPanel.js";
+export * from "./components/VerfahrenInspektor.js";
 export * from "./components/AktivitaetsFeed.js";
 export * from "./components/RelationPanel.js";
 export * from "./components/TriageInbox.js";

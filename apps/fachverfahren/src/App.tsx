@@ -28,6 +28,7 @@ import {
   RegelwerkPanel,
   ReviewWorkspace,
   StatCard,
+  VerfahrenInspektor,
   leiteWorkspaceBenachrichtigungen,
   StatusRegionProvider,
   TriageInbox,
@@ -114,6 +115,7 @@ function AmtSubNav(): React.JSX.Element {
     { href: "/amt/dashboard", label: "Übersicht" },
     { href: "/amt/kalender", label: "Fristen" },
     { href: "/amt/regeln", label: "Regelwerk" },
+    { href: "/amt/verfahren", label: "Verfahren" },
     { href: "/amt/benachrichtigungen", label: "Meldungen" },
     { href: "/amt", label: "Eingangskorb" },
     { href: "/amt/einstellungen", label: "Einstellungen" },
@@ -623,6 +625,55 @@ function AmtRegeln(): React.JSX.Element {
   );
 }
 
+/** /amt/verfahren — der VERFAHREN-INSPEKTOR: die eine Naht (`LeistungConfig`) je aktivem Verfahren browsbar +
+ *  strukturell validierbar (Steckbrief · Befunde · Kennzahlen · Prozess-Diagramm). Hilft beim Entwickeln neuer und
+ *  Integrieren bestehender Fachverfahren. */
+function AmtVerfahren(): React.JSX.Element {
+  useStoreVersion();
+  const verfahren = workspace.verfahren();
+  const [gewaehlt, setGewaehlt] = useState(verfahren[0]?.procedureId ?? "");
+  const eintrag =
+    verfahren.find((v) => v.procedureId === gewaehlt) ?? verfahren[0];
+  const automationen = [
+    ...(workspace.config.automationenGlobal ?? []),
+    ...(eintrag?.config.automationen ?? []),
+  ];
+  return (
+    <Shell persona="sachbearbeitung" activeNavKey="eingang">
+      <AmtSubNav />
+      {verfahren.length > 1 ? (
+        <div className="mx-auto flex max-w-4xl flex-wrap gap-2 px-4 pt-4 md:px-6">
+          {verfahren.map((v) => (
+            <Button
+              key={v.procedureId}
+              type="button"
+              variant={
+                v.procedureId === (eintrag?.procedureId ?? "")
+                  ? "default"
+                  : "outline"
+              }
+              size="sm"
+              onClick={() => setGewaehlt(v.procedureId)}
+            >
+              {v.config.label}
+            </Button>
+          ))}
+        </div>
+      ) : null}
+      {eintrag ? (
+        <VerfahrenInspektor
+          config={eintrag.config}
+          automationen={automationen}
+        />
+      ) : (
+        <p className="mx-auto max-w-4xl p-6 text-sm text-muted-foreground">
+          Kein aktives Verfahren im Workspace.
+        </p>
+      )}
+    </Shell>
+  );
+}
+
 /** /amt/benachrichtigungen — Collaboration/Meldungen: die aus dem Aufgabenbestand ABGELEITETEN In-App-Meldungen
  *  (Ihnen zugewiesen · Fristwarnungen), gerendert im generischen NotificationCenter mit lokalem Gelesen-Zustand. */
 function AmtBenachrichtigungen(): React.JSX.Element {
@@ -706,6 +757,7 @@ export function App(): React.JSX.Element {
         <Route path="/amt/dashboard" element={<AmtDashboard />} />
         <Route path="/amt/kalender" element={<AmtKalender />} />
         <Route path="/amt/regeln" element={<AmtRegeln />} />
+        <Route path="/amt/verfahren" element={<AmtVerfahren />} />
         <Route
           path="/amt/benachrichtigungen"
           element={<AmtBenachrichtigungen />}
