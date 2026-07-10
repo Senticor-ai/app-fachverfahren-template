@@ -81,6 +81,15 @@ for (const component of publicComponents) {
   }
 }
 
+// Neue exportierte Kit-Komponenten müssen in Storybook tatsächlich gerendert werden.
+const requiredKitComponents = ["VerfahrenInspektor"];
+for (const component of requiredKitComponents) {
+  if (!new RegExp(`<${component}[\\s/>]`).test(storyText)) {
+    failures.push(
+      `Kit-Komponente ohne echte Storybook-Abdeckung (nicht als JSX gerendert): ${component}`,
+    );
+  }
+}
 if (!storyText.includes("Screen Contract")) {
   failures.push("stories must expose at least one Screen Contract example");
 }
