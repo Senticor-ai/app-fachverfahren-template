@@ -16,6 +16,7 @@ import {
   useParams,
 } from "react-router-dom";
 import {
+  AktivitaetsFeed,
   AntragStepper,
   Arbeitsvorrat,
   AufsichtDashboard,
@@ -24,6 +25,8 @@ import {
   FachverfahrenShell,
   FristenKalender,
   KiSidecar,
+  KommentarThread,
+  RelationPanel,
   NotificationCenter,
   RegelwerkPanel,
   ReviewWorkspace,
@@ -422,6 +425,27 @@ function AmtVorgang(): React.JSX.Element {
             akteur={AKTEUR}
             onClose={() => navigate("/amt")}
           />
+          {/* Zusammenarbeit an der Aufgabe: interne Vermerke (append-only), Aktivitäts-Feed, Beziehungen —
+              dieselben WorkspacePort-Methoden wie im Board-Drawer, hier in der vollen Prüf-/Detailsicht. */}
+          {task ? (
+            <div className="mt-8 flex flex-col gap-8">
+              <KommentarThread
+                kommentare={workspace.listKommentare(task.id)}
+                schreibenErlaubt
+                onVermerk={(text) =>
+                  workspace.addKommentar(task.id, text, AKTEUR)
+                }
+              />
+              <AktivitaetsFeed
+                aktivitaeten={workspace.listAktivitaet(task.id)}
+              />
+              <RelationPanel
+                beziehungen={workspace.listBeziehungen(task.id)}
+                bearbeitenErlaubt
+                onEntfernen={(rid) => workspace.entferneBeziehung(task.id, rid)}
+              />
+            </div>
+          ) : null}
         </div>
         {task ? (
           <StatusRegionProvider>
