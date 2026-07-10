@@ -4,7 +4,68 @@ export {
   PostgresAppStore,
   UnavailableAppStore,
 } from "./app-store.js";
-export { createPgClient } from "./client.js";
+export {
+  createPgClient,
+  createPooledPgClient,
+  closePgPools,
+} from "./client.js";
+export {
+  AutomationRuleNotFoundError,
+  createAutomationStoreFromEnv,
+  InMemoryAutomationStore,
+  PostgresAutomationStore,
+} from "./automation-store.js";
+export {
+  createActorRoleStoreFromEnv,
+  InMemoryActorRoleStore,
+  PostgresActorRoleStore,
+} from "./actor-role-store.js";
+export type { ActorRole, ActorRoleStore } from "./actor-role-store.js";
+export type {
+  AppAutomationEvent,
+  AppAutomationRule,
+  AppAutomationRun,
+  AutomationRunStatus,
+  AutomationStore,
+  ListRulesQuery,
+} from "./automation-store.js";
+export {
+  CaseNotFoundError,
+  CaseVersionConflictError,
+  createCaseStoreFromEnv,
+  InMemoryCaseStore,
+  PostgresCaseStore,
+} from "./case-store.js";
+export type {
+  AppAuditEvent,
+  AppCase,
+  CaseStore,
+  ListAuditQuery,
+  ListCasesQuery,
+  TransitionCaseInput,
+} from "./case-store.js";
+export {
+  createTaskStoreFromEnv,
+  InMemoryTaskStore,
+  PostgresTaskStore,
+  TaskNotFoundError,
+  TaskRelationError,
+} from "./task-store.js";
+export type {
+  AcceptIntakeInput,
+  AppIntakeItem,
+  AppSavedView,
+  AppTask,
+  AppTaskActivity,
+  AppTaskComment,
+  AppTaskRelation,
+  IntakeSource,
+  IntakeTriageStatus,
+  ListTasksQuery,
+  TaskPatch,
+  TaskRelationType,
+  TaskStore,
+} from "./task-store.js";
 export type {
   AppStore,
   ColorSchemePreference,

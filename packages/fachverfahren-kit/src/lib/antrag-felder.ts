@@ -39,8 +39,10 @@ export function parsePath(path: string): PathToken[] {
   return tokens;
 }
 
-/** Liest einen Wert aus dem verschachtelten Objekt/Array anhand des Feldpfads (z. B. "posten[0].wert"). */
-export function getPath(obj: Antragsdaten, path: string): unknown {
+/** Liest einen Wert aus dem verschachtelten Objekt/Array anhand des Feldpfads (z. B. "posten[0].wert"). `obj` ist
+ *  `unknown` (nicht nur `Antragsdaten`), damit die EINE Wahrheit auch die SB-Sichten (VorgangDetail/Arbeitsvorrat/
+ *  ReviewWorkspace) bedient, die generische `T`-Antragsdaten halten — die Traversierung guarded jeden Nicht-Objekt-Knoten. */
+export function getPath(obj: unknown, path: string): unknown {
   return parsePath(path).reduce<unknown>((acc, key) => {
     if (acc == null || typeof acc !== "object") return undefined;
     if (typeof key === "number")

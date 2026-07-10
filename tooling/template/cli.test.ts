@@ -9,17 +9,15 @@ const execFileAsync = promisify(execFile);
 const cli = join(process.cwd(), "tooling", "template", "cli.ts");
 const cliUrl = new URL("./cli.ts", import.meta.url);
 
-// Root-caused in infra#5 (flaky under CPU load): each `runTemplateSubprocess`
-// call cold-spawns a fresh `node --experimental-strip-types` process that
-// re-parses this file's own ~1929 lines PLUS the ~1818-line
-// `lib/agent-platform.ts` (and the rest of `lib/`) from scratch every single
-// time. On an idle machine that's cheap (~2s for the heaviest commands); under
-// real CPU contention -- exactly what happens when CHOS-Code's Durchstich
-// pipeline runs a generated app's `pnpm run test:template` gate synchronously
-// inside the busy chos-code-runner pod -- it intermittently blows even a 20s
-// per-test budget (observed live: "sometimes 2, sometimes 6" of these 7 tests
-// timing out), which incorrectly BLOCKIERT/FEHLER's the whole governed run
-// (see CHOS-CODE-Innovation#62/#64).
+// Root cause (flaky under CPU load): each `runTemplateSubprocess` call
+// cold-spawns a fresh `node --experimental-strip-types` process that re-parses
+// this file's own ~1929 lines PLUS the ~1818-line `lib/agent-platform.ts` (and
+// the rest of `lib/`) from scratch every single time. On an idle machine that's
+// cheap (~2s for the heaviest commands); under real CPU contention -- e.g. when
+// an external app generator runs a generated app's `pnpm run test:template`
+// gate synchronously inside a busy CI runner -- it intermittently blows even a
+// 20s per-test budget (observed: "sometimes 2, sometimes 6" of these 7 tests
+// timing out), which incorrectly BLOCKIERT/FEHLER's the whole governed run.
 //
 // `runTemplate` below fixes the actual root cause for 6 of the 7 cases: it
 // invokes `cli.ts` IN-PROCESS via a cache-busted dynamic `import()` instead of

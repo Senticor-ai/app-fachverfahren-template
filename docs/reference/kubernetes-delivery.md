@@ -11,22 +11,22 @@ Die kanonische Deploy-Form generierter Apps ist ein Helm-Chart unter
   `/readyz`, `/startupz`
 - Interne Endpunkte: `/internal/metrics`, `/internal/build-info`
 
-`/internal/*` darf nie ueber den public Ingress geroutet werden. Der Chart
+`/internal/*` darf nie über den public Ingress geroutet werden. Der Chart
 rendert deshalb einen separaten internen Service.
 
 ## Probes
 
 - `/startupz`: Server gebootet, Konfiguration geparst, statisches Bundle
   lesbar.
-- `/livez`: Event Loop und Prozess reagieren; keine Dependency-Pruefung.
-- `/readyz`: false waehrend Shutdown; prueft nur deklarierte erforderliche
+- `/livez`: Event Loop und Prozess reagieren; keine Dependency-Prüfung.
+- `/readyz`: false während Shutdown; prüft nur deklarierte erforderliche
   Upstreams.
 
 Die Runtime behandelt `SIGTERM` als Shutdown-Signal, setzt Readiness auf false,
 stoppt neue Requests und wartet innerhalb `APP_SHUTDOWN_TIMEOUT_MS` auf
 laufende Requests.
 
-## Pod- und Container-Haertung
+## Pod- und Container-Härtung
 
 Der Chart setzt:
 
@@ -36,12 +36,12 @@ Der Chart setzt:
 - `capabilities.drop: [ALL]`
 - `seccompProfile: RuntimeDefault`
 - `automountServiceAccountToken: false`
-- writable `emptyDir` nur fuer `/tmp`
+- writable `emptyDir` nur für `/tmp`
 
 Secrets werden nur referenziert. Nicht geheime Runtime-Werte liegen in einer
 ConfigMap.
 
-## Verfuegbarkeit und Rollout
+## Verfügbarkeit und Rollout
 
 - Default `replicaCount: 2`
 - Rolling Update mit `maxUnavailable: 0`, `maxSurge: 1`
@@ -50,16 +50,16 @@ ConfigMap.
 - Topology Spread und Anti-Affinity
 - Ressourcen-Requests und Limits
 
-Nach Rollout gehoeren Smoke-Tests gegen `/readyz`, `/runtime-config.json` und
+Nach Rollout gehören Smoke-Tests gegen `/readyz`, `/runtime-config.json` und
 eine echte SPA-Route zum Betriebsablauf. Rollback-Kriterium ist jedes
 fehlschlagende Health-, Header- oder Login-Smoke-Ergebnis.
 
 ## CI-Gates
 
-`pnpm run check:k8s-delivery` rendert den Helm-Chart, prueft Pflichtobjekte und
-laeuft gegen `kubeconform` und `conftest`. `pnpm run test:supply-chain`
+`pnpm run check:k8s-delivery` rendert den Helm-Chart, prüft Pflichtobjekte und
+läuft gegen `kubeconform` und `conftest`. `pnpm run test:supply-chain`
 erzeugt ein SBOM mit Syft und blockiert High/Critical-Funde mit Trivy.
 
 Cosign-Signaturen sind als Release-Schritt vorgesehen, aber nicht Teil des
-ersten Pflicht-Gates, solange Registry/OIDC-Bindings nicht ueberall verfuegbar
+ersten Pflicht-Gates, solange Registry/OIDC-Bindings nicht überall verfügbar
 sind.

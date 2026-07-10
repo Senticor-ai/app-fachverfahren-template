@@ -212,6 +212,19 @@ export const leistungConfig: LeistungConfig = {
     },
   ],
   ki: { schwelleAutonom: 0.9 },
+  // Demo-Bearbeitungsfrist: 14 Tage ab Eingang. Data-driven — der Store leitet daraus die Fälligkeit je (nicht
+  // terminaler) Aufgabe ab (Kalender + zeitgetriebener frist-erreicht-Trigger). Ein reales Verfahren führt seine
+  // gesetzlichen Fristen im Fachkonzept.
+  fristenTypen: [
+    {
+      id: "bearbeitungsfrist",
+      label: "Bearbeitungsfrist",
+      dauer: 14,
+      einheit: "tag",
+      anker: "eingang",
+      art: "behoerdlich",
+    },
+  ],
   seed: ({ vorgangsnummer }) => {
     const mk = (
       min: number,

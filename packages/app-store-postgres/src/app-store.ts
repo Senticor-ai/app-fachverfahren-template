@@ -1,4 +1,4 @@
-import { createPgClient, type PgClient } from "./client.js";
+import { createPooledPgClient, type PgClient } from "./client.js";
 import { createDefaultUserPreferences } from "./preferences.js";
 
 export type ColorSchemePreference = "light" | "dark" | "system";
@@ -225,7 +225,8 @@ export class PostgresAppStore implements AppStore {
   }
 
   private async withClient<T>(callback: (client: PgClient) => Promise<T>) {
-    const client = await createPgClient(this.databaseUrl);
+    // Gepoolte Verbindung: `connect()` leiht aus dem prozessweiten Pool, `end()` gibt zurück (schließt ihn nicht).
+    const client = await createPooledPgClient(this.databaseUrl);
     await client.connect();
     try {
       return await callback(client);

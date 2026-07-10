@@ -14,20 +14,9 @@ import { cn } from "../lib/cn.js";
 import { formatBetrag as formatBetragKit } from "../format.js";
 import { KiVorschlag } from "./KiVorschlag.js";
 import { KiAssistPanel } from "./KiAssistPanel.js";
-
-/** Liest einen verschachtelten Pfad ("a.b.c") aus einem Objekt — defensiv, ohne Annahmen über die Form. */
-export function getPfad(obj: unknown, pfad: string): unknown {
-  return pfad.split(".").reduce<unknown>((acc, key) => {
-    if (
-      acc &&
-      typeof acc === "object" &&
-      key in (acc as Record<string, unknown>)
-    ) {
-      return (acc as Record<string, unknown>)[key];
-    }
-    return undefined;
-  }, obj);
-}
+// EINE Wahrheit über den Feldpfad-Zugriff (array-index-fähig: "posten[0].wert") — der frühere lokale `getPfad`
+// (naives split(".")) las Array-Indizes NICHT und lieferte „—"; ersetzt durch das kanonische getPath aus lib.
+import { getPath } from "../lib/antrag-felder.js";
 
 /** Formatiert einen unbekannten Wert lesbar (Boolean → Ja/Nein, leer → „—") — generisch, keine Domänen-Logik. */
 export function formatWert(value: unknown): string {
@@ -66,7 +55,7 @@ function Sektion<T>({
 }) {
   // Felder ohne Wert ausblenden, damit optionale Angaben (z.B. fehlende Chip-Nr.) die Sicht nicht aufblähen.
   const felder = sektion.felder
-    .map((f) => ({ ...f, wert: getPfad(antragsdaten, f.pfad) }))
+    .map((f) => ({ ...f, wert: getPath(antragsdaten, f.pfad) }))
     .filter((f) => f.wert !== undefined && f.wert !== null && f.wert !== "");
   if (felder.length === 0) return null;
 

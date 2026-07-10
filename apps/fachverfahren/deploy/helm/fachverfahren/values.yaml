@@ -95,6 +95,24 @@ probes:
 
 terminationGracePeriodSeconds: 30
 
+# Eigenständiger Automations-WORKER (Event-Driven Architecture / horizontale Skalierung): verarbeitet die
+# Automations-Outbox + den Deadline-Scanner GETRENNT vom Web-Deployment. Standardmäßig AUS — nur sinnvoll mit
+# geteiltem Postgres-Zustand (APP_PG_URL); mehrere Replicas koordinieren über FOR UPDATE SKIP LOCKED.
+# Wenn der Worker aktiv ist, sollte der in-Web-Poller (APP_AUTOMATION_POLL_MS) auf 0 bleiben (keine Doppel-Verarbeitung
+# nötig — beide wären zwar SKIP-LOCKED-sicher, aber der Worker ist der dedizierte Ort).
+worker:
+  enabled: false
+  replicaCount: 1
+  pollMs: 2000
+  healthPort: 8081
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 384Mi
+
 autoscaling:
   enabled: true
   minReplicas: 2

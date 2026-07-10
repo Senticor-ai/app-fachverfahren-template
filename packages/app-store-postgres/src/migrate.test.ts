@@ -69,6 +69,51 @@ describe("postgres migration runner", () => {
     expect(sql).toContain("'caseworker'");
   });
 
+  it("ships the PM/board + intake + automation schema and the append-only audit lock", async () => {
+    const migrations = await loadMigrations(
+      "packages/app-store-postgres/migrations",
+    );
+    const sql = migrations.map((migration) => migration.sql).join("\n");
+
+    // Phase-7 / PM-Board + Intake (belebt durch task-store).
+    for (const table of [
+      "app_tasks",
+      "app_intake_items",
+      "app_task_comments",
+      "app_task_activity",
+      "app_saved_views",
+    ]) {
+      expect(sql).toContain(`CREATE TABLE IF NOT EXISTS ${table}`);
+    }
+
+    // Automations-Engine-Schema (Outbox + idempotente Läufe).
+    for (const table of [
+      "app_automation_rules",
+      "app_automation_events",
+      "app_automation_runs",
+    ]) {
+      expect(sql).toContain(`CREATE TABLE IF NOT EXISTS ${table}`);
+    }
+    // Idempotenz-Riegel: ein Event darf je Regel nur EINEN Lauf erzeugen.
+    expect(sql).toContain("UNIQUE (rule_id, idempotency_key)");
+
+    // Zuständigkeit: der PK von app_actor_roles wurde um authority_id erweitert (Multi-Behörden-Rollen).
+    expect(sql).toContain(
+      "ADD PRIMARY KEY (tenant_id, actor_id, role_key, authority_id)",
+    );
+
+    // Aufgaben-Beziehungen (Plane-Parität) mit Selbstreferenz-CHECK.
+    expect(sql).toContain("CREATE TABLE IF NOT EXISTS app_task_relations");
+    expect(sql).toContain("CHECK (task_id <> related_task_id)");
+
+    // Append-only-Audit: REVOKE + BEFORE-Trigger (bindet auch den Tabellen-Owner).
+    expect(sql).toContain("REVOKE UPDATE, DELETE ON app_audit_events");
+    expect(sql).toContain(
+      "CREATE OR REPLACE FUNCTION app_audit_events_immutable",
+    );
+    expect(sql).toContain("CREATE TRIGGER app_audit_events_no_mutation");
+  });
+
   it("keeps preference and mailbox semantics testable without a database", async () => {
     const messages: MailboxMessage[] = [
       {

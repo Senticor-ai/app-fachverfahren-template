@@ -52,6 +52,18 @@ const ignoredNames = new Set([
 
 const repositoryOnlyPaths = new Set([".gitlab/CODEOWNERS"]);
 
+// INTERNE MAINTAINER-Skills bleiben im Template-Repo (für dessen eigene Pflege/Publish-Workflow), werden aber NIE in
+// einen gescaffoldeten/konsumierbaren App-Baum kopiert — sonst leckt Maintainer-Internes (SDK-Publish-Interna,
+// interne Anforderungsregister mit contributor-lokalen Pfaden) in jeden Fork. Präfix-basiert, ganze Verzeichnisse.
+const repositoryOnlyPrefixes = [
+  ".agents/skills/govtech-deutschland-sdk/",
+  ".agents/skills/deutschland-plattform-anforderungen/",
+  // auch die Claude-Shims der internen Skills — sonst erhielte ein Konsument einen verwaisten Zeiger auf einen
+  // Skill, den er (korrekt) nicht bekommt.
+  ".claude/skills/govtech-deutschland-sdk/",
+  ".claude/skills/deutschland-plattform-anforderungen/",
+];
+
 // Die generische Template-Engine wird VERBATIM kopiert — NIE textersetzt. Sie enthält ihre eigene
 // Ersetzungs-Tabelle sowie Identitäts-/Provenienz-Konstanten als DATEN (z.B. `fachverfahren-template`,
 // `senticor-app-fachverfahren-template`, `Musterantrag`). Würde man sie ersetzen, zerlegte sich die
@@ -101,12 +113,12 @@ const textFileNames = new Set([
   "pre-push",
 ]);
 
-/** Is `dir` a LIVE/governed consumer project (not the pristine template)? Such a project carries CHOS-overlay markers:
- *  a `.chos/` directory OR `cognitive-hive.governance.yaml` (which, in a project, is a symlink into the shared source).
- *  The domain-app scaffold must render from the pristine template only — scaffolding from a consumer would follow the
- *  cognitive-hive symlink and corrupt the shared source governance (CHOS-CODE#68). The pristine template ships neither. */
+/** Is `dir` a LIVE/governed consumer project (not the pristine template)? A governed instance carries an overlay
+ *  marker — a `.chos/` directory (the public overlay convention; see docs/reference/chos-code-integration.md). The
+ *  domain-app scaffold must render from the pristine template only — scaffolding from a governed consumer could follow
+ *  an overlay symlink into shared governance and corrupt it. The pristine template ships no such marker. */
 async function isLiveConsumerProject(dir: string): Promise<boolean> {
-  for (const marker of [".chos", "cognitive-hive.governance.yaml"]) {
+  for (const marker of [".chos"]) {
     try {
       await access(join(dir, marker));
       return true;
@@ -132,14 +144,14 @@ export async function renderDomainApp(
     );
   }
 
-  // GUARD (CHOS-CODE#68): the domain-app scaffold renders FROM the pristine template — NEVER from a live/governed
-  // consumer project. A governed instance carries CHOS-overlay markers (a `.chos/` dir and `cognitive-hive.*` which,
-  // in a project, is a SYMLINK into the shared source governance). Copying + the in-place string-replace would follow
-  // that symlink and flip the shared source (`apps/fachverfahren` -> `apps/<domain>`), corrupting it for every future
-  // build (broke B2/origin/main; in multi-tenancy: cross-tenant corruption). One truth, no parallel path: refuse hard.
+  // GUARD: the domain-app scaffold renders FROM the pristine template — NEVER from a live/governed consumer project.
+  // A governed instance carries an overlay marker (a `.chos/` dir) that may be a SYMLINK into shared source governance.
+  // Copying + the in-place string-replace would follow that symlink and flip the shared source
+  // (`apps/fachverfahren` -> `apps/<domain>`), corrupting it for every future build (in multi-tenancy: cross-tenant
+  // corruption). One truth, no parallel path: refuse hard.
   if (await isLiveConsumerProject(source)) {
     throw new Error(
-      "refusing to scaffold FROM a live/governed consumer project (found .chos/ or cognitive-hive.* — a CHOS-governed instance, not the pristine template). Run the domain-app scaffold from the template source only (CHOS-CODE#68).",
+      "refusing to scaffold FROM a live/governed consumer project (found .chos/ — a governed instance, not the pristine template). Run the domain-app scaffold from the template source only.",
     );
   }
 
@@ -170,8 +182,8 @@ export async function renderDomainApp(
   // Basis-Identität der QUELLE: die pristine Vorlage ist `fachverfahren`/`Fachverfahren`; ein bereits
   // scaffoldeter Konsument trägt seine eigene Domain in `.template/answers.json`. Ohne diese Erkennung
   // könnte eine generierte App (apps/<domain>) sich selbst NICHT erneut scaffolden — die mitgelieferte
-  // render.test.ts / `check:scaffold` würden dort `apps/fachverfahren` suchen und fehlschlagen. Der
-  // CHOS-Durchstich fährt aber genau diesen `pnpm run test:template`-Gate in generierten Apps.
+  // render.test.ts / `check:scaffold` würden dort `apps/fachverfahren` suchen und fehlschlagen. Ein externer
+  // App-Generator fährt aber genau diesen `pnpm run test:template`-Gate in generierten Apps.
   const base = await detectBaseIdentity(source);
 
   const appSource = join(target, "apps", base.domain);
@@ -436,7 +448,13 @@ function shouldCopy(path: string, sourceRoot: string) {
   if (relativePath === "") {
     return true;
   }
-  if (repositoryOnlyPaths.has(relativePath)) {
+  if (
+    repositoryOnlyPaths.has(relativePath) ||
+    repositoryOnlyPrefixes.some(
+      (prefix) =>
+        relativePath === prefix.slice(0, -1) || relativePath.startsWith(prefix),
+    )
+  ) {
     return false;
   }
   // TypeScript-Inkrementell-State (`*.tsbuildinfo`, git-ignoriert, liegt NEBEN der tsconfig statt in

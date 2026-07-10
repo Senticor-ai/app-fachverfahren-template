@@ -83,6 +83,16 @@
     ],
     "einleitung": "Neutrales Demo-Verfahren — es zeigt die drei Sichten (Bürger:in · Sachbearbeitung · Aufsicht), enthält aber keine echten Fachdaten."
   },
+  "fristenTypen": [
+    {
+      "id": "bearbeitungsfrist",
+      "label": "Bearbeitungsfrist",
+      "dauer": 14,
+      "einheit": "tag",
+      "anker": "eingang",
+      "art": "behoerdlich"
+    }
+  ],
   "statusMachine": {
     "initial": "eingegangen",
     "states": [

@@ -6,6 +6,10 @@ import { defineConfig } from "vitest/config";
 // Plattformpakete (@senticor/*) auf ihre gebauten Pakete auflösen — ohne Provider/Infrastruktur.
 const pkg = (name: string) =>
   fileURLToPath(new URL(`./packages/${name}/dist/index.js`, import.meta.url));
+// Das UI-Kit ist src-only (kein dist-Build) — Root-Tests (tests/simulation) lösen es auf die Quelle auf.
+const kitSrc = fileURLToPath(
+  new URL("./packages/fachverfahren-kit/src/index.ts", import.meta.url),
+);
 
 const sharedExclude = [
   "**/.{git,cache,output,temp}/**",
@@ -23,6 +27,8 @@ export default defineConfig({
       "@senticor/public-sector-sdk": pkg("public-sector-sdk"),
       "@senticor/platform-contracts": pkg("platform-contracts"),
       "@senticor/conformance-kit": pkg("conformance-kit"),
+      "@senticor/app-store-postgres": pkg("app-store-postgres"),
+      "@senticor/fachverfahren-kit": kitSrc,
     },
   },
   test: {

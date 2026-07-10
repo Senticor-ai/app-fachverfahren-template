@@ -55,7 +55,8 @@ rendered, and it is held to a strict module contract. See `modules/README.md`.
 3. **Gate each phase before pushing to `main`.** After each `chos-phase`, run:
 
    ```bash
-   pnpm run check:domain-contracts      # fast, catches the modules/ problem
+   # fast, catches the modules/ problem
+   pnpm run check:domain-contracts
    # or the fuller domain gate:
    pnpm run check:agent-domain
    ```
@@ -78,8 +79,10 @@ events/ migrations/ i18n/ tests/ compliance/` directories).
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm run check:domain-contracts   # must print "Domain contract check passed."
-pnpm run check:scaffold           # must have no findings
+# must print "Domain contract check passed."
+pnpm run check:domain-contracts
+# must have no findings
+pnpm run check:scaffold
 ```
 
 If `check:domain-contracts` lists `modules/<domain> missing required directory …`

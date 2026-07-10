@@ -1,0 +1,91 @@
+{{- if .Values.worker.enabled }}
+# Eigenständiges Worker-Deployment (Event-Driven Architecture / horizontale Skalierung): verarbeitet die
+# transaktionale Automations-Outbox + den zeitgetriebenen Deadline-Scanner, GETRENNT vom Web-Deployment. Web skaliert
+# für Requests (HPA), Worker für Events. Mehrere Worker-Replicas koordinieren über `FOR UPDATE SKIP LOCKED` — kein
+# Doppel-Claim/Doppelfeuern. Kein Service/Ingress; Liveness über den eigenen /livez-Health-Port des Workers.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "fachverfahren.fullname" . }}-worker
+  labels:
+    {{- include "fachverfahren.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "fachverfahren.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "fachverfahren.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/runtime-config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "fachverfahren.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      containers:
+        - name: worker
+          image: {{ include "fachverfahren.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          # Der Worker-Entrypoint (kein HTTP-Domain-Server, nur Event-Loop + /livez).
+          command: ["node", "apps/fachverfahren/dist-server/worker.js"]
+          ports:
+            - name: health
+              containerPort: {{ .Values.worker.healthPort }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "fachverfahren.fullname" . }}-runtime
+            {{- range .Values.secretRefs }}
+            - secretRef:
+                name: {{ . | quote }}
+            {{- end }}
+          env:
+            # Poll-Intervall + Health-Port des Workers (der Web-Poller bleibt über APP_AUTOMATION_POLL_MS separat).
+            - name: APP_WORKER_POLL_MS
+              value: {{ .Values.worker.pollMs | quote }}
+            - name: APP_WORKER_HEALTH_PORT
+              value: {{ .Values.worker.healthPort | quote }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: health
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}

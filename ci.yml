@@ -1,4 +1,4 @@
-# Codesphere-Deploy-Pipeline (GovTech-DE-Plattform, vendorportal.gtplatforms.org).
+# Codesphere-Deploy-Pipeline (Codesphere-Laufzeit-Wahrheit).
 # Dies ist die Laufzeit-Wahrheit, die `cs start pipeline prepare test run` ausführt — sie SPIEGELT das Dockerfile
 # (dasselbe Build-Rezept: corepack→pnpm install→build:packages/app/server), damit Codesphere-Deploy und Container-Build
 # NICHT auseinanderlaufen (eine Wahrheit). Der Server lauscht auf $PORT (Default 8080; Codesphere setzt $PORT) und

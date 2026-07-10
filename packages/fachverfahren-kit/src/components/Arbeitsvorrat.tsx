@@ -31,10 +31,22 @@ import {
   TableRow,
 } from "../ui/table.js";
 import { SkeletonTable } from "../ui/skeleton.js";
+// Design-System-Primitive statt roher Controls (Konsolidierung: `ps-btn`-CSS + rohe input/select → Kit).
+import { Button } from "../ui/button.js";
+import { Checkbox } from "../ui/checkbox.js";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select.js";
 import { EmptyState } from "./EmptyState.js";
 import { StatusPill } from "./StatusPill.js";
 import { useStatusRegion } from "./StatusRegion.js";
 import { formatBetrag as formatBetragKit } from "../format.js";
+// EINE Wahrheit über Feldpfad-Zugriff (array-index-fähig) + String-Projektion — ersetzt das lokale, naive `readPfad`.
+import { getPath, asString } from "../lib/antrag-felder.js";
 
 export interface ArbeitsvorratProps<T = Record<string, unknown>> {
   config: LeistungConfig<T>;
@@ -73,24 +85,6 @@ type ColKey =
   | "berechnung"
   | "status"
   | `feld:${string}`;
-
-/** Liefert einen verschachtelten Wert (Pfad wie "person.nachname") aus den Antragsdaten als String. */
-function readPfad(antragsdaten: unknown, pfad: string): string {
-  let cur: unknown = antragsdaten;
-  for (const teil of pfad.split(".")) {
-    if (
-      cur &&
-      typeof cur === "object" &&
-      teil in (cur as Record<string, unknown>)
-    ) {
-      cur = (cur as Record<string, unknown>)[teil];
-    } else {
-      return "";
-    }
-  }
-  if (cur === null || cur === undefined) return "";
-  return String(cur);
-}
 
 /** Eingang stabil-absolut rendern (kein Date.now() → keine Hydration-Diskrepanz). */
 function eingangText(iso: string): string {
@@ -194,7 +188,7 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
       if (key === "berechnung") return v.berechnung?.betrag ?? -Infinity;
       if (key === "status") return statusLabel[v.status] ?? v.status;
       // feld:<pfad>
-      return readPfad(v.antragsdaten, key.slice("feld:".length));
+      return asString(getPath(v.antragsdaten, key.slice("feld:".length)));
     };
   }, [statusLabel]);
 
@@ -470,25 +464,30 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
               </div>
             </div>
 
-            <label className="ps-inbox__mobile-sort">
+            <div className="ps-inbox__mobile-sort">
               <span>Sortieren</span>
-              <select
-                value={mobileSortValue}
-                onChange={(event) => updateMobileSort(event.target.value)}
-              >
-                <option value="none">Standardreihenfolge</option>
-                {mobileSortOptions.map((option) => (
-                  <React.Fragment key={option.key}>
-                    <option value={`${option.key}|asc`}>
-                      {option.label} aufsteigend
-                    </option>
-                    <option value={`${option.key}|desc`}>
-                      {option.label} absteigend
-                    </option>
-                  </React.Fragment>
-                ))}
-              </select>
-            </label>
+              <Select value={mobileSortValue} onValueChange={updateMobileSort}>
+                <SelectTrigger
+                  aria-label="Sortierung"
+                  className="h-11 min-w-48 text-sm font-semibold normal-case"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Standardreihenfolge</SelectItem>
+                  {mobileSortOptions.map((option) => (
+                    <React.Fragment key={option.key}>
+                      <SelectItem value={`${option.key}|asc`}>
+                        {option.label} aufsteigend
+                      </SelectItem>
+                      <SelectItem value={`${option.key}|desc`}>
+                        {option.label} absteigend
+                      </SelectItem>
+                    </React.Fragment>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             <div className="ps-inbox__cards mt-4" aria-label="Vorgänge">
               {rows.length === 0 ? (
@@ -521,14 +520,14 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                       onFocus={() => setActiveRow(rowIndex)}
                     >
                       <span className="ps-inbox__mobile-card-head">
-                        <label className="ps-inbox__select">
-                          <input
-                            type="checkbox"
+                        <span className="ps-inbox__select">
+                          <Checkbox
                             checked={checked}
-                            onChange={() => toggleSelection(v.id)}
+                            onCheckedChange={() => toggleSelection(v.id)}
+                            aria-label={`Vorgang ${v.vorgangsnummer} auswählen`}
                           />
                           <span>Auswählen</span>
-                        </label>
+                        </span>
                         <StatusPill status={v.status} states={states} />
                       </span>
                       <span className="ps-inbox__mobile-card-title ps-num text-primary">
@@ -543,7 +542,7 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                           <span key={f.pfad}>
                             <span>{f.label}</span>
                             <strong>
-                              {readPfad(v.antragsdaten, f.pfad) || "—"}
+                              {asString(getPath(v.antragsdaten, f.pfad)) || "—"}
                             </strong>
                           </span>
                         ))}
@@ -563,9 +562,10 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                           </span>
                         )}
                       </span>
-                      <button
+                      <Button
                         type="button"
-                        className="ps-btn ps-btn--ghost"
+                        variant="outline"
+                        size="sm"
                         aria-label={`Vorgang ${v.vorgangsnummer} öffnen`}
                         onClick={() => {
                           setActiveRow(rowIndex);
@@ -573,7 +573,7 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                         }}
                       >
                         Vorgang öffnen
-                      </button>
+                      </Button>
                     </article>
                   ) : (
                     <button
@@ -602,7 +602,7 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                           <span key={f.pfad}>
                             <span>{f.label}</span>
                             <strong>
-                              {readPfad(v.antragsdaten, f.pfad) || "—"}
+                              {asString(getPath(v.antragsdaten, f.pfad)) || "—"}
                             </strong>
                           </span>
                         ))}
@@ -636,26 +636,27 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                     <TableRow>
                       {selectionEnabled ? (
                         <TableHead className="w-14 px-4 py-2">
-                          <label className="ps-inbox__select ps-inbox__select--head">
-                            <input
-                              type="checkbox"
-                              checked={allPageSelected}
-                              aria-label="Alle sichtbaren Vorgänge auswählen"
-                              aria-checked={
-                                selectedOnPage > 0 && !allPageSelected
-                                  ? "mixed"
-                                  : allPageSelected
+                          <span
+                            className="ps-inbox__select ps-inbox__select--head"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <Checkbox
+                              checked={
+                                allPageSelected
+                                  ? true
+                                  : selectedOnPage > 0
+                                    ? "indeterminate"
+                                    : false
                               }
-                              onClick={(event) => event.stopPropagation()}
-                              onKeyDown={(event) => event.stopPropagation()}
-                              onChange={() =>
+                              aria-label="Alle sichtbaren Vorgänge auswählen"
+                              onCheckedChange={() =>
                                 allPageSelected
                                   ? clearSelection()
                                   : selectCurrentPage()
                               }
                             />
                             <span className="ps-visually-hidden">Auswahl</span>
-                          </label>
+                          </span>
                         </TableHead>
                       ) : null}
                       <Th
@@ -727,21 +728,20 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                         >
                           {selectionEnabled ? (
                             <TableCell className="w-14 align-top">
-                              <label
+                              <span
                                 className="ps-inbox__select"
                                 onClick={(event) => event.stopPropagation()}
                                 onKeyDown={(event) => event.stopPropagation()}
                               >
-                                <input
-                                  type="checkbox"
+                                <Checkbox
                                   checked={checked}
                                   aria-label={`Vorgang ${v.vorgangsnummer} auswählen`}
-                                  onChange={() => toggleSelection(v.id)}
+                                  onCheckedChange={() => toggleSelection(v.id)}
                                 />
                                 <span className="ps-visually-hidden">
                                   Vorgang {v.vorgangsnummer} auswählen
                                 </span>
-                              </label>
+                              </span>
                             </TableCell>
                           ) : null}
                           <TableCell className="align-top">
@@ -767,7 +767,7 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                               key={f.pfad}
                               className="align-top text-foreground"
                             >
-                              {readPfad(v.antragsdaten, f.pfad) || (
+                              {asString(getPath(v.antragsdaten, f.pfad)) || (
                                 <span className="text-muted-foreground">—</span>
                               )}
                             </TableCell>
@@ -901,36 +901,46 @@ function ArbeitsvorratPagination({
         {status} · Seite <span className="ps-num">{page + 1}</span> von{" "}
         <span className="ps-num">{pageCount}</span>
       </p>
-      <label className="ps-inbox__page-size">
+      <div className="ps-inbox__page-size">
         <span>Einträge pro Seite</span>
-        <select
-          value={pageSize}
-          onChange={(event) => onPageSizeChange(Number(event.target.value))}
+        <Select
+          value={String(pageSize)}
+          onValueChange={(value) => onPageSizeChange(Number(value))}
         >
-          {pageSizeOptions.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-      </label>
+          <SelectTrigger
+            aria-label="Einträge pro Seite"
+            className="h-9 w-20 text-sm"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {pageSizeOptions.map((option) => (
+              <SelectItem key={option} value={String(option)}>
+                {option}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       <div className="ps-inbox__page-actions">
-        <button
+        <Button
           type="button"
-          className="ps-btn ps-btn--ghost"
+          variant="outline"
+          size="sm"
           disabled={page === 0}
           onClick={() => onPageChange(Math.max(0, page - 1))}
         >
           Zurück
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className="ps-btn ps-btn--ghost"
+          variant="outline"
+          size="sm"
           disabled={page >= pageCount - 1}
           onClick={() => onPageChange(Math.min(pageCount - 1, page + 1))}
         >
           Weiter
-        </button>
+        </Button>
       </div>
     </nav>
   );
@@ -988,42 +998,48 @@ function ArbeitsvorratBulkActions({
         </div>
       </div>
       <div className="ps-bulk-action-bar__actions">
-        <button
+        <Button
           type="button"
-          className="ps-btn ps-btn--ghost"
+          variant="outline"
+          size="sm"
           disabled={allPageSelected || !canSelectPage}
           onClick={onSelectCurrentPage}
         >
           Aktuelle Seite auswählen
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className="ps-btn ps-btn--ghost"
+          variant="outline"
+          size="sm"
           disabled={!hasSelection}
           onClick={onClearSelection}
         >
           Auswahl leeren
-        </button>
+        </Button>
         {actions.map((action) => (
-          <button
+          <Button
             key={action.id}
             type="button"
-            className={cn("ps-btn", bulkActionClass(action.tone))}
+            variant={bulkActionVariant(action.tone)}
+            size="sm"
             disabled={!hasSelection || action.disabled}
             onClick={() => action.onClick(selectedIds)}
           >
             {action.label}
-          </button>
+          </Button>
         ))}
       </div>
     </section>
   );
 }
 
-function bulkActionClass(tone: ArbeitsvorratBulkAction["tone"]): string {
-  if (tone === "primary") return "ps-btn--primary";
-  if (tone === "danger") return "ps-btn--danger";
-  return "ps-btn--ghost";
+/** Bulk-Ton → Kit-Button-Variante (ersetzt die frühere `ps-btn--*`-Klassenzuordnung). */
+function bulkActionVariant(
+  tone: ArbeitsvorratBulkAction["tone"],
+): "default" | "destructive" | "outline" {
+  if (tone === "primary") return "default";
+  if (tone === "danger") return "destructive";
+  return "outline";
 }
 
 // ── Sortierbarer Spalten-Header (a11y: Button mit aria-sort am TableHead) ────

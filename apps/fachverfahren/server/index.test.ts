@@ -2,11 +2,43 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { InMemoryCaseStore } from "@senticor/app-store-postgres";
 import {
+  assertHeaderAuthAllowed,
+  buildDomainApiFromEnv,
   buildInternalServer,
   buildPublicServer,
   readRuntimeConfig,
 } from "./index.js";
+
+/** Minimal-Vertrag (id + StatusMachine) für die Auth-Bootstrap-Tests. */
+async function writeContract(): Promise<{ path: string; dir: string }> {
+  const dir = join(tmpdir(), `fv-contract-${Date.now()}-${randomSuffix()}`);
+  await mkdir(dir, { recursive: true });
+  const path = join(dir, "leistung.contract.json");
+  await writeFile(
+    path,
+    JSON.stringify({
+      id: "leistung-test",
+      statusMachine: {
+        initial: "eingegangen",
+        states: [
+          { key: "eingegangen" },
+          { key: "entschieden", terminal: true },
+        ],
+        transitions: [
+          { from: "eingegangen", to: "entschieden", rollen: ["sb"] },
+        ],
+      },
+    }),
+  );
+  return { path, dir };
+}
+
+let suffix = 0;
+function randomSuffix(): string {
+  return String(suffix++);
+}
 
 describe("fachverfahren runtime", () => {
   it("sets redeploy-safe cache and security headers", async () => {
@@ -113,6 +145,177 @@ describe("fachverfahren runtime", () => {
     } finally {
       await app.close();
       await rm(staticDir, { recursive: true, force: true });
+    }
+  });
+
+  it("marks readiness false when the data store is unreachable (fail-soft probe)", async () => {
+    const staticDir = await createStaticDir();
+    const config = readRuntimeConfig({ STATIC_DIR: staticDir });
+    const caseStore = new InMemoryCaseStore();
+    // Simuliere einen toten Pool: ping wirft.
+    caseStore.ping = async () => {
+      throw new Error("pool down");
+    };
+    const app = buildPublicServer({
+      config,
+      state: { startupComplete: true, shuttingDown: false },
+      domainApi: {
+        caseStore,
+        catalog: { transitionsFor: () => [] },
+        resolveSession: () => undefined,
+      },
+    });
+    try {
+      const res = await app.inject({ method: "GET", url: "/readyz" });
+      expect(res.statusCode).toBe(503);
+      expect(res.json().upstreamFailures.join(" ")).toContain("caseStore");
+    } finally {
+      await app.close();
+      await rm(staticDir, { recursive: true, force: true });
+    }
+  });
+
+  it("rate-limits /api/* per key and answers 429 as problem+json", async () => {
+    const staticDir = await createStaticDir();
+    const config = readRuntimeConfig({
+      STATIC_DIR: staticDir,
+      APP_RATELIMIT_MAX: "2",
+    });
+    const app = buildPublicServer({
+      config,
+      state: { startupComplete: true, shuttingDown: false },
+      domainApi: {
+        caseStore: new InMemoryCaseStore(),
+        catalog: { transitionsFor: () => [] },
+        resolveSession: () => undefined,
+      },
+    });
+    try {
+      const hdr = { "x-actor-id": "sb.limit" };
+      const first = await app.inject({
+        method: "GET",
+        url: "/api/cases",
+        headers: hdr,
+      });
+      const second = await app.inject({
+        method: "GET",
+        url: "/api/cases",
+        headers: hdr,
+      });
+      const third = await app.inject({
+        method: "GET",
+        url: "/api/cases",
+        headers: hdr,
+      });
+      expect(first.statusCode).not.toBe(429);
+      expect(second.statusCode).not.toBe(429);
+      expect(third.statusCode).toBe(429);
+      expect(third.headers["content-type"]).toContain(
+        "application/problem+json",
+      );
+      expect(third.headers["retry-after"]).toBeDefined();
+      expect(third.json().status).toBe(429);
+      // Statische Assets bleiben unlimitiert.
+      const asset = await app.inject({ method: "GET", url: "/", headers: hdr });
+      expect(asset.statusCode).toBe(200);
+    } finally {
+      await app.close();
+      await rm(staticDir, { recursive: true, force: true });
+    }
+  });
+
+  it("echoes the incoming x-request-id as the correlation id (genReqId)", async () => {
+    const staticDir = await createStaticDir();
+    const config = readRuntimeConfig({ STATIC_DIR: staticDir });
+    const app = buildPublicServer({
+      config,
+      state: { startupComplete: true, shuttingDown: false },
+    });
+    try {
+      const withId = await app.inject({
+        method: "GET",
+        url: "/livez",
+        headers: { "x-request-id": "korr-abc-123" },
+      });
+      expect(withId.headers["x-request-id"]).toBe("korr-abc-123");
+      const withoutId = await app.inject({ method: "GET", url: "/livez" });
+      expect(String(withoutId.headers["x-request-id"] ?? "")).not.toBe("");
+    } finally {
+      await app.close();
+      await rm(staticDir, { recursive: true, force: true });
+    }
+  });
+
+  it("serves unplanned errors as sanitized RFC-9457 problem+json", async () => {
+    const staticDir = await createStaticDir();
+    const config = readRuntimeConfig({ STATIC_DIR: staticDir });
+    const app = buildPublicServer({
+      config,
+      state: { startupComplete: true, shuttingDown: false },
+      domainApi: {
+        caseStore: new InMemoryCaseStore(),
+        catalog: { transitionsFor: () => [] },
+        resolveSession: () => ({
+          actorId: "sb.a",
+          tenantId: "t1",
+          authorityId: "b1",
+          jurisdictionId: "de",
+          permissions: [],
+        }),
+      },
+    });
+    try {
+      // Fehlerhaftes JSON → Fastify-Body-Parser wirft 400 VOR dem Handler → zentrale Fehlerbehandlung.
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/cases/abc/transitions",
+        headers: { "content-type": "application/json" },
+        payload: "{ das ist kein json",
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.headers["content-type"]).toContain("application/problem+json");
+      const body = res.json();
+      expect(body.status).toBe(400);
+      expect(typeof body.title).toBe("string");
+      expect(body.instance).toBe(res.headers["x-request-id"]);
+    } finally {
+      await app.close();
+      await rm(staticDir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses to bootstrap header-auth in production (full-bypass guard, HTTP-Pfad)", () => {
+    // Der Guard lebt auf dem HTTP-Bootstrap-Pfad (startRuntime), NICHT in buildDomainApiFromEnv — so triggert der reine
+    // Automations-Worker (der die Deps ohne HTTP nutzt) ihn nicht. Hier direkt die Guard-Funktion:
+    // PRODUCTION ohne ausdrückliches dev-header → verboten (ungeprüfte x-*-Header = Voll-Bypass).
+    expect(() =>
+      assertHeaderAuthAllowed({ NODE_ENV: "production" } as NodeJS.ProcessEnv),
+    ).toThrow(/PRODUCTION/);
+    // Mit ausdrücklichem Bekenntnis dev-header → erlaubt.
+    expect(() =>
+      assertHeaderAuthAllowed({
+        NODE_ENV: "production",
+        APP_AUTH_MODE: "dev-header",
+      } as NodeJS.ProcessEnv),
+    ).not.toThrow();
+    // Nicht-PRODUCTION → erlaubt (DEV/Test).
+    expect(() =>
+      assertHeaderAuthAllowed({} as NodeJS.ProcessEnv),
+    ).not.toThrow();
+  });
+
+  it("buildDomainApiFromEnv baut die Deps unabhängig von der HTTP-Auth-Policy (Worker-Pfad)", async () => {
+    // Ein reiner Worker baut die Deps in PRODUCTION AUCH ohne dev-header — die HTTP-Header-Auth-Sperre ist NICHT hier.
+    const { path, dir } = await writeContract();
+    try {
+      await expect(
+        buildDomainApiFromEnv({
+          NODE_ENV: "production",
+          APP_LEISTUNG_CONTRACT: path,
+        } as NodeJS.ProcessEnv),
+      ).resolves.toBeDefined();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
     }
   });
 });

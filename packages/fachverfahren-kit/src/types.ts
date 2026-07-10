@@ -14,6 +14,11 @@ export interface VorgangHistorie {
   ts: string;
   aktion: string;
   rolle: string;
+  /** ART des Eintrags — trennt fachliche STATUS-Übergänge von anderen Vermerken. Load-bearing für die
+   *  Vier-Augen-Prüfung: der „Vorbereiter" einer kritischen Entscheidung ist der Akteur des letzten
+   *  `uebergang`-Eintrags, NICHT irgendein beliebiger History-Akteur (sonst „vergiften" Label-/Zuweisungs-/
+   *  Automations-Vermerke die Prüfung). OPTIONAL/additiv: fehlt sie, gilt ein Eintrag als neutraler Vermerk. */
+  art?: "eingang" | "uebergang" | "vermerk";
   /** Der HANDELNDE (pseudonymes Kürzel/Nutzer-ID, keine Klarnamen nötig) — zusätzlich zur Rolle. Ohne Akteur ist ein
    *  Vier-Augen-Nachweis nicht führbar: „Vier Augen" heißt ZWEI VERSCHIEDENE Personen, nicht zwei Rollen desselben
    *  Menschen. Optional (bestehende Configs bleiben gültig); Compliance-KPIs messen über history[].akteur. */
@@ -104,8 +109,11 @@ export interface Nachweis {
   /** M4 — REGISTER-BEZUG (nur bei `register-once-only` sinnvoll): Quelle/Rechtsgrundlage/Einwilligung/Status. */
   register?: NachweisRegister;
   /** Die TATSÄCHLICH beim Antrag hochgeladene Datei (Metadaten). Wird beim Einreichen aus dem Bürger-Upload
-   *  reconciled (hochgeladen:true) — so sieht der Sachbearbeiter im ReviewWorkspace echte „Hochgeladen"-Zustände. */
-  datei?: { name: string; groesse: number };
+   *  reconciled (hochgeladen:true) — so sieht der Sachbearbeiter im ReviewWorkspace echte „Hochgeladen"-Zustände.
+   *  `vorschauUrl` (optional): eine begrenzte Vorschau-dataURL für BILD-Nachweise (akzeptierteTypen image/*) — nur für die
+   *  Anzeige (ReviewWorkspace-Vorschau, optionaler Bescheid-Lichtbild-Slot). Der echte Datei-Inhalt wandert in PROD über den
+   *  Port; die dataURL ist Prototyp-Komfort. Bei Nicht-Bild-Nachweisen leer. */
+  datei?: { name: string; groesse: number; vorschauUrl?: string };
 }
 
 /** Der generische Vorgang — `TAntragsdaten` ist der LEISTUNGS-spezifische Antragsinhalt
@@ -295,6 +303,19 @@ export interface EPaymentConfig {
 }
 
 /** Zustellungs-/Bekanntgabe-Signal: schaltet Bescheid-Tab (PdfViewer) + Bürger-Postfach frei. */
+/** Die REGIME-abhängige Rechtsbehelfsbelehrung (data-driven — die einzige regime-spezifische Aussage im Bescheid). Ohne
+ *  Deklaration gilt der VwVfG-/VwGO-Default (Widerspruch, ein Monat, erlassende Stelle). Ein AO-/Steuer-Verfahren setzt
+ *  art „Einspruch" + norm „§ 347 AO", ein OWiG-Verfahren „Einspruch § 67 OWiG → Amtsgericht", ein SGB-Verfahren
+ *  „Widerspruch §§ 83 ff. SGG → Sozialgericht". EINE Wahrheit: der Generator setzt sie aus subsumtion.verfahrensregime. */
+export interface RechtsbehelfConfig {
+  art?: string; // „Widerspruch" (VwVfG/VwGO) | „Einspruch" (AO/OWiG) — Default „Widerspruch"
+  frist?: string; // Fristdauer als Text, Default „einem Monat"
+  norm?: string; // Norm des Rechtsbehelfs, z. B. „§ 68 VwGO" | „§ 347 AO" | „§ 67 OWiG" | „§§ 83 ff. SGG"
+  adressat?: string; // Stelle, bei der einzulegen ist — Default „der erlassenden Stelle (<kommune>)"
+  form?: string; // Form, Default „schriftlich oder zur Niederschrift"
+  gericht?: string; // Rechtsweg/Gericht bei Nichtabhilfe, z. B. „Verwaltungsgericht" | „Finanzgericht" | „Sozialgericht" | „Amtsgericht"
+}
+
 export interface ZustellungConfig {
   /** ISO-Datum der rechtlichen Bekanntgabe (§ 41 VwVfG) — maßgeblich für den Fristlauf. */
   bekanntgabeIso?: string | undefined;
@@ -309,6 +330,13 @@ export interface ZustellungConfig {
   fiktionNorm?: string | undefined;
   /** URL des Bescheid-PDFs — gesetzt ⇒ Bescheid-Tab (PdfViewer) + Postfach-Dokument. */
   bescheidUrl?: string | undefined;
+  /** Optionaler LICHTBILD-/BILD-Slot auf dem Bescheid: verweist auf einen BILD-Nachweis (per `nachweisId`), dessen Vorschau
+   *  (datei.vorschauUrl) im Bescheid als Abbildung erscheint. NUR setzen, wenn die Darstellung eines personenbezogenen Bildes
+   *  auf dem hoheitlichen Bescheid ERFORDERLICH + rechtsgrundlagen-gedeckt ist (Datenminimierung Art. 5 DSGVO — die Nachprompt-
+   *  Fabrik prüft das über feature-feasibility, bevor dieses Feld je gesetzt wird). Fehlt es ⇒ kein Bild-Slot. */
+  bescheidBild?: { nachweisId: string; maxHoehePx?: number } | undefined;
+  /** REGIME-abhängige Rechtsbehelfsbelehrung (Widerspruch/Einspruch, Frist, Norm, Gericht). Fehlt sie ⇒ VwVfG-Default. */
+  rechtsbehelf?: RechtsbehelfConfig | undefined;
 }
 
 /** Eine zu überwachende Frist (spiegelt TerminFristPanel `FristItem` — `status` exakt-optional, ohne `| undefined`). */
@@ -682,6 +710,16 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   termin?: TerminConfig | undefined;
   /** `enabled` ⇒ AdressValidierung (deterministischer Registerabgleich) im Bürger-Antrag. */
   adressValidierung?: AdressValidierungConfig | undefined;
+  /** PM-UPGRADE (additiv) — verfahrensspezifische AUTOMATIONS-Regeln („special case je Verfahren") als DATEN:
+   *  Trigger→Bedingung→Aktion, ausgewertet vom reinen `evalAutomationen` (DEV/`simulate`) bzw. server-autoritativ
+   *  von der Automations-Engine. Fehlt das Feld ⇒ keine Automation (Verhalten wie bisher). */
+  automationen?: AutomationRule[] | undefined;
+  /** PM-UPGRADE (additiv) — BOARD-Konfiguration (Kanban-Spalten) dieses Verfahrens. Fehlt sie ⇒ die Spalten
+   *  werden aus `statusMachine.states` abgeleitet (`boardSpalten`). */
+  board?: BoardConfig | undefined;
+  /** PM-UPGRADE (additiv) — verfahrensspezifische PRIORITÄTS-Stufen. Fehlt das Feld ⇒ der Workspace nutzt seine
+   *  gemeinsamen `WorkspaceConfig.prioritaeten`. */
+  prioritaeten?: PriorityDef[] | undefined;
   /** Seed-Fälle (Demo-Arbeitsvorrat), damit die SB-Sicht sofort echte Vorgänge zeigt. */
   seed?: (helpers: {
     vorgangsnummer: () => string;
@@ -718,4 +756,396 @@ export interface VorgangPort<TAntragsdaten = Record<string, unknown>> {
   ): void;
   /** Once-Only-Lookup gegen das Register. */
   lookupRegister(query: string): Record<string, string> | undefined;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+// PM-UPGRADE — Task-/Board-/Workspace-Schicht (verfahrensübergreifend, Plane-inspiriert)
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+//
+// Die generische MANAGEMENT-KLAMMER über dem fachlichen `Vorgang`. Priorität, Zuweisung, Labels, Board-Position
+// und Sub-Task-Bezug sind verfahrensÜBERGREIFEND und ORTHOGONAL zur fachlichen Wahrheit — der `Vorgang` (oben)
+// bleibt bewusst frei von Verfahren/Mandant/Priorität. Alle Felder sind DATEN; die reine Auswertung
+// (lib/automation, lib/rank, `boardSpalten`) ist deterministisch und testbar. Ein Board-Move (Priorität/Position)
+// darf NIE einen fachlichen Vier-Augen-Übergang auslösen — deshalb sind Task und Vorgang GETRENNTE Entitäten.
+// Alle Typen sind additiv: bestehende Configs/Vorgänge bleiben ohne sie gültig.
+
+/** Schlüssel einer Priorität (aus `PriorityDef.key`) — verfahrens-/workspaceweit kuratiert. */
+export type Prioritaet = string;
+
+/** Eine PRIORITÄTS-Definition als DATEN. `tone` steuert die Farbe (BITV: nie Farbe allein — `label` ist immer
+ *  sichtbar); `ordinal` ordnet (0 = höchste Dringlichkeit, aufsteigend); `slaStunden` ist ein optionales
+ *  Bearbeitungsziel (aus dem später eine Restfrist/Warnung abgeleitet werden kann). */
+export interface PriorityDef {
+  key: string;
+  label: string;
+  tone: StatusTone;
+  ordinal: number;
+  slaStunden?: number;
+}
+
+/** Ein kuratiertes LABEL/Tag als DATEN — bewusst getrennt von `KiEinschaetzung.flags` (maschinelle Hinweise).
+ *  Heißt `LabelDef` (nicht `Label`), um die Kollision mit der UI-`Label`-Komponente zu vermeiden. */
+export interface LabelDef {
+  key: string;
+  label: string;
+  tone?: StatusTone;
+}
+
+/** Der TRIAGE-Status eines Eingangs (verfahrensübergreifende Inbox): offen, zurückgestellt, angenommen (→ Vorgang),
+ *  abgelehnt oder als Dublette markiert. */
+export type TriageStatus =
+  | "pending"
+  | "snoozed"
+  | "accepted"
+  | "declined"
+  | "duplicate";
+
+/** Ein EINGANG in der verfahrensübergreifenden Inbox — VOR der Annahme als fachlicher `Vorgang`. `rohdaten` trägt
+ *  die noch nicht subsumierten Antragsdaten; `aufgabeId`/`vorgangId` werden bei Annahme (`triage`) gesetzt. */
+export interface InboxItem {
+  id: string;
+  procedureId: string;
+  tenantId: string;
+  authorityId: string;
+  jurisdictionId: string;
+  /** Herkunft des Eingangs (Bürger-Antrag, E-Mail, Formular, Register-Meldung). */
+  quelle: "antrag" | "email" | "formular" | "register";
+  eingangIso: string;
+  triageStatus: TriageStatus;
+  rohdaten: Record<string, unknown>;
+  /** Kurzbetreff für die Triage-Liste (aus `rohdaten` abgeleitet oder vom Erzeuger gesetzt). */
+  betreff?: string;
+  /** Nach Annahme: die erzeugte Aufgabe/der erzeugte Vorgang. */
+  aufgabeId?: string;
+  vorgangId?: string;
+}
+
+/** Die TASK/AUFGABE — die verfahrensübergreifende Management-Klammer, die 1:1 einen `Vorgang` umschließt
+ *  (`vorgangId`), aber auch VOR dem Vorgang (aus der Inbox) existieren kann (`vorgangId` optional). */
+export interface Aufgabe {
+  id: string;
+  /** 1:1 zum fachlichen Vorgang (`Vorgang.id`); OPTIONAL, solange die Aufgabe nur ein Inbox-Eingang ist. */
+  vorgangId?: string;
+  /** Verfahren, zu dem diese Aufgabe gehört. OPTIONAL: eine VERFAHRENS-FREIE Aufgabe (ein generisches Projekt-/
+   *  Workflow-Item OHNE Fachverfahren/Vorgang) trägt keine `procedureId` — so ist das System auch als reines
+   *  Projekt-/Task-Management jenseits kommunaler Fachverfahren nutzbar. */
+  procedureId?: string;
+  procedureVersion?: string;
+  /** Multi-Tenancy, konsistent zu `app_cases` — der Scope kommt in PROD IMMER aus der Server-Session. */
+  tenantId: string;
+  authorityId: string;
+  jurisdictionId: string;
+  titel: string;
+  prioritaet?: Prioritaet;
+  /** Bearbeiter-Kennung — dieselbe Akteur-Semantik wie `VorgangHistorie.akteur` (vereinheitlicht zur `actor_id`). */
+  zugewiesenAn?: string;
+  labels?: string[];
+  /** Fälligkeit als ISO-8601 — abgeleitet aus `FristTyp` + `faelligkeitAb()` (lib/frist), nicht frei gesetzt. */
+  faelligIso?: string;
+  /** Manuelle Board-Ordnung als FRACTIONAL-INDEX (lib/rank) — ein Drop schreibt nur diese eine Karte. */
+  sortRank: string;
+  /** Sub-Task-Bezug (flache Gruppierung zunächst). */
+  parentAufgabeId?: string;
+  /** Board-Spalte NUR, wenn die Board-Achse von `status` ENTKOPPELT ist (z. B. Prioritäts-/Zuweisungs-Board). */
+  boardSpalte?: string;
+  /** Optimistic-Locking-Zähler (Drag-Konflikte, If-Match). */
+  version: number;
+}
+
+// ── Aufgaben-Detail: Vermerke, Aktivität, Beziehungen (Phase 7, camelCase-Sicht der Server-DATEN) ──
+/** Interner Vermerk an einer Aufgabe (append-only) — ↔ `AppTaskComment` im app-store. */
+export interface AufgabeKommentar {
+  id: string;
+  aufgabeId: string;
+  /** Handelnder Akteur — dieselbe Akteur-Semantik wie `VorgangHistorie.akteur`. */
+  autorAkteurId: string;
+  text: string;
+  erstelltIso: string;
+}
+
+/** Aktivitäts-Eintrag (append-only) — ↔ `AppTaskActivity`. */
+export interface AufgabeAktivitaet {
+  id: string;
+  aufgabeId: string;
+  akteurId: string;
+  /** Aktivitätstyp als DATEN (z. B. `task.commented`, `task.ki-uebernommen`) — kein Domänen-Literal im UI. */
+  typ: string;
+  payload?: Record<string, unknown>;
+  zeitpunktIso: string;
+}
+
+/** Beziehungstyp zwischen zwei Aufgaben (Plane-Parität). */
+export type BeziehungsTyp =
+  | "blocks"
+  | "blocked-by"
+  | "duplicate"
+  | "relates"
+  | "widerspruch-zu";
+
+/** Gerichtete Beziehung zwischen zwei Aufgaben — ↔ `AppTaskRelation`. */
+export interface AufgabeBeziehung {
+  id: string;
+  aufgabeId: string;
+  verknuepfteAufgabeId: string;
+  typ: BeziehungsTyp;
+  erstelltIso: string;
+}
+
+// ── Board / View als DATEN ───────────────────────────────────────────────────────────────────────
+/** Achse, nach der ein Board seine Spalten bildet: fachlicher Status, Priorität oder Zuweisung. */
+export type BoardAchse = "status" | "prioritaet" | "zuweisung";
+
+/** Eine BOARD-SPALTE (Kanban). `gruppe` normalisiert HETEROGENE `statusMachine`s über Verfahren hinweg zu
+ *  gemeinsamen Plane-artigen State-Groups, damit ein Cross-Verfahren-Board nicht fremde Spalten nebeneinander
+ *  zeigt. `wipLimit` ist ein optionales Work-in-Progress-Limit. */
+export interface BoardColumn {
+  key: string;
+  label: string;
+  tone?: StatusTone;
+  wipLimit?: number;
+  gruppe?: "backlog" | "offen" | "in-arbeit" | "erledigt" | "abgebrochen";
+}
+
+/** BOARD-Konfiguration eines Verfahrens/Workspace. `spalten` überschreibt die aus `statusMachine.states`
+ *  abgeleiteten Default-Spalten; `sichtbarWenn` blendet das Board bedingt ein (progressive disclosure). */
+export interface BoardConfig {
+  achse: BoardAchse;
+  spalten?: BoardColumn[];
+  sichtbarWenn?: Bedingung;
+}
+
+/** FILTER einer gespeicherten View. `zugewiesenAn` kennt die dynamischen Marker `$ich`/`$niemand`; `bedingung`
+ *  erlaubt beliebige generische Prädikate über die Antrags-/Task-Daten (via `evalBedingung`). */
+export interface ViewFilter {
+  suche?: string;
+  status?: string[];
+  prioritaet?: Prioritaet[];
+  labels?: string[];
+  zugewiesenAn?: string | "$ich" | "$niemand";
+  procedureId?: string[];
+  bedingung?: Bedingung;
+}
+
+/** Das LAYOUT einer View. */
+export type ViewLayout = "liste" | "board" | "tabelle" | "kalender";
+
+/** Eine gespeicherte VIEW (Filter + Sortierung + Gruppierung + Layout) — personal oder geteilt. */
+export interface ViewConfig {
+  id: string;
+  label: string;
+  layout: ViewLayout;
+  filter?: ViewFilter;
+  sortKey?: string;
+  sortDir?: "asc" | "desc";
+  groupBy?: BoardAchse;
+  scope?: "personal" | "geteilt";
+}
+
+// ── Dynamisches Regeln/Hooks-Framework (EIN Schema, ZWEI Auswerter: rein `simulate` + Server-Engine) ─
+/** Der TRIGGER einer Automations-Regel. Zeitgetriebene Trigger (`frist-erreicht`) werden server-seitig von einem
+ *  Scheduler-Tick erzeugt (die reine Auswertung bekommt die Zeit injiziert, kein `Date.now` im Kit). */
+export type AutomationTrigger =
+  | { art: "beim-eingang" }
+  | { art: "beim-uebergang"; von?: string; nach?: string }
+  | { art: "frist-erreicht"; fristTyp: string }
+  | { art: "nachweis-eingegangen"; nachweisId?: string }
+  | { art: "feld-geaendert"; feld: string }
+  | { art: "zuweisung-geaendert" }
+  | { art: "manuell"; label: string };
+
+/** Eine AKTION (Effekt-ABSICHT) einer Automations-Regel. Die reine Auswertung liefert nur diese Absichten; die
+ *  AUSFÜHRUNG (Mutation, Audit, Gate) ist server-autoritativ. `status-uebergang` läuft durch dieselben
+ *  `uebergang`-Guards (RBAC/Vier-Augen); `ki-vorschlag` ist NIE autonom (Mensch entscheidet, Art. 50 EU-AI-Act). */
+export type AutomationAktion =
+  | { art: "setze-feld"; feld: string; wert: string | number | boolean }
+  | { art: "setze-prioritaet"; wert: Prioritaet }
+  | { art: "zuweisen"; an: string | { rolle: string } }
+  | { art: "label-hinzufuegen"; label: string }
+  | { art: "status-uebergang"; nach: string; detail?: string }
+  | { art: "aufgabe-erstellen"; titel: string; faelligInTagen?: number }
+  | { art: "benachrichtigen"; kanal: string; template: string }
+  | { art: "ki-vorschlag"; vorschlag: KiVorschlagConfig }
+  | { art: "audit"; aktion: string };
+
+/** Eine deklarative AUTOMATIONS-/HOOK-Regel als DATEN. `wenn` ist für ZUSTANDSÄNDERNDE Aktionen PFLICHT
+ *  (fail-closed — `evalBedingung` ist sonst fail-open und würde die Regel dauerhaft feuern lassen); `evalAutomationen`
+ *  überspringt eine mutierende Regel ohne `wenn`. `vierAugenErforderlich` markiert Regeln, deren Ausführung nur als
+ *  menschliche Vorlage (nie autonom) zulässig ist. */
+export interface AutomationRule {
+  id: string;
+  trigger: AutomationTrigger;
+  wenn?: Bedingung;
+  dann: AutomationAktion[];
+  vierAugenErforderlich?: boolean;
+  /** Standard aktiv; `false` deaktiviert die Regel (Trockenlauf/`simulate` bleibt möglich). */
+  aktiv?: boolean;
+  normRef?: NormRef;
+}
+
+// ── Multi-Verfahren-Registry + Workspace-Komposition als DATEN ───────────────────────────────────
+/** Ein WIDGET im komponierbaren Workspace-Layout — `typ` verweist auf einen Eintrag der (in der App lebenden)
+ *  WidgetRegistry; `optionen` sind widget-spezifische DATEN. Das Rendering ist Phase 7; der Typ ist additiv. */
+export interface WidgetDef {
+  typ: string;
+  optionen?: Record<string, unknown>;
+}
+
+/** Eine WORKSPACE-VIEW im Layout (Route/Seite): ein Layout + Widgets + Filter, optional bedingt sichtbar. */
+export interface WorkspaceView {
+  id: string;
+  label: string;
+  layout: ViewLayout;
+  widgets?: WidgetDef[];
+  filter?: ViewFilter;
+  sichtbarWenn?: Bedingung;
+}
+
+/** Das komponierbare WORKSPACE-LAYOUT als DATEN (Navigation + Views). */
+export interface WorkspaceLayout {
+  views: WorkspaceView[];
+}
+
+/** Ein Eintrag der Verfahrens-REGISTRY: ein Verfahren (`LeistungConfig`) unter seiner `procedureId`. */
+export interface VerfahrenEintrag<TAntragsdaten = Record<string, unknown>> {
+  procedureId: string;
+  config: LeistungConfig<TAntragsdaten>;
+  /** Standard aktiv; `false` blendet das Verfahren im Workspace aus, ohne es zu entfernen. */
+  aktiv?: boolean;
+}
+
+/** Die WORKSPACE-KONFIGURATION — die neue, N-wertige „Naht": EIN Sachbearbeiter-Workspace über MEHRERE Verfahren,
+ *  mit gemeinsamem Vokabular (Prioritäten/Labels), Board, gespeicherten Views und komponierbarem Layout. Der
+ *  Mandanten-Scope ist Teil der Config (DEV: synthetischer Einzeltenant; PROD: aus der Server-Session). */
+export interface WorkspaceConfig {
+  tenantId: string;
+  authorityId: string;
+  jurisdictionId: string;
+  verfahren: VerfahrenEintrag[];
+  prioritaeten: PriorityDef[];
+  labels: LabelDef[];
+  board?: BoardConfig;
+  views?: ViewConfig[];
+  layout?: WorkspaceLayout;
+  /** Workspace-weite Automations-Regeln (zusätzlich zu den verfahrensspezifischen `LeistungConfig.automationen`). */
+  automationenGlobal?: AutomationRule[];
+}
+
+/** FILTER der verfahrensübergreifenden Aufgabenliste — rein additiv: fehlt ein Kriterium, ist es unbeschränkt.
+ *  `zugewiesenAn` kennt den Marker `$niemand` (nicht zugewiesen) neben einer konkreten Akteur-Kennung. */
+export interface TaskFilter {
+  procedureId?: string[];
+  status?: string[];
+  prioritaet?: Prioritaet[];
+  labels?: string[];
+  zugewiesenAn?: string | "$niemand";
+  suche?: string;
+}
+
+/** Ergebnis einer BULK-Teilaktion — jede Teilaktion einzeln bilanziert (nie eine Bulk-*Entscheidung*, nur
+ *  Zuweisung/Priorität/Label). */
+export interface BulkErgebnis {
+  taskId: string;
+  ok: boolean;
+  fehler?: string;
+}
+
+/** Der WORKSPACE-PORT — die verfahrensÜBERGREIFENDE Datenschicht des SB-Workspace. DEV: In-Memory-Aggregat über
+ *  N `createFachverfahrenStore` (synchron, damit der `useSyncExternalStore`-Reaktivitätsvertrag erhalten bleibt);
+ *  PROD: die Fastify-Domain-API (/api/*) ist die Datenquelle — angebunden über eine SEPARATE async Fetch-Schicht,
+ *  die einen synchronen Snapshot speist (nicht über einen async Port „gleicher Signatur"). Die FACHLICHEN
+ *  Einzel-Operationen je Verfahren
+ *  (Antrag/Register) laufen über `portFor(procedureId)` (ein `VorgangPort`); die MANAGEMENT-Ebene (Aufgaben/Board)
+ *  ist hier. Board-Metadaten (Priorität/Zuweisung/Label/Rang) ändern NIE den fachlichen Status — dafür gibt es den
+ *  eigenen, guard-geprüften `taskUebergang`. */
+export interface WorkspacePort<TAntragsdaten = Record<string, unknown>> {
+  /** Die aktiven Verfahren des Workspace (Registry). */
+  verfahren(): VerfahrenEintrag<TAntragsdaten>[];
+  /** Die `LeistungConfig` eines Verfahrens. `undefined`-Eingabe (verfahrens-freie Aufgabe) ⇒ `undefined`. */
+  configFor(
+    procedureId: string | undefined,
+  ): LeistungConfig<TAntragsdaten> | undefined;
+  /** Der fachliche `VorgangPort` eines Verfahrens. `undefined`-Eingabe (verfahrens-freie Aufgabe) ⇒ `undefined`. */
+  portFor(
+    procedureId: string | undefined,
+  ): VorgangPort<TAntragsdaten> | undefined;
+
+  /** Aufgaben über ALLE Verfahren (inkl. verfahrens-freier), gefiltert + nach `sortRank` geordnet. */
+  listTasks(filter?: TaskFilter): Aufgabe[];
+  getTask(taskId: string): Aufgabe | undefined;
+  /** Legt eine VERFAHRENS-FREIE Aufgabe an (generisches Projekt-/Workflow-Item ohne Fachverfahren/Vorgang) und
+   *  gibt sie zurück. Metadaten (Priorität/Zuweisung/Labels/Board/Vermerke/Beziehungen) funktionieren wie bei
+   *  verfahrens-gebundenen Aufgaben; ein fachlicher `taskUebergang` ist mangels Status-Machine NICHT möglich. */
+  createFreieAufgabe(
+    titel: string,
+    opts?: {
+      prioritaet?: Prioritaet;
+      zugewiesenAn?: string;
+      labels?: string[];
+    },
+  ): Aufgabe;
+
+  /** Zuweisung setzen/entfernen (`undefined` = nicht zugewiesen). Metadaten, KEIN Vier-Augen-Gate. */
+  assign(
+    taskId: string,
+    zugewiesenAn: string | undefined,
+    akteur?: string,
+  ): void;
+  /** Priorität setzen/entfernen. Metadaten, KEIN Gate. */
+  setPrioritaet(
+    taskId: string,
+    prioritaet: Prioritaet | undefined,
+    akteur?: string,
+  ): void;
+  addLabel(taskId: string, label: string, akteur?: string): void;
+  removeLabel(taskId: string, label: string, akteur?: string): void;
+  /** Board-Position/-Spalte ändern (Drag&Drop): `rank` aus `rankZwischen`, `expectedVersion` für Optimistic Locking. */
+  move(
+    taskId: string,
+    boardSpalte: string | undefined,
+    rank: string,
+    expectedVersion: number,
+  ): void;
+  /** Bulk-Zuweisung — jede Teilaktion einzeln bilanziert; NIE eine Bulk-Entscheidung. */
+  bulkAssign(
+    taskIds: string[],
+    zugewiesenAn: string | undefined,
+    akteur?: string,
+  ): BulkErgebnis[];
+
+  /** FACHLICHER Statusübergang einer Aufgabe — delegiert an den Sub-Store des Verfahrens; prüft
+   *  Rolle/Detail/Vier-Augen (in PROD server-autoritativ). GETRENNT von den Metadaten-Mutationen oben. */
+  taskUebergang(
+    taskId: string,
+    to: string,
+    rolle: string,
+    detail?: string,
+    akteur?: string,
+  ): void;
+
+  // ── Aufgaben-Detail (Vermerke append-only, Aktivität append-only, Beziehungen löschbar) ──
+  // Der DEV-Store hält diese Daten in-memory; in PROD lädt/schreibt die App über die geprüften Server-Routen
+  // (`/api/tasks/:id/comments|activity|relations`). Reaktiv über den Versions-Snapshot des Stores.
+  listKommentare(taskId: string): AufgabeKommentar[];
+  /** Legt einen Vermerk an (append-only) UND protokolliert eine Aktivität `task.commented`. */
+  addKommentar(taskId: string, text: string, akteur?: string): void;
+  listAktivitaet(taskId: string): AufgabeAktivitaet[];
+  listBeziehungen(taskId: string): AufgabeBeziehung[];
+  /** Legt eine Beziehung an. Selbstreferenz/Duplikat werden ignoriert (kein Wurf im DEV-Store). */
+  addBeziehung(
+    taskId: string,
+    verknuepfteAufgabeId: string,
+    typ: BeziehungsTyp,
+  ): void;
+  entferneBeziehung(taskId: string, beziehungId: string): void;
+
+  // ── Verfahrensübergreifende Inbox / Triage (Phase 4) ──
+  // Der DEV-Store hält die Eingänge in-memory; in PROD über `/api/inbox` (+ `/accept`, `/triage`). Reaktiv.
+  /** Alle Eingänge der Inbox über ALLE Verfahren, optional nach Triage-Status gefiltert (Standard: `pending`). */
+  listInbox(triageStatus?: TriageStatus): InboxItem[];
+  /** Setzt den Triage-Status eines Eingangs (declined/duplicate/snoozed/pending) — NICHT `accepted`; das ist die
+   *  atomare `acceptInbox` (erzeugt Vorgang + Aufgabe). */
+  triageInbox(inboxId: string, status: Exclude<TriageStatus, "accepted">): void;
+  /** Nimmt einen Eingang AN: erzeugt im richtigen Verfahren einen `Vorgang` (+ Aufgabe) und markiert den Eingang als
+   *  `accepted`. Gibt die neue Aufgaben-Id zurück (oder `undefined`, wenn der Eingang fehlt/schon angenommen ist). */
+  acceptInbox(inboxId: string, akteur?: string): string | undefined;
 }

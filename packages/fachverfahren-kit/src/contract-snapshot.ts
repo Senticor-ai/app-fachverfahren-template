@@ -26,6 +26,13 @@ export interface LeistungContractSnapshot {
   fimRefs?: LeistungConfig["fimRefs"];
   /** FRISTEN-TYPEN als echte Zeilen. */
   fristenTypen?: LeistungConfig["fristenTypen"];
+  /** PM-UPGRADE — AUTOMATIONS-Regeln als echte Zeilen. Sicherheitsrelevante „special-case"-Logik GEHÖRT in den
+   *  auditierbaren Vertrag (deterministisch prüfbar), nicht als un-projiziertes Feld daran vorbei. */
+  automationen?: LeistungConfig["automationen"];
+  /** PM-UPGRADE — verfahrensspezifische BOARD-Konfiguration (strukturelle DATEN wie `statusMachine`). */
+  board?: LeistungConfig["board"];
+  /** PM-UPGRADE — verfahrensspezifische PRIORITÄTS-Stufen. */
+  prioritaeten?: LeistungConfig["prioritaeten"];
   statusMachine: LeistungConfig["statusMachine"];
   register: LeistungConfig["register"];
   detailSektionen: LeistungConfig["detailSektionen"];
@@ -68,6 +75,9 @@ export function toContractSnapshot<T = Record<string, unknown>>(
     ...(config.registerRefs ? { registerRefs: config.registerRefs } : {}),
     ...(config.fimRefs ? { fimRefs: config.fimRefs } : {}),
     ...(config.fristenTypen ? { fristenTypen: config.fristenTypen } : {}),
+    ...(config.automationen ? { automationen: config.automationen } : {}),
+    ...(config.board ? { board: config.board } : {}),
+    ...(config.prioritaeten ? { prioritaeten: config.prioritaeten } : {}),
     statusMachine: config.statusMachine,
     register: config.register,
     detailSektionen: config.detailSektionen,

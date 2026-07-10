@@ -1,0 +1,96 @@
+// verfahren.registry — die NEUE, N-wertige Naht: die VERFAHREN-REGISTRY des Sachbearbeiter-Workspace.
+//
+// Wo `leistung.config.ts` GENAU EIN Verfahren beschreibt, aggregiert diese `WorkspaceConfig` MEHRERE Verfahren zu
+// EINEM verfahrensübergreifenden Workspace (Plane-artige Inbox/Board über alle Verfahren). Für ein neues Verfahren
+// wird hier ein weiterer `VerfahrenEintrag` ergänzt — der Workspace-Store aggregiert sie automatisch. Prioritäten
+// und Labels sind das GEMEINSAME, workspace-weite Vokabular; ein Verfahren kann über `LeistungConfig.prioritaeten`
+// eigene Stufen mitbringen.
+//
+// Die Registry lebt bewusst INNERHALB von `apps/` (kein statischer Import aus `modules/*`) — sie bricht damit
+// `check:module-boundaries` nicht.
+import type {
+  VerfahrenEintrag,
+  WorkspaceConfig,
+} from "@senticor/fachverfahren-kit";
+import { leistungConfig } from "./leistung.config.js";
+import { beispielConfig } from "./leistung.config.beispiel.js";
+
+// Das zweite Demo-Verfahren erscheint NUR, solange das primäre noch das unveränderte Vorlagen-Demo (`musterantrag`)
+// ist. Ein generierender Build ÜBERSCHREIBT `leistung.config.ts` mit dem echten Verfahren (andere id) — dann fällt
+// dieses Demo automatisch weg und der Konsument sieht ausschließlich SEIN Verfahren. So zeigt die Vorlage die
+// verfahrensübergreifende Sicht eigenständig, ohne einen generierten Fork zu verschmutzen.
+const istUnveraendertesVorlagenDemo = leistungConfig.id === "musterantrag";
+const verfahren: VerfahrenEintrag[] = [
+  { procedureId: leistungConfig.id, config: leistungConfig },
+  ...(istUnveraendertesVorlagenDemo
+    ? [{ procedureId: beispielConfig.id, config: beispielConfig }]
+    : []),
+  // Weitere Verfahren hier ergänzen — der Workspace führt sie verfahrensübergreifend zusammen.
+];
+
+export const workspaceConfig: WorkspaceConfig = {
+  // DEV-Demo: EIN synthetischer Mandant. In PROD kommt der Mandanten-Scope IMMER aus der Server-Session,
+  // NIE aus dem Client — die Kit-Komponenten exponieren keinen Mandanten-Wechsler.
+  tenantId: "demo-tenant",
+  authorityId: "demo-authority",
+  jurisdictionId: "de",
+  verfahren,
+  prioritaeten: [
+    {
+      key: "dringend",
+      label: "Dringend",
+      tone: "block",
+      ordinal: 0,
+      slaStunden: 24,
+    },
+    { key: "hoch", label: "Hoch", tone: "warn", ordinal: 1, slaStunden: 72 },
+    { key: "normal", label: "Normal", tone: "info", ordinal: 2 },
+    { key: "niedrig", label: "Niedrig", tone: "neu", ordinal: 3 },
+  ],
+  labels: [
+    { key: "rueckfrage", label: "Rückfrage", tone: "warn" },
+    { key: "eilt", label: "Eilt", tone: "block" },
+    { key: "vollstaendig", label: "Vollständig", tone: "ok" },
+  ],
+  // WORKSPACE-WEITE Automations-/Hook-Regeln als DATEN (verfahrensübergreifend). Rein deklarativ; die AUSFÜHRUNG ist
+  // server-autoritativ (RBAC · Vier-Augen · Audit · Idempotenz). Das `RegelwerkPanel` macht sie sichtbar + erlaubt
+  // einen reinen Trockenlauf. Neutrale Muster — ein generierendes Verfahren bringt eigene Regeln mit.
+  automationenGlobal: [
+    // NICHT-mutierend (kein `wenn` nötig): Eingangsbestätigung ins Bürger-Postfach.
+    {
+      id: "benachrichtigung.eingang",
+      trigger: { art: "beim-eingang" },
+      dann: [
+        {
+          art: "benachrichtigen",
+          kanal: "postfach",
+          template: "eingang-bestaetigung",
+        },
+      ],
+    },
+    // NICHT-mutierend: jeden Statuswechsel zusätzlich fachlich protokollieren.
+    {
+      id: "audit.uebergang",
+      trigger: { art: "beim-uebergang" },
+      dann: [{ art: "audit", aktion: "statuswechsel-protokolliert" }],
+    },
+    // MUTIEREND → `wenn` PFLICHT (fail-closed): bei Fristablauf eskalieren, wenn noch nicht dringend.
+    {
+      id: "eskalation.frist",
+      trigger: { art: "frist-erreicht", fristTyp: "bearbeitung" },
+      wenn: { feld: "$prioritaet", op: "!=", wert: "dringend" },
+      dann: [
+        { art: "setze-prioritaet", wert: "dringend" },
+        { art: "label-hinzufuegen", label: "eilt" },
+      ],
+    },
+    // MUTIEREND + inaktiv (nur Trockenlauf): eilige Vorgänge bei Übergang der Sachbearbeitung zuweisen.
+    {
+      id: "zuweisung.eilige",
+      trigger: { art: "beim-uebergang" },
+      wenn: { feld: "$prioritaet", op: "in", wert: ["dringend", "hoch"] },
+      dann: [{ art: "zuweisen", an: { rolle: "sachbearbeitung" } }],
+      aktiv: false,
+    },
+  ],
+};

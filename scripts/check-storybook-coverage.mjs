@@ -81,6 +81,29 @@ for (const component of publicComponents) {
   }
 }
 
+// Kit-Komponenten der PM-/Workflow-Initiative MÜSSEN echte Story-Abdeckung haben — als JSX GERENDERT, nicht nur
+// als Name/Überschrift genannt. Das schließt (a) den Blindfleck, dass das Gate bisher NUR public-sector-ui-Exports
+// prüfte, und (b) die Substring-Schwäche des reinen includes() (ein Baustein galt als abgedeckt, wenn sein Name
+// irgendwo als Titel-String auftauchte, ohne je gerendert zu werden).
+const requiredKitComponents = [
+  "KommentarThread",
+  "AktivitaetsFeed",
+  "RelationPanel",
+  "TriageInbox",
+  "KiSidecar",
+  "BenutzerEinstellungen",
+  "Arbeitsvorrat",
+  "ReviewWorkspace",
+  "RegelwerkPanel",
+];
+for (const component of requiredKitComponents) {
+  if (!new RegExp(`<${component}[\\s/>]`).test(storyText)) {
+    failures.push(
+      `Kit-Komponente ohne echte Storybook-Abdeckung (nicht als JSX gerendert): ${component}`,
+    );
+  }
+}
+
 if (!storyText.includes("Screen Contract")) {
   failures.push("stories must expose at least one Screen Contract example");
 }

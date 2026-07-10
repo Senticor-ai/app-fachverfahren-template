@@ -1,3 +1,5 @@
+import type { Clock } from "./clock.js";
+
 export interface Actor {
   actorId: string;
   actorType: "citizen" | "employee" | "service" | "organization";
@@ -156,6 +158,7 @@ export function transitionCase(
   procedureVersion: ProcedureVersion,
   action: string,
   expectedVersion: number,
+  now: Clock = () => new Date().toISOString(),
 ): Case {
   if (currentCase.version !== expectedVersion) {
     throw new Error("case version conflict");
@@ -174,8 +177,6 @@ export function transitionCase(
     ...currentCase,
     state: transition.to,
     version: currentCase.version + 1,
-    ...(transition.to === "closed"
-      ? { closedAt: new Date().toISOString() }
-      : {}),
+    ...(transition.to === "closed" ? { closedAt: now() } : {}),
   };
 }

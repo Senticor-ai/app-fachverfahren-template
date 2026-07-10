@@ -46,6 +46,56 @@ export const builtInPermissions = {
     permission: "case.decision.prepare",
     description: "Entscheidung vorbereiten",
   },
+  // ── Verfahrensübergreifende Management-Ebene (PM-Upgrade): Aufgaben/Board/Inbox/Vermerke/Ansichten/Automation/KI.
+  //    Ohne diese Grants wären die /api/tasks · /api/inbox · /api/automations · /api/views-Routen in PROD tot (403).
+  taskRead: { permission: "task.read", description: "Aufgaben lesen" },
+  taskWrite: {
+    permission: "task.write",
+    description:
+      "Aufgaben-Metadaten (Priorität/Zuweisung/Label/Board/Frist) ändern",
+  },
+  inboxRead: { permission: "inbox.read", description: "Triage-Eingang lesen" },
+  inboxTriage: {
+    permission: "inbox.triage",
+    description: "Eingang annehmen/ablehnen/triagieren",
+  },
+  commentRead: {
+    permission: "comment.read",
+    description: "Interne Vermerke lesen",
+  },
+  commentWrite: {
+    permission: "comment.write",
+    description: "Internen Vermerk anlegen (append-only)",
+  },
+  viewRead: {
+    permission: "view.read",
+    description: "Gespeicherte Ansichten lesen",
+  },
+  viewWrite: {
+    permission: "view.write",
+    description: "Ansicht speichern/löschen",
+  },
+  viewShare: {
+    permission: "view.share",
+    description: "Ansicht als geteilt speichern (erhöhtes Recht)",
+  },
+  auditRead: {
+    permission: "audit.read",
+    description: "Append-only Audit eines Falls lesen",
+  },
+  automationRead: {
+    permission: "automation.read",
+    description: "Automations-Regeln und -Läufe lesen",
+  },
+  automationWrite: {
+    permission: "automation.write",
+    description: "Automations-Regeln anlegen/aktiv schalten/simulieren",
+  },
+  aiAssist: {
+    permission: "ai.assist",
+    description:
+      "KI-Assistenz anfordern/übernehmen (assistiv, Mensch entscheidet)",
+  },
 } as const satisfies Record<string, RbacPermission>;
 
 export const builtInRbacRegistry = {
@@ -75,6 +125,21 @@ export const builtInRbacRegistry = {
         builtInPermissions.mailboxAuthorityRead,
         builtInPermissions.caseRead,
         builtInPermissions.casePrepareDecision,
+        // Management-Ebene (PM-Upgrade) — die Sachbearbeitung bedient Aufgaben/Board/Inbox/Vermerke/Ansichten/
+        // Automation/KI-Assistenz. Reale Deployments können automation.write/view.share in eine erhöhte Rolle heben.
+        builtInPermissions.taskRead,
+        builtInPermissions.taskWrite,
+        builtInPermissions.inboxRead,
+        builtInPermissions.inboxTriage,
+        builtInPermissions.commentRead,
+        builtInPermissions.commentWrite,
+        builtInPermissions.viewRead,
+        builtInPermissions.viewWrite,
+        builtInPermissions.viewShare,
+        builtInPermissions.auditRead,
+        builtInPermissions.automationRead,
+        builtInPermissions.automationWrite,
+        builtInPermissions.aiAssist,
       ],
       builtIn: true,
     },

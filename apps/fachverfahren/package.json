@@ -10,11 +10,14 @@
     "build:server": "tsc -p tsconfig.server.json",
     "preview": "vite preview",
     "start": "node dist-server/index.js",
+    "start:worker": "node dist-server/worker.js",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json",
     "emit:contract": "node --experimental-strip-types ./scripts/emit-contract.mts"
   },
   "dependencies": {
     "@senticor/fachverfahren-kit": "workspace:*",
+    "@senticor/app-store-postgres": "workspace:*",
+    "@senticor/public-sector-sdk": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.17.0",

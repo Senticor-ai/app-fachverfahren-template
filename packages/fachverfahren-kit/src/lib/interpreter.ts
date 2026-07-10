@@ -10,6 +10,7 @@
 import type {
   Bedingung,
   Berechnung,
+  BoardColumn,
   Codeliste,
   FeldBedingung,
   FeldDef,
@@ -18,6 +19,8 @@ import type {
   Nachweis,
   NachweisBezugsweg,
   NormRef,
+  PriorityDef,
+  StatusDef,
   StepDef,
   Tarif,
 } from "../types.js";
@@ -231,6 +234,52 @@ export function interpretTarif(tarif: Tarif, daten: Antragsdaten): Berechnung {
     status: vollstaendig ? "final" : "provisional",
     positionen,
   };
+}
+
+// ── Board-Spalten (Kanban) aus DATEN ableiten ─────────────────────────────────────────────────────
+/** Leitet aus einem Endzustand die normalisierte Plane-State-Group ab: ein blockender Endzustand (Ablehnung)
+ *  → „abgebrochen", sonst (Festsetzung o. Ä.) → „erledigt". Nicht-Endzustände bleiben ohne Default-Gruppe
+ *  (der Cross-Verfahren-Fall setzt `gruppe` bei Bedarf explizit in der `BoardColumn`). */
+function defaultGruppe(state: StatusDef): BoardColumn["gruppe"] | undefined {
+  if (!state.terminal) return undefined;
+  return state.tone === "block" ? "abgebrochen" : "erledigt";
+}
+
+/**
+ * Die BOARD-SPALTEN (Kanban) als DATEN. Reihenfolge der Wahrheit: explizite `board.spalten` (falls gesetzt) haben
+ * Vorrang; sonst werden die Spalten aus der gewählten Achse abgeleitet — `status` (Default) aus
+ * `statusMachine.states`, `prioritaet` aus den Prioritäts-Stufen (Verfahren ODER übergebene Workspace-Stufen,
+ * nach `ordinal` sortiert). Die Achse `zuweisung` kann NICHT statisch abgeleitet werden (Bearbeiter sind dynamisch)
+ * → sie liefert nur die expliziten `spalten` (sonst leer). Rein/deterministisch.
+ */
+export function boardSpalten(
+  config: Pick<LeistungConfig, "statusMachine" | "board" | "prioritaeten">,
+  workspacePrioritaeten?: PriorityDef[],
+): BoardColumn[] {
+  const board = config.board;
+  if (board?.spalten && board.spalten.length > 0) return board.spalten;
+
+  const achse = board?.achse ?? "status";
+  if (achse === "prioritaet") {
+    const stufen = config.prioritaeten ?? workspacePrioritaeten ?? [];
+    return [...stufen]
+      .sort((a, b) => a.ordinal - b.ordinal)
+      .map((p) => ({ key: p.key, label: p.label, tone: p.tone }));
+  }
+  if (achse === "zuweisung") {
+    // Dynamische Achse — ohne explizite Spalten gibt es keine statische Ableitung.
+    return [];
+  }
+  // Default: Status-Achse aus der State-Machine.
+  return (config.statusMachine?.states ?? []).map((s) => {
+    const gruppe = defaultGruppe(s);
+    return {
+      key: s.key,
+      label: s.label,
+      tone: s.tone,
+      ...(gruppe ? { gruppe } : {}),
+    };
+  });
 }
 
 // ── Nachweise aus Codelisten ableiten (belege der gewählten Einträge) ─────────────────────────────

@@ -60,10 +60,27 @@ export function BescheidView<T = Record<string, unknown>>({
   config,
 }: BescheidViewProps<T>): ReactElement {
   const berechnung: Berechnung | undefined = vorgang.berechnung;
-  const datum = useMemo(
-    () => formatDatum(vorgang.eingangIso),
-    [vorgang.eingangIso],
-  );
+  // Bescheid-Datum = Bekanntgabe/Festsetzung, NICHT der Antrags-Eingang (App-Audit: der Bescheid trug das Eingangsdatum).
+  // Priorität: config.zustellung.bekanntgabeIso → ts des letzten Status-ÜBERGANGS (die Entscheidung) → Eingang (Fallback).
+  const datum = useMemo(() => {
+    const bk = config.zustellung?.bekanntgabeIso;
+    if (bk) return formatDatum(bk);
+    const letzterUebergang = [...(vorgang.history ?? [])]
+      .reverse()
+      .find((h) => h.art === "uebergang");
+    return formatDatum(letzterUebergang?.ts ?? vorgang.eingangIso);
+  }, [config.zustellung, vorgang.history, vorgang.eingangIso]);
+  // ── SACHTENOR aus dem TERMINALEN statusMachine-Zustand (App-Audit: der Bescheid bildete den Tenor NUR aus der Berechnung
+  // und las vorgang.status NIE → ein abgelehnter/versagter Vorgang zeigte trotzdem „Es wird festgesetzt: X €"). Der Kern-VA
+  // (genehmigt/versagt) ist die ENTSCHEIDUNG; die Berechnung ist die Neben-/Kostenentscheidung. Data-driven (tone==="block"
+  // ⇒ Ablehnung), kein Domänen-Literal; reine Festsetzungs-VA (Gebühr IST die Entscheidung) bleiben unverändert korrekt. ──
+  const entscheidung = useMemo(() => {
+    const st = (config.statusMachine?.states ?? []).find(
+      (s) => s.key === vorgang.status,
+    );
+    if (!st?.terminal) return undefined;
+    return { label: st.label, abgelehnt: st.tone === "block" };
+  }, [config.statusMachine, vorgang.status]);
 
   return (
     <section className="mx-auto w-full max-w-3xl px-6 py-8 print:max-w-none print:px-0 print:py-0">
@@ -138,7 +155,25 @@ export function BescheidView<T = Record<string, unknown>>({
             Tenor
           </h2>
 
-          {berechnung && berechnung.status === "provisional" ? (
+          {entscheidung?.abgelehnt ? (
+            // ABLEHNUNG/VERSAGUNG (terminaler block-Zustand): der Sachtenor IST die Ablehnung — KEINE Festsetzung. Die
+            // Begründung (Tatbestand → Rechtsfolge) trägt den tragenden Grund; ein etwaiger Betrag ist NICHT der Tenor.
+            <div className="mt-3">
+              <p className="text-sm font-medium leading-relaxed text-foreground print:text-black">
+                {entscheidung.label || "Der Antrag wird abgelehnt."}
+              </p>
+              {(berechnung?.begruendungRecht ?? berechnung?.begruendung) && (
+                <div className="mt-6">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-black">
+                    Begründung
+                  </h3>
+                  <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-foreground print:text-black">
+                    {berechnung?.begruendungRecht ?? berechnung?.begruendung}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : berechnung && berechnung.status === "provisional" ? (
             // VORLÄUFIG ⇒ KEIN verbindlicher Tenor: ein Bescheid ist die ENDGÜLTIGE Festsetzung. Solange die Berechnung
             // provisorisch ist (Eingaben stehen aus / Annahme-/Platzhalterwert), darf hier kein festsetzender Betrag
             // erscheinen (tiefer App-Audit: 0 € wurde als definitive Festsetzung gezeigt).
@@ -156,6 +191,11 @@ export function BescheidView<T = Record<string, unknown>>({
             </div>
           ) : berechnung ? (
             <div className="mt-3">
+              {entscheidung && !entscheidung.abgelehnt && entscheidung.label ? (
+                <p className="mb-2 text-sm font-medium leading-relaxed text-foreground print:text-black">
+                  {entscheidung.label}
+                </p>
+              ) : null}
               <p className="text-sm leading-relaxed text-foreground print:text-black">
                 Es wird festgesetzt:
               </p>
@@ -232,6 +272,32 @@ export function BescheidView<T = Record<string, unknown>>({
           )}
         </section>
 
+        {/* ── Optionaler LICHTBILD-/BILD-Slot: nur wenn config.zustellung.bescheidBild einen BILD-Nachweis mit Vorschau
+            referenziert (die Nachprompt-Fabrik setzt das Feld erst nach Erforderlichkeits-/DSGVO-Prüfung). ─────────────── */}
+        {(() => {
+          const bild = config.zustellung?.bescheidBild;
+          if (!bild) return null;
+          const nw = vorgang.nachweise.find((n) => n.id === bild.nachweisId);
+          const url = nw?.datei?.vorschauUrl;
+          if (!url) return null;
+          return (
+            <section aria-labelledby="bescheid-lichtbild" className="mt-8">
+              <h2
+                id="bescheid-lichtbild"
+                className="text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-black"
+              >
+                {nw?.label ?? "Abbildung"}
+              </h2>
+              <img
+                src={url}
+                alt={nw?.label ?? "Abbildung zum Bescheid"}
+                className="mt-3 rounded-md border border-border object-contain print:border-black/30"
+                style={{ maxHeight: `${bild.maxHoehePx ?? 200}px` }}
+              />
+            </section>
+          );
+        })()}
+
         {/* ── Rechtsgrundlagen aus config.rechtsgrundlagen ──────────────────────────── */}
         {config.rechtsgrundlagen.length > 0 && (
           <section aria-labelledby="bescheid-rechtsgrundlagen" className="mt-8">
@@ -273,17 +339,33 @@ export function BescheidView<T = Record<string, unknown>>({
           >
             Rechtsbehelfsbelehrung
           </h2>
-          <p className="mt-3 text-sm leading-relaxed text-muted-foreground print:text-black">
-            Gegen diesen Bescheid kann innerhalb eines Monats nach Bekanntgabe
-            Widerspruch erhoben werden. Der Widerspruch ist schriftlich oder zur
-            Niederschrift bei der erlassenden Stelle ({config.kommune})
-            einzulegen. Die Frist beginnt mit dem Tag der Bekanntgabe dieses
-            Bescheides. Erfolgt die Bekanntgabe durch die Post im Inland, gilt
-            der Bescheid am {ordinalTag(config.zustellung?.fiktionTage ?? 4)}{" "}
-            Tag nach Aufgabe zur Post als bekannt gegeben. Wird der Widerspruch
-            nicht oder nicht fristgerecht erhoben, wird der Bescheid
-            bestandskräftig.
-          </p>
+          {(() => {
+            // DATA-DRIVEN (regime-abhängig): Widerspruch (VwVfG-Default) · Einspruch (AO/OWiG) · SGG (Sozial). Ohne
+            // config.zustellung.rechtsbehelf gilt der VwVfG-Default (byte-gleich zur bisherigen Prosa) — rückwärtskompatibel.
+            const rb = config.zustellung?.rechtsbehelf;
+            const art = rb?.art ?? "Widerspruch";
+            const frist = rb?.frist ?? "einem Monat";
+            const adressat =
+              rb?.adressat ?? `der erlassenden Stelle (${config.kommune})`;
+            const form = rb?.form ?? "schriftlich oder zur Niederschrift";
+            const norm = rb?.norm ? ` (${rb.norm})` : "";
+            return (
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground print:text-black">
+                Gegen diesen Bescheid kann innerhalb von {frist} nach
+                Bekanntgabe {art}
+                {norm} erhoben werden. Der {art} ist {form} bei {adressat}{" "}
+                einzulegen. Die Frist beginnt mit dem Tag der Bekanntgabe dieses
+                Bescheides. Erfolgt die Bekanntgabe durch die Post im Inland,
+                gilt der Bescheid am{" "}
+                {ordinalTag(config.zustellung?.fiktionTage ?? 4)} Tag nach
+                Aufgabe zur Post als bekannt gegeben. Wird der {art} nicht oder
+                nicht fristgerecht erhoben, wird der Bescheid bestandskräftig.
+                {rb?.gericht
+                  ? ` Über den ${art} entscheidet die zuständige Stelle; der Rechtsweg führt zum ${rb.gericht}.`
+                  : ""}
+              </p>
+            );
+          })()}
         </section>
 
         {/* ── Unterschrift / Fußzeile ───────────────────────────────────────────────── */}

@@ -1,6 +1,8 @@
+---
 bump: patch
 updateMode: review
 migration: none
+---
 
 # Public Sector UI Styles
 

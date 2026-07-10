@@ -62,14 +62,35 @@ describe("domain app rendering", () => {
       expect(
         await readFile(join(first, "tooling", "template", "cli.ts"), "utf8"),
       ).toContain("template");
+
+      // OSS-Isolation: INTERNE Maintainer-Skills werden NICHT in einen gescaffoldeten Konsumenten kopiert;
+      // die konsumierbaren Skills schon.
+      const { access } = await import("node:fs/promises");
+      const fehlt = (p: string) =>
+        access(join(first, p)).then(
+          () => false,
+          () => true,
+        );
+      expect(await fehlt(".agents/skills/govtech-deutschland-sdk")).toBe(true);
+      expect(
+        await fehlt(".agents/skills/deutschland-plattform-anforderungen"),
+      ).toBe(true);
+      expect(await fehlt(".agents/skills/fachverfahren-app")).toBe(false);
+      // auch die Claude-Shims der internen Skills dürfen nicht in einen Konsumenten lecken (sonst verwaiste Zeiger);
+      // die Shims der konsumierbaren Skills schon.
+      expect(await fehlt(".claude/skills/govtech-deutschland-sdk")).toBe(true);
+      expect(
+        await fehlt(".claude/skills/deutschland-plattform-anforderungen"),
+      ).toBe(true);
+      expect(await fehlt(".claude/skills/fachverfahren-app")).toBe(false);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
   });
 
-  // GUARD (CHOS-CODE#68): the scaffold must refuse to render FROM a live/governed consumer project (one carrying a
-  // `.chos/` dir or a `cognitive-hive.*` symlink). Scaffolding from there would follow that symlink and flip the shared
-  // source governance (parallel app + broken gates). It renders from the pristine template only.
+  // GUARD: the scaffold must refuse to render FROM a live/governed consumer project (one carrying a `.chos/` overlay
+  // marker). Scaffolding from there could follow an overlay symlink and flip the shared source governance (parallel
+  // app + broken gates). It renders from the pristine template only.
   it("refuses to scaffold FROM a live/governed consumer project (.chos present)", async () => {
     const root = await mkdtemp(join(tmpdir(), "template-guard-test-"));
     try {
@@ -83,7 +104,7 @@ describe("domain app rendering", () => {
           force: true,
           allowDirty: true,
         }),
-      ).rejects.toThrow(/live\/governed consumer project|CHOS-CODE#68/);
+      ).rejects.toThrow(/live\/governed consumer project/);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

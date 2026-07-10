@@ -22,10 +22,12 @@ import {
 } from "../ui/resizable.js";
 import { StatusPill } from "./StatusPill.js";
 import { EvidenceCard } from "./EvidenceCard.js";
-import { VorgangDetail, formatWert, getPfad } from "./VorgangDetail.js";
+import { VorgangDetail, formatWert } from "./VorgangDetail.js";
+import { getPath } from "../lib/antrag-felder.js"; // EINE Wahrheit (array-index-fähig) statt VorgangDetail-lokalem getPfad
 import { EntscheidungPanel } from "./EntscheidungPanel.js";
 import { NachweisBrowser, type NachweisEintrag } from "./NachweisBrowser.js";
 import { PdfViewer } from "./PdfViewer.js";
+import { BescheidView } from "./BescheidView.js";
 import { FourEyesReview, type FourEyesStatus } from "./FourEyesReview.js";
 
 export interface ReviewWorkspaceProps<T = Record<string, unknown>> {
@@ -86,7 +88,7 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
       s.felder.map((f) => ({
         pfad: f.pfad,
         label: f.label,
-        wert: formatWert(getPfad(vorgang.antragsdaten, f.pfad)),
+        wert: formatWert(getPath(vorgang.antragsdaten, f.pfad)),
       })),
     );
   }, [config.detailSektionen, vorgang]);
@@ -109,8 +111,20 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
     [nachweise],
   );
 
-  // (2) Bescheid-Tab (PdfViewer) NUR wenn ein Bescheid-PDF in der Zustellung hinterlegt ist.
+  // (2) Bescheid-Tab: das hinterlegte Bescheid-PDF (PdfViewer) ODER — der Regelfall — der GENERISCH gerenderte Bescheid.
   const bescheidUrl = config.zustellung?.bescheidUrl;
+  // WURZEL-FIX (bescheid-erreichbar, alle Verfahren): ein Bescheid EXISTIERT, sobald der Vorgang einen TERMINALEN
+  // statusMachine-Zustand erreicht (Entscheidung getroffen: festgesetzt/genehmigt bzw. abgelehnt/versagt). Data-driven
+  // (kein Domänen-Literal), ENTKOPPELT von config.zustellung.bescheidUrl — die generische BescheidView rendert den
+  // Bescheid aus vorgang.berechnung + Status inline. Damit ist der Bescheid in JEDER generierten App erreichbar (bisher
+  // toter Code: ReviewWorkspace mountete BescheidView nie, nur einen PdfViewer an einer nie gesetzten bescheidUrl).
+  const bescheidReif = useMemo(
+    () =>
+      !!(config.statusMachine?.states ?? []).find(
+        (s) => s.key === vorgang?.status,
+      )?.terminal,
+    [config.statusMachine, vorgang],
+  );
 
   // (3) 4-Augen-Vorprüfung: anstehende Übergänge (Status + Rolle), die `vierAugen` fordern.
   const vierAugenTransition = useMemo(
@@ -232,8 +246,8 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
                     <ScrollText className="h-3.5 w-3.5" aria-hidden="true" />
                     Prüfschema
                   </TabsTrigger>
-                  {/* Bescheid-Tab NUR wenn ein Bescheid-PDF in der Zustellung hinterlegt ist (additiv). */}
-                  {bescheidUrl ? (
+                  {/* Bescheid-Tab, sobald eine Entscheidung getroffen ist (terminaler Zustand) ODER ein Bescheid-PDF vorliegt. */}
+                  {bescheidReif || bescheidUrl ? (
                     <TabsTrigger value="bescheid" className="flex-1 gap-1.5">
                       <Stamp className="h-3.5 w-3.5" aria-hidden="true" />
                       Bescheid
@@ -340,13 +354,19 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
                   )}
                 </TabsContent>
 
-                {/* Bescheid: das hinterlegte Bescheid-PDF im barrierearmen Viewer (nur wenn config.zustellung.bescheidUrl). */}
-                {bescheidUrl ? (
+                {/* Bescheid: der GENERISCH gerenderte Bescheid (BescheidView aus vorgang.berechnung+Status) sobald eine
+                    Entscheidung getroffen ist; ein hinterlegtes Bescheid-PDF (PdfViewer) bleibt additiv darunter. */}
+                {bescheidReif || bescheidUrl ? (
                   <TabsContent value="bescheid">
-                    <PdfViewer
-                      url={bescheidUrl}
-                      title={`Bescheid · ${vorgang.vorgangsnummer}`}
-                    />
+                    {bescheidReif ? (
+                      <BescheidView vorgang={vorgang} config={config} />
+                    ) : null}
+                    {bescheidUrl ? (
+                      <PdfViewer
+                        url={bescheidUrl}
+                        title={`Bescheid · ${vorgang.vorgangsnummer}`}
+                      />
+                    ) : null}
                   </TabsContent>
                 ) : null}
               </Tabs>

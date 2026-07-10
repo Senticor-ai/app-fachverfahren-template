@@ -1,4 +1,8 @@
-# GitLab CODEOWNERS for this public template repository.
-# Profile: https://gitlab.opencode.de/wolfgangihloff
+# GitLab CODEOWNERS für dieses Repository.
+#
+# Trage hier das Team bzw. die Gruppe ein, das/die Merge Requests freigibt. Diese Datei gehört dem
+# Konsumenten (Ownership "consumer") — `template:update` überschreibt sie nie, also passe sie an dein
+# Projekt an. Verwende möglichst eine GitLab-Gruppe/-Rolle statt einer einzelnen Person, damit die
+# Freigabe nicht an einem Namen hängt.
 
-* @wolfgangihloff
+* @your-team

@@ -8,6 +8,30 @@ import fastify, {
   type FastifyReply,
   type FastifyRequest,
 } from "fastify";
+import {
+  closePgPools,
+  createActorRoleStoreFromEnv,
+  createAutomationStoreFromEnv,
+  createCaseStoreFromEnv,
+  createTaskStoreFromEnv,
+  InMemoryActorRoleStore,
+  InMemoryAutomationStore,
+  InMemoryCaseStore,
+  InMemoryTaskStore,
+} from "@senticor/app-store-postgres";
+import {
+  catalogFromStatusMachines,
+  headerSession,
+  registerDomainApi,
+  type DomainApiDeps,
+} from "./domain-api.js";
+import { pmModuleManifest } from "./pm-module-manifest.js";
+import { DefaultDenyPolicyEngine } from "@senticor/public-sector-sdk";
+import {
+  runAutomationTick,
+  type AutomationEngineDeps,
+} from "./automation-engine.js";
+import { HeuristicKiAssist } from "./ai-assist.js";
 
 const NO_STORE = "no-store";
 const IMMUTABLE = "public, max-age=31536000, immutable";
@@ -15,6 +39,9 @@ const DEFAULT_MAX_BODY_BYTES = 1_048_576;
 const DEFAULT_SHUTDOWN_TIMEOUT_MS = 10_000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 const DEFAULT_HEADER_TIMEOUT_MS = 10_000;
+const DEFAULT_RATE_LIMIT_MAX = 600;
+const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_KEYS = 50_000;
 
 type CspMode = "enforce" | "report-only";
 
@@ -39,6 +66,9 @@ interface RuntimeConfig {
   allowedHosts: Set<string>;
   maxBodyBytes: number;
   shutdownTimeoutMs: number;
+  /** Max. Anfragen je Schlüssel (actorId/Client-IP) pro Fenster auf /api/*. 0 = aus. */
+  rateLimitMax: number;
+  rateLimitWindowMs: number;
   requiredUpstreams: URL[];
   buildInfo: BuildInfo;
   publicRuntimeConfig: Record<string, unknown>;
@@ -52,11 +82,6 @@ interface RuntimeState {
 interface RequestMetric {
   count: number;
   durationSeconds: number;
-}
-
-interface RequestContext {
-  startedAt: bigint;
-  requestId: string;
 }
 
 class RuntimeMetrics {
@@ -122,7 +147,12 @@ class RuntimeMetrics {
   }
 }
 
-const requestContexts = new WeakMap<FastifyRequest, RequestContext>();
+/** Korrelations-Id aus dem eingehenden `x-request-id`-Header (oder eine neue UUID). Fastify `genReqId`. */
+function reqIdFromHeaders(req: { headers: Record<string, unknown> }): string {
+  const h = req.headers["x-request-id"];
+  const v = Array.isArray(h) ? h[0] : h;
+  return typeof v === "string" && v.length > 0 ? v : randomUUID();
+}
 
 export function readRuntimeConfig(
   env: NodeJS.ProcessEnv = process.env,
@@ -171,6 +201,14 @@ export function readRuntimeConfig(
       env["APP_SHUTDOWN_TIMEOUT_MS"],
       DEFAULT_SHUTDOWN_TIMEOUT_MS,
     ),
+    rateLimitMax: parseNonNegativeInt(
+      env["APP_RATELIMIT_MAX"],
+      DEFAULT_RATE_LIMIT_MAX,
+    ),
+    rateLimitWindowMs: parsePositiveInt(
+      env["APP_RATELIMIT_WINDOW_MS"],
+      DEFAULT_RATE_LIMIT_WINDOW_MS,
+    ),
     requiredUpstreams: parseUrlList(env["APP_REQUIRED_UPSTREAMS"]),
     buildInfo,
     publicRuntimeConfig: buildPublicRuntimeConfig(env, {
@@ -185,19 +223,29 @@ export function buildPublicServer({
   config = readRuntimeConfig(),
   state = createRuntimeState(),
   metrics = new RuntimeMetrics(),
+  domainApi,
 }: {
   config?: RuntimeConfig;
   state?: RuntimeState;
   metrics?: RuntimeMetrics;
+  /** Optional: die fachliche Domain-API (/api/*). Ohne sie ist der Server reine Web-Delivery (Verhalten wie bisher). */
+  domainApi?: DomainApiDeps;
 } = {}): FastifyInstance {
   const app = fastify({
     logger: false,
     bodyLimit: config.maxBodyBytes,
     trustProxy: config.trustProxy,
     requestTimeout: DEFAULT_REQUEST_TIMEOUT_MS,
+    // EINE Korrelations-Id: `request.id` ist der eingehende `x-request-id` (oder eine neue UUID). Damit trägt der
+    // revisionssichere Audit-Eintrag (der `request.id` nutzt) exakt die Id, die Client + Access-Log sehen.
+    genReqId: reqIdFromHeaders,
   });
   app.server.headersTimeout = DEFAULT_HEADER_TIMEOUT_MS;
   registerPublicHooks(app, config, metrics);
+  // Ungeplante Fehler einheitlich als problem+json ausliefern (5xx sanitisiert) — vor den Routen registrieren.
+  registerErrorHandler(app);
+  // Domain-API NACH den Hooks, VOR dem SPA-Fallback (setNotFoundHandler) registrieren.
+  if (domainApi) registerDomainApi(app, domainApi);
   app.get("/livez", async (_request, reply) => {
     return reply.header("Cache-Control", NO_STORE).send({ status: "ok" });
   });
@@ -216,13 +264,22 @@ export function buildPublicServer({
     const upstreamFailures = state.shuttingDown
       ? ["shutdown in progress"]
       : await checkRequiredUpstreams(config.requiredUpstreams);
-    const ok = state.startupComplete && upstreamFailures.length === 0;
+    // Fail-soft Datenschicht-Probe: ein toter Postgres-Pool soll `/readyz` rot färben (nicht nur die Upstreams).
+    const storeFailures =
+      !state.shuttingDown && domainApi?.caseStore.ping
+        ? await domainApi.caseStore
+            .ping()
+            .then(() => [] as string[])
+            .catch((error: unknown) => [`caseStore: ${String(error)}`])
+        : [];
+    const failures = [...upstreamFailures, ...storeFailures];
+    const ok = state.startupComplete && failures.length === 0;
     return reply
       .code(ok ? 200 : 503)
       .header("Cache-Control", NO_STORE)
       .send({
         status: ok ? "ok" : "not-ready",
-        upstreamFailures,
+        upstreamFailures: failures,
       });
   });
   app.get("/runtime-config.json", async (_request, reply) => {
@@ -257,7 +314,7 @@ export function buildInternalServer({
   config?: RuntimeConfig;
   metrics?: RuntimeMetrics;
 } = {}): FastifyInstance {
-  const app = fastify({ logger: false });
+  const app = fastify({ logger: false, genReqId: reqIdFromHeaders });
   app.get("/internal/metrics", async (_request, reply) => {
     return reply
       .header("Cache-Control", NO_STORE)
@@ -279,12 +336,108 @@ export function buildInternalServer({
   return app;
 }
 
+/**
+ * Baut die Domain-API-Abhängigkeiten aus der Umgebung — nur aktiv, wenn `APP_LEISTUNG_CONTRACT` auf den
+ * (generierten) Vertrags-Snapshot zeigt. Daraus entsteht der Prozess-Katalog (StatusMachine → erlaubte Übergänge);
+ * der CaseStore kommt aus `APP_PG_URL`/`APP_PG_DIRECT_URL` (Postgres) bzw. fällt auf In-Memory zurück. Fehlt der
+ * Vertrag oder ist er unlesbar, bleibt die API AUS (Server = reine Web-Delivery wie zuvor).
+ */
+/**
+ * Bootstrap-Sperre für die Authentifizierung. Die Domain-API löst die Sitzung heute AUSSCHLIESSLICH aus `x-*`-Headern
+ * auf (der echte OIDC/JWKS-Verifier ist in `session.ts` als Naht vorbereitet, aber noch nicht im Server verdrahtet).
+ * Ungeprüfte Header sind in PRODUCTION ein Voll-Bypass — jeder Client könnte `x-actor-id`/`x-permissions` setzen und
+ * sich beliebige Rechte/Mandanten geben. Fail-closed: in PRODUCTION verweigert der Server den Start, es sei denn, der
+ * Betreiber bekennt sich mit `APP_AUTH_MODE=dev-header` ausdrücklich zur Header-Auflösung (nur nicht-öffentliche
+ * Test-/Abnahmeumgebungen). Sobald der IdP verdrahtet ist, wird diese Sperre durch die OIDC-Weiche ersetzt.
+ */
+export function assertHeaderAuthAllowed(env: NodeJS.ProcessEnv): void {
+  if (
+    env["NODE_ENV"] === "production" &&
+    env["APP_AUTH_MODE"] !== "dev-header"
+  ) {
+    throw new Error(
+      "Header-Authentifizierung ist in PRODUCTION nicht erlaubt (ungeprüfte x-*-Header = Voll-Bypass). " +
+        "Binde einen echten Identity-Provider an oder setze für nicht-öffentliche Umgebungen bewusst " +
+        "APP_AUTH_MODE=dev-header.",
+    );
+  }
+}
+
+export async function buildDomainApiFromEnv(
+  env: NodeJS.ProcessEnv,
+): Promise<DomainApiDeps | undefined> {
+  const contractPath = env["APP_LEISTUNG_CONTRACT"];
+  if (!contractPath) return undefined;
+  let contract: {
+    id?: string;
+    statusMachine?: Parameters<
+      typeof catalogFromStatusMachines
+    >[0][number]["statusMachine"] & { initial?: string };
+  };
+  try {
+    contract = JSON.parse(await readFile(contractPath, "utf8"));
+  } catch {
+    return undefined;
+  }
+  if (!contract.id || !contract.statusMachine) return undefined;
+  // Hinweis: die Header-Auth-Sperre (`assertHeaderAuthAllowed`) wird NICHT hier geprüft, sondern erst beim Verdrahten
+  // des HTTP-Servers (`startRuntime`). So triggert der reine Automations-WORKER (der diese Deps nutzt, aber KEINE
+  // Session auflöst / keinen HTTP-Traffic serviert) die HTTP-spezifische Auth-Policy nicht.
+  const procedureVersion = env["APP_PROCEDURE_VERSION"] ?? "1";
+  const catalog = catalogFromStatusMachines([
+    {
+      procedureId: contract.id,
+      procedureVersion,
+      statusMachine: contract.statusMachine,
+    },
+  ]);
+  const initialState = contract.statusMachine.initial;
+  // Automations-Store ZUERST: die In-Memory-Stores teilen GENAU DIESE Instanz, damit ein in-TX emittiertes Event in
+  // demselben Store landet, aus dem die Engine via `claimDueEvents` liest (Postgres schreibt ohnehin in-TX in die DB).
+  const automationStore =
+    createAutomationStoreFromEnv(env) ?? new InMemoryAutomationStore();
+  const caseStore =
+    createCaseStoreFromEnv(env) ?? new InMemoryCaseStore({ automationStore });
+  // WICHTIG: der In-Memory-TaskStore muss DENSELBEN CaseStore teilen, sonst schreibt `acceptIntake` den Fall in
+  // eine private Map, die `executeCaseTransition` nie liest (Split-Brain → accept→transition ergäbe 404).
+  const taskStore =
+    createTaskStoreFromEnv(env) ??
+    new InMemoryTaskStore({ caseStore, automationStore });
+  // Zuständigkeits-Lesepfad + KI-Assistenz: In-Memory/heuristisch als sichere Defaults; PROD tauscht den KI-Port
+  // gegen einen echten LLM-Adapter (derselbe `KiAssistPort`). KI bleibt strukturell assistiv.
+  const actorRoleStore =
+    createActorRoleStoreFromEnv(env) ?? new InMemoryActorRoleStore();
+  const aiAssist = new HeuristicKiAssist();
+  return {
+    caseStore,
+    taskStore,
+    automationStore,
+    actorRoleStore,
+    aiAssist,
+    catalog,
+    resolveSession: headerSession,
+    procedureVersion,
+    procedureInitialState: (procedureId) =>
+      procedureId === contract.id ? initialState : undefined,
+  };
+}
+
 export async function startRuntime(env: NodeJS.ProcessEnv = process.env) {
   const config = readRuntimeConfig(env);
   await assertStaticDir(config);
   const state = createRuntimeState();
   const metrics = new RuntimeMetrics();
-  const publicServer = buildPublicServer({ config, state, metrics });
+  const domainApi = await buildDomainApiFromEnv(env);
+  // Die Domain-API wird gleich ÜBER HTTP aktiv → JETZT die Header-Auth-Sperre prüfen (schließt den Header-Voll-Bypass
+  // in PRODUCTION). Bewusst hier auf dem HTTP-Pfad, nicht in `buildDomainApiFromEnv` (der Worker teilt die Deps, aber
+  // nicht diese HTTP-Policy).
+  if (domainApi) assertHeaderAuthAllowed(env);
+  const publicServer = buildPublicServer({
+    config,
+    state,
+    metrics,
+    ...(domainApi ? { domainApi } : {}),
+  });
   const internalServer = buildInternalServer({ config, metrics });
   await Promise.all([
     publicServer.listen({ host: config.host, port: config.port }),
@@ -297,13 +450,30 @@ export async function startRuntime(env: NodeJS.ProcessEnv = process.env) {
     staticDir: config.staticDir,
     config: redactedConfigSummary(config),
   });
+  // DSGVO-Anker: die Datenschutz-Deklaration der Management-Ebene ist beim Start geprüft (assert) und auffindbar.
+  if (domainApi?.taskStore) {
+    logInfo("runtime.module.manifest", {
+      module: pmModuleManifest.id,
+      version: pmModuleManifest.version,
+      dataCategories: pmModuleManifest.dataCategories,
+      retentionPolicies: pmModuleManifest.retentionPolicies,
+    });
+  }
+
+  // Automations-Poller: verarbeitet fällige Outbox-Events. BEWUSST opt-in (APP_AUTOMATION_POLL_MS>0) — ein
+  // Template soll nicht überraschend im Hintergrund Fälle mutieren. Multi-Replica-sicher durch `FOR UPDATE SKIP
+  // LOCKED` im Store. `unref()` hält den Prozess nicht künstlich am Leben; im Shutdown wird der Timer gestoppt.
+  const automationTimer = startAutomationPoller(env, domainApi);
 
   const shutdown = async (signal: NodeJS.Signals) => {
     if (state.shuttingDown) return;
     state.shuttingDown = true;
+    if (automationTimer) clearInterval(automationTimer);
     logInfo("runtime.shutdown.started", { signal });
     const timeout = delay(config.shutdownTimeoutMs).then(() => "timeout");
     const closed = Promise.all([publicServer.close(), internalServer.close()])
+      // Zuerst die HTTP-Server schließen (keine neuen Anfragen), DANN die DB-Pools freigeben.
+      .then(() => closePgPools())
       .then(() => "closed")
       .catch((error: unknown) => {
         logError("runtime.shutdown.error", { error: String(error) });
@@ -323,47 +493,227 @@ function createRuntimeState(): RuntimeState {
   return { startupComplete: false, shuttingDown: false };
 }
 
+/**
+ * Startet den Automations-Poller, wenn `APP_AUTOMATION_POLL_MS > 0` und ein `automationStore` konfiguriert ist.
+ * Ein Tick verarbeitet fällige Outbox-Events durch die geprüfte Domain-Kette. Überlappende Ticks werden per
+ * `laeuft`-Flag verhindert; Fehler eines Ticks brechen den Poller nicht ab. Gibt den Timer zurück (oder `undefined`).
+ */
+/** Baut die `AutomationEngineDeps` aus den Domain-API-Deps — GETEILT vom in-process-Poller (Web-Prozess) und vom
+ *  eigenständigen Worker-Prozess (`server/worker.ts`). Voraussetzung: `domainApi.automationStore` ist gesetzt. */
+export function automationEngineDepsFrom(
+  domainApi: DomainApiDeps,
+): AutomationEngineDeps {
+  if (!domainApi.automationStore)
+    throw new Error("automationEngineDepsFrom: automationStore fehlt");
+  return {
+    automationStore: domainApi.automationStore,
+    caseStore: domainApi.caseStore,
+    ...(domainApi.taskStore ? { taskStore: domainApi.taskStore } : {}),
+    policy: domainApi.policy ?? new DefaultDenyPolicyEngine(),
+    catalog: domainApi.catalog,
+    now: domainApi.now ?? (() => new Date().toISOString()),
+    newId: domainApi.newId ?? (() => randomUUID()),
+    procedureVersion: domainApi.procedureVersion ?? "1",
+  };
+}
+
+/** EIN Automations-Tick (Deadline-Scan → Outbox-Verarbeitung) mit Überlappungs-Schutz + strukturiertem Log. Geteilt
+ *  von Poller und Worker, damit beide Betriebsarten EXAKT dieselbe Semantik haben. `laeuft` ist prozess-lokal; die
+ *  ECHTE Nebenläufigkeits-Sicherheit über mehrere Prozesse/Replicas kommt aus `FOR UPDATE SKIP LOCKED` im Store. */
+export function automationTickRunner(
+  engineDeps: AutomationEngineDeps,
+  onSettled?: () => void,
+): () => void {
+  let laeuft = false;
+  return () => {
+    if (laeuft) return; // kein überlappender Tick IM SELBEN Prozess
+    laeuft = true;
+    void runAutomationTick(engineDeps)
+      .then((r) => {
+        if (r.scanned > 0)
+          logInfo("runtime.automation.deadlines", { scanned: r.scanned });
+        if (r.claimed > 0)
+          logInfo("runtime.automation.tick", {
+            claimed: r.claimed,
+            applied: r.applied,
+            blocked: r.blocked,
+            skipped: r.skipped,
+            failed: r.failed,
+          });
+      })
+      .catch((error: unknown) => {
+        logError("runtime.automation.error", { error: String(error) });
+      })
+      .finally(() => {
+        laeuft = false;
+        // NACH Tick-Abschluss — die Worker-Liveness misst so „Tick fertig", nicht „Timer gefeuert": ein dauerhaft
+        // hängender Tick lässt den Heartbeat veralten (→ /livez 503 → K8s startet neu).
+        onSettled?.();
+      });
+  };
+}
+
+function startAutomationPoller(
+  env: NodeJS.ProcessEnv,
+  domainApi: DomainApiDeps | undefined,
+): NodeJS.Timeout | undefined {
+  const pollMs = parseNonNegativeInt(env["APP_AUTOMATION_POLL_MS"], 0);
+  if (pollMs <= 0 || !domainApi?.automationStore) return undefined;
+  const tick = automationTickRunner(automationEngineDepsFrom(domainApi));
+  const timer = setInterval(tick, pollMs);
+  timer.unref();
+  logInfo("runtime.automation.poller", { pollMs });
+  return timer;
+}
+
+/** Deutschsprachige Titel je Status (RFC-9457 `title`). Fehlt einer, greift ein generischer Fallback. */
+const PROBLEM_TITLES: Record<number, string> = {
+  400: "Ungültige Anfrage",
+  401: "Nicht authentifiziert",
+  403: "Nicht berechtigt",
+  404: "Nicht gefunden",
+  405: "Methode nicht erlaubt",
+  409: "Konflikt",
+  413: "Anfrage zu groß",
+  415: "Nicht unterstützter Medientyp",
+  422: "Nicht verarbeitbar",
+  429: "Zu viele Anfragen",
+};
+
+/**
+ * Zentrale Fehlerbehandlung als RFC-9457 `application/problem+json`. SANITISIERT: bei 5xx wird niemals die interne
+ * Fehlermeldung/der Stack an den Client geleakt (nur eine generische Meldung); der echte Fehler landet server-seitig
+ * im strukturierten Log samt Korrelations-Id (`request.id`). 4xx (z. B. Fastify-Validierung) dürfen eine knappe
+ * Ursache im `detail` nennen. Die Domain-API sendet ihre erwarteten 4xx selbst — hier landet nur Ungeplantes.
+ */
+function registerErrorHandler(app: FastifyInstance): void {
+  app.setErrorHandler((error: unknown, request, reply) => {
+    const err = error as { statusCode?: unknown; message?: unknown };
+    const status =
+      typeof err.statusCode === "number" && err.statusCode >= 400
+        ? err.statusCode
+        : 500;
+    const message = typeof err.message === "string" ? err.message : "";
+    const title =
+      PROBLEM_TITLES[status] ??
+      (status >= 500 ? "Interner Serverfehler" : "Fehler");
+    if (status >= 500) {
+      logError("runtime.request.error", {
+        requestId: request.id,
+        route: request.routeOptions.url ?? routeForMetrics(request.url),
+        error: message || String(error),
+      });
+    }
+    const problem: Record<string, unknown> = {
+      type: "about:blank",
+      title,
+      status,
+      instance: request.id,
+    };
+    // Ursache nur für Client-Fehler (4xx) offenlegen — nie bei 5xx (Sanitisierung).
+    if (status < 500 && message) problem["detail"] = message;
+    return reply
+      .code(status)
+      .header("Cache-Control", NO_STORE)
+      .type("application/problem+json")
+      .send(problem);
+  });
+}
+
+/**
+ * Fixed-Window-Zähler mit BESCHRÄNKTER Kardinalität (max. `RATE_LIMIT_MAX_KEYS` Schlüssel) — verhindert selbst einen
+ * Speicher-DoS über viele verschiedene Schlüssel. Dependency-frei (kein @fastify/rate-limit). Schlüssel = actorId
+ * (aus `x-actor-id`) bzw. Client-IP. Nur auf /api/* angewandt; statische Assets/Health bleiben unlimitiert.
+ */
+class RateLimiter {
+  private readonly hits = new Map<string, { count: number; resetAt: number }>();
+  constructor(
+    private readonly max: number,
+    private readonly windowMs: number,
+  ) {}
+
+  /** Registriert einen Treffer. `null` = erlaubt; `{ retryAfterSeconds }` = überschritten (429). */
+  check(key: string, nowMs: number): { retryAfterSeconds: number } | null {
+    if (this.max <= 0) return null;
+    let entry = this.hits.get(key);
+    if (!entry || entry.resetAt <= nowMs) {
+      if (this.hits.size >= RATE_LIMIT_MAX_KEYS) this.hits.clear();
+      entry = { count: 0, resetAt: nowMs + this.windowMs };
+      this.hits.set(key, entry);
+    }
+    entry.count += 1;
+    if (entry.count > this.max) {
+      return { retryAfterSeconds: Math.ceil((entry.resetAt - nowMs) / 1000) };
+    }
+    return null;
+  }
+}
+
 function registerPublicHooks(
   app: FastifyInstance,
   config: RuntimeConfig,
   metrics: RuntimeMetrics,
 ) {
+  const limiter = new RateLimiter(
+    config.rateLimitMax,
+    config.rateLimitWindowMs,
+  );
   app.addHook("onRequest", async (request, reply) => {
-    const requestId = readHeader(request, "x-request-id") ?? randomUUID();
-    requestContexts.set(request, {
-      startedAt: process.hrtime.bigint(),
-      requestId,
-    });
-    reply.header("X-Request-ID", requestId);
+    // `request.id` = die Korrelations-Id (genReqId) — eine Wahrheit für Audit, Access-Log und Client-Header.
+    reply.header("X-Request-ID", request.id);
     applySecurityHeaders(reply, config);
     if (!hostAllowed(request, config)) {
       logAudit("runtime.security.host_denied", {
         host: readHeader(request, "host") ?? "",
-        requestId,
+        requestId: request.id,
       });
       return reply
         .code(421)
         .header("Cache-Control", NO_STORE)
         .send({ status: "misdirected-request" });
     }
+    // Rate-Limit nur auf die Domain-API (mutierend/teuer); Assets + Health bleiben frei. Schlüssel = NETZWERK-Identität
+    // (`request.ip`, `trustProxy`-korrekt) — NICHT der client-setzbare `x-actor-id`-Header: der wäre trivial umgehbar
+    // (jede Anfrage ein neuer „Actor") UND als Waffe nutzbar (fremden Actor gezielt aussperren).
+    if (config.rateLimitMax > 0 && request.url.startsWith("/api/")) {
+      const key = request.ip;
+      const limited = limiter.check(key, Date.now());
+      if (limited) {
+        logAudit("runtime.security.rate_limited", {
+          key,
+          route: routeForMetrics(request.url),
+          requestId: request.id,
+        });
+        return reply
+          .code(429)
+          .header("Cache-Control", NO_STORE)
+          .header("Retry-After", String(limited.retryAfterSeconds))
+          .type("application/problem+json")
+          .send({
+            type: "about:blank",
+            title: PROBLEM_TITLES[429],
+            status: 429,
+            instance: request.id,
+          });
+      }
+    }
   });
   app.addHook("onResponse", async (request, reply) => {
-    const context = requestContexts.get(request);
-    const durationSeconds = context
-      ? Number(process.hrtime.bigint() - context.startedAt) / 1_000_000_000
-      : 0;
+    // Fastify liefert die verstrichene Zeit (ms) — kein eigener Zeitstempel/WeakMap nötig.
+    const durationSeconds = reply.elapsedTime / 1000;
+    const route = request.routeOptions.url ?? routeForMetrics(request.url);
     metrics.observe({
       method: request.method,
-      route: request.routeOptions.url ?? routeForMetrics(request.url),
+      route,
       statusCode: reply.statusCode,
       durationSeconds,
     });
     logInfo("runtime.request", {
       method: request.method,
-      route: request.routeOptions.url ?? routeForMetrics(request.url),
+      route,
       statusCode: reply.statusCode,
-      durationMs: Math.round(durationSeconds * 1000),
-      requestId: context?.requestId ?? request.id,
+      durationMs: Math.round(reply.elapsedTime),
+      requestId: request.id,
       traceparent: readHeader(request, "traceparent") ?? "",
     });
   });
@@ -638,6 +988,19 @@ function parsePositiveInt(raw: string | undefined, fallback: number): number {
   return value;
 }
 
+/** Wie `parsePositiveInt`, erlaubt aber 0 (z. B. Rate-Limit „aus"). */
+export function parseNonNegativeInt(
+  raw: string | undefined,
+  fallback: number,
+): number {
+  if (raw === undefined || raw === "") return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`invalid non-negative integer value: ${raw}`);
+  }
+  return value;
+}
+
 function parseUrlList(raw: string | undefined): URL[] {
   return (raw ?? "")
     .split(",")
@@ -665,7 +1028,10 @@ function readHeader(request: FastifyRequest, name: string): string | undefined {
 function routeForMetrics(url: string): string {
   const pathname = safePathname(url);
   if (pathname.startsWith("/assets/")) return "/assets/*";
-  if (path.extname(pathname)) return pathname;
+  if (pathname.startsWith("/api/")) return "/api/*";
+  // BOUNDED Kardinalität: ein Angreifer, der /x1.a, /x2.b, … abruft, darf die Metrik-Map NICHT unbegrenzt wachsen
+  // lassen (Speicher-DoS, verschärft durch HPA). Extension-Pfade fallen in EINEN Bucket statt je die volle pathname.
+  if (path.extname(pathname)) return "static";
   return "spa";
 }
 
@@ -706,11 +1072,11 @@ function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function logInfo(event: string, fields: Record<string, unknown>) {
+export function logInfo(event: string, fields: Record<string, unknown>) {
   console.log(JSON.stringify({ level: "info", event, ...fields }));
 }
 
-function logError(event: string, fields: Record<string, unknown>) {
+export function logError(event: string, fields: Record<string, unknown>) {
   console.error(JSON.stringify({ level: "error", event, ...fields }));
 }
 

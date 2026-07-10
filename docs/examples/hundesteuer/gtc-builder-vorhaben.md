@@ -11,8 +11,8 @@
 Agenten geschrieben, der direkt im Root dieses Template-Repositories arbeitet
 (Package-Scripts `agent:discover`/`agent:context`, optional `app:new` für den
 Generator-Pfad, Ausgabe unter `modules/dog-tax/` (PLAN — existiert erst nach einem
-Lauf von `app:new`, siehe `modules/README.md`)). GTC Builder (`Senticor-ai/gtc-builder`,
-betrieben über CHOS-CODE-Innovation) ist ein
+Lauf von `app:new`, siehe `modules/README.md`)). GTC Builder (ein externer, governter
+App-Generator) ist ein
 anderes Werkzeug: es nimmt keinen mehrteiligen Spec/Prompt-Satz entgegen, sondern genau
 ein freitextliches **Vorhaben**-Feld beim Anlegen eines neuen Projekts, aus dem seine
 eigene governte Pipeline (Intake → Grounding → Fachkonzept → Build → …) das restliche
@@ -22,11 +22,8 @@ als optionale Fußnote (siehe PR-Review-Feedback unten).
 
 Dieses Dokument ist die freitextliche Vorhaben-Variante derselben fachlichen Annahmen —
 gleiche Steuersätze, Rollen und FIM-Bezüge wie oben, nur als ein einzelner Absatz statt
-als Prompt+Spec-Paar. Es ist die Quelle, an der sich der Hundesteuer-Vorhaben-Text in
-der Hundesteuer-E2E-Suite des externen Repositories
-[`Senticor-ai/infrastructure`](https://github.com/Senticor-ai/infrastructure)
-(in der dortigen E2E-Suite, außerhalb dieses Scaffolds) orientiert. Bei einer Änderung hier bitte dort gegenprüfen
-(und umgekehrt).
+als Prompt+Spec-Paar. Es kann als Quelle für eine separat gepflegte, externe E2E-Suite
+dienen, die einen App-Generator gegen diesen Vorhaben-Text durchstößt.
 
 ## Vorhaben-Text
 
@@ -53,19 +50,15 @@ Produktivdeploy) — auch wenn eine reale Gemeinde eingesetzt wird.
 ```
 
 Ersetze `Musterstadt` durch den Namen der Zielkommune, wenn ein konkretes Beispiel
-gebraucht wird. Die infrastructure-E2E-Suite substituiert hier bewusst echte deutsche
-Städtenamen (München, Hamburg, …) statt der synthetischen Demo-Kommune, um
-strukturell identische, aber nicht textidentische Runs für OpenRouters Prompt-Cache zu
-erzeugen — siehe die Suite's eigenes README für die Begründung. Der Text markiert die
-Steuersätze/Fristen ausdrücklich als Annahmewerte, gerade weil eine reale Gemeinde
-eingesetzt werden kann: ohne diese Markierung könnte ein generiertes Projekt so lesen,
-als behaupte es echtes Ortsrecht der genannten Stadt.
+gebraucht wird. Der Text markiert die Steuersätze/Fristen ausdrücklich als Annahmewerte,
+gerade weil eine reale Gemeinde eingesetzt werden kann: ohne diese Markierung könnte ein
+generiertes Projekt so lesen, als behaupte es echtes Ortsrecht der genannten Stadt.
 
 Rollen (inkl. Authentifizierung), Audit-Sicht, Postfach-Zustellung, Sandbox-Zahlung und
 FIM-Bezug (`99 102 013 000 000`) stehen absichtlich direkt im Text oben, nicht nur als
 Randnotiz: da GTC Builder ausschließlich dieses eine Feld erhält, würde ein Weglassen
-hier zu generierten Projekten (und zur infra-Fixture, die sich daran orientiert) führen,
-die vom kanonischen Umfang aus `app.spec.yaml` abweichen (Rollen
+hier zu generierten Projekten führen, die vom kanonischen Umfang aus `app.spec.yaml`
+abweichen (Rollen
 `citizen`/`caseworker`/`auditor`, `requiredCapabilities`
 `identity-and-trust`/`payment`/`mailbox`/`audit`/`workflow`, `fimLeistung`).
 

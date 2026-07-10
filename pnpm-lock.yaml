@@ -77,6 +77,9 @@ importers:
       husky:
         specifier: ^9.1.7
         version: 9.1.7
+      playwright-core:
+        specifier: 1.49.1
+        version: 1.49.1
       prettier:
         specifier: ^3.8.4
         version: 3.8.4
@@ -122,9 +125,15 @@ importers:
       '@radix-ui/react-tabs':
         specifier: ^1.1.15
         version: 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@senticor/app-store-postgres':
+        specifier: workspace:*
+        version: link:../../packages/app-store-postgres
       '@senticor/fachverfahren-kit':
         specifier: workspace:*
         version: link:../../packages/fachverfahren-kit
+      '@senticor/public-sector-sdk':
+        specifier: workspace:*
+        version: link:../../packages/public-sector-sdk
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -3705,6 +3714,11 @@ packages:
 
   pino@10.3.1:
     resolution: {integrity: sha512-r34yH/GlQpKZbU1BvFFqOjhISRo1MNx1tWYsYvmj6KIRHSPMT2+yHOEb1SG6NMvRoHRF0a07kCOox/9yakl1vg==}
+    hasBin: true
+
+  playwright-core@1.49.1:
+    resolution: {integrity: sha512-BzmpVcs4kE2CH15rWfzpjzVGhWERJfmnXmniSyKeRZUs9Ws65m+RGIi7mjJK/euCegfn3i7jvqWeWyHe9y3Vgg==}
+    engines: {node: '>=18'}
     hasBin: true
 
   points-on-curve@0.2.0:
@@ -7976,6 +7990,8 @@ snapshots:
       safe-stable-stringify: 2.5.0
       sonic-boom: 4.2.1
       thread-stream: 4.2.0
+
+  playwright-core@1.49.1: {}
 
   points-on-curve@0.2.0: {}
 

@@ -2,15 +2,34 @@
 // folgen in ./components und werden hier re-exportiert.
 export * from "./types.js";
 export * from "./store.js";
+// PROD-Wiring: der HTTP-`WorkspacePort` über die Domain-API (/api/*) + die reinen Server↔Client-Mapper + die
+// Umgebungs-Naht (In-Memory-DEV ↔ HTTP-PROD).
+export * from "./http-workspace.js";
+export * from "./lib/http-mappers.js";
 export * from "./contract-snapshot.js";
 export * from "./format.js";
 // Business-Logik als DATEN: Feldwert-/Options-Auflösung + der generische reine Interpreter (Tarif/Regeln/Codelisten).
 export * from "./lib/antrag-felder.js";
 export * from "./lib/interpreter.js";
+// EINE Wahrheit über die Status-State-Machine (Übergangssuche + strukturelle Validierung).
+export * from "./lib/status-machine.js";
+// EINE DEV-seitige Wahrheit der Vier-Augen-Kernregel (Vorbereiter des letzten Übergangs).
+export * from "./lib/vier-augen.js";
+// PM-UPGRADE: reine Fractional-Index-Ordnung (Board-Drag&Drop) + reiner Auswerter des Regeln/Hooks-Frameworks
+// + der ausführende Applier (mit Vier-Augen-Block).
+export * from "./lib/rank.js";
+export * from "./lib/automation.js";
+// Collaboration: reine Ableitung von In-App-Benachrichtigungen (Zuweisung/Frist) aus dem Aufgabenbestand.
+export * from "./lib/benachrichtigungen.js";
+export * from "./lib/automation-run.js";
 // KI-Extraktions-PORT (Dokument → Feld-Vorschläge mit Konfidenz) — vendor-neutral, Stub-Default.
 export * from "./lib/dokument-extraktion.js";
 // Nachweis-Upload-Regeln als DATEN: accept-Attribut, Einschränkungs-Text + reine Fail-Fast-Vorprüfung (Typ/Größe).
 export * from "./lib/nachweis-pruefung.js";
+
+// `cn` (clsx + tailwind-merge) — der kanonische Klassen-Merger des shadcn/ui-Musters. Öffentlich, damit
+// App-Composition-Bausteine (z. B. das Board) Varianten token-konform mergen statt per Template-Literal.
+export { cn } from "./lib/utils.js";
 
 // UI-Bausteine (Tailwind + shadcn/ui OSS) — konsumieren ausschließlich den Vertrag (config/port/vorgang).
 export * from "./ui/badge.js";
@@ -36,6 +55,13 @@ export * from "./components/HilfePanel.js";
 export * from "./components/BundIDLoginForm.js";
 export * from "./components/BescheidView.js";
 export * from "./components/AuditTimeline.js";
+export * from "./components/KommentarThread.js";
+export * from "./components/RegelwerkPanel.js";
+export * from "./components/AktivitaetsFeed.js";
+export * from "./components/RelationPanel.js";
+export * from "./components/TriageInbox.js";
+export * from "./components/KiSidecar.js";
+export * from "./components/BenutzerEinstellungen.js";
 export * from "./components/ReportingPanel.js";
 export * from "./components/DateiUpload.js";
 export * from "./components/NachweisAutorisierung.js";

@@ -1,7 +1,7 @@
 // shadcn/ui Checkbox (Radix) — 1:1 aus der verifizierten Referenz-UX.
 import * as React from "react";
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
-import { Check } from "lucide-react";
+import { Check, Minus } from "lucide-react";
 
 import { cn } from "../lib/utils.js";
 
@@ -18,9 +18,12 @@ const Checkbox = React.forwardRef<
     {...props}
   >
     <CheckboxPrimitive.Indicator
-      className={cn("grid place-content-center text-current")}
+      className={cn("group grid place-content-center text-current")}
     >
-      <Check className="h-4 w-4" />
+      {/* Voll-Haken bei "checked", Minus-Strich bei "indeterminate" (Teil-Auswahl) — so ist der mixed-Zustand
+          visuell unterscheidbar (wie beim nativen input.indeterminate), nicht nur via aria-checked="mixed". */}
+      <Check className="h-4 w-4 group-data-[state=indeterminate]:hidden" />
+      <Minus className="hidden h-4 w-4 group-data-[state=indeterminate]:block" />
     </CheckboxPrimitive.Indicator>
   </CheckboxPrimitive.Root>
 ));
