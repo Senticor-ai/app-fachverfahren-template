@@ -119,4 +119,10 @@ describe("resolverFromEnv — Weiche", () => {
       })?.actorId,
     ).toBe("sb.a");
   });
+  it("FAIL-CLOSED: OIDC_ISSUER gesetzt, aber kein Verifier → wirft (KEIN Rückfall auf den Header-Resolver)", () => {
+    // Sonst könnte ein Aufrufer per x-*-Headern eine voll privilegierte Sitzung fälschen (Rechte-Eskalation in PROD).
+    expect(() =>
+      resolverFromEnv({ OIDC_ISSUER: "https://idp.example" }),
+    ).toThrow(/OIDC_ISSUER/);
+  });
 });

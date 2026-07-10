@@ -131,7 +131,18 @@ export function resolverFromEnv(
   ) => (token: string) => IdentityClaims | undefined,
 ): SessionResolver {
   const issuer = env["OIDC_ISSUER"];
-  if (issuer && buildOidcVerify)
+  if (issuer) {
+    // FAIL-CLOSED: ein gesetzter OIDC_ISSUER ist eindeutiger PROD-/echter-IdP-Intent. Fehlt der Verifier (eine
+    // Verdrahtungs-Lücke), NIEMALS auf den client-vertrauenden Header-Resolver zurückfallen — der glaubt
+    // x-actor-id/x-tenant-id/x-permissions ungeprüft und erlaubte einem beliebigen Aufrufer, sich eine voll
+    // privilegierte Sitzung zu FÄLSCHEN (Identitäts-/Rechte-Eskalation). Lieber laut scheitern, damit die
+    // Fehlkonfiguration sofort auffällt — konsistent zu `assertHeaderAuthAllowed` im Server-Adapter.
+    if (!buildOidcVerify)
+      throw new Error(
+        "OIDC_ISSUER ist gesetzt (PROD-Intent), aber kein OIDC-Verifier (buildOidcVerify) übergeben — " +
+          "fail-closed: kein Rückfall auf den client-vertrauenden Header-Resolver.",
+      );
     return oidcSessionResolver(buildOidcVerify(issuer));
+  }
   return headerSessionResolver();
 }

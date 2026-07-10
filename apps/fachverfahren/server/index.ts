@@ -439,10 +439,18 @@ export async function startRuntime(env: NodeJS.ProcessEnv = process.env) {
     ...(domainApi ? { domainApi } : {}),
   });
   const internalServer = buildInternalServer({ config, metrics });
-  await Promise.all([
-    publicServer.listen({ host: config.host, port: config.port }),
-    internalServer.listen({ host: config.host, port: config.internalPort }),
-  ]);
+  // Bindet nur EINER der beiden Server (z. B. internalPort belegt/kollidiert), MUSS der bereits gebundene wieder
+  // geschlossen werden — sonst bliebe der Public-Port (inkl. gemounteter /api/*) offen + traffic-bedienend, während
+  // der Prozess sich für „nicht gestartet" hält und der offene Socket den Event-Loop am Leben hält (Zombie).
+  try {
+    await Promise.all([
+      publicServer.listen({ host: config.host, port: config.port }),
+      internalServer.listen({ host: config.host, port: config.internalPort }),
+    ]);
+  } catch (error) {
+    await Promise.allSettled([publicServer.close(), internalServer.close()]);
+    throw error;
+  }
   state.startupComplete = true;
   logInfo("runtime.started", {
     publicPort: config.port,
@@ -1103,6 +1111,8 @@ if (
 ) {
   startRuntime().catch((error: unknown) => {
     logError("runtime.startup.failed", { error: String(error) });
-    process.exitCode = 1;
+    // process.exit statt nur exitCode: ein bei partiellem Bind noch offener Socket/Handle hielte den Event-Loop
+    // sonst am Leben → der Prozess terminierte nie (halb-gestarteter Zombie), statt sauber neu zu starten.
+    process.exit(1);
   });
 }
