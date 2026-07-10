@@ -131,6 +131,14 @@ for (const impl of impls) {
         assigneeActorId: null,
       });
       expect(p3.assigneeActorId).toBeNull();
+      // Priorität entfernen (null explizit) — darf NICHT wie „nicht angegeben" behandelt werden (COALESCE-Falle):
+      // ein explizites null MUSS die Priorität zurücksetzen, nicht die bestehende „hoch" behalten.
+      const p4 = await store.patchTask({
+        tenantId: "t1",
+        taskId: t.taskId,
+        priorityKey: null,
+      });
+      expect(p4.priorityKey).toBeNull();
     });
 
     it("erzwingt Optimistic-Locking bei Board-Move (expectedVersion)", async () => {

@@ -279,6 +279,17 @@ function registerAutomationRoutes(
       if (!session.permissions.includes("automation.write"))
         return forbidden(reply);
       reply.header("Cache-Control", NO_STORE);
+      // Behörden-Scope: setRuleActive filtert nur nach tenant_id — erst die Eigentümerschaft in der Behörde der
+      // Session prüfen (Fremd-Behörde = 404), sonst schaltet A eine Regel der Behörde B aktiv/inaktiv.
+      const vorhandeneRegel = await automationStore.getRule({
+        tenantId: session.tenantId,
+        ruleId: request.params.id,
+      });
+      if (
+        !vorhandeneRegel ||
+        vorhandeneRegel.authorityId !== session.authorityId
+      )
+        return reply.code(404).send({ error: "not-found" });
       try {
         const rule = await automationStore.setRuleActive({
           tenantId: session.tenantId,
@@ -318,7 +329,9 @@ function registerAutomationRoutes(
         tenantId: session.tenantId,
         ruleId: request.params.id,
       });
-      if (!rule)
+      // Behörden-Scope: getRule filtert nur nach tenant_id — die Regel MUSS zusätzlich zur Behörde der Session
+      // gehören, sonst leakt eine fremde ruleId aus der URL fremde Regeln/Läufe (Fremd-Behörde = 404, nicht 403).
+      if (!rule || rule.authorityId !== session.authorityId)
         return reply
           .code(404)
           .header("Cache-Control", NO_STORE)
@@ -352,7 +365,9 @@ function registerAutomationRoutes(
         tenantId: session.tenantId,
         ruleId: request.params.id,
       });
-      if (!rule)
+      // Behörden-Scope: getRule filtert nur nach tenant_id — die Regel MUSS zusätzlich zur Behörde der Session
+      // gehören, sonst leakt eine fremde ruleId aus der URL fremde Regeln/Läufe (Fremd-Behörde = 404, nicht 403).
+      if (!rule || rule.authorityId !== session.authorityId)
         return reply
           .code(404)
           .header("Cache-Control", NO_STORE)
@@ -404,7 +419,9 @@ export function registerDomainApi(
         tenantId: session.tenantId,
         caseId: request.params.id,
       });
-      if (!found)
+      // Behörden-Scope: getCase ist nur mandanten-scoped — eine Fremd-Behörde im selben Mandanten wird als 404
+      // behandelt (Existenz einer fremden Akte darf nicht durchsickern), konsistent zu executeCaseTransition.
+      if (!found || found.authorityId !== session.authorityId)
         return reply
           .code(404)
           .header("Cache-Control", NO_STORE)
@@ -424,6 +441,18 @@ export function registerDomainApi(
           error: "forbidden",
         });
       }
+      // Behörden-Scope: listAuditEvents ist nur mandanten-scoped — erst die Zugehörigkeit der Akte zur Behörde der
+      // Session prüfen (Fremd-Behörde = 404), sonst leakt die vollständige revisionssichere Audit-Historie
+      // (Akteure, Zwecke, Begründungen) einer fremden Behörde im selben Mandanten.
+      const fall = await deps.caseStore.getCase({
+        tenantId: session.tenantId,
+        caseId: request.params.id,
+      });
+      if (!fall || fall.authorityId !== session.authorityId)
+        return reply
+          .code(404)
+          .header("Cache-Control", NO_STORE)
+          .send({ error: "not-found" });
       const events = await deps.caseStore.listAuditEvents({
         tenantId: session.tenantId,
         caseId: request.params.id,
@@ -559,6 +588,18 @@ export function registerDomainApi(
           .header("Cache-Control", NO_STORE)
           .send({ error: "forbidden" });
       reply.header("Cache-Control", NO_STORE);
+      // Behörden-Scope: patchTask kann nur nach tenant_id+task_id filtern — erst die Zugehörigkeit der Aufgabe zur
+      // Behörde der Session prüfen (Fremd-Behörde = 404), sonst mutiert A eine Aufgabe der Behörde B (Zuweisung/
+      // Board/Priorität; `dueAt: null` würde sogar deren Fristautomation stilllegen). Wie die relations/ai-Routen.
+      const vorhandeneAufgabe = await taskStore.getTask({
+        tenantId: session.tenantId,
+        taskId: request.params.id,
+      });
+      if (
+        !vorhandeneAufgabe ||
+        vorhandeneAufgabe.authorityId !== session.authorityId
+      )
+        return reply.code(404).send({ error: "not-found" });
       try {
         const task = await taskStore.patchTask({
           tenantId: session.tenantId,
@@ -835,6 +876,20 @@ export function registerDomainApi(
         !session.permissions.includes("comment.read")
       )
         return forbidden(reply);
+      // Behörden-Scope: listTaskComments ist nur mandanten-scoped — interne Vermerke sind vertraulich; eine
+      // Fremd-Behörde im selben Mandanten darf sie nicht lesen (404), wie die relations/ai-Routen.
+      const kommentarAufgabe = await taskStore.getTask({
+        tenantId: session.tenantId,
+        taskId: request.params.id,
+      });
+      if (
+        !kommentarAufgabe ||
+        kommentarAufgabe.authorityId !== session.authorityId
+      )
+        return reply
+          .code(404)
+          .header("Cache-Control", NO_STORE)
+          .send({ error: "not-found" });
       const comments = await taskStore.listTaskComments({
         tenantId: session.tenantId,
         taskId: request.params.id,
@@ -861,6 +916,16 @@ export function registerDomainApi(
       if (!session) return reply;
       if (!session.permissions.includes("comment.write"))
         return forbidden(reply);
+      // Behörden-Scope: kein Vermerk/keine Aktivität an einer Aufgabe einer FREMDEN Behörde (404), wie GET.
+      const zielAufgabe = await taskStore.getTask({
+        tenantId: session.tenantId,
+        taskId: request.params.id,
+      });
+      if (!zielAufgabe || zielAufgabe.authorityId !== session.authorityId)
+        return reply
+          .code(404)
+          .header("Cache-Control", NO_STORE)
+          .send({ error: "not-found" });
       const ts = now();
       const comment = await taskStore.insertTaskComment({
         commentId: `comment.${newId()}`,
@@ -894,6 +959,20 @@ export function registerDomainApi(
       const session = requireSession(deps, request, reply);
       if (!session) return reply;
       if (!session.permissions.includes("task.read")) return forbidden(reply);
+      // Behörden-Scope: der Aktivitäts-Feed einer Aufgabe einer FREMDEN Behörde ist nicht lesbar (404), wie die
+      // relations/comments/ai-Routen.
+      const aktivitaetAufgabe = await taskStore.getTask({
+        tenantId: session.tenantId,
+        taskId: request.params.id,
+      });
+      if (
+        !aktivitaetAufgabe ||
+        aktivitaetAufgabe.authorityId !== session.authorityId
+      )
+        return reply
+          .code(404)
+          .header("Cache-Control", NO_STORE)
+          .send({ error: "not-found" });
       const activity = await taskStore.listTaskActivity({
         tenantId: session.tenantId,
         taskId: request.params.id,

@@ -727,8 +727,11 @@ export class PostgresTaskStore implements TaskStore {
             row.version,
           );
         const upd = await c.query<TaskRow>(
+          // priority_key nutzt DASSELBE Flag/CASE-WHEN-Muster wie assignee/board/due — sonst kann ein explizites
+          // `priorityKey: null` (Priorität ZURÜCKSETZEN) via COALESCE nicht von „nicht angegeben" unterschieden
+          // werden und die Priorität bliebe fälschlich bestehen.
           `UPDATE app_tasks SET
-             priority_key = COALESCE($3, priority_key),
+             priority_key = CASE WHEN $3::boolean THEN $12 ELSE priority_key END,
              assignee_actor_id = CASE WHEN $4::boolean THEN $5 ELSE assignee_actor_id END,
              labels = COALESCE($6::jsonb, labels),
              sort_rank = COALESCE($7, sort_rank),
@@ -741,7 +744,7 @@ export class PostgresTaskStore implements TaskStore {
           [
             patch.tenantId,
             patch.taskId,
-            patch.priorityKey ?? null,
+            patch.priorityKey !== undefined,
             patch.assigneeActorId !== undefined,
             patch.assigneeActorId ?? null,
             patch.labels !== undefined ? JSON.stringify(patch.labels) : null,
@@ -750,6 +753,7 @@ export class PostgresTaskStore implements TaskStore {
             patch.boardColumn ?? null,
             patch.dueAt !== undefined,
             patch.dueAt ?? null,
+            patch.priorityKey ?? null,
           ],
         );
         await c.query("COMMIT");

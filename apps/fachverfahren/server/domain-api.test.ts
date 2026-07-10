@@ -703,6 +703,156 @@ runTaskContract(
   Boolean(pgUrl),
 );
 
+// ── Behörden-Scope: Cross-Authority-Isolation (Reflection-Loop-Härtung) ────────────────────────────
+// Ressourcen der FREMDEN Behörde b2 im SELBEN Mandanten t1 — eine b1-Session darf sie weder lesen noch mutieren.
+// Ohne diese Regressionen konnten mehrere Routen (nur mandanten-, nicht behörden-scoped) fremde Akten/Aufgaben/
+// Vermerke/Regeln lesen oder ändern.
+describe("Domain-API Behörden-Scope — Cross-Authority → 404", () => {
+  function aufbau() {
+    const caseStore = new InMemoryCaseStore();
+    const taskStore = new InMemoryTaskStore({ caseStore });
+    const automationStore = new InMemoryAutomationStore();
+    const app = buildTaskApp(caseStore, taskStore, automationStore);
+    return { caseStore, taskStore, automationStore, app };
+  }
+  // SBT setzt tenant=t1, authority=b1; die Ressourcen liegen in authority=b2.
+  const b1 = (perms: string) => SBT("sb.b1", perms);
+
+  it("GET /api/cases/:id — Fremd-Behörde → 404", async () => {
+    const { caseStore, app } = aufbau();
+    await caseStore.insertCase(
+      macheCase({ caseId: "case-b2", authorityId: "b2" }),
+    );
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/cases/case-b2",
+      headers: b1("case.read"),
+    });
+    expect(res.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it("GET /api/cases/:id/audit — Fremd-Behörde → 404 (keine Audit-Leak)", async () => {
+    const { caseStore, app } = aufbau();
+    await caseStore.insertCase(
+      macheCase({ caseId: "case-b2", authorityId: "b2" }),
+    );
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/cases/case-b2/audit",
+      headers: b1("audit.read"),
+    });
+    expect(res.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it("PATCH /api/tasks/:id — Fremd-Behörde → 404 (keine Fremd-Mutation)", async () => {
+    const { taskStore, app } = aufbau();
+    await taskStore.insertTask({
+      ...macheTaskFixture(),
+      taskId: "task-b2",
+      authorityId: "b2",
+    });
+    const res = await app.inject({
+      method: "PATCH",
+      url: "/api/tasks/task-b2",
+      headers: b1("task.write"),
+      payload: { assigneeActorId: "eindringling", dueAt: null },
+    });
+    expect(res.statusCode).toBe(404);
+    const t = await taskStore.getTask({ tenantId: "t1", taskId: "task-b2" });
+    expect(t?.assigneeActorId).toBeNull();
+    await app.close();
+  });
+
+  it("GET /api/tasks/:id/comments — Fremd-Behörde → 404 (keine Vermerke-Leak)", async () => {
+    const { taskStore, app } = aufbau();
+    await taskStore.insertTask({
+      ...macheTaskFixture(),
+      taskId: "task-b2",
+      authorityId: "b2",
+    });
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/tasks/task-b2/comments",
+      headers: b1("task.read,comment.read"),
+    });
+    expect(res.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it("POST /api/tasks/:id/comments — Fremd-Behörde → 404 (kein Fremd-Vermerk)", async () => {
+    const { taskStore, app } = aufbau();
+    await taskStore.insertTask({
+      ...macheTaskFixture(),
+      taskId: "task-b2",
+      authorityId: "b2",
+    });
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/tasks/task-b2/comments",
+      headers: b1("comment.write"),
+      payload: { body: "leak" },
+    });
+    expect(res.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it("GET /api/tasks/:id/activity — Fremd-Behörde → 404", async () => {
+    const { taskStore, app } = aufbau();
+    await taskStore.insertTask({
+      ...macheTaskFixture(),
+      taskId: "task-b2",
+      authorityId: "b2",
+    });
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/tasks/task-b2/activity",
+      headers: b1("task.read"),
+    });
+    expect(res.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it("Automations-Routen (PATCH aktiv / simulate / runs) — Fremd-Behörde → 404", async () => {
+    const { automationStore, app } = aufbau();
+    await automationStore.insertRule({
+      ruleId: "rule-b2",
+      tenantId: "t1",
+      authorityId: "b2",
+      procedureId: "leistung",
+      triggerEvent: "beim-eingang",
+      condition: null,
+      actions: [],
+      requiresFourEyes: false,
+      active: true,
+      createdAt: "2026-06-01T00:00:00.000Z",
+    });
+    const perms = "automation.read,automation.write";
+    const patch = await app.inject({
+      method: "PATCH",
+      url: "/api/automations/rule-b2",
+      headers: b1(perms),
+      payload: { active: false },
+    });
+    expect(patch.statusCode).toBe(404);
+    const sim = await app.inject({
+      method: "POST",
+      url: "/api/automations/rule-b2/simulate",
+      headers: b1(perms),
+      payload: {},
+    });
+    expect(sim.statusCode).toBe(404);
+    const runs = await app.inject({
+      method: "GET",
+      url: "/api/automations/rule-b2/runs",
+      headers: b1(perms),
+    });
+    expect(runs.statusCode).toBe(404);
+    await app.close();
+  });
+});
+
 // ── Automations-Routen + End-to-End-Roundtrip ──────────────────────────────────────────────────────
 const SBA = (
   actor: string,
