@@ -22,6 +22,9 @@ interface PgPoolClient {
 interface PgPool {
   connect(): Promise<PgPoolClient>;
   end(): Promise<void>;
+  /** node-postgres-Pools emittieren `'error'`, wenn eine IDLE-Verbindung serverseitig stirbt (DB-Neustart/Failover/
+   *  Netz-Blip). Ohne Listener reicht Node das als uncaught exception weiter → der langlaufende Prozess stürzt ab. */
+  on(event: "error", listener: (err: Error) => void): void;
 }
 
 interface PgPoolConstructor {
@@ -63,7 +66,18 @@ function poolFor(databaseUrl: string): Promise<PgPool> {
       if (!Pool) {
         throw new Error("pg Pool export not found");
       }
-      return new Pool({ connectionString: databaseUrl });
+      const pool = new Pool({ connectionString: databaseUrl });
+      // PFLICHT-Listener: stirbt eine IDLE-Verbindung serverseitig, emittiert der Pool `'error'`. Ohne Listener
+      // reißt Node den gesamten server-autoritativen Prozess mit (uncaught exception) — obwohl gerade KEIN Request
+      // diese Verbindung nutzt. node-postgres entfernt die kaputte Verbindung selbst; wir loggen nur strukturiert.
+      pool.on("error", (err: Error) => {
+        // Infrastruktur-Fehler einer Idle-Pool-Verbindung; kein Domain-Log-Kanal in dieser Adapter-Schicht.
+        console.error(
+          "[app-store-postgres] idle pool client error:",
+          err.message,
+        );
+      });
+      return pool;
     })();
     pgPools.set(databaseUrl, pool);
   }

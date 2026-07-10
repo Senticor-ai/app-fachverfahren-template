@@ -182,7 +182,10 @@ export class InMemoryCaseStore implements CaseStore {
       ...current,
       state: input.toState,
       version: current.version + 1,
-      closedAt: input.closedAt ?? current.closedAt,
+      // undefined = BEHALTEN, explizites null = ZURÜCKSETZEN (Wiederaufnahme aus einem Endzustand). `??` würde null
+      // wie „nicht angegeben" behandeln und einen wiedereröffneten, aktiven Fall mit veraltetem closedAt hinterlassen.
+      closedAt:
+        input.closedAt === undefined ? current.closedAt : input.closedAt,
     };
     // Atomar: erst nach erfolgreicher Zustandsänderung wird das Audit geschrieben (in-memory synchron unteilbar).
     this.cases.set(k, updated);
@@ -325,7 +328,8 @@ export class PostgresCaseStore implements CaseStore {
             input.tenantId,
             input.caseId,
             input.toState,
-            input.closedAt ?? row.closed_at,
+            // undefined = BEHALTEN, explizites null = ZURÜCKSETZEN (Wiederaufnahme) — `??` würde null verschlucken.
+            input.closedAt === undefined ? row.closed_at : input.closedAt,
           ],
         );
         await client.query(

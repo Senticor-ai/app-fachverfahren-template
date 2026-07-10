@@ -113,6 +113,30 @@ for (const impl of impls) {
       expect(audit[0]!.actorId).toBe("sb.mueller");
     });
 
+    it("transitionCase: closedAt setzen (Endzustand) und via explizites null ZURÜCKSETZEN (Wiederaufnahme)", async () => {
+      const c = macheCase();
+      await store.insertCase(c);
+      const zu = await store.transitionCase({
+        tenantId: c.tenantId,
+        caseId: c.caseId,
+        expectedVersion: 1,
+        toState: "festgesetzt",
+        closedAt: "2026-07-01T00:00:00.000Z",
+        auditEvent: macheAudit(c.caseId, "sb.a"),
+      });
+      expect(zu.closedAt).toBe("2026-07-01T00:00:00.000Z");
+      // Wiederaufnahme: explizites null MUSS closedAt zurücksetzen (nicht via `??` den alten Wert behalten).
+      const auf = await store.transitionCase({
+        tenantId: c.tenantId,
+        caseId: c.caseId,
+        expectedVersion: 2,
+        toState: "in_pruefung",
+        closedAt: null,
+        auditEvent: macheAudit(c.caseId, "sb.b"),
+      });
+      expect(auf.closedAt).toBeNull();
+    });
+
     it("transitionCase wirft bei veralteter Version (Optimistic Locking → 409)", async () => {
       const c = macheCase();
       await store.insertCase(c);
