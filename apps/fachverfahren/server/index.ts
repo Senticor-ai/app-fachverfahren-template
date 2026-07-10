@@ -468,11 +468,14 @@ export async function startRuntime(env: NodeJS.ProcessEnv = process.env) {
   const shutdown = async (signal: NodeJS.Signals) => {
     if (state.shuttingDown) return;
     state.shuttingDown = true;
-    if (automationTimer) clearInterval(automationTimer);
+    if (automationTimer) clearInterval(automationTimer.timer);
     logInfo("runtime.shutdown.started", { signal });
     const timeout = delay(config.shutdownTimeoutMs).then(() => "timeout");
     const closed = Promise.all([publicServer.close(), internalServer.close()])
-      // Zuerst die HTTP-Server schließen (keine neuen Anfragen), DANN die DB-Pools freigeben.
+      // Zuerst die HTTP-Server schließen (keine neuen Anfragen), DANN einen ggf. LAUFENDEN Automations-Tick abwarten
+      // (Drain) — sonst reißt closePgPools den DB-Pool mitten in einem bereits geclaimten Event-Batch ab und die
+      // geclaimten Events blieben ohne angewandte Effekte hängen. ERST DANN die DB-Pools freigeben.
+      .then(() => automationTimer?.drain())
       .then(() => closePgPools())
       .then(() => "closed")
       .catch((error: unknown) => {
@@ -520,15 +523,23 @@ export function automationEngineDepsFrom(
 /** EIN Automations-Tick (Deadline-Scan → Outbox-Verarbeitung) mit Überlappungs-Schutz + strukturiertem Log. Geteilt
  *  von Poller und Worker, damit beide Betriebsarten EXAKT dieselbe Semantik haben. `laeuft` ist prozess-lokal; die
  *  ECHTE Nebenläufigkeits-Sicherheit über mehrere Prozesse/Replicas kommt aus `FOR UPDATE SKIP LOCKED` im Store. */
+/** Steuert einen Automations-Tick: `run` startet ihn (überlappungs-geschützt), `drain` wartet auf einen GERADE
+ *  laufenden Tick — für sauberes Shutdown, damit der DB-Pool NICHT mitten in einem bereits geclaimten Batch
+ *  abgerissen wird (sonst bleiben geclaimte Events `processed_at != NULL` ohne angewandte Effekte hängen). */
+export interface AutomationTickHandle {
+  run: () => void;
+  drain: () => Promise<void>;
+}
+
 export function automationTickRunner(
   engineDeps: AutomationEngineDeps,
   onSettled?: () => void,
-): () => void {
-  let laeuft = false;
-  return () => {
+): AutomationTickHandle {
+  // `laeuft` hält die in-flight-Promise (statt eines Booleans), damit `drain()` sie abwarten kann.
+  let laeuft: Promise<void> | null = null;
+  const run = (): void => {
     if (laeuft) return; // kein überlappender Tick IM SELBEN Prozess
-    laeuft = true;
-    void runAutomationTick(engineDeps)
+    laeuft = runAutomationTick(engineDeps)
       .then((r) => {
         if (r.scanned > 0)
           logInfo("runtime.automation.deadlines", { scanned: r.scanned });
@@ -545,25 +556,27 @@ export function automationTickRunner(
         logError("runtime.automation.error", { error: String(error) });
       })
       .finally(() => {
-        laeuft = false;
+        laeuft = null;
         // NACH Tick-Abschluss — die Worker-Liveness misst so „Tick fertig", nicht „Timer gefeuert": ein dauerhaft
         // hängender Tick lässt den Heartbeat veralten (→ /livez 503 → K8s startet neu).
         onSettled?.();
       });
   };
+  const drain = (): Promise<void> => laeuft ?? Promise.resolve();
+  return { run, drain };
 }
 
 function startAutomationPoller(
   env: NodeJS.ProcessEnv,
   domainApi: DomainApiDeps | undefined,
-): NodeJS.Timeout | undefined {
+): { timer: NodeJS.Timeout; drain: () => Promise<void> } | undefined {
   const pollMs = parseNonNegativeInt(env["APP_AUTOMATION_POLL_MS"], 0);
   if (pollMs <= 0 || !domainApi?.automationStore) return undefined;
-  const tick = automationTickRunner(automationEngineDepsFrom(domainApi));
-  const timer = setInterval(tick, pollMs);
+  const runner = automationTickRunner(automationEngineDepsFrom(domainApi));
+  const timer = setInterval(runner.run, pollMs);
   timer.unref();
   logInfo("runtime.automation.poller", { pollMs });
-  return timer;
+  return { timer, drain: runner.drain };
 }
 
 /** Deutschsprachige Titel je Status (RFC-9457 `title`). Fehlt einer, greift ein generischer Fallback. */

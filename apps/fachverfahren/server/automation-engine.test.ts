@@ -180,6 +180,56 @@ describe("automation engine — server-autoritative Ausführung", () => {
     );
   });
 
+  it("MEHR-AKTIONS-REGEL: eine spätere Aktion wirft → Lauf `failed`, aber bereits committete Teil-Effekte werden EHRLICH protokolliert (`partiell`/`teilEffekte`) statt verschwiegen", async () => {
+    const { deps, caseStore, taskStore, automationStore } = makeDeps();
+    const c = macheCase();
+    await caseStore.insertCase(c);
+    const task = macheTask(c.caseId);
+    await taskStore.insertTask(task);
+    await automationStore.insertRule({
+      ruleId: "r-partiell",
+      tenantId: "t1",
+      authorityId: "b1",
+      procedureId: "leistung",
+      triggerEvent: "beim-eingang",
+      condition: { feld: "$procedureId", op: "==", wert: "leistung" },
+      // „zuweisen" committet (patchTask); danach wirft „setze-feld" fail-closed → der Vor-Effekt bleibt bestehen.
+      actions: [
+        { art: "zuweisen", an: "sb.auto" },
+        { art: "setze-feld", feld: "x", wert: "y" },
+      ],
+      requiresFourEyes: false,
+      active: true,
+      createdAt: NOW,
+    });
+    await automationStore.enqueueEvent({
+      eventId: "e-partiell",
+      tenantId: "t1",
+      authorityId: "b1",
+      procedureId: "leistung",
+      caseId: c.caseId,
+      taskId: task.taskId,
+      triggerEvent: "beim-eingang",
+      payload: {},
+      createdAt: NOW,
+      processedAt: null,
+    });
+
+    const res = await processDueAutomationEvents(deps);
+    expect(res).toMatchObject({ claimed: 1, applied: 0, failed: 1 });
+    // Der Teil-Effekt (Zuweisung) IST persistiert ...
+    const nach = await taskStore.getTask({
+      tenantId: "t1",
+      taskId: task.taskId,
+    });
+    expect(nach?.assigneeActorId).toBe("sb.auto");
+    // ... und wird im fehlgeschlagenen Lauf EHRLICH ausgewiesen (keine stille, nicht-protokollierte Mutation).
+    const runs = await automationStore.listRuns({ ruleId: "r-partiell" });
+    expect(runs[0]?.status).toBe("failed");
+    expect(runs[0]?.detail?.["partiell"]).toBe(true);
+    expect(runs[0]?.detail?.["teilEffekte"]).toEqual(["zuweisen:sb.auto"]);
+  });
+
   it("BLOCKIERT einen Vier-Augen-Übergang HART (Automation ist nie das zweite Auge)", async () => {
     const { deps, caseStore, automationStore } = makeDeps();
     const c = macheCase();

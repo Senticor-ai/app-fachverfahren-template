@@ -55,13 +55,13 @@ export async function startWorker(
   // erkennt die Liveness einen HÄNGENDEN Tick: bleibt ein Tick stecken, veraltet dieser Wert → /livez 503 → Neustart.
   // Startwert „jetzt", damit das erste maxAlterMs-Fenster vor dem ersten Tick-Abschluss gesund ist.
   let letzterTick = Date.now();
-  const runTick = automationTickRunner(
+  const runner = automationTickRunner(
     automationEngineDepsFrom(domainApi),
     () => {
       letzterTick = Date.now();
     },
   );
-  const timer = setInterval(runTick, pollMs);
+  const timer = setInterval(runner.run, pollMs);
 
   // Minimaler HTTP-Liveness-Server (portabel, kein Shell/`stat` nötig). Der Worker serviert KEINEN Domain-Traffic;
   // nur `/livez` (200, solange der letzte Tick nicht älter als das Vielfache des Poll-Intervalls ist).
@@ -85,6 +85,9 @@ export async function startWorker(
   const stop = async () => {
     clearInterval(timer);
     if (health) await new Promise<void>((r) => health!.close(() => r()));
+    // Einen GERADE laufenden Tick abwarten, BEVOR der DB-Pool geschlossen wird — sonst reißt closePgPools den Pool
+    // mitten in einem bereits geclaimten Event-Batch ab (die geclaimten Events blieben ohne angewandte Effekte hängen).
+    await runner.drain().catch(() => {});
     await closePgPools().catch(() => {});
     logInfo("worker.stopped", {});
   };
@@ -93,16 +96,25 @@ export async function startWorker(
 
 // Prozess-Entrypoint: starten + SIGTERM/SIGINT sauber behandeln (K8s-Rolling-Update ohne hängenden Claim).
 if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) {
-  void startWorker().then((handle) => {
-    if (!handle) {
-      process.exitCode = 1;
-      return;
-    }
-    for (const signal of ["SIGTERM", "SIGINT"] as const) {
-      process.on(signal, () => {
-        logInfo("worker.shutdown", { signal });
-        void handle.stop().then(() => process.exit(0));
+  void startWorker()
+    .then((handle) => {
+      if (!handle) {
+        process.exitCode = 1;
+        return;
+      }
+      for (const signal of ["SIGTERM", "SIGINT"] as const) {
+        process.on(signal, () => {
+          logInfo("worker.shutdown", { signal });
+          void handle.stop().then(() => process.exit(0));
+        });
+      }
+    })
+    // Ein Startup-Throw (ungültige Env, fehlerhafte StatusMachine, buildDomainApiFromEnv-Reject) darf nicht als
+    // unhandled rejection stillschweigend hängen bleiben — strukturiert loggen + definiert mit Code 1 beenden.
+    .catch((error: unknown) => {
+      logError("worker.fatal", {
+        error: error instanceof Error ? error.message : String(error),
       });
-    }
-  });
+      process.exit(1);
+    });
 }

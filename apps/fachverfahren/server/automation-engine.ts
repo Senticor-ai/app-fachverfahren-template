@@ -265,14 +265,24 @@ async function applyRule(
     return "blocked";
   }
 
+  // Teil-Effekte werden in DIESE Liste akkumuliert, damit der catch bei einem Wurf die bereits (dauerhaft)
+  // committeten Vor-Effekte kennt und EHRLICH protokollieren kann.
+  const effekte: string[] = [];
   try {
-    const effekte = await fuehreAktionenAus(deps, event, appCase, acts);
+    await fuehreAktionenAus(deps, event, appCase, acts, effekte);
     await record(deps, rule, event, idempotencyKey, "applied", { effekte });
     return "applied";
   } catch (error) {
-    // Dauerhaft scheiterndes Event wird NICHT re-claimt (bereits verarbeitet) — der Fehlversuch ist protokolliert.
+    // Dauerhaft scheiterndes Event wird NICHT re-claimt (bereits verarbeitet). WICHTIG: bereits committete Teil-
+    // Effekte MIT protokollieren — sonst behauptete das revisionssichere Lauf-Protokoll fälschlich, es sei nichts
+    // mutiert worden (stille Mutation). HINWEIS/GRENZE: die Mehr-Aktions-Ausführung ist (noch) NICHT atomar — die
+    // Stores teilen keine gemeinsame Transaktion; committete Vor-Effekte bleiben bestehen. `partiell` macht das im
+    // Protokoll sichtbar, bis ein `withTransaction`-Pfad über beide Stores existiert.
     await record(deps, rule, event, idempotencyKey, "failed", {
       error: String(error instanceof Error ? error.message : error),
+      ...(effekte.length > 0
+        ? { teilEffekte: [...effekte], partiell: true }
+        : {}),
     });
     return "failed";
   }
@@ -304,8 +314,9 @@ async function fuehreAktionenAus(
   event: AppAutomationEvent,
   appCase: AppCase | undefined,
   acts: Aktion[],
+  // Wird IN-PLACE gefüllt — so kennt der Aufrufer bei einem Wurf die bereits committeten Teil-Effekte.
+  effekte: string[],
 ): Promise<string[]> {
-  const effekte: string[] = [];
   const session = {
     actorId: AUTOMATION_ACTOR,
     tenantId: event.tenantId,
