@@ -5,6 +5,7 @@ import { readJson, writeJson, type PackageJson } from "./structured-edit.ts";
 
 const managedCandidateFiles = [
   ".gitlab-ci.yml",
+  "ci.yml",
   "Dockerfile",
   "package.json",
   "pnpm-workspace.yaml",

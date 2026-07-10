@@ -1,1 +1,7 @@
-consumers: []
+# Registrierte Konsumenten der Vorlage — aktuell nur für Sichtbarkeit über
+# `pnpm run template:consumers:status`. Die consumers:update/mr/report-Automatisierung ist noch ein
+# Stub (siehe tooling/template/cli.ts), registrieren allein löst also noch keine echten Fleet-Updates aus.
+consumers:
+  - name: demo
+    repository: Senticor-ai/app-fachverfahren-template-demo
+    purpose: Live-Vorschau der Vorlage (siehe .github/workflows/deploy-demo-consumer.yml) — kein Produktions-Konsument

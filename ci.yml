@@ -3,6 +3,8 @@
 # (dasselbe Build-Rezept: corepack→pnpm install→build:packages/app/server), damit Codesphere-Deploy und Container-Build
 # NICHT auseinanderlaufen (eine Wahrheit). Der Server lauscht auf $PORT (Default 8080; Codesphere setzt $PORT) und
 # einem internen Port 9090. Kein floating Tag / kein `latest` — reproduzierbar wie der Dockerfile-Build.
+# Die `run`-Stufe migriert die Datenbank VOR dem Serverstart (APP_PG_DIRECT_URL oder APP_PG_URL muss im
+# Workspace gesetzt sein) — sonst würde ein Deploy mit neuen Migrationen gegen ein veraltetes Schema laufen.
 schemaVersion: v0.2
 
 prepare:
@@ -21,5 +23,7 @@ test:
 
 run:
   steps:
+    - name: Run DB migrations
+      command: pnpm --filter @senticor/app-store-postgres db:migrate
     - name: Fachverfahren-Server
       command: node apps/fachverfahren/dist-server/index.js
