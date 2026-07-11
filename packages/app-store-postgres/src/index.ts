@@ -25,10 +25,23 @@ export type {
   AppAutomationEvent,
   AppAutomationRule,
   AppAutomationRun,
+  AppEventDelivery,
   AutomationRunStatus,
   AutomationStore,
+  ClaimedDelivery,
+  ClaimForConsumerInput,
+  DeliveryStatus,
   ListRulesQuery,
 } from "./automation-store.js";
+export {
+  InMemoryNotificationStore,
+  PostgresNotificationStore,
+} from "./notification-store.js";
+export type {
+  AppNotification,
+  ListNotificationsQuery,
+  NotificationStore,
+} from "./notification-store.js";
 export {
   CaseNotFoundError,
   CaseVersionConflictError,
