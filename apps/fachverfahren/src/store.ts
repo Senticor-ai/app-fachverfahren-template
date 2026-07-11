@@ -26,12 +26,15 @@ const portalConfig = waehleVerfahren(workspaceConfig, enabledProcedures);
 // der den `useSyncExternalStore`-Reaktivitätsvertrag erfüllt); sonst (DEV/Standalone) den synchronen In-Memory-Store
 // mit Seed-Daten. `import.meta.env` wird von Vite zur BUILD-Zeit statisch eingesetzt (synchron verfügbar, anders als
 // das async `/runtime-config.json`) — passend zum modul-globalen `workspace`-Export.
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
+// Exportiert, damit weitere PROD-Nähte (z. B. der Notification-Client #18) DIESELBE API-Basis + Auth-Naht nutzen.
+export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL as
+  | string
+  | undefined;
 
 // OPTIONAL für lokale Full-Stack-Tests mit Header-Auth (DEV): setzt man `VITE_DEV_ACTOR`, gehen die `x-*`-Header des
 // Header-Session-Resolvers mit. In echtem PROD bleibt das leer — die Session kommt aus dem Cookie/OIDC (credentials).
 const devActor = import.meta.env.VITE_DEV_ACTOR as string | undefined;
-const devHeaders = devActor
+export const devHeaders = devActor
   ? {
       "x-actor-id": devActor,
       "x-tenant-id": workspaceConfig.tenantId,

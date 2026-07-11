@@ -52,6 +52,10 @@ import {
   store,
   workspace,
 } from "./store.js";
+import {
+  notificationsUeberApi,
+  usePersistierteBenachrichtigungen,
+} from "./notifications.js";
 import { WorkspaceListe } from "./WorkspaceListe.js";
 import { VorgangBoard } from "./VorgangBoard.js";
 import {
@@ -737,11 +741,17 @@ function AmtVerfahren(): React.JSX.Element {
   );
 }
 
-/** /amt/benachrichtigungen — Collaboration/Meldungen: die aus dem Aufgabenbestand ABGELEITETEN In-App-Meldungen
- *  (Ihnen zugewiesen · Fristwarnungen), gerendert im generischen NotificationCenter mit lokalem Gelesen-Zustand. */
+/** /amt/benachrichtigungen — Collaboration/Meldungen im generischen NotificationCenter.
+ *  PROD (`VITE_API_BASE_URL` gesetzt): die vom Notification-Projektor (2. Fan-out-Backend, #18) PERSISTIERTEN
+ *  Meldungen aus `/api/notifications` — server-autoritativ, über Prozess-Neustarts hinweg, gelesen via POST.
+ *  DEV (ohne API): die aus dem Aufgabenbestand ABGELEITETEN Meldungen (Ihnen zugewiesen · Fristwarnungen) mit
+ *  lokalem Gelesen-Zustand — byte-stabil unverändert. Beide Hooks laufen unbedingt (Regeln der Hooks); je nach
+ *  Naht wird nur das eine ODER das andere Ergebnis angezeigt. */
 function AmtBenachrichtigungen(): React.JSX.Element {
   useStoreVersion();
   const akteur = useAkteur();
+  // Persistierte Meldungen (nur aktiv, wenn eine API-Basis konfiguriert ist — sonst leer/inert).
+  const persistiert = usePersistierteBenachrichtigungen();
   // „Jetzt" EINMAL beim Mounten festhalten (kein Date.now() im Render → keine Hydration-Diskrepanz, stabile Sortierung).
   const [nowIso] = useState(() => new Date().toISOString());
   const [gelesen, setGelesen] = useState<Set<string>>(new Set());
@@ -750,18 +760,27 @@ function AmtBenachrichtigungen(): React.JSX.Element {
     aktuellerAkteur: akteur,
     nowIso,
   });
-  const benachrichtigungen = roh.map((b) => ({
+  const abgeleitet = roh.map((b) => ({
     ...b,
     gelesen: gelesen.has(b.id),
   }));
+  const benachrichtigungen = notificationsUeberApi
+    ? persistiert.benachrichtigungen
+    : abgeleitet;
+  const onMarkiereGelesen = notificationsUeberApi
+    ? persistiert.markiere
+    : (id: string) => setGelesen((s) => new Set(s).add(id));
+  const onAlleGelesen = notificationsUeberApi
+    ? persistiert.markiereAlle
+    : () => setGelesen(new Set(roh.map((b) => b.id)));
   return (
     <Shell persona="sachbearbeitung" activeNavKey="eingang">
       <AmtSubNav />
       <div className="mx-auto max-w-3xl p-4 md:p-6">
         <NotificationCenter
           benachrichtigungen={benachrichtigungen}
-          onMarkiereGelesen={(id) => setGelesen((s) => new Set(s).add(id))}
-          onAlleGelesen={() => setGelesen(new Set(roh.map((b) => b.id)))}
+          onMarkiereGelesen={onMarkiereGelesen}
+          onAlleGelesen={onAlleGelesen}
         />
       </div>
     </Shell>
