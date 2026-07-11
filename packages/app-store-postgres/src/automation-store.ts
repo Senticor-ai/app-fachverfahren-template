@@ -38,6 +38,11 @@ export interface AppAutomationEvent {
    *  Zeitgetriebene Trigger (z. B. `frist-erreicht`) setzen die Fälligkeit auf den Fristzeitpunkt;
    *  `claimDueEvents` claimt ein geplantes Event erst ab dann. */
   scheduledFor?: string | null;
+  /** LEASE-Buchhaltung (at-least-once). `attempts` zählt jeden Claim; `lockedUntil` ist der Lease-Ablauf (ISO) —
+   *  bis dahin claimt es kein anderer Poller. Ist die Lease abgelaufen und `processedAt` noch NULL (Crash), wird das
+   *  Event erneut claimbar. Optional/additiv: bestehende Konstruktoren setzen sie nicht (Default `0`/`null`). */
+  attempts?: number;
+  lockedUntil?: string | null;
 }
 
 export type AutomationRunStatus = "applied" | "blocked" | "skipped" | "failed";
@@ -76,14 +81,21 @@ export interface AutomationStore {
 
   /** Reiht ein Outbox-Event ein (wird vom Aufrufer in DERSELBEN Domain-TX geschrieben — hier die Standalone-Variante). */
   enqueueEvent(event: AppAutomationEvent): Promise<AppAutomationEvent>;
-  /** CLAIMT bis zu `limit` fällige Events ATOMAR (Postgres: `FOR UPDATE SKIP LOCKED` + `processed_at = now()`),
-   *  sodass parallele Poller dasselbe Event NICHT doppelt greifen. Ein Event gilt danach als verarbeitet — ein
-   *  dauerhaft scheiterndes Event wird NICHT endlos re-claimt (kein Event-Sturm), sein Fehlversuch steht als
-   *  `failed`-Lauf im Protokoll. */
+  /** LEAST bis zu `limit` fällige Events ATOMAR (Postgres: `FOR UPDATE SKIP LOCKED`), sodass parallele Poller
+   *  dasselbe Event NICHT doppelt greifen. AT-LEAST-ONCE: der Claim setzt `locked_until = now + visibilityMs` und
+   *  zählt `attempts` hoch, markiert aber NICHT `processed_at` — das tut erst `markProcessed` nach erfolgreicher
+   *  Behandlung. Läuft die Lease ab (Consumer-Crash vor `markProcessed`), wird das Event erneut claimbar. `visibilityMs`
+   *  fehlend ⇒ Default 30 s. */
   claimDueEvents(input: {
     now: string;
     limit: number;
+    visibilityMs?: number;
   }): Promise<AppAutomationEvent[]>;
+
+  /** Markiert ein geleastes Event TERMINAL als verarbeitet (`processed_at = now`) — von der Engine NACH der Behandlung
+   *  (Erfolg ODER deterministischer Fehler) aufgerufen, damit die Lease nicht abläuft und kein Re-Claim erfolgt. Nur
+   *  ein PROZESS-Crash (nie erreichtes `markProcessed`) führt über den Lease-Ablauf zur Wiederaufnahme. Idempotent. */
+  markProcessed(input: { eventId: string; now: string }): Promise<void>;
 
   /** Distinkte (tenant, authority, procedure)-Skopes mit einer AKTIVEN Regel für `triggerEvent`. Der zeitgetriebene
    *  Deadline-Scanner iteriert NUR diese Skopes — kein Event-Rauschen für Verfahren ohne Fristregel, mandanten-korrekt
@@ -99,6 +111,16 @@ export interface AutomationStore {
     ruleId?: string;
     limit?: number;
   }): Promise<AppAutomationRun[]>;
+}
+
+/** Default-Lease-Fenster (Visibility-Timeout) in ms: so lange gilt ein geclaimtes Event als „in Arbeit", bevor es
+ *  (bei ausbleibendem `markProcessed`) erneut claimbar wird. Grosszügig gegenüber der Batch-Verarbeitungszeit
+ *  gewählt, damit ein lebender Consumer nicht sich selbst das Event wegzieht. */
+export const LEASE_MS = 30_000;
+
+/** ISO-Zeitpunkt + `ms` → ISO. Für den Lease-Ablauf (`locked_until`). */
+function addMillis(iso: string, ms: number): string {
+  return new Date(new Date(iso).getTime() + ms).toISOString();
 }
 
 // ── In-Memory ─────────────────────────────────────────────────────────────────────────────────────
@@ -163,6 +185,9 @@ export class InMemoryAutomationStore implements AutomationStore {
       ...event,
       // Normalisieren, damit `claimDueEvents` verlässlich gegen null vergleicht (nicht gegen undefined).
       scheduledFor: event.scheduledFor ?? null,
+      // Lease-Buchhaltung initialisieren (parität zu den DB-Defaults attempts=0 / locked_until=NULL).
+      attempts: event.attempts ?? 0,
+      lockedUntil: event.lockedUntil ?? null,
       payload: { ...event.payload },
     });
     return { ...event };
@@ -171,11 +196,17 @@ export class InMemoryAutomationStore implements AutomationStore {
   async claimDueEvents(input: {
     now: string;
     limit: number;
+    visibilityMs?: number;
   }): Promise<AppAutomationEvent[]> {
+    const lockedUntil = addMillis(input.now, input.visibilityMs ?? LEASE_MS);
     const due = [...this.events.values()]
       .filter(
         (e) =>
           e.processedAt === null &&
+          // AT-LEAST-ONCE: claimbar, wenn nie geleast ODER die Lease abgelaufen ist (Crash → Wiederaufnahme).
+          (e.lockedUntil === null ||
+            e.lockedUntil === undefined ||
+            e.lockedUntil <= input.now) &&
           // Zeit-Gating: geplante Events erst ab ihrem Fälligkeitszeitpunkt claimen (fehlend/null = sofort).
           (e.scheduledFor === null ||
             e.scheduledFor === undefined ||
@@ -184,9 +215,26 @@ export class InMemoryAutomationStore implements AutomationStore {
       .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
       .slice(0, input.limit);
     for (const e of due) {
-      this.events.set(e.eventId, { ...e, processedAt: input.now });
+      // LEASE: locked_until setzen + attempts hochzählen; processed_at bleibt NULL (das setzt erst `markProcessed`).
+      this.events.set(e.eventId, {
+        ...e,
+        lockedUntil,
+        attempts: (e.attempts ?? 0) + 1,
+      });
     }
-    return due.map((e) => ({ ...e, payload: { ...e.payload } }));
+    return due.map((e) => ({
+      ...e,
+      lockedUntil,
+      attempts: (e.attempts ?? 0) + 1,
+      payload: { ...e.payload },
+    }));
+  }
+
+  async markProcessed(input: { eventId: string; now: string }): Promise<void> {
+    const e = this.events.get(input.eventId);
+    // Idempotent: unbekanntes/bereits verarbeitetes Event ⇒ no-op.
+    if (!e || e.processedAt !== null) return;
+    this.events.set(input.eventId, { ...e, processedAt: input.now });
   }
 
   async listActiveRuleScopes(
@@ -313,32 +361,44 @@ export class PostgresAutomationStore implements AutomationStore {
   async claimDueEvents(input: {
     now: string;
     limit: number;
+    visibilityMs?: number;
   }): Promise<AppAutomationEvent[]> {
+    const lockedUntil = addMillis(input.now, input.visibilityMs ?? LEASE_MS);
     return this.withClient(async (c) => {
-      try {
-        await c.query("BEGIN");
-        // FOR UPDATE SKIP LOCKED: parallele Poller greifen disjunkte Events.
-        const sel = await c.query<EventRow>(
-          `${EVENT_SELECT} WHERE processed_at IS NULL
+      // Kanonischer SKIP-LOCKED-Claim in EINER atomaren Anweisung: die Subquery sperrt die claimbaren Zeilen
+      // (unbearbeitet + Lease nie gesetzt/abgelaufen + zeit-fällig), das umschliessende UPDATE LEAST sie
+      // (locked_until + attempts+1), RETURNING liefert die POST-Update-Zeilen. `processed_at` bleibt NULL — erst
+      // `markProcessed` schliesst das Event terminal ab (at-least-once: abgelaufene Lease ⇒ Wiederaufnahme).
+      const r = await c.query<EventRow>(
+        `UPDATE app_automation_events
+           SET locked_until = $3, attempts = attempts + 1
+         WHERE event_id IN (
+           SELECT event_id FROM app_automation_events
+           WHERE processed_at IS NULL
+             AND (locked_until IS NULL OR locked_until <= $2)
              AND (scheduled_for IS NULL OR scheduled_for <= $2)
-           ORDER BY created_at ASC LIMIT $1
-           FOR UPDATE SKIP LOCKED`,
-          [input.limit, input.now],
-        );
-        const ids = sel.rows.map((r) => r.event_id);
-        if (ids.length > 0) {
-          // Atomar als verarbeitet markieren = claim (kein Re-Claim, kein Event-Sturm bei Dauerfehler).
-          await c.query(
-            `UPDATE app_automation_events SET processed_at = $1 WHERE event_id = ANY($2::text[])`,
-            [input.now, ids],
-          );
-        }
-        await c.query("COMMIT");
-        return sel.rows.map(eventFromRow);
-      } catch (e) {
-        await c.query("ROLLBACK").catch(() => {});
-        throw e;
-      }
+           ORDER BY created_at ASC
+           LIMIT $1
+           FOR UPDATE SKIP LOCKED
+         )
+         RETURNING ${EVENT_COLS}, attempts, locked_until`,
+        [input.limit, input.now, lockedUntil],
+      );
+      // RETURNING garantiert die Reihenfolge nicht → nach created_at sortieren (Parität zur In-Memory-Ordnung).
+      return r.rows
+        .map(eventFromRow)
+        .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+    });
+  }
+
+  async markProcessed(input: { eventId: string; now: string }): Promise<void> {
+    await this.withClient(async (c) => {
+      // Idempotent (WHERE processed_at IS NULL): ein erneuter Aufruf lässt den ersten Zeitstempel unverändert.
+      await c.query(
+        `UPDATE app_automation_events SET processed_at = $1
+         WHERE event_id = $2 AND processed_at IS NULL`,
+        [input.now, input.eventId],
+      );
     });
   }
 
@@ -500,7 +560,6 @@ function ruleFromRow(r: RuleRow): AppAutomationRule {
 
 const EVENT_COLS = `event_id, tenant_id, authority_id, procedure_id, case_id, task_id, trigger_event,
   payload, created_at, processed_at, scheduled_for`;
-const EVENT_SELECT = `SELECT ${EVENT_COLS} FROM app_automation_events`;
 const EVENT_INSERT_VALUES = `INSERT INTO app_automation_events (${EVENT_COLS})
   VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11)`;
 // Standalone-`enqueueEvent` (u. a. der Deadline-Scanner): IDEMPOTENT — die deterministische event_id je fälliger Frist
@@ -524,6 +583,9 @@ interface EventRow extends Record<string, unknown> {
   created_at: Date | string;
   processed_at: Date | string | null;
   scheduled_for: Date | string | null;
+  // Nur im claimDueEvents-RETURNING vorhanden (nicht in der schlanken EVENT_COLS-Spaltenliste); daher optional.
+  attempts?: number;
+  locked_until?: Date | string | null;
 }
 
 function eventInsertParams(e: AppAutomationEvent): readonly unknown[] {
@@ -543,7 +605,7 @@ function eventInsertParams(e: AppAutomationEvent): readonly unknown[] {
 }
 
 function eventFromRow(r: EventRow): AppAutomationEvent {
-  return {
+  const e: AppAutomationEvent = {
     eventId: r.event_id,
     tenantId: r.tenant_id,
     authorityId: r.authority_id,
@@ -556,6 +618,10 @@ function eventFromRow(r: EventRow): AppAutomationEvent {
     processedAt: isoOrNull(r.processed_at),
     scheduledFor: isoOrNull(r.scheduled_for),
   };
+  // Lease-Felder nur setzen, wenn die Query sie mitliefert (claimDueEvents-RETURNING) — exactOptional-konform.
+  if (typeof r.attempts === "number") e.attempts = r.attempts;
+  if (r.locked_until !== undefined) e.lockedUntil = isoOrNull(r.locked_until);
+  return e;
 }
 
 const RUN_COLS = `run_id, rule_id, event_id, idempotency_key, status, detail, created_at`;

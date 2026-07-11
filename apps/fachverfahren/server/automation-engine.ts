@@ -204,31 +204,50 @@ export async function processDueAutomationEvents(
   };
 
   for (const event of events) {
-    // Rekursions-Sperre: von der Automation selbst erzeugte Events nicht erneut verarbeiten.
-    if (event.payload["actor"] === AUTOMATION_ACTOR) continue;
-
-    // PER-EVENT-ISOLATION: `claimDueEvents` hat den GANZEN Batch (bis 50) bereits als processed_at≠NULL committet.
-    // Ein Orchestrierungs-Fehler bei EINEM Event (transienter `listRules`-Wurf oder ein `record`-Wurf in `applyRule`
-    // bei DB-Störung) darf daher NIE die restlichen, ebenfalls schon geclaimten Events des Batches mitreißen — die
-    // würden sonst nie erneut geclaimt (WHERE processed_at IS NULL) und liefen spurlos verloren. Den einen Event
-    // ehrlich als `failed` zählen und best-effort auditieren; der Batch läuft weiter.
+    // PER-EVENT-ISOLATION: `claimDueEvents` LEAST den Batch (locked_until gesetzt, processed_at noch NULL). Ein
+    // Orchestrierungs-Fehler bei EINEM Event (transienter `listRules`-Wurf oder ein `record`-Wurf in `applyRule` bei
+    // DB-Störung) darf NIE die restlichen Events mitreißen — den einen ehrlich als `failed` zählen + best-effort
+    // auditieren; der Batch läuft weiter.
     try {
-      const rules = await deps.automationStore.listRules({
-        tenantId: event.tenantId,
-        // Behörden-Scope: eine Regel EINER Behörde darf nicht auf Events einer ANDEREN Behörde desselben Mandanten feuern.
-        authorityId: event.authorityId,
-        procedureId: event.procedureId,
-        triggerEvent: event.triggerEvent,
-        activeOnly: true,
-      });
+      // Rekursions-Sperre: von der Automation selbst erzeugte Events nicht erneut verarbeiten. WICHTIG: NICHT per
+      // `continue` überspringen — das Event MUSS unten terminal markiert werden, sonst liefe die Lease ab und es
+      // würde endlos neu geclaimt (Übersprungen ≠ unbearbeitet). Der Sprung ist eine Entscheidung, kein Crash.
+      if (event.payload["actor"] !== AUTOMATION_ACTOR) {
+        const rules = await deps.automationStore.listRules({
+          tenantId: event.tenantId,
+          // Behörden-Scope: eine Regel EINER Behörde darf nicht auf Events einer ANDEREN Behörde desselben Mandanten feuern.
+          authorityId: event.authorityId,
+          procedureId: event.procedureId,
+          triggerEvent: event.triggerEvent,
+          activeOnly: true,
+        });
 
-      for (const rule of rules) {
-        const status = await applyRule(deps, event, rule);
-        if (status) result[status] += 1;
+        for (const rule of rules) {
+          const status = await applyRule(deps, event, rule);
+          if (status) result[status] += 1;
+        }
       }
     } catch (error) {
       result.failed += 1;
       await protokolliereOrchestrierungsFehler(deps, event, error);
+    }
+
+    // TERMINAL (Erfolg, Rekursions-Sperre ODER deterministischer Fehler): die Lease auflösen (`processed_at = now`),
+    // damit KEIN Re-Claim erfolgt — ein deterministischer Fehler wiederholt sich sonst zum Event-Sturm. AT-LEAST-ONCE
+    // greift NUR beim PROZESS-Crash, der diese Zeile nie erreicht (Lease läuft ab → Wiederaufnahme). Best-effort:
+    // schlägt `markProcessed` fehl (DB-Störung), bleibt das Event geleast und wird nach Ablauf erneut aufgenommen.
+    // DOPPEL-EFFEKTE beim Re-Claim: die aktuellen Aktionen sind dagegen sicher, weil sie IDEMPOTENT bzw.
+    // OPTIMISTIC-LOCK-geschützt sind (`status-uebergang` via expectedVersion; `setze-prioritaet`/`zuweisen`/`label`
+    // wertsetzend). `recordRun` (ON CONFLICT) dedupliziert ZUSÄTZLICH die Audit-Zeile — es riegelt NICHT die
+    // Effekt-Ausführung ab. Eine künftige nicht-idempotente Aktion bräuchte einen Effekt-Vorab-Riegel (Folge-Härtung
+    // zusammen mit dem attempts-Cap/Dead-Letter, Skalierungsplan #9).
+    try {
+      await deps.automationStore.markProcessed({
+        eventId: event.eventId,
+        now: deps.now(),
+      });
+    } catch {
+      /* Re-Claim nach Lease-Ablauf ist der sichere Fallback; den Batch-Rest nicht abbrechen. */
     }
   }
   return result;

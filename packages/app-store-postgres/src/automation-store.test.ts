@@ -132,7 +132,7 @@ for (const impl of impls) {
         ).rejects.toBeInstanceOf(AutomationRuleNotFoundError);
       });
 
-      it("claimt fällige Events genau einmal (kein Re-Claim → kein Event-Sturm)", async () => {
+      it("LEAST fällige Events und hält sie WÄHREND der Lease exklusiv (kein Doppel-Claim durch Nebenläufer)", async () => {
         const tid = `t-${uid()}`;
         const e1 = macheEvent({
           tenantId: tid,
@@ -148,18 +148,103 @@ for (const impl of impls) {
         const claimed = await store.claimDueEvents({
           now: "2026-06-02T00:00:00.000Z",
           limit: 10,
+          visibilityMs: 60_000,
         });
-        const claimedIds = claimed.map((e) => e.eventId);
-        expect(claimedIds).toContain(e1.eventId);
-        expect(claimedIds).toContain(e2.eventId);
+        expect(claimed.map((e) => e.eventId).sort()).toEqual(
+          [e1.eventId, e2.eventId].sort(),
+        );
+        // Erster Claim ⇒ attempts=1; das RETURNING/der In-Memory-Rückgabewert trägt den POST-Update-Stand.
+        expect(claimed.every((e) => e.attempts === 1)).toBe(true);
 
-        // Zweiter Claim liefert diese Events NICHT erneut (bereits verarbeitet).
-        const again = await store.claimDueEvents({
-          now: "2026-06-02T00:01:00.000Z",
+        // Innerhalb des Lease-Fensters (30 s < 60 s) claimt sie kein zweiter Poller (noch „in Arbeit").
+        const waehrendLease = await store.claimDueEvents({
+          now: "2026-06-02T00:00:30.000Z",
           limit: 10,
         });
-        expect(again.map((e) => e.eventId)).not.toContain(e1.eventId);
-        expect(again.map((e) => e.eventId)).not.toContain(e2.eventId);
+        const noch = waehrendLease.map((e) => e.eventId);
+        expect(noch).not.toContain(e1.eventId);
+        expect(noch).not.toContain(e2.eventId);
+      });
+
+      it("markProcessed schliesst terminal ab (kein Re-Claim); ein UNMARKIERTES Event wird nach Lease-Ablauf erneut aufgenommen (at-least-once)", async () => {
+        const tid = `t-${uid()}`;
+        const erledigt = macheEvent({
+          tenantId: tid,
+          createdAt: "2026-06-01T00:00:01.000Z",
+        });
+        const gecrasht = macheEvent({
+          tenantId: tid,
+          createdAt: "2026-06-01T00:00:02.000Z",
+        });
+        await store.enqueueEvent(erledigt);
+        await store.enqueueEvent(gecrasht);
+
+        const ersteRunde = await store.claimDueEvents({
+          now: "2026-06-02T00:00:00.000Z",
+          limit: 10,
+          visibilityMs: 60_000,
+        });
+        expect(ersteRunde).toHaveLength(2);
+
+        // Simulierter Consumer-Crash: nur EINES wird terminal markiert; das andere bleibt geleast (kein markProcessed).
+        await store.markProcessed({
+          eventId: erledigt.eventId,
+          now: "2026-06-02T00:00:05.000Z",
+        });
+
+        // Nach Lease-Ablauf (>60 s): das markierte NICHT mehr, das unmarkierte WIRD erneut geclaimt (attempts=2).
+        const zweiteRunde = await store.claimDueEvents({
+          now: "2026-06-02T00:01:30.000Z",
+          limit: 10,
+          visibilityMs: 60_000,
+        });
+        const ids = zweiteRunde.map((e) => e.eventId);
+        expect(ids).not.toContain(erledigt.eventId);
+        expect(ids).toContain(gecrasht.eventId);
+        expect(
+          zweiteRunde.find((e) => e.eventId === gecrasht.eventId)?.attempts,
+        ).toBe(2);
+
+        // Auch das wiederaufgenommene Event terminal markieren → danach claimt niemand mehr etwas.
+        await store.markProcessed({
+          eventId: gecrasht.eventId,
+          now: "2026-06-02T00:01:35.000Z",
+        });
+        const dritteRunde = await store.claimDueEvents({
+          now: "2026-06-02T01:00:00.000Z",
+          limit: 10,
+        });
+        expect(dritteRunde.map((e) => e.eventId)).not.toContain(
+          erledigt.eventId,
+        );
+        expect(dritteRunde.map((e) => e.eventId)).not.toContain(
+          gecrasht.eventId,
+        );
+      });
+
+      it("markProcessed ist idempotent (zweiter Aufruf ändert nichts, kein Re-Claim)", async () => {
+        const tid = `t-${uid()}`;
+        const e = macheEvent({ tenantId: tid });
+        await store.enqueueEvent(e);
+        await store.claimDueEvents({
+          now: "2026-06-02T00:00:00.000Z",
+          limit: 10,
+          visibilityMs: 1000,
+        });
+        await store.markProcessed({
+          eventId: e.eventId,
+          now: "2026-06-02T00:00:01.000Z",
+        });
+        await store.markProcessed({
+          eventId: e.eventId,
+          now: "2026-06-02T00:00:10.000Z",
+        });
+        // Weit nach Lease-Ablauf: bleibt terminal (kein Re-Claim).
+        const spaeter = await store.claimDueEvents({
+          now: "2026-06-02T00:05:00.000Z",
+          limit: 10,
+        });
+        expect(spaeter.map((x) => x.eventId)).not.toContain(e.eventId);
       });
 
       it("claimDueEvents ist ZEIT-gegatet auf scheduled_for — ein zukünftiges Event wird erst ab Fälligkeit geclaimt", async () => {
