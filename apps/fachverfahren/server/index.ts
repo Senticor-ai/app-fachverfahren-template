@@ -9,6 +9,7 @@ import fastify, {
   type FastifyRequest,
 } from "fastify";
 import {
+  type AutomationStore,
   closePgPools,
   createActorRoleStoreFromEnv,
   createAutomationStoreFromEnv,
@@ -27,6 +28,8 @@ import {
   registerDomainApi,
   type DomainApiDeps,
 } from "./domain-api.js";
+import { runConsumerTick, type ConsumerHandle } from "./event-consumer.js";
+import { notificationProjector } from "./notification-projector.js";
 import { pmModuleManifest } from "./pm-module-manifest.js";
 import { DefaultDenyPolicyEngine } from "@senticor/public-sector-sdk";
 import {
@@ -506,11 +509,14 @@ export async function startRuntime(env: NodeJS.ProcessEnv = process.env) {
   // Template soll nicht überraschend im Hintergrund Fälle mutieren. Multi-Replica-sicher durch `FOR UPDATE SKIP
   // LOCKED` im Store. `unref()` hält den Prozess nicht künstlich am Leben; im Shutdown wird der Timer gestoppt.
   const automationTimer = startAutomationPoller(env, domainApi);
+  // Notification-Projektor als 2. Consumer im selben Intervall (opt-in via APP_AUTOMATION_POLL_MS, nur mit Stores).
+  const notificationTimer = startNotificationProjectorPoller(env, domainApi);
 
   const shutdown = async (signal: NodeJS.Signals) => {
     if (state.shuttingDown) return;
     state.shuttingDown = true;
     if (automationTimer) clearInterval(automationTimer.timer);
+    if (notificationTimer) clearInterval(notificationTimer.timer);
     logInfo("runtime.shutdown.started", { signal });
     const timeout = delay(config.shutdownTimeoutMs).then(() => "timeout");
     const closed = Promise.all([publicServer.close(), internalServer.close()])
@@ -518,6 +524,7 @@ export async function startRuntime(env: NodeJS.ProcessEnv = process.env) {
       // (Drain) — sonst reißt closePgPools den DB-Pool mitten in einem bereits geclaimten Event-Batch ab und die
       // geclaimten Events blieben ohne angewandte Effekte hängen. ERST DANN die DB-Pools freigeben.
       .then(() => automationTimer?.drain())
+      .then(() => notificationTimer?.drain())
       .then(() => closePgPools())
       .then(() => "closed")
       .catch((error: unknown) => {
@@ -624,6 +631,67 @@ function startAutomationPoller(
   const timer = setInterval(runner.run, pollMs);
   timer.unref();
   logInfo("runtime.automation.poller", { pollMs });
+  return { timer, drain: runner.drain };
+}
+
+/** Überlappungs-geschützter Tick eines FAN-OUT-Consumers (#24) — analog `automationTickRunner`, aber über
+ *  `runConsumerTick` (per-Consumer-Zustellung, rührt `processed_at`/die Engine NICHT an). GETEILT von Poller + Worker. */
+export function consumerTickRunner(
+  automationStore: AutomationStore,
+  consumer: ConsumerHandle,
+  now: () => string,
+  onSettled?: () => void,
+): AutomationTickHandle {
+  let laeuft: Promise<void> | null = null;
+  const run = (): void => {
+    if (laeuft) return; // kein überlappender Tick IM SELBEN Prozess
+    laeuft = runConsumerTick(automationStore, consumer, { now })
+      .then((r) => {
+        if (r.claimed > 0)
+          logInfo("runtime.consumer.tick", {
+            consumer: consumer.id,
+            claimed: r.claimed,
+            delivered: r.delivered,
+            deadLettered: r.deadLettered,
+            failed: r.failed,
+          });
+      })
+      .catch((error: unknown) =>
+        logError("runtime.consumer.error", {
+          consumer: consumer.id,
+          error: String(error),
+        }),
+      )
+      .finally(() => {
+        laeuft = null;
+        onSettled?.();
+      });
+  };
+  return { run, drain: () => laeuft ?? Promise.resolve() };
+}
+
+/** Startet den Notification-Projektor als 2. Fan-out-Consumer im GLEICHEN Poll-Intervall wie die Engine. NUR aktiv,
+ *  wenn ein Automations- UND ein Notification-Store konfiguriert ist (additiv/guarded; ohne Store keine Projektion). */
+function startNotificationProjectorPoller(
+  env: NodeJS.ProcessEnv,
+  domainApi: DomainApiDeps | undefined,
+): { timer: NodeJS.Timeout; drain: () => Promise<void> } | undefined {
+  const pollMs = parseNonNegativeInt(env["APP_AUTOMATION_POLL_MS"], 0);
+  if (
+    pollMs <= 0 ||
+    !domainApi?.automationStore ||
+    !domainApi.notificationStore
+  )
+    return undefined;
+  const now = domainApi.now ?? (() => new Date().toISOString());
+  const runner = consumerTickRunner(
+    domainApi.automationStore,
+    notificationProjector(domainApi.notificationStore),
+    now,
+  );
+  const timer = setInterval(runner.run, pollMs);
+  timer.unref();
+  logInfo("runtime.notification.projector", { pollMs });
   return { timer, drain: runner.drain };
 }
 

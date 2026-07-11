@@ -16,10 +16,12 @@ import {
   automationEngineDepsFrom,
   automationTickRunner,
   buildDomainApiFromEnv,
+  consumerTickRunner,
   logError,
   logInfo,
   parseNonNegativeInt,
 } from "./index.js";
+import { notificationProjector } from "./notification-projector.js";
 
 export interface WorkerHandle {
   stop: () => Promise<void>;
@@ -63,6 +65,20 @@ export async function startWorker(
   );
   const timer = setInterval(runner.run, pollMs);
 
+  // 2. Consumer im selben Intervall: der Notification-Projektor (Fan-out) — nur wenn ein Notification-Store da ist.
+  // Eigener Overlap-Guard; die Liveness bleibt an der Engine (deren Tick ist der Massstab), aber sauberer Drain im Stop.
+  const projektor =
+    domainApi.automationStore && domainApi.notificationStore
+      ? consumerTickRunner(
+          domainApi.automationStore,
+          notificationProjector(domainApi.notificationStore),
+          domainApi.now ?? (() => new Date().toISOString()),
+        )
+      : undefined;
+  const projektorTimer = projektor
+    ? setInterval(projektor.run, pollMs)
+    : undefined;
+
   // Minimaler HTTP-Liveness-Server (portabel, kein Shell/`stat` nötig). Der Worker serviert KEINEN Domain-Traffic;
   // nur `/livez` (200, solange der letzte Tick nicht älter als das Vielfache des Poll-Intervalls ist).
   const healthPort = parseNonNegativeInt(env["APP_WORKER_HEALTH_PORT"], 0);
@@ -84,10 +100,12 @@ export async function startWorker(
 
   const stop = async () => {
     clearInterval(timer);
+    if (projektorTimer) clearInterval(projektorTimer);
     if (health) await new Promise<void>((r) => health!.close(() => r()));
     // Einen GERADE laufenden Tick abwarten, BEVOR der DB-Pool geschlossen wird — sonst reißt closePgPools den Pool
     // mitten in einem bereits geclaimten Event-Batch ab (die geclaimten Events blieben ohne angewandte Effekte hängen).
     await runner.drain().catch(() => {});
+    if (projektor) await projektor.drain().catch(() => {});
     await closePgPools().catch(() => {});
     logInfo("worker.stopped", {});
   };
