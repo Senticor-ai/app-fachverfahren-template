@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 56" role="img" aria-label="Wappen der Stadt Musterstadt (Demo)">
+  <!-- DEMO-Wappen der Vorlage (synthetisch, KEIN echtes Hoheitszeichen). Ein generierender Build ersetzt es
+       durch das verifizierte Wappen der echten Kommune (KommuneTheme.logo + Provenienz). -->
+  <path d="M6 6 H42 V30 Q42 42 24 50 Q6 42 6 30 Z" fill="#146b64" stroke="#0c4a45" stroke-width="1.5" />
+  <rect x="17" y="20" width="14" height="15" fill="#ffffff" />
+  <rect x="17" y="18" width="3" height="3" fill="#ffffff" />
+  <rect x="22.5" y="18" width="3" height="3" fill="#ffffff" />
+  <rect x="28" y="18" width="3" height="3" fill="#ffffff" />
+  <path d="M21 35 v-6 a3 3 0 0 1 6 0 v6 Z" fill="#146b64" />
+</svg>

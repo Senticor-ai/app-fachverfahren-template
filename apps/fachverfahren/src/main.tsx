@@ -1,9 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { registerServiceWorker } from "@senticor/fachverfahren-kit";
 import { App } from "./App.js";
 import { AppErrorBoundary } from "./AppErrorBoundary.js";
+import { KommuneBranding, RuntimeConfigProvider } from "./runtime-config.js";
+import { portalMarke } from "./verfahren.registry.js";
 import "./styles.css";
 
 const el = document.getElementById("root");
@@ -21,28 +22,15 @@ createRoot(el).render(
   <StrictMode>
     <AppErrorBoundary>
       <BrowserRouter basename={routerBase}>
-        <App />
+        {/* RuntimeConfigProvider lädt `/runtime-config.json` EINMAL (application/tenant/branding/delivery + SW);
+            KommuneBranding speist deren `branding` (bzw. die Build-Zeit-`portalMarke` als Fallback) in den
+            KommuneThemeProvider → Wappen + Markenfarben. */}
+        <RuntimeConfigProvider>
+          <KommuneBranding fallback={portalMarke}>
+            <App />
+          </KommuneBranding>
+        </RuntimeConfigProvider>
       </BrowserRouter>
     </AppErrorBoundary>
   </StrictMode>,
 );
-
-void configureBrowserRuntime();
-
-async function configureBrowserRuntime(): Promise<void> {
-  try {
-    const response = await fetch("/runtime-config.json", {
-      cache: "no-store",
-      credentials: "same-origin",
-    });
-    if (!response.ok) return;
-    const config = (await response.json()) as {
-      delivery?: { serviceWorkerEnabled?: boolean };
-    };
-    if (config.delivery?.serviceWorkerEnabled === true) {
-      await registerServiceWorker("/service-worker.js");
-    }
-  } catch {
-    // Die Runtime-Konfiguration ist eine Verbesserung fuer Deployments; die App muss ohne sie starten.
-  }
-}

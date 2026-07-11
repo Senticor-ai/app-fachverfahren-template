@@ -9,6 +9,7 @@
 // Die Registry lebt bewusst INNERHALB von `apps/` (kein statischer Import aus `modules/*`) — sie bricht damit
 // `check:module-boundaries` nicht.
 import type {
+  KommuneTheme,
   VerfahrenEintrag,
   WorkspaceConfig,
 } from "@senticor/fachverfahren-kit";
@@ -27,6 +28,25 @@ const verfahren: VerfahrenEintrag[] = [
     : []),
   // Weitere Verfahren hier ergänzen — der Workspace führt sie verfahrensübergreifend zusammen.
 ];
+
+// PORTAL-MARKE (Skalierungsplan #21, strikt optional): die Build-Zeit-Identität DIESES Portals — Anzeigename,
+// Wappen + Markenfarbe. `KommuneBranding` (runtime-config.tsx) mountet sie in den `KommuneThemeProvider`, sodass die
+// Shell Wappen + Markenfarben zeigt. Ein Server mit `APP_BRAND_*` überschreibt sie zur Laufzeit (Runtime schlägt
+// Build-Zeit). SYNTHETISCH: das Demo-Wappen ist KEIN echtes Hoheitszeichen — ein generierender Build ersetzt die
+// Marke durch die verifizierte Kommune (Wappen + Provenienz). Ungesetzt lassen ⇒ neutrales Default-Kit.
+export const portalMarke: KommuneTheme = {
+  name: "Stadt Musterstadt",
+  brand: {
+    // Deutlich unterscheidbare Demo-Markenfarbe (Teal) — belegt live, dass das White-Labeling die Token bespielt.
+    primary: "hsl(174 62% 26%)",
+  },
+  logo: {
+    // Mit dem Vite-Base präfixiert (BASE_URL endet auf „/") — ein relativer src würde sonst gegen die SPA-Route
+    // (z. B. /amt/board) aufgelöst und 404en. Standalone „/demo-wappen.svg", hinter Proxy „/<base>/demo-wappen.svg".
+    src: `${import.meta.env.BASE_URL}demo-wappen.svg`,
+    alt: "Wappen der Stadt Musterstadt (Demo)",
+  },
+};
 
 export const workspaceConfig: WorkspaceConfig = {
   // DEV-Demo: EIN synthetischer Mandant. In PROD kommt der Mandanten-Scope IMMER aus der Server-Session,

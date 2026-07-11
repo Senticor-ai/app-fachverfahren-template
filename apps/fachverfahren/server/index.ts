@@ -940,6 +940,7 @@ function buildPublicRuntimeConfig(
     buildInfo: BuildInfo;
   },
 ): Record<string, unknown> {
+  const branding = brandingBlock(env);
   return {
     schemaVersion: "public-runtime.v1",
     application: {
@@ -955,11 +956,39 @@ function buildPublicRuntimeConfig(
       defaultLocale: "de-DE",
       supportedLocales: ["de-DE"],
     },
+    // Optionales White-Labeling (Skalierungsplan #4): nur wenn APP_BRAND_* gesetzt ist — sonst entfällt der Block
+    // (Ausgabe byte-stabil, rückwärtskompatibel). Der Client (RuntimeConfigProvider) macht daraus ein KommuneTheme.
+    ...(branding ? { branding } : {}),
     delivery: {
       publicBaseUrl: publicBaseUrl ?? "",
       serviceWorkerEnabled,
     },
   };
+}
+
+/** Optionaler `branding`-Block aus `APP_BRAND_*` — übernimmt NUR gesetzte Schlüssel; keiner gesetzt ⇒ `undefined`
+ *  (der Block entfällt in `buildPublicRuntimeConfig`). Flach, passend zu `RuntimeBranding` im Client
+ *  (apps/fachverfahren/src/runtime-config.tsx). */
+function brandingBlock(
+  env: NodeJS.ProcessEnv,
+): Record<string, unknown> | undefined {
+  const b: Record<string, unknown> = {};
+  const put = (key: string, value: string | undefined): void => {
+    if (value !== undefined && value !== "") b[key] = value;
+  };
+  put("name", env["APP_BRAND_NAME"]);
+  put("primary", env["APP_BRAND_PRIMARY"]);
+  put("accent", env["APP_BRAND_ACCENT"]);
+  put("surface", env["APP_BRAND_SURFACE"]);
+  put("logoSrc", env["APP_BRAND_LOGO_URL"]);
+  put("logoAlt", env["APP_BRAND_LOGO_ALT"]);
+  put("logoHref", env["APP_BRAND_LOGO_HREF"]);
+  put("sourceUrl", env["APP_BRAND_SOURCE_URL"]);
+  const verified = env["APP_BRAND_SOURCE_VERIFIED"];
+  if (verified !== undefined && verified !== "") {
+    b["sourceVerifiziert"] = parseBoolean(verified, false);
+  }
+  return Object.keys(b).length > 0 ? b : undefined;
 }
 
 function redactedConfigSummary(config: RuntimeConfig) {
