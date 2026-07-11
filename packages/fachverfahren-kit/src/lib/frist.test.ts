@@ -97,4 +97,25 @@ describe("faelligkeitAb — Fälligkeit über ECHTE Kalender-Arithmetik (kein Ta
       "2026-02-15T00:00:00.000Z",
     );
   });
+
+  it("interpretiert einen offsetlosen ISO-Zeitanteil als UTC — Fälligkeit ist zeitzonen-STABIL", () => {
+    // Regression: Ohne UTC-Erzwingung parste `new Date(...)` den offsetlosen String als LOKALZEIT → das
+    // Fälligkeitsdatum driftete mit der Server-Zeitzone (rechtlich relevant: 28.02. vs. 01.03.). Dieses Ergebnis
+    // muss in JEDER Test-Runner-Zeitzone identisch sein.
+    expect(faelligkeitAb("2026-01-31T20:00:00", 1, "monat")).toBe(
+      "2026-02-28T20:00:00.000Z",
+    );
+    // Date-only bleibt UTC-Mitternacht (laut Spec bereits UTC).
+    expect(faelligkeitAb("2026-01-15", 1, "monat")).toBe(
+      "2026-02-15T00:00:00.000Z",
+    );
+    // „Z" bleibt unverändert absolut.
+    expect(faelligkeitAb("2026-01-31T20:00:00.000Z", 1, "monat")).toBe(
+      "2026-02-28T20:00:00.000Z",
+    );
+    // Expliziter Offset bleibt erhalten: 20:00−05:00 ⇒ Anker 2026-02-01T01:00Z, +1 Tag ⇒ 2026-02-02T01:00Z.
+    expect(faelligkeitAb("2026-01-31T20:00:00-05:00", 1, "tag")).toBe(
+      "2026-02-02T01:00:00.000Z",
+    );
+  });
 });

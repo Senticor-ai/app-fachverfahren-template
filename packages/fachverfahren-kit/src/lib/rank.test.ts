@@ -47,6 +47,21 @@ describe("rankZwischen — reine Fractional-Index-Ordnung (lexikografisch)", () 
     expect(() => rankZwischen("5", "5")).toThrow();
   });
 
+  it("wirft, wenn `nachher` = `vorher` + Null-Ziffern ist — statt still die Ordnung zu brechen", () => {
+    // Regression: Früher lieferte rankZwischen("1","10") still „10V" (> „10", weil „10" Präfix von „10V" ist) und
+    // zerstörte damit die Board-Sortierung. Zwischen „1" und „10" existiert KEIN strikter Rang → Wurf (Vertrag).
+    expect(() => rankZwischen("1", "10")).toThrow();
+    expect(() => rankZwischen("1", "100")).toThrow();
+    expect(() => rankZwischen("AB", "AB0")).toThrow();
+  });
+
+  it("liefert weiter einen gültigen Rang, wenn `nachher` auf einer Null-Ziffer endet, aber früh divergiert", () => {
+    // Divergenz an einer Nicht-Null-Stelle VOR der Null-Ziffer → Platz existiert, KEIN Wurf.
+    const r = rankZwischen("1", "30");
+    expect("1" < r).toBe(true);
+    expect(r < "30").toBe(true);
+  });
+
   it("wiederholtes Einfügen zwischen denselben Nachbarn bleibt strikt geordnet (Kernkonvergenz)", () => {
     let lo = "1";
     const hi = "2";

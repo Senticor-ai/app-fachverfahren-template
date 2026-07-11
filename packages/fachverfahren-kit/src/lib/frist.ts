@@ -45,6 +45,21 @@ export function formatFristDauerObj(dauer: FristDauer): string {
   return formatFristDauer(dauer.wert, dauer.einheit ?? FRIST_EINHEIT_DEFAULT);
 }
 
+/**
+ * Parst einen Anker-ISO-Zeitstempel STABIL als UTC. Ein ISO-8601-Zeitanteil OHNE Offset (kein „Z", kein
+ * „±hh[:mm]") wird von ECMAScript als LOKALZEIT interpretiert — die daraus abgeleitete Fälligkeit hinge dann an
+ * der Server-Zeitzone (nicht reproduzierbar, entgegen der dokumentierten UTC-Semantik). Wir lesen einen
+ * offsetlosen Zeitanteil daher als UTC (Suffix „Z"). Date-only-Formen ("2026-01-15") sind laut Spec bereits UTC;
+ * Zeitanteile mit Offset bleiben unverändert absolut. Nur der Bereich NACH dem „T" wird auf einen Offset geprüft
+ * (das Datum enthält „-", das sonst fälschlich als Offset zählte).
+ */
+function ankerAlsUtc(iso: string): Date {
+  const t = iso.indexOf("T");
+  const hatOffset =
+    t >= 0 && /(?:[zZ]|[+-]\d{2}(?::?\d{2})?)$/.test(iso.slice(t));
+  return new Date(t >= 0 && !hatOffset ? `${iso}Z` : iso);
+}
+
 /** Addiert `n` Kalendermonate auf `d` (UTC-Kalender) mit Monatsende-Klemmung: 31.01. + 1 Monat → 28./29.02.
  *  (nicht 03.03.). Zuerst auf den 1. setzen verhindert den Monatsüberlauf, dann auf den geklemmten Tag. */
 function addKalenderMonate(d: Date, n: number): void {
@@ -73,7 +88,7 @@ export function faelligkeitAb(
   wert: number,
   einheit: FristEinheit = FRIST_EINHEIT_DEFAULT,
 ): string | null {
-  const anker = new Date(ankerIso);
+  const anker = ankerAlsUtc(ankerIso);
   if (Number.isNaN(anker.getTime())) return null;
   const d = new Date(anker.getTime()); // Kopie — Anker bleibt unverändert.
   switch (einheit) {

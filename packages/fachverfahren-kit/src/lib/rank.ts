@@ -42,7 +42,17 @@ export function rankZwischen(vorher?: string, nachher?: string): string {
   // `a` wird konzeptionell mit der kleinsten Ziffer (0) aufgefüllt, `b` (falls offen) mit der Obergrenze (BASIS).
   for (;;) {
     const x = i < a.length ? ziffer(a[i]!) : 0;
-    const y = b !== null && i < b.length ? ziffer(b[i]!) : BASIS;
+    // Oberes Ende: `b === null` ⇒ offen (BASIS). Ist `b` eine ENDLICHE Grenze und HIER erschöpft
+    // (`i >= b.length`), dann stimmt das Ergebnis bereits mit GANZ `b` überein (alle Ziffern per x===y gematcht) —
+    // jede weitere Ziffer würde `b` lexikografisch ÜBERSCHREITEN. Dann existiert kein Rang strikt zwischen `a` und
+    // `b` (z. B. rankZwischen("1","10"): kein Rang > "1" und < "10"). Werfen statt still die Ordnung zu brechen
+    // (früher lieferte der BASIS-Zweig hier ein LÄNGERES, also GRÖSSERES Ergebnis als `b`).
+    if (b !== null && i >= b.length) {
+      throw new Error(
+        `rankZwischen: kein Rang strikt zwischen „${vorher}" und „${nachher}" möglich — die Nachbar-Ränge sind zu dicht (Rebalance nötig).`,
+      );
+    }
+    const y = b !== null ? ziffer(b[i]!) : BASIS;
     if (x === y) {
       ergebnis.push(x);
       i++;
