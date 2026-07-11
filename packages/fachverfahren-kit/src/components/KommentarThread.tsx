@@ -5,17 +5,13 @@
 // Text). Ein optionaler Composer (nur wenn `schreibenErlaubt`) legt einen neuen Vermerk an. CONFIG-/DATEN-getrieben:
 // kein Domänen-Literal, alle Inhalte kommen aus den Props. Barrierefrei (BITV 2.0/WCAG 2.2 AA): <ol>/<li> + <time>,
 // beschriftetes Textfeld, Live-Region meldet das Anlegen, sichtbarer Fokus-Ring, `prefers-reduced-motion` respektiert.
-import {
-  useId,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactElement,
-} from "react";
+import { useId, useState, type FormEvent, type ReactElement } from "react";
 import { MessageSquare } from "lucide-react";
 
 import type { AufgabeKommentar } from "../types.js";
 import { cn } from "../lib/utils.js";
+import { MarkdownView } from "./MarkdownView.js";
+import { MarkdownEditor } from "./MarkdownEditor.js";
 
 export interface KommentarThreadProps {
   kommentare: AufgabeKommentar[];
@@ -52,8 +48,6 @@ export function KommentarThread({
   const [text, setText] = useState("");
   const ueberschriftId = useId();
   const statusId = useId();
-  const hinweisId = useId();
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const chronologisch = [...kommentare].sort((a, b) =>
     a.erstelltIso < b.erstelltIso ? -1 : 1,
   );
@@ -64,9 +58,6 @@ export function KommentarThread({
     if (!wert) return;
     onVermerk?.(wert);
     setText("");
-    // BITV-Fokusverwaltung: den Fokus zurück ins Textfeld führen (der disablte Button würde ihn sonst an
-    // document.body verlieren). Die Live-Region meldet das Anlegen weiterhin.
-    textareaRef.current?.focus();
   }
 
   return (
@@ -110,9 +101,9 @@ export function KommentarThread({
                     {k.autorAkteurId}
                   </span>
                 </div>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                  {k.text}
-                </p>
+                {/* Vermerke rendern als Markdown (GFM: Fett/Listen/Links/Code) — reicher als reiner Klartext.
+                    Klartext-Vermerke rendern unverändert; append-only bleibt (keine Edit-Affordanz). */}
+                <MarkdownView compact>{k.text}</MarkdownView>
               </div>
             </li>
           ))}
@@ -121,26 +112,21 @@ export function KommentarThread({
 
       {schreibenErlaubt && (
         <form onSubmit={absenden} className="flex flex-col gap-2">
-          <label
-            htmlFor={`${ueberschriftId}-eingabe`}
-            className="text-sm font-medium text-foreground"
-          >
+          <span className="text-sm font-medium text-foreground">
             Neuen Vermerk anlegen
-          </label>
-          <textarea
-            id={`${ueberschriftId}-eingabe`}
-            ref={textareaRef}
+          </span>
+          {/* Reicher Composer: Markdown-Toolbar + umschaltbare Vorschau. Das Eingabefeld ist über `ariaLabel`
+              kontextspezifisch beschriftet (nicht generisch), append-only-Semantik unverändert. */}
+          <MarkdownEditor
             value={text}
-            onChange={(e) => setText(e.target.value)}
-            rows={3}
-            aria-describedby={hinweisId}
-            className="min-h-20 rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
-            placeholder="Interne Einschätzung — nur für die Sachbearbeitung sichtbar."
+            onChange={setText}
+            preview="tab"
+            ariaLabel="Neuen Vermerk anlegen (Markdown)"
+            placeholder="Interne Einschätzung — nur für die Sachbearbeitung sichtbar. Markdown wird unterstützt."
           />
-          {/* Feldbeschreibung (statisch) — getrennt von der Zähler-Live-Region. */}
-          <span id={hinweisId} className="sr-only">
+          <span className="sr-only">
             Interner Vermerk, wird der Aufgabe dauerhaft hinzugefügt
-            (append-only, nicht editierbar).
+            (append-only, nicht editierbar). Markdown (GFM) wird unterstützt.
           </span>
           <div className="flex items-center justify-between gap-2">
             <span id={statusId} aria-live="polite" className="sr-only">

@@ -21,6 +21,8 @@ interface Props {
   className?: string;
   /** "side" = Split (Desktop), "tab" = umschaltbar Bearbeiten/Vorschau. */
   preview?: "side" | "tab";
+  /** Barrierefreies Label des Eingabefelds (Default „Markdown-Editor"). Aufrufer setzen es kontextspezifisch. */
+  ariaLabel?: string;
 }
 
 export function MarkdownEditor({
@@ -29,6 +31,7 @@ export function MarkdownEditor({
   placeholder,
   className,
   preview = "side",
+  ariaLabel = "Markdown-Editor",
 }: Props) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [tab, setTab] = useState<"edit" | "preview">("edit");
@@ -79,7 +82,7 @@ export function MarkdownEditor({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      aria-label="Markdown-Editor"
+      aria-label={ariaLabel}
       className="h-full min-h-[12rem] w-full resize-none bg-transparent p-3 font-mono text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground"
     />
   );
