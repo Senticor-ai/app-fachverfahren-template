@@ -7,3 +7,4 @@ export * from "./audit.js";
 export * from "./rbac.js";
 export * from "./case-service.js";
 export * from "./session.js";
+export * from "./module-server.js";

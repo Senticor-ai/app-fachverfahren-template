@@ -22,11 +22,11 @@ export interface SessionGuardDeps {
 /** Der server-autoritative Scope, abgeleitet NUR aus der Session (nie aus Query/Body). Immutable — Downstream (Routen,
  *  ModuleHost) liest den Mandanten-/Akteur-Kontext ausschliesslich hieraus. */
 export interface HttpScope {
-  tenantId: string;
-  authorityId: string;
-  jurisdictionId: string;
-  actorId: string;
-  permissions: readonly string[];
+  readonly tenantId: string;
+  readonly authorityId: string;
+  readonly jurisdictionId: string;
+  readonly actorId: string;
+  readonly permissions: readonly string[];
 }
 
 /** 401 (keine Sitzung) bzw. 403 (Tenant nicht bedient) — sonst die Sitzung. Der Mandanten-Scope kommt danach aus
@@ -69,11 +69,14 @@ export function forbidden(reply: FastifyReply, reason?: string): FastifyReply {
  *  ModuleHost teilen. Trägt NUR die Scope-Felder (kein weiterer Request-Kontext) → Downstream kann keinen fremden
  *  Mandanten adressieren, indem es versehentlich Query/Body liest. */
 export function scopeFromSession(session: CaseworkerSession): HttpScope {
-  return {
+  // Object.freeze: der Scope ist zur LAUFZEIT unveränderlich — ein Modul-Handler kann `ctx.scope.tenantId` nicht
+  // umschreiben, um einen vor-gescopten Port auf einen fremden Mandanten zu lenken (readonly allein wirkt nur zur
+  // Compile-Zeit). Defense-in-Depth zusätzlich zum tenant-Snapshot im Port.
+  return Object.freeze({
     tenantId: session.tenantId,
     authorityId: session.authorityId,
     jurisdictionId: session.jurisdictionId,
     actorId: session.actorId,
     permissions: session.permissions,
-  };
+  });
 }

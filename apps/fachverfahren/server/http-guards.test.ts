@@ -116,4 +116,9 @@ describe("scopeFromSession — session-getriebener Scope", () => {
       permissions: ["case.read", "inbox.read"],
     });
   });
+
+  it("liefert einen EINGEFRORENEN Scope (Laufzeit-Schutz gegen Mutation → kein Port-Umlenken)", () => {
+    const scope = scopeFromSession(SESSION);
+    expect(Object.isFrozen(scope)).toBe(true);
+  });
 });
