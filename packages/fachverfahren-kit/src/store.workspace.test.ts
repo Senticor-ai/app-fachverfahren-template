@@ -640,4 +640,44 @@ describe("createWorkspaceStore — Aktivitäts-Change-Log", () => {
     ).toThrow();
     expect(store.listAktivitaet(t.id)).toEqual([]);
   });
+
+  it("addBeziehung legt die Verknüpfung an UND protokolliert eine Aktivität task.beziehung-hinzugefuegt", () => {
+    const store = createWorkspaceStore(macheWorkspace(), { now: NOW });
+    const alle = store.listTasks();
+    const t1 = alle[0]!;
+    const t2 = alle[1]!;
+    store.addBeziehung(t1.id, t2.id, "blocks", "sb.eins");
+
+    const bez = store.listBeziehungen(t1.id);
+    expect(bez).toHaveLength(1);
+    expect(bez[0]!).toMatchObject({
+      verknuepfteAufgabeId: t2.id,
+      typ: "blocks",
+    });
+
+    const eintrag = store
+      .listAktivitaet(t1.id)
+      .find((a) => a.typ === "task.beziehung-hinzugefuegt");
+    expect(eintrag?.akteurId).toBe("sb.eins");
+    expect(eintrag?.payload).toMatchObject({
+      verknuepfteAufgabeId: t2.id,
+      typ: "blocks",
+    });
+  });
+
+  it("addBeziehung ignoriert Selbstreferenz + Duplikat (kein Aktivitäts-Rauschen)", () => {
+    const store = createWorkspaceStore(macheWorkspace(), { now: NOW });
+    const alle = store.listTasks();
+    const t1 = alle[0]!;
+    const t2 = alle[1]!;
+    store.addBeziehung(t1.id, t1.id, "blocks", "sb.eins"); // Selbstreferenz → ignoriert
+    store.addBeziehung(t1.id, t2.id, "blocks", "sb.eins");
+    store.addBeziehung(t1.id, t2.id, "blocks", "sb.eins"); // Duplikat → ignoriert
+    expect(store.listBeziehungen(t1.id)).toHaveLength(1);
+    expect(
+      store
+        .listAktivitaet(t1.id)
+        .filter((a) => a.typ === "task.beziehung-hinzugefuegt"),
+    ).toHaveLength(1);
+  });
 });

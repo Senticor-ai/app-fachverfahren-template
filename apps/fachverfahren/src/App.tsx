@@ -18,6 +18,7 @@ import {
 import {
   AKTIVITAET_TYP_LABELS,
   AktivitaetsFeed,
+  BEZIEHUNGS_TYP_LABELS,
   AntragStepper,
   Arbeitsvorrat,
   AufsichtDashboard,
@@ -455,6 +456,17 @@ function AmtVorgang(): React.JSX.Element {
               <RelationPanel
                 beziehungen={workspace.listBeziehungen(task.id)}
                 bearbeitenErlaubt
+                typLabels={BEZIEHUNGS_TYP_LABELS}
+                aufgabenTitel={Object.fromEntries(
+                  workspace.listTasks().map((a) => [a.id, a.titel]),
+                )}
+                anlegbareAufgaben={workspace
+                  .listTasks()
+                  .filter((a) => a.id !== task.id)
+                  .map((a) => ({ id: a.id, titel: a.titel }))}
+                onAnlegen={(zielId, typ) =>
+                  workspace.addBeziehung(task.id, zielId, typ, akteur)
+                }
                 onEntfernen={(rid) => workspace.entferneBeziehung(task.id, rid)}
               />
             </div>

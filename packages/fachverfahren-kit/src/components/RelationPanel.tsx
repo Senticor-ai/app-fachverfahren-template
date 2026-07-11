@@ -4,13 +4,31 @@
 // zugängliche Liste; ein optionaler Entfernen-Knopf (nur wenn `bearbeitenErlaubt`) löst das Löschen aus. Der
 // Beziehungstyp ist DATEN; `typLabels` macht ihn menschenlesbar, ohne Domänen-Literale in die Komponente zu backen.
 // Barrierefrei (BITV/WCAG 2.2 AA): semantische Liste, beschriftete Aktionen, sichtbarer Fokus-Ring, reduced-motion.
-import { useId, type ReactElement } from "react";
+import { useId, useState, type ReactElement } from "react";
 import { Link2, X } from "lucide-react";
 
 import type { AufgabeBeziehung, BeziehungsTyp } from "../types.js";
 import { cn } from "../lib/utils.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
+
+/** Kanonische Beziehungstypen (Plane-Parität) in Anlege-Reihenfolge — DATEN für das Typ-Auswahlmenü. */
+export const BEZIEHUNGS_TYPEN: readonly BeziehungsTyp[] = [
+  "blocks",
+  "blocked-by",
+  "relates",
+  "duplicate",
+  "widerspruch-zu",
+];
+
+/** Sinnvolle deutsche Standard-Beschriftungen je Beziehungstyp — wiederverwendbar (an `typLabels` reichen). */
+export const BEZIEHUNGS_TYP_LABELS: Record<BeziehungsTyp, string> = {
+  blocks: "blockiert",
+  "blocked-by": "blockiert von",
+  relates: "bezieht sich auf",
+  duplicate: "Dublette von",
+  "widerspruch-zu": "Widerspruch zu",
+};
 
 export interface RelationPanelProps {
   beziehungen: AufgabeBeziehung[];
@@ -20,6 +38,10 @@ export interface RelationPanelProps {
   aufgabenTitel?: Record<string, string>;
   bearbeitenErlaubt?: boolean;
   onEntfernen?: (beziehungId: string) => void;
+  /** Verknüpfbare andere Aufgaben (für das Anlege-UI) — ohne die eigene Aufgabe. Leer/fehlt = kein Anlege-UI. */
+  anlegbareAufgaben?: readonly { id: string; titel: string }[];
+  /** Legt eine neue Beziehung an. Nur wirksam mit `bearbeitenErlaubt` + `anlegbareAufgaben`. */
+  onAnlegen?: (verknuepfteAufgabeId: string, typ: BeziehungsTyp) => void;
   className?: string;
 }
 
@@ -37,9 +59,20 @@ export function RelationPanel({
   aufgabenTitel,
   bearbeitenErlaubt = false,
   onEntfernen,
+  anlegbareAufgaben,
+  onAnlegen,
   className,
 }: RelationPanelProps): ReactElement {
   const ueberschriftId = useId();
+  const [zielId, setZielId] = useState("");
+  const [typ, setTyp] = useState<BeziehungsTyp>("blocks");
+  const anlegenMoeglich =
+    bearbeitenErlaubt &&
+    !!onAnlegen &&
+    !!anlegbareAufgaben &&
+    anlegbareAufgaben.length > 0;
+  const labelFuer = (t: BeziehungsTyp): string =>
+    typLabels?.[t] ?? BEZIEHUNGS_TYP_LABELS[t];
 
   return (
     <section
@@ -67,9 +100,7 @@ export function RelationPanel({
               className="flex items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <Badge tone={typTon(b.typ)}>
-                  {typLabels?.[b.typ] ?? b.typ}
-                </Badge>
+                <Badge tone={typTon(b.typ)}>{labelFuer(b.typ)}</Badge>
                 <span className="text-sm text-foreground">
                   {aufgabenTitel?.[b.verknuepfteAufgabeId] ??
                     b.verknuepfteAufgabeId}
@@ -94,6 +125,53 @@ export function RelationPanel({
           ))}
         </ul>
       )}
+
+      {anlegenMoeglich ? (
+        <form
+          className="flex flex-wrap items-end gap-2 rounded-md border border-dashed border-border p-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!zielId) return;
+            onAnlegen?.(zielId, typ);
+            setZielId("");
+          }}
+        >
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            Beziehungstyp
+            <select
+              value={typ}
+              onChange={(e) => setTyp(e.target.value as BeziehungsTyp)}
+              aria-label="Beziehungstyp"
+              className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+            >
+              {BEZIEHUNGS_TYPEN.map((t) => (
+                <option key={t} value={t}>
+                  {labelFuer(t)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex min-w-[12rem] flex-1 flex-col gap-1 text-xs text-muted-foreground">
+            Aufgabe verknüpfen
+            <select
+              value={zielId}
+              onChange={(e) => setZielId(e.target.value)}
+              aria-label="Aufgabe verknüpfen"
+              className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+            >
+              <option value="">Aufgabe wählen …</option>
+              {anlegbareAufgaben!.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.titel}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button type="submit" size="sm" disabled={!zielId}>
+            Verknüpfen
+          </Button>
+        </form>
+      ) : null}
     </section>
   );
 }

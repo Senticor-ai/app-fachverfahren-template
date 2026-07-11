@@ -779,7 +779,7 @@ export function createWorkspaceStore<T = Record<string, unknown>>(
       const ref = resolveTaskId(taskId);
       return ref ? (beziehungen.get(ref.key) ?? []).map((b) => ({ ...b })) : [];
     },
-    addBeziehung: (taskId, verknuepfteAufgabeId, typ) => {
+    addBeziehung: (taskId, verknuepfteAufgabeId, typ, akteur) => {
       const ref = resolveTaskId(taskId);
       if (!ref || ref.key === verknuepfteAufgabeId) return; // keine Selbstreferenz
       const liste = beziehungen.get(ref.key) ?? [];
@@ -798,6 +798,10 @@ export function createWorkspaceStore<T = Record<string, unknown>>(
         erstelltIso: nowIso(),
       });
       beziehungen.set(ref.key, liste);
+      protokolliereAktivitaet(taskId, "task.beziehung-hinzugefuegt", akteur, {
+        verknuepfteAufgabeId,
+        typ,
+      });
       bump();
     },
     entferneBeziehung: (taskId, beziehungId) => {

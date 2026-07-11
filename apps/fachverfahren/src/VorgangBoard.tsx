@@ -13,6 +13,7 @@ import { Check, MoreHorizontal, PanelRightOpen } from "lucide-react";
 import {
   AKTIVITAET_TYP_LABELS,
   AktivitaetsFeed,
+  BEZIEHUNGS_TYP_LABELS,
   Badge,
   Button,
   DropdownMenu,
@@ -448,6 +449,22 @@ export function VorgangBoard({
                 <RelationPanel
                   beziehungen={workspace.listBeziehungen(detail.id)}
                   bearbeitenErlaubt
+                  typLabels={BEZIEHUNGS_TYP_LABELS}
+                  aufgabenTitel={Object.fromEntries(
+                    workspace.listTasks().map((a) => [a.id, a.titel]),
+                  )}
+                  anlegbareAufgaben={workspace
+                    .listTasks()
+                    .filter((a) => a.id !== detail.id)
+                    .map((a) => ({ id: a.id, titel: a.titel }))}
+                  onAnlegen={(zielId, typ) =>
+                    workspace.addBeziehung(
+                      detail.id,
+                      zielId,
+                      typ,
+                      aktuellerAkteur,
+                    )
+                  }
                   onEntfernen={(id) =>
                     workspace.entferneBeziehung(detail.id, id)
                   }

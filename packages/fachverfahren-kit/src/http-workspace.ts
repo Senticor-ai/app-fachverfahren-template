@@ -608,6 +608,9 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
     taskId: string,
     verknuepfteAufgabeId: string,
     typ: BeziehungsTyp,
+    // Der Akteur wird server-autoritativ aus der Session abgeleitet; der Parameter hält nur die Port-Signatur
+    // konsistent zum DEV-Store (dort speist er die Aktivität). Bewusst ungenutzt im HTTP-Pfad.
+    _akteur?: string,
   ): void => {
     void (async () => {
       try {

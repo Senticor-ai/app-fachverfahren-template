@@ -1162,6 +1162,7 @@ export interface WorkspacePort<TAntragsdaten = Record<string, unknown>> {
     taskId: string,
     verknuepfteAufgabeId: string,
     typ: BeziehungsTyp,
+    akteur?: string,
   ): void;
   entferneBeziehung(taskId: string, beziehungId: string): void;
 
