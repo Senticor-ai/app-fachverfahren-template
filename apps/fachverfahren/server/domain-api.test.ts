@@ -646,6 +646,33 @@ function runTaskContract(
         await app.close();
       });
 
+      it("RBAC über x-roles: caseworker-Rolle (OHNE x-permissions) erhält task.read; citizen nicht (403)", async () => {
+        const { caseStore, taskStore } = makeStores();
+        const task = macheTaskFixture();
+        await taskStore.insertTask(task);
+        const app = buildTaskApp(caseStore, taskStore);
+        const basis = {
+          "x-actor-id": "sb.eins",
+          "x-tenant-id": "t1",
+          "x-authority-id": "b1",
+        };
+        // Rechte NUR aus der Rolle abgeleitet (kein x-permissions-Header).
+        const alsCaseworker = await app.inject({
+          method: "GET",
+          url: `/api/tasks/${task.taskId}/activity`,
+          headers: { ...basis, "x-roles": "caseworker" },
+        });
+        expect(alsCaseworker.statusCode).toBe(200);
+        // Gegenprobe: die citizen-Rolle enthält KEIN task.read → 403 (der Client kann sich das Recht nicht erschleichen).
+        const alsCitizen = await app.inject({
+          method: "GET",
+          url: `/api/tasks/${task.taskId}/activity`,
+          headers: { ...basis, "x-roles": "citizen" },
+        });
+        expect(alsCitizen.statusCode).toBe(403);
+        await app.close();
+      });
+
       it("gespeicherte Ansichten: persönlich ohne, geteilt nur mit view.share; löschbar", async () => {
         const { caseStore, taskStore } = makeStores();
         const app = buildTaskApp(caseStore, taskStore);

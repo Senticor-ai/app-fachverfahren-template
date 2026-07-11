@@ -65,6 +65,63 @@ describe("headerSessionResolver — DEV", () => {
       headerSessionResolver()({ headers: { "x-tenant-id": "t1" } }),
     ).toBeUndefined();
   });
+
+  it("leitet Rechte aus x-roles über die RBAC-Registry ab (caseworker → sein Rechte-Set)", () => {
+    const s = headerSessionResolver()({
+      headers: {
+        "x-actor-id": "sb.a",
+        "x-tenant-id": "t1",
+        "x-authority-id": "b1",
+        "x-roles": "caseworker",
+      },
+    });
+    expect(s?.permissions).toContain("task.read");
+    expect(s?.permissions).toContain("task.write");
+    expect(s?.permissions).toContain("case.read");
+    expect(s?.permissions).toContain("ai.assist");
+    // Registry-Gap (ehrlich): case.transition/case.decide sind NICHT im caseworker-Rollen-Set — Rollen-Auth allein
+    // kann heute (noch) keine Übergänge; dafür weiterhin explizite x-permissions oder eine erweiterte Rolle nötig.
+    expect(s?.permissions).not.toContain("case.transition");
+  });
+
+  it("VEREINIGT Rollen-Rechte mit expliziten x-permissions (additiv)", () => {
+    const s = headerSessionResolver()({
+      headers: {
+        "x-actor-id": "sb.a",
+        "x-tenant-id": "t1",
+        "x-authority-id": "b1",
+        "x-roles": "citizen",
+        "x-permissions": "case.transition",
+      },
+    });
+    expect(s?.permissions).toContain("session.read"); // aus der citizen-Rolle abgeleitet
+    expect(s?.permissions).toContain("case.transition"); // explizit ergänzt
+  });
+
+  it("ignoriert unbekannte Rollen (kein Crash, keine Rechte daraus)", () => {
+    const s = headerSessionResolver()({
+      headers: {
+        "x-actor-id": "sb.a",
+        "x-tenant-id": "t1",
+        "x-authority-id": "b1",
+        "x-roles": "gibtsnicht",
+        "x-permissions": "case.read",
+      },
+    });
+    expect(s?.permissions).toEqual(["case.read"]);
+  });
+
+  it("bleibt rückwärtskompatibel: ohne x-roles zählen nur die x-permissions", () => {
+    const s = headerSessionResolver()({
+      headers: {
+        "x-actor-id": "sb.a",
+        "x-tenant-id": "t1",
+        "x-authority-id": "b1",
+        "x-permissions": "view.read",
+      },
+    });
+    expect(s?.permissions).toEqual(["view.read"]);
+  });
 });
 
 describe("oidcSessionResolver — PROD-Seam (injizierte Verifikation)", () => {

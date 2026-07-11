@@ -8,6 +8,11 @@
 // austauschbarer `verify`-Callback (Test = Fake, PROD = z. B. jose/JWKS gegen den IdP) — so ist die IAM-Anbindung
 // vorbereitet und TESTBAR, ohne einen laufenden Identity-Provider zu brauchen.
 import type { CaseworkerSession } from "./case-service.js";
+import {
+  builtInRbacRegistry,
+  resolvePermissionsForRoles,
+  type RbacRegistry,
+} from "./rbac.js";
 
 /** eIDAS-Vertrauensniveau (assurance level, aus dem OIDC-`acr`-Claim). Steuert, welche Aktionen erlaubt sind. */
 export type AssuranceLevel = "niedrig" | "substanziell" | "hoch";
@@ -76,17 +81,37 @@ function headerWert(v: string | string[] | undefined): string | undefined {
 }
 
 /** DEV/Test-Resolver: Sitzung aus `x-*`-Headern (kein IdP). Rechte als kommagetrennte `x-permissions`. */
-export function headerSessionResolver(): SessionResolver {
+export function headerSessionResolver(
+  registry: RbacRegistry = builtInRbacRegistry,
+): SessionResolver {
   return (req) => {
     const h = req.headers;
     const subject = headerWert(h["x-actor-id"]);
     const tenantId = headerWert(h["x-tenant-id"]);
     const authorityId = headerWert(h["x-authority-id"]);
     if (!subject || !tenantId || !authorityId) return undefined;
-    const permissions = (headerWert(h["x-permissions"]) ?? "")
+    const explizitePermissions = (headerWert(h["x-permissions"]) ?? "")
       .split(",")
       .map((p) => p.trim())
       .filter(Boolean);
+    // RBAC: Rechte aus ROLLEN ableiten (rbac-Registry) statt sie dem Client als reine Rechte-Liste zu glauben.
+    // Ist ein `x-roles`-Header gesetzt, werden die daraus abgeleiteten Rechte mit etwaigen expliziten
+    // `x-permissions` VEREINIGT; ohne `x-roles` bleibt es exakt beim bisherigen x-permissions-Verhalten
+    // (rückwärtskompatibel). Unbekannte Rollen werden ignoriert (kein Crash) und gewähren keine Rechte.
+    const roleKeys = (headerWert(h["x-roles"]) ?? "")
+      .split(",")
+      .map((r) => r.trim())
+      .filter(Boolean);
+    const bekannteRollen = roleKeys.filter((k) =>
+      registry.roles.some((r) => r.roleKey === k),
+    );
+    const rollenPermissions =
+      bekannteRollen.length > 0
+        ? resolvePermissionsForRoles(bekannteRollen, registry)
+        : [];
+    const permissions = [
+      ...new Set([...rollenPermissions, ...explizitePermissions]),
+    ];
     const assuranceLevel = headerWert(h["x-assurance-level"]) as
       | AssuranceLevel
       | undefined;
