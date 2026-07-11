@@ -1,0 +1,32 @@
+{{- if and .Values.worker.enabled .Values.worker.autoscaling.enabled }}
+# EVENT-getriebenes Autoscaling des Worker-Deployments (#10) über KEDA. Skaliert auf dem OUTBOX-RÜCKSTAU statt CPU:
+# der `postgresql`-Trigger zählt die fälligen, unverarbeiteten Events (WORTGLEICH zum Claim-Prädikat des Workers) und
+# hält ~`backlogPerReplica` Events je Replica. So wächst die Worker-Flotte mit dem Event-Rückstand und schrumpft, wenn
+# die Outbox leerläuft. Benötigt KEDA im Cluster (keda.sh CRDs); ist das nicht installiert, `worker.autoscaling.enabled`
+# auf false lassen — dann rendert diese Ressource gar nicht.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "fachverfahren.fullname" . }}-worker
+  labels:
+    {{- include "fachverfahren.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  scaleTargetRef:
+    name: {{ include "fachverfahren.fullname" . }}-worker
+  minReplicaCount: {{ .Values.worker.autoscaling.minReplicaCount }}
+  maxReplicaCount: {{ .Values.worker.autoscaling.maxReplicaCount }}
+  pollingInterval: {{ .Values.worker.autoscaling.pollingIntervalSeconds }}
+  cooldownPeriod: {{ .Values.worker.autoscaling.cooldownSeconds }}
+  triggers:
+    - type: postgresql
+      metadata:
+        # Der Rückstau: fällige, unverarbeitete Outbox-Events — deckungsgleich zum `claimDueEvents`-Prädikat des Workers
+        # UND zur `app_automation_backlog{state="due"}`-Gauge am /metrics-Endpunkt (eine Wahrheit, zwei Messpfade).
+        query: >-
+          SELECT count(*) FROM app_automation_events
+          WHERE processed_at IS NULL AND (scheduled_for IS NULL OR scheduled_for <= now())
+        targetQueryValue: "{{ .Values.worker.autoscaling.backlogPerReplica }}"
+        # KEDA liest die Verbindungszeichenfolge aus der genannten Env-Variable des Worker-Pods (aus dem DB-Secret).
+        connectionFromEnv: {{ .Values.worker.autoscaling.connectionEnv | quote }}
+{{- end }}

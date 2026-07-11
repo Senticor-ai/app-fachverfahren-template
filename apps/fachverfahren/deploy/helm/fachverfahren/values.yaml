@@ -112,6 +112,19 @@ worker:
     limits:
       cpu: 300m
       memory: 384Mi
+  # EVENT-getriebenes Autoscaling des Workers (#10): skaliert auf dem OUTBOX-RÜCKSTAU (fällige, unverarbeitete Events),
+  # nicht auf CPU — ein idle-CPU-Worker mit grossem Rückstand MUSS hochskalieren. Benötigt KEDA im Cluster (das OSS-
+  # Standardwerkzeug für event-driven Autoscaling); der `postgresql`-Trigger fragt die Outbox direkt (kein Prometheus/
+  # Service nötig, da der Worker keinen Service hat). Default AUS — ohne KEDA-CRD würde die ScaledObject nicht greifen.
+  autoscaling:
+    enabled: false
+    minReplicaCount: 1 # >=1: der zeitgetriebene Deadline-Scanner braucht mindestens einen laufenden Worker.
+    maxReplicaCount: 6
+    backlogPerReplica: 30 # Ziel: ~30 fällige Events je Replica (KEDA targetQueryValue).
+    pollingIntervalSeconds: 15
+    cooldownSeconds: 120
+    # Name der Umgebungsvariable im Worker-Pod mit der Postgres-Verbindungszeichenfolge (KEDA `connectionFromEnv`).
+    connectionEnv: APP_PG_URL
 
 autoscaling:
   enabled: true

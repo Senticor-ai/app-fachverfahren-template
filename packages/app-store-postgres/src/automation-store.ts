@@ -108,6 +108,17 @@ export interface ClaimedDelivery {
   lockedUntil: string;
 }
 
+/** Rückstau-Kennzahlen der Outbox — die Skalierungs-Signale des Event-Workers (#10). `due` = fällige, unverarbeitete
+ *  Events (der ehrliche Arbeitsrückstand). `claimable` = davon gerade frei greifbar (Prädikat DECKUNGSGLEICH zu
+ *  `claimDueEvents`; momentan geleaste Events zählen NICHT). `scheduled` = unverarbeitet, aber noch nicht fällig
+ *  (`scheduled_for` in der Zukunft). Ein Autoscaler skaliert auf `due` (robust, kollabiert nicht auf 0, wenn kurz alles
+ *  geleast ist), die anderen sind Diagnose. */
+export interface AutomationBacklogStats {
+  due: number;
+  claimable: number;
+  scheduled: number;
+}
+
 export interface AutomationStore {
   insertRule(rule: AppAutomationRule): Promise<AppAutomationRule>;
   getRule(input: {
@@ -179,6 +190,10 @@ export interface AutomationStore {
     consumer?: string;
     limit?: number;
   }): Promise<AppEventDelivery[]>;
+
+  /** Rückstau der Outbox zum Zeitpunkt `now` (#10) — Skalierungs-/Beobachtungssignal, bewusst MANDANTEN-ÜBERGREIFEND
+   *  (wie `claimDueEvents`: der Worker verarbeitet alle Mandanten). `claimable` ist deckungsgleich zum Claim-Prädikat. */
+  backlogStats(input: { now: string }): Promise<AutomationBacklogStats>;
 }
 
 /** Default-Lease-Fenster (Visibility-Timeout) in ms: so lange gilt ein geclaimtes Event als „in Arbeit", bevor es
@@ -189,6 +204,11 @@ export const LEASE_MS = 30_000;
 /** Default-Zeilenobergrenze für `listDeliveries` OHNE explizites `limit` — EINE Wahrheit für beide Laufzeiten, damit
  *  InMemory und Postgres nie divergieren (Postgres kann sonst still bei 1000 kappen, während InMemory alles liefert). */
 const DELIVERY_LIST_DEFAULT_LIMIT = 1000;
+
+/** Server-seitige Obergrenze (ms) für die `backlogStats`-Zählung (#10). Der Rückstau ist ein Beobachtungs-/Skalierungs-
+ *  signal — er darf unter DB-Last NIE eine geteilte Pool-Verbindung (die der Event-Tick braucht) unbegrenzt binden.
+ *  Kleiner als die app-seitige Scrape-Frist, damit im Regelfall die DB zuerst abbricht und die Verbindung freigibt. */
+const BACKLOG_STATEMENT_TIMEOUT_MS = 3000;
 
 /** ISO-Zeitpunkt + `ms` → ISO. Für den Lease-Ablauf (`locked_until`). */
 function addMillis(iso: string, ms: number): string {
@@ -315,6 +335,33 @@ export class InMemoryAutomationStore implements AutomationStore {
     // Idempotent: unbekanntes/bereits verarbeitetes Event ⇒ no-op.
     if (!e || e.processedAt !== null) return;
     this.events.set(input.eventId, { ...e, processedAt: input.now });
+  }
+
+  async backlogStats(input: { now: string }): Promise<AutomationBacklogStats> {
+    let due = 0;
+    let claimable = 0;
+    let scheduled = 0;
+    for (const e of this.events.values()) {
+      if (e.processedAt !== null) continue; // erledigt zählt nie zum Rückstau
+      const faellig =
+        e.scheduledFor === null ||
+        e.scheduledFor === undefined ||
+        e.scheduledFor <= input.now;
+      if (!faellig) {
+        scheduled += 1;
+        continue;
+      }
+      due += 1;
+      // claimable: EXAKT das Prädikat aus claimDueEvents (Lease-frei ODER abgelaufen).
+      if (
+        e.lockedUntil === null ||
+        e.lockedUntil === undefined ||
+        e.lockedUntil <= input.now
+      ) {
+        claimable += 1;
+      }
+    }
+    return { due, claimable, scheduled };
   }
 
   // ── Fan-out (#24): rührt `events`/`processedAt` NICHT an — nur die `deliveries`-Map je Consumer. ──
@@ -579,6 +626,56 @@ export class PostgresAutomationStore implements AutomationStore {
          WHERE event_id = $2 AND processed_at IS NULL`,
         [input.now, input.eventId],
       );
+    });
+  }
+
+  async backlogStats(input: { now: string }): Promise<AutomationBacklogStats> {
+    return this.withClient(async (c) => {
+      // FRISTGEBUNDEN per `statement_timeout` (SET LOCAL ⇒ nur in DIESER TX, keine Pool-Verschmutzung): eine lahme/
+      // gesperrte Zählung bricht server-seitig ab und GIBT DIE VERBINDUNG FREI, statt eine Pool-Verbindung (die der
+      // Event-Tick teilt) unbegrenzt zu binden. Der Metrik-Scrape ist zusätzlich app-seitig fristgebunden. EINE
+      // Aggregat-Abfrage (count … FILTER); die `due`/`claimable`-Prädikate sind WORTGLEICH zu claimDueEvents. bigint ⇒ Number.
+      await c.query("BEGIN");
+      try {
+        await c.query(
+          `SET LOCAL statement_timeout = ${BACKLOG_STATEMENT_TIMEOUT_MS}`,
+        );
+        const r = await c.query<{
+          due: string | number;
+          claimable: string | number;
+          scheduled: string | number;
+        }>(
+          `SELECT
+             count(*) FILTER (
+               WHERE processed_at IS NULL
+                 AND (scheduled_for IS NULL OR scheduled_for <= $1)
+             ) AS due,
+             count(*) FILTER (
+               WHERE processed_at IS NULL
+                 AND (scheduled_for IS NULL OR scheduled_for <= $1)
+                 AND (locked_until IS NULL OR locked_until <= $1)
+             ) AS claimable,
+             count(*) FILTER (
+               WHERE processed_at IS NULL
+                 AND scheduled_for IS NOT NULL
+                 AND scheduled_for > $1
+             ) AS scheduled
+           FROM app_automation_events`,
+          [input.now],
+        );
+        await c.query("COMMIT");
+        const row = r.rows[0];
+        return {
+          due: Number(row?.due ?? 0),
+          claimable: Number(row?.claimable ?? 0),
+          scheduled: Number(row?.scheduled ?? 0),
+        };
+      } catch (fehler) {
+        // Verbindung in sauberen Zustand zurückführen, bevor sie in den Pool zurückgeht (sonst „current transaction
+        // is aborted"-Folgefehler auf der nächsten Nutzung derselben Pool-Verbindung).
+        await c.query("ROLLBACK").catch(() => {});
+        throw fehler;
+      }
     });
   }
 

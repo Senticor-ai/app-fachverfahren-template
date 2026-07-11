@@ -128,6 +128,43 @@ describe("fachverfahren runtime", () => {
     }
   });
 
+  it("exposes the outbox backlog gauge on /internal/metrics when a backlog source is present (#10)", async () => {
+    const config = readRuntimeConfig({ STATIC_DIR: tmpdir() });
+    const app = buildInternalServer({
+      config,
+      backlog: async () => ({ due: 5, claimable: 3, scheduled: 1 }),
+    });
+    try {
+      const res = await app.inject({ method: "GET", url: "/internal/metrics" });
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toContain("app_build_info"); // Basis-Metriken bleiben
+      expect(res.body).toContain('app_automation_backlog{state="due"} 5');
+      expect(res.body).toContain('app_automation_backlog{state="claimable"} 3');
+      expect(res.body).toContain('app_automation_backlog{state="scheduled"} 1');
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("keeps /internal/metrics serving base metrics when the backlog source throws (#10)", async () => {
+    const config = readRuntimeConfig({ STATIC_DIR: tmpdir() });
+    const app = buildInternalServer({
+      config,
+      backlog: async () => {
+        throw new Error("db down");
+      },
+    });
+    try {
+      const res = await app.inject({ method: "GET", url: "/internal/metrics" });
+      // Der Rückstau ist Bonus — ein DB-Fehler darf den Scrape nicht kippen: 200 + Basis-Metriken, Gauge fehlt schlicht.
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toContain("app_build_info");
+      expect(res.body).not.toContain("app_automation_backlog");
+    } finally {
+      await app.close();
+    }
+  });
+
   it("marks readiness false during shutdown", async () => {
     const staticDir = await createStaticDir();
     const config = readRuntimeConfig({ STATIC_DIR: staticDir });

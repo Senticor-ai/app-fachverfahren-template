@@ -26,6 +26,7 @@ export type {
   AppAutomationRule,
   AppAutomationRun,
   AppEventDelivery,
+  AutomationBacklogStats,
   AutomationRunStatus,
   AutomationStore,
   ClaimedDelivery,

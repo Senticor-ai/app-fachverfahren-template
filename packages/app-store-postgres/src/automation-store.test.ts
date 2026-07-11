@@ -589,3 +589,84 @@ for (const impl of impls) {
     },
   );
 }
+
+// ── backlogStats (#10): der Outbox-Rückstau als Skalierungssignal des Event-Workers. Bewusst GLOBAL (mandanten-
+//    übergreifend, wie der Claim) → gegen den geteilten Store/dieselbe DB der Vertragssuite DELTA-basiert getestet
+//    (absolute Zählungen wären durch Rest-Events anderer Tests verfälscht). Die exakte Semantik pinnt der isolierte
+//    InMemory-Test darunter. ──
+for (const impl of impls) {
+  describe.skipIf(!impl.enabled)(
+    `AutomationStore.backlogStats (Delta) — ${impl.name}`,
+    () => {
+      it("klassifiziert due/claimable/scheduled und folgt Claim + markProcessed", async () => {
+        const store = impl.make();
+        const now = "2026-06-10T00:00:00.000Z";
+        const vorher = await store.backlogStats({ now });
+
+        // 2 fällige, frei greifbare Events (verschiedene Mandanten — der Rückstau ist mandanten-übergreifend).
+        await store.enqueueEvent(
+          macheEvent({ createdAt: "2026-06-01T00:00:00.000Z" }),
+        );
+        await store.enqueueEvent(
+          macheEvent({ tenantId: "t2", createdAt: "2026-06-01T00:00:01.000Z" }),
+        );
+        // 1 in der Zukunft geplant ⇒ scheduled, NICHT due.
+        await store.enqueueEvent(
+          macheEvent({ scheduledFor: "2099-01-01T00:00:00.000Z" }),
+        );
+        // 1 bereits verarbeitet ⇒ zählt NIE zum Rückstau.
+        const erledigt = macheEvent({});
+        await store.enqueueEvent(erledigt);
+        await store.markProcessed({ eventId: erledigt.eventId, now });
+
+        const a1 = await store.backlogStats({ now });
+        expect(a1.due - vorher.due).toBe(2);
+        expect(a1.claimable - vorher.claimable).toBe(2);
+        expect(a1.scheduled - vorher.scheduled).toBe(1);
+
+        // Ein Claim leaset genau EIN fälliges Event → global claimable -1, due unverändert (Arbeit bleibt offen). Die
+        // Deltas gelten UNABHÄNGIG davon, welches (evtl. ältere) Event der Claim greift.
+        const geleast = await store.claimDueEvents({ now, limit: 1 });
+        expect(geleast).toHaveLength(1);
+        const a2 = await store.backlogStats({ now });
+        expect(a2.claimable).toBe(a1.claimable - 1);
+        expect(a2.due).toBe(a1.due);
+
+        // markProcessed des geleasten Events → due -1 (erledigt); claimable unverändert (es war geleast, nicht claimbar).
+        await store.markProcessed({ eventId: geleast[0]!.eventId, now });
+        const a3 = await store.backlogStats({ now });
+        expect(a3.due).toBe(a2.due - 1);
+        expect(a3.claimable).toBe(a2.claimable);
+      });
+    },
+  );
+}
+
+describe("InMemoryAutomationStore.backlogStats — absolute Zählung (#10)", () => {
+  it("zählt exakt und lässt geplante Events zum Fälligkeitszeitpunkt in den Rückstau rücken", async () => {
+    const store = new InMemoryAutomationStore();
+    const now = "2026-06-10T00:00:00.000Z";
+    await store.enqueueEvent(
+      macheEvent({ createdAt: "2026-06-01T00:00:00.000Z" }),
+    );
+    await store.enqueueEvent(
+      macheEvent({ tenantId: "t2", createdAt: "2026-06-01T00:00:01.000Z" }),
+    );
+    const geplant = macheEvent({ scheduledFor: "2026-06-20T00:00:00.000Z" });
+    await store.enqueueEvent(geplant);
+    const erledigt = macheEvent({});
+    await store.enqueueEvent(erledigt);
+    await store.markProcessed({ eventId: erledigt.eventId, now });
+
+    expect(await store.backlogStats({ now })).toEqual({
+      due: 2,
+      claimable: 2,
+      scheduled: 1,
+    });
+
+    // Nach dem Fälligkeitszeitpunkt des geplanten Events zählt es als fällig UND (lease-frei) claimbar.
+    expect(
+      await store.backlogStats({ now: "2026-06-21T00:00:00.000Z" }),
+    ).toEqual({ due: 3, claimable: 3, scheduled: 0 });
+  });
+});

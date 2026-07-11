@@ -22,6 +22,11 @@ import {
   parseNonNegativeInt,
 } from "./index.js";
 import { notificationProjector } from "./notification-projector.js";
+import {
+  BACKLOG_SCRAPE_TIMEOUT_MS,
+  mitFrist,
+  renderBacklogMetrics,
+} from "./worker-metrics.js";
 
 export interface WorkerHandle {
   stop: () => Promise<void>;
@@ -79,13 +84,39 @@ export async function startWorker(
     ? setInterval(projektor.run, pollMs)
     : undefined;
 
-  // Minimaler HTTP-Liveness-Server (portabel, kein Shell/`stat` nötig). Der Worker serviert KEINEN Domain-Traffic;
-  // nur `/livez` (200, solange der letzte Tick nicht älter als das Vielfache des Poll-Intervalls ist).
+  // Minimaler HTTP-Health-Server (portabel, kein Shell/`stat` nötig). Der Worker serviert KEINEN Domain-Traffic;
+  // nur `/livez` (Liveness) und `/metrics` (Rückstau-Gauge #10 für den Autoscaler — Prometheus-Text).
+  // `automationStore` ist oben garantiert (früher Guard-Return, wenn es fehlt) — die Non-Null-Assertion hält das fest,
+  // da TS die Verengung nach den zwischenliegenden Aufrufen (Runner/Timer) nicht mehr trägt.
+  const automationStore = domainApi.automationStore!;
+  const jetztIso = domainApi.now ?? (() => new Date().toISOString());
   const healthPort = parseNonNegativeInt(env["APP_WORKER_HEALTH_PORT"], 0);
   let health: Server | undefined;
   if (healthPort > 0) {
     const maxAlterMs = Math.max(30_000, pollMs * 6);
     health = createServer((req, res) => {
+      if (req.url === "/metrics") {
+        // Rückstau EINMAL pro Scrape aus der Outbox lesen (Prometheus/KEDA scrapen im 15–30-s-Takt → günstig). Die
+        // Abfrage ist an eine Frist gebunden: eine hängende/lahme DB darf den Scrape NICHT unbegrenzt offen halten und
+        // NICHT eine geteilte Pool-Verbindung binden (die der Event-Tick braucht) — sonst antwortet der Worker nie.
+        void mitFrist(
+          () => automationStore.backlogStats({ now: jetztIso() }),
+          BACKLOG_SCRAPE_TIMEOUT_MS,
+        )
+          .then((stats) => {
+            res.writeHead(200, {
+              "content-type": "text/plain; version=0.0.4; charset=utf-8",
+            });
+            res.end(renderBacklogMetrics(stats));
+          })
+          .catch(() => {
+            // Rückstau nicht messbar (DB-Fehler) ⇒ 500, NICHT 200 mit 0 — sonst skalierte der Autoscaler den Worker
+            // fälschlich auf Minimum herunter, während der Rückstand in Wahrheit wächst.
+            res.writeHead(500, { "content-type": "text/plain; charset=utf-8" });
+            res.end("# app_automation_backlog unavailable\n");
+          });
+        return;
+      }
       const frisch = Date.now() - letzterTick < maxAlterMs;
       const ok = req.url === "/livez" && frisch;
       res.writeHead(ok ? 200 : 503, { "content-type": "application/json" });

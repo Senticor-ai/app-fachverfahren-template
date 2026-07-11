@@ -9,6 +9,7 @@ import fastify, {
   type FastifyRequest,
 } from "fastify";
 import {
+  type AutomationBacklogStats,
   type AutomationStore,
   closePgPools,
   createActorRoleStoreFromEnv,
@@ -30,6 +31,11 @@ import {
 } from "./domain-api.js";
 import { runConsumerTick, type ConsumerHandle } from "./event-consumer.js";
 import { notificationProjector } from "./notification-projector.js";
+import {
+  BACKLOG_SCRAPE_TIMEOUT_MS,
+  mitFrist,
+  renderBacklogMetrics,
+} from "./worker-metrics.js";
 import { pmModuleManifest } from "./pm-module-manifest.js";
 import { DefaultDenyPolicyEngine } from "@senticor/public-sector-sdk";
 import {
@@ -316,16 +322,33 @@ export function buildPublicServer({
 export function buildInternalServer({
   config = readRuntimeConfig(),
   metrics = new RuntimeMetrics(),
+  backlog,
 }: {
   config?: RuntimeConfig;
   metrics?: RuntimeMetrics;
+  /** OPTIONAL (#10): liefert den Outbox-Rückstau für die `app_automation_backlog`-Gauge. Fehlt er (kein
+   *  Automations-Store), bleibt es bei den HTTP-/Build-Metriken. */
+  backlog?: () => Promise<AutomationBacklogStats>;
 } = {}): FastifyInstance {
   const app = fastify({ logger: false, genReqId: reqIdFromHeaders });
   app.get("/internal/metrics", async (_request, reply) => {
+    let body = metrics.render(config.buildInfo);
+    if (backlog) {
+      // Der Rückstau ist ein BONUS auf diesem Endpunkt (HTTP-/Build-Metriken sind die Basis) — ein DB-Fehler ODER eine
+      // hängende/lahme DB darf den Scrape NICHT kippen: die Abfrage ist fristgebunden, danach fehlt die Backlog-Gauge
+      // schlicht, die Basis-Metriken gehen trotzdem raus (der Web-HPA skaliert ohnehin auf CPU, nicht Rückstau).
+      try {
+        body += renderBacklogMetrics(
+          await mitFrist(backlog, BACKLOG_SCRAPE_TIMEOUT_MS),
+        );
+      } catch {
+        /* Rückstau momentan nicht messbar (Fehler ODER Frist) — HTTP-/Build-Metriken trotzdem ausliefern. */
+      }
+    }
     return reply
       .header("Cache-Control", NO_STORE)
       .type("text/plain; version=0.0.4; charset=utf-8")
-      .send(metrics.render(config.buildInfo));
+      .send(body);
   });
   app.get("/internal/build-info", async (_request, reply) => {
     return reply.header("Cache-Control", NO_STORE).send({
@@ -475,7 +498,20 @@ export async function startRuntime(env: NodeJS.ProcessEnv = process.env) {
     metrics,
     ...(domainApi ? { domainApi } : {}),
   });
-  const internalServer = buildInternalServer({ config, metrics });
+  // Rückstau-Gauge (#10) am /internal/metrics, sobald ein Automations-Store da ist (der In-Process-Poller ist der
+  // Default, wenn KEIN separater Worker läuft) — dann ist die Skalierungs-Kennzahl auch ohne Worker-Deployment sichtbar.
+  const backlogQuelle: (() => Promise<AutomationBacklogStats>) | undefined =
+    domainApi?.automationStore
+      ? () =>
+          domainApi.automationStore!.backlogStats({
+            now: (domainApi.now ?? (() => new Date().toISOString()))(),
+          })
+      : undefined;
+  const internalServer = buildInternalServer({
+    config,
+    metrics,
+    ...(backlogQuelle ? { backlog: backlogQuelle } : {}),
+  });
   // Bindet nur EINER der beiden Server (z. B. internalPort belegt/kollidiert), MUSS der bereits gebundene wieder
   // geschlossen werden — sonst bliebe der Public-Port (inkl. gemounteter /api/*) offen + traffic-bedienend, während
   // der Prozess sich für „nicht gestartet" hält und der offene Socket den Event-Loop am Leben hält (Zombie).
