@@ -20,7 +20,10 @@ import { beispielConfig } from "./leistung.config.beispiel.js";
 // ist. Ein generierender Build ÜBERSCHREIBT `leistung.config.ts` mit dem echten Verfahren (andere id) — dann fällt
 // dieses Demo automatisch weg und der Konsument sieht ausschließlich SEIN Verfahren. So zeigt die Vorlage die
 // verfahrensübergreifende Sicht eigenständig, ohne einen generierten Fork zu verschmutzen.
-const istUnveraendertesVorlagenDemo = leistungConfig.id === "musterantrag";
+// Exportiert, damit auch die Portal-Registry (portale.ts) ihr 2. Demo-Portal NUR im unveränderten Vorlagen-Zustand
+// zeigt — ein generierender Build (echte Verfahren-id) bekommt automatisch ein sauberes Ein-Portal-Setup.
+export const istUnveraendertesVorlagenDemo =
+  leistungConfig.id === "musterantrag";
 const verfahren: VerfahrenEintrag[] = [
   { procedureId: leistungConfig.id, config: leistungConfig },
   ...(istUnveraendertesVorlagenDemo

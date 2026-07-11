@@ -10,15 +10,20 @@ import {
   waehleVerfahren,
 } from "@senticor/fachverfahren-kit";
 import { workspaceConfig } from "./verfahren.registry.js";
+import { aktivesPortal } from "./portale.js";
 
-// PORTAL-NAHT (mehrere Bürger-Applikationen aus EINER Registry): `VITE_ENABLED_PROCEDURES` (komma-separierte
-// procedureIds) beschränkt DIESES Portal auf eine Teilmenge der Verfahren; unset ⇒ alle (rückwärtskompatibel).
-const enabledProcedures = (
+// PORTAL-NAHT (mehrere Bürger-Applikationen aus EINER Registry): das per `VITE_PORTAL_ID` gewählte Portal (portale.ts)
+// bestimmt die Verfahren-Teilmenge. `VITE_ENABLED_PROCEDURES` (komma-separierte procedureIds) bleibt als FEINGRANULARE
+// Override erhalten (rückwärtskompatibel) — gesetzt schlägt es die Portal-Vorgabe; unset ⇒ die Portal-Teilmenge; beides
+// unset ⇒ alle Verfahren.
+const envEnabledProcedures = (
   import.meta.env.VITE_ENABLED_PROCEDURES as string | undefined
 )
   ?.split(",")
   .map((s) => s.trim())
   .filter(Boolean);
+const enabledProcedures =
+  envEnabledProcedures ?? aktivesPortal.enabledProcedures;
 const portalConfig = waehleVerfahren(workspaceConfig, enabledProcedures);
 
 // PROD-NAHT (die EINE austauschbare Datenquelle): ist `VITE_API_BASE_URL` gesetzt, spricht der Workspace die

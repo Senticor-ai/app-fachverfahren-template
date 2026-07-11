@@ -56,6 +56,7 @@ import {
   notificationsUeberApi,
   usePersistierteBenachrichtigungen,
 } from "./notifications.js";
+import { aktivesPortal } from "./portale.js";
 import { WorkspaceListe } from "./WorkspaceListe.js";
 import { VorgangBoard } from "./VorgangBoard.js";
 import {
@@ -825,7 +826,16 @@ export function App(): React.JSX.Element {
     <AkteurProvider>
       <WorkspaceFehlerToast />
       <Routes>
-        <Route path="/" element={<Navigate to="/buerger" replace />} />
+        {/* Landing an „/": der Einstieg des aktiven Portals (Start-Persona, Default „buerger" ⇒ byte-stabil). */}
+        <Route
+          path="/"
+          element={
+            <Navigate
+              to={PERSONA_HOME[aktivesPortal.startPersona ?? "buerger"]}
+              replace
+            />
+          }
+        />
         <Route path="/buerger" element={<BuergerStart />} />
         <Route path="/buerger/anmelden" element={<BuergerAnmelden />} />
         <Route
