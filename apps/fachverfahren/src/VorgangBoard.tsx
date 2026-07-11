@@ -11,6 +11,7 @@
 import { useMemo, useState } from "react";
 import { MoreHorizontal, PanelRightOpen } from "lucide-react";
 import {
+  AKTIVITAET_TYP_LABELS,
   AktivitaetsFeed,
   Badge,
   Button,
@@ -434,6 +435,7 @@ export function VorgangBoard({
                 />
                 <AktivitaetsFeed
                   aktivitaeten={workspace.listAktivitaet(detail.id)}
+                  typLabels={AKTIVITAET_TYP_LABELS}
                 />
                 <RelationPanel
                   beziehungen={workspace.listBeziehungen(detail.id)}

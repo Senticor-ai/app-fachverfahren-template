@@ -335,6 +335,31 @@ export function createWorkspaceStore<T = Record<string, unknown>>(
     `${praefix}-${(detailSeq += 1)}`;
   const nowIso = opts.now ?? (() => new Date().toISOString());
 
+  // Append-only Aktivitäts-Protokoll (Change-Log): JEDE Management-Mutation (Zuweisung/Priorität/Label/Move/
+  // Statuswechsel) erzeugt einen Eintrag, damit der Aktivitäts-Feed ein ECHTES Änderungsprotokoll ist — nicht nur
+  // Kommentare/KI. `typ` ist DATEN (task.*), `payload` trägt den neuen Wert. Wird NACH der geglückten Mutation
+  // aufgerufen (bei `move` also nur, wenn der Versions-Guard nicht geworfen hat) und bumpt selbst.
+  const protokolliereAktivitaet = (
+    taskId: string,
+    typ: string,
+    akteur: string | undefined,
+    payload?: Record<string, unknown>,
+  ): void => {
+    const ref = resolveTaskId(taskId);
+    if (!ref) return;
+    const liste = aktivitaet.get(ref.key) ?? [];
+    liste.push({
+      id: detailId("aktivitaet"),
+      aufgabeId: ref.key,
+      akteurId: akteur ?? "sb.angemeldet",
+      typ,
+      ...(payload ? { payload } : {}),
+      zeitpunktIso: nowIso(),
+    });
+    aktivitaet.set(ref.key, liste);
+    bump();
+  };
+
   const hoechsterRang = (meta: Record<string, TaskMeta>): string => {
     let max = "";
     for (const m of Object.values(meta)) if (m.sortRank > max) max = m.sortRank;
@@ -612,29 +637,43 @@ export function createWorkspaceStore<T = Record<string, unknown>>(
       return v ? baueAufgabe(ref.pid, v, m) : undefined;
     },
 
-    assign: (taskId, zugewiesenAn) =>
+    assign: (taskId, zugewiesenAn, akteur) => {
       mutMeta(taskId, (m) => ({
         ...m,
         zugewiesenAn,
         version: m.version + 1,
-      })),
+      }));
+      protokolliereAktivitaet(taskId, "task.zugewiesen", akteur, {
+        zugewiesenAn: zugewiesenAn ?? null,
+      });
+    },
 
-    setPrioritaet: (taskId, prioritaet) =>
-      mutMeta(taskId, (m) => ({ ...m, prioritaet, version: m.version + 1 })),
+    setPrioritaet: (taskId, prioritaet, akteur) => {
+      mutMeta(taskId, (m) => ({ ...m, prioritaet, version: m.version + 1 }));
+      protokolliereAktivitaet(taskId, "task.prioritaet-geaendert", akteur, {
+        prioritaet: prioritaet ?? null,
+      });
+    },
 
-    addLabel: (taskId, label) =>
+    addLabel: (taskId, label, akteur) => {
       mutMeta(taskId, (m) => ({
         ...m,
         labels: m.labels.includes(label) ? m.labels : [...m.labels, label],
         version: m.version + 1,
-      })),
+      }));
+      protokolliereAktivitaet(taskId, "task.label-hinzugefuegt", akteur, {
+        label,
+      });
+    },
 
-    removeLabel: (taskId, label) =>
+    removeLabel: (taskId, label, akteur) => {
       mutMeta(taskId, (m) => ({
         ...m,
         labels: m.labels.filter((l) => l !== label),
         version: m.version + 1,
-      })),
+      }));
+      protokolliereAktivitaet(taskId, "task.label-entfernt", akteur, { label });
+    },
 
     move: (taskId, boardSpalte, rank, expectedVersion) =>
       mutMeta(taskId, (m) => {
@@ -674,7 +713,12 @@ export function createWorkspaceStore<T = Record<string, unknown>>(
         throw new Error(
           `Aufgabe ${taskId} keinem Verfahren zugeordnet — eine verfahrens-freie Aufgabe hat keinen fachlichen Status`,
         );
+      // Wirft bei unerlaubtem Übergang / Rollen- / Vier-Augen-Verstoß → die Aktivität wird dann NICHT protokolliert.
       s.uebergang(ref.vorgangId, to, rolle, detail, akteur);
+      protokolliereAktivitaet(taskId, "task.status-geaendert", akteur, {
+        nach: to,
+        ...(detail ? { detail } : {}),
+      });
     },
 
     createFreieAufgabe: (titel, opts) => {

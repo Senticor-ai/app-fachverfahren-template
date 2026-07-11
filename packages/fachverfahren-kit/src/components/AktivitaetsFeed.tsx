@@ -18,6 +18,25 @@ export interface AktivitaetsFeedProps {
   className?: string;
 }
 
+/**
+ * Sinnvolle deutsche Standard-Beschriftungen für die kanonischen `task.*`-Aktivitätstypen des Workspace-Stores —
+ * als DATEN wiederverwendbar (an `AktivitaetsFeed`-`typLabels` reichen). Ein Verfahren kann sie überschreiben/ergänzen.
+ */
+export const AKTIVITAET_TYP_LABELS: Record<string, string> = {
+  "task.commented": "Vermerk hinzugefügt",
+  "task.zugewiesen": "Zugewiesen",
+  "task.prioritaet-geaendert": "Priorität geändert",
+  "task.label-hinzugefuegt": "Label hinzugefügt",
+  "task.label-entfernt": "Label entfernt",
+  "task.label-geaendert": "Label geändert",
+  "task.status-geaendert": "Status geändert",
+  "task.verschoben": "Auf dem Board verschoben",
+  "task.beziehung-hinzugefuegt": "Verknüpfung angelegt",
+  "task.beziehung-entfernt": "Verknüpfung entfernt",
+  "task.ki-uebernommen": "KI-Vorschlag übernommen",
+  "task.aus-inbox-angenommen": "Aus dem Eingang angenommen",
+};
+
 function tsText(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;

@@ -595,3 +595,49 @@ describe("Gespeicherte Ansichten (in-memory)", () => {
     expect(store.snapshot()).toBeGreaterThan(v1);
   });
 });
+
+describe("createWorkspaceStore — Aktivitäts-Change-Log", () => {
+  it("Zuweisung/Priorität/Label/Statuswechsel erzeugen je eine Aktivität mit Akteur + Typ + Payload", () => {
+    const store = createWorkspaceStore(macheWorkspace(), { now: NOW });
+    const t = store.listTasks()[0]!; // b-v1 (leistung-b), Status „eingegangen"
+    expect(store.listAktivitaet(t.id)).toEqual([]);
+
+    store.assign(t.id, "sb.zwei", "sb.eins");
+    store.setPrioritaet(t.id, "hoch", "sb.eins");
+    store.addLabel(t.id, "eilt", "sb.eins");
+    store.taskUebergang(
+      t.id,
+      "geprueft",
+      "sachbearbeitung",
+      undefined,
+      "sb.eins",
+    );
+
+    const akt = store.listAktivitaet(t.id);
+    expect(akt.map((a) => a.typ)).toEqual([
+      "task.zugewiesen",
+      "task.prioritaet-geaendert",
+      "task.label-hinzugefuegt",
+      "task.status-geaendert",
+    ]);
+    expect(akt.every((a) => a.akteurId === "sb.eins")).toBe(true);
+    expect(akt[0]!.payload).toEqual({ zugewiesenAn: "sb.zwei" });
+    expect(akt[1]!.payload).toEqual({ prioritaet: "hoch" });
+    expect(akt[3]!.payload).toEqual({ nach: "geprueft" });
+  });
+
+  it("ein FEHLGESCHLAGENER Statuswechsel (unerlaubt) erzeugt KEINE Aktivität", () => {
+    const store = createWorkspaceStore(macheWorkspace(), { now: NOW });
+    const t = store.listTasks()[0]!;
+    expect(() =>
+      store.taskUebergang(
+        t.id,
+        "gibtsnicht",
+        "sachbearbeitung",
+        undefined,
+        "sb.eins",
+      ),
+    ).toThrow();
+    expect(store.listAktivitaet(t.id)).toEqual([]);
+  });
+});

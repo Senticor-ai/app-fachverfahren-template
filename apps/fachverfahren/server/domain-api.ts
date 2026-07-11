@@ -620,6 +620,38 @@ export function registerDomainApi(
           taskId: request.params.id,
           ...request.body,
         });
+        // CHANGE-LOG (Server-Parität zum DEV-Store): jede Metadaten-Mutation erzeugt einen Aktivitäts-Eintrag, damit
+        // der Aktivitäts-Feed ein ECHTES Änderungsprotokoll ist (bisher nur Vermerk + KI-Übernahme).
+        const b = request.body;
+        const ts = now();
+        const protokolliere = async (
+          activityType: string,
+          payload: Record<string, unknown>,
+        ): Promise<void> => {
+          await taskStore.insertTaskActivity({
+            activityId: `activity.${newId()}`,
+            taskId: request.params.id,
+            tenantId: session.tenantId,
+            actorId: session.actorId,
+            activityType,
+            payload,
+            occurredAt: ts,
+          });
+        };
+        if (b.assigneeActorId !== undefined)
+          await protokolliere("task.zugewiesen", {
+            zugewiesenAn: b.assigneeActorId,
+          });
+        if (b.priorityKey !== undefined)
+          await protokolliere("task.prioritaet-geaendert", {
+            prioritaet: b.priorityKey,
+          });
+        if (b.labels !== undefined)
+          await protokolliere("task.label-geaendert", { labels: b.labels });
+        if (b.boardColumn !== undefined || b.sortRank !== undefined)
+          await protokolliere("task.verschoben", {
+            boardSpalte: b.boardColumn ?? null,
+          });
         return reply.code(200).send({ task });
       } catch (error) {
         const name = errorName(error);

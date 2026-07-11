@@ -606,6 +606,46 @@ function runTaskContract(
         ).toContain("task.commented");
       });
 
+      it("Change-Log: PATCH (Zuweisung + Priorität) protokolliert je eine Aktivität mit Akteur", async () => {
+        const { caseStore, taskStore } = makeStores();
+        const task = macheTaskFixture();
+        await taskStore.insertTask(task);
+        const app = buildTaskApp(caseStore, taskStore);
+
+        const zug = await app.inject({
+          method: "PATCH",
+          url: `/api/tasks/${task.taskId}`,
+          headers: SBT("sb.eins", "task.write"),
+          payload: { assigneeActorId: "sb.zwei" },
+        });
+        expect(zug.statusCode).toBe(200);
+        const prio = await app.inject({
+          method: "PATCH",
+          url: `/api/tasks/${task.taskId}`,
+          headers: SBT("sb.eins", "task.write"),
+          payload: { priorityKey: "hoch" },
+        });
+        expect(prio.statusCode).toBe(200);
+
+        const activity = await app.inject({
+          method: "GET",
+          url: `/api/tasks/${task.taskId}/activity`,
+          headers: SBT("sb.eins", "task.read"),
+        });
+        const eintraege = activity.json().activity as {
+          activityType: string;
+          actorId: string;
+          payload?: Record<string, unknown>;
+        }[];
+        const typen = eintraege.map((a) => a.activityType);
+        expect(typen).toContain("task.zugewiesen");
+        expect(typen).toContain("task.prioritaet-geaendert");
+        const zuw = eintraege.find((a) => a.activityType === "task.zugewiesen");
+        expect(zuw?.actorId).toBe("sb.eins");
+        expect(zuw?.payload).toEqual({ zugewiesenAn: "sb.zwei" });
+        await app.close();
+      });
+
       it("gespeicherte Ansichten: persönlich ohne, geteilt nur mit view.share; löschbar", async () => {
         const { caseStore, taskStore } = makeStores();
         const app = buildTaskApp(caseStore, taskStore);

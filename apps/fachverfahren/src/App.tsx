@@ -16,6 +16,7 @@ import {
   useParams,
 } from "react-router-dom";
 import {
+  AKTIVITAET_TYP_LABELS,
   AktivitaetsFeed,
   AntragStepper,
   Arbeitsvorrat,
@@ -443,6 +444,7 @@ function AmtVorgang(): React.JSX.Element {
               />
               <AktivitaetsFeed
                 aktivitaeten={workspace.listAktivitaet(task.id)}
+                typLabels={AKTIVITAET_TYP_LABELS}
               />
               <RelationPanel
                 beziehungen={workspace.listBeziehungen(task.id)}
