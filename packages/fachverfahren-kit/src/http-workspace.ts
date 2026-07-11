@@ -142,6 +142,9 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
   let savedViewCache: GespeicherteAnsicht[] = [];
   const detailCache = new Map<string, DetailEintrag>();
   const detailLaedt = new Set<string>();
+  // Monoton steigende Ladungs-Generation je Aufgabe: eine verspätet eintreffende ÄLTERE Detail-Ladung darf einen
+  // frisch nachgeladenen Stand (neuLadenDetail nach Vermerk/Beziehung) nicht überschreiben (Antwort-Reordering).
+  const detailGen = new Map<string, number>();
   // Fälle, deren Antragsdaten bereits per Einzel-Load (`GET /api/cases/:id`) angereichert wurden bzw. gerade laden.
   const antragsdatenGeladen = new Set<string>();
   const antragsdatenLaedt = new Set<string>();
@@ -408,9 +411,14 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
           `/api/tasks/${enc(taskId)}`,
           body,
         );
-        taskCache = taskCache.map((t) =>
-          t.id === taskId ? aufgabeVonAppTask(task) : t,
-        );
+        taskCache = taskCache.map((t) => {
+          if (t.id !== taskId) return t;
+          const neu = aufgabeVonAppTask(task);
+          // MONOTONIE-GUARD (wie ladeAufgaben): eine verspätet eintreffende, ÄLTERE PATCH-Antwort darf einen bereits
+          // neueren, server-bestätigten Cache-Eintrag nicht zurücksetzen (Lost-Update bei nebenläufigen Mutationen /
+          // Antwort-Reordering — der Server bumpt `version` monoton, die höchste Version ist der vollständigste Stand).
+          return t.version > neu.version ? t : neu;
+        });
         bump();
       } catch (err) {
         melde(err, kontext);
@@ -532,6 +540,9 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
     return d;
   }
   async function ladeDetail(taskId: string): Promise<void> {
+    // Generation dieser Ladung reservieren (VOR dem await), damit eine später angestoßene Ladung eine höhere trägt.
+    const gen = (detailGen.get(taskId) ?? 0) + 1;
+    detailGen.set(taskId, gen);
     const [k, a, r] = await Promise.all([
       api<{ comments: AppTaskCommentDTO[] }>(
         "GET",
@@ -546,6 +557,8 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
         `/api/tasks/${enc(taskId)}/relations`,
       ),
     ]);
+    // Wurde inzwischen eine NEUERE Ladung gestartet, ist dieses Ergebnis veraltet → verwerfen (kein Overwrite).
+    if (detailGen.get(taskId) !== gen) return;
     detailCache.set(taskId, {
       kommentare: k.comments.map(kommentarVonApp),
       aktivitaet: a.activity.map(aktivitaetVonApp),
@@ -740,7 +753,7 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
     })();
   };
   const deleteView = (id: string): void => {
-    const vorher = savedViewCache;
+    const entfernt = savedViewCache.find((v) => v.id === id);
     savedViewCache = savedViewCache.filter((v) => v.id !== id);
     bump();
     void (async () => {
@@ -748,7 +761,10 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
         await api("DELETE", `/api/views/${enc(id)}`);
       } catch (err) {
         melde(err, "deleteView");
-        savedViewCache = vorher;
+        // GEZIELTER Rollback: nur die (fälschlich entfernte) Ansicht zurücklegen — NICHT einen Voll-Snapshot
+        // restaurieren, der eine NEBENLÄUFIG erfolgreich gespeicherte Ansicht (saveView) mit verwerfen würde.
+        if (entfernt && !savedViewCache.some((v) => v.id === id))
+          savedViewCache = [...savedViewCache, entfernt];
         bump();
       }
     })();
