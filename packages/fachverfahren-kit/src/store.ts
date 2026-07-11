@@ -9,6 +9,7 @@ import type {
   Aufgabe,
   AufgabeAktivitaet,
   AufgabeBeziehung,
+  GespeicherteAnsicht,
   AufgabeKommentar,
   AutomationTrigger,
   BulkErgebnis,
@@ -302,6 +303,11 @@ export function createWorkspaceStore<T = Record<string, unknown>>(
   const kommentare = new Map<string, AufgabeKommentar[]>();
   const aktivitaet = new Map<string, AufgabeAktivitaet[]>();
   const beziehungen = new Map<string, AufgabeBeziehung[]>();
+
+  // ── Gespeicherte Ansichten (in-memory; reaktiv über `bump`). In PROD über `/api/views`. ──
+  let viewSeq = 0;
+  const gespeicherteAnsichten: GespeicherteAnsicht[] = [];
+  const jetztIso = (): string => opts.now?.() ?? new Date().toISOString();
 
   // ── Verfahrensübergreifende Inbox (Phase 4; in-memory, reaktiv über `bump`) ──
   // DEV-Seed: je aktivem Verfahren EIN offener Eingang, damit die Triage-Inbox in der Vorlage etwas zeigt (analog
@@ -757,6 +763,31 @@ export function createWorkspaceStore<T = Record<string, unknown>>(
       const gefiltert = liste.filter((b) => b.id !== beziehungId);
       if (gefiltert.length !== liste.length) {
         beziehungen.set(ref.key, gefiltert);
+        bump();
+      }
+    },
+
+    // ── Gespeicherte Ansichten ──
+    listSavedViews: () =>
+      gespeicherteAnsichten.map((v) => ({
+        ...v,
+        definition: { ...v.definition },
+      })),
+    saveView: (input) => {
+      gespeicherteAnsichten.push({
+        id: `view-${(viewSeq += 1)}`,
+        label: input.label,
+        layout: input.layout,
+        scope: input.scope ?? "personal",
+        definition: input.definition ? { ...input.definition } : {},
+        erstelltIso: jetztIso(),
+      });
+      bump();
+    },
+    deleteView: (id) => {
+      const i = gespeicherteAnsichten.findIndex((v) => v.id === id);
+      if (i >= 0) {
+        gespeicherteAnsichten.splice(i, 1);
         bump();
       }
     },

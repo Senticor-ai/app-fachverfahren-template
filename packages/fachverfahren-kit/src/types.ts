@@ -891,6 +891,18 @@ export interface AufgabeBeziehung {
   erstelltIso: string;
 }
 
+/** Eine zur LAUFZEIT vom Sachbearbeiter GESPEICHERTE Ansicht (Filter/Sortierung/Layout) — ↔ `app_saved_views`.
+ *  Anders als `ViewConfig` (config-time, im Vertrag) ist dies benutzer-erzeugt + LÖSCHBAR (kein Aktenbestandteil).
+ *  `scope`: `personal` (nur der Eigentümer) oder `geteilt` (behördenweit). `definition` trägt frei den Filter. */
+export interface GespeicherteAnsicht {
+  id: string;
+  label: string;
+  layout: string;
+  scope: "personal" | "geteilt";
+  definition: Record<string, unknown>;
+  erstelltIso: string;
+}
+
 // ── Board / View als DATEN ───────────────────────────────────────────────────────────────────────
 /** Achse, nach der ein Board seine Spalten bildet: fachlicher Status, Priorität oder Zuweisung. */
 export type BoardAchse = "status" | "prioritaet" | "zuweisung";
@@ -1152,6 +1164,20 @@ export interface WorkspacePort<TAntragsdaten = Record<string, unknown>> {
     typ: BeziehungsTyp,
   ): void;
   entferneBeziehung(taskId: string, beziehungId: string): void;
+
+  // ── Gespeicherte Ansichten (Filter/Layout als benannte, löschbare Views) ──
+  // Der DEV-Store hält sie in-memory; in PROD über `/api/views` (GET/POST/DELETE). Reaktiv über den Snapshot.
+  /** Die gespeicherten Ansichten im Scope (persönliche + geteilte). */
+  listSavedViews(): GespeicherteAnsicht[];
+  /** Speichert die aktuelle Ansicht (Filter/Sortierung) unter einem Namen. `scope` Default `personal`. */
+  saveView(input: {
+    label: string;
+    layout: string;
+    scope?: "personal" | "geteilt";
+    definition?: Record<string, unknown>;
+  }): void;
+  /** Löscht eine gespeicherte Ansicht (persönlich: nur Eigentümer; geteilt: behördenweit — server-autoritativ). */
+  deleteView(id: string): void;
 
   // ── Verfahrensübergreifende Inbox / Triage (Phase 4) ──
   // Der DEV-Store hält die Eingänge in-memory; in PROD über `/api/inbox` (+ `/accept`, `/triage`). Reaktiv.

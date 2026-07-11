@@ -64,6 +64,32 @@ export function WorkspaceListe({
     setZuweisung("alle");
   };
 
+  // ── Gespeicherte Ansichten: den aktuellen Filter als benannte, wiederverwendbare Ansicht sichern/anwenden/löschen.
+  const [viewName, setViewName] = useState("");
+  const gespeicherte = workspace.listSavedViews();
+  const speichereAnsicht = () => {
+    const label = viewName.trim();
+    if (!label) return;
+    workspace.saveView({
+      label,
+      layout: "liste",
+      definition: { ...filter } as Record<string, unknown>,
+    });
+    setViewName("");
+  };
+  const wendeAnsichtAn = (def: Record<string, unknown>) => {
+    const f = def as TaskFilter;
+    setSuche(typeof f.suche === "string" ? f.suche : "");
+    setPrioAktiv(new Set(Array.isArray(f.prioritaet) ? f.prioritaet : []));
+    setZuweisung(
+      f.zugewiesenAn === "$niemand"
+        ? "niemand"
+        : f.zugewiesenAn === aktuellerAkteur
+          ? "meine"
+          : "alle",
+    );
+  };
+
   const togglePrio = (key: string) =>
     setPrioAktiv((prev) => {
       const next = new Set(prev);
@@ -170,6 +196,58 @@ export function WorkspaceListe({
           </div>
         }
       />
+
+      {/* Gespeicherte Ansichten: aktuellen Filter benannt sichern, per Klick anwenden, löschen. */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs uppercase tracking-wide text-muted-foreground">
+          Ansichten:
+        </span>
+        {gespeicherte.length === 0 ? (
+          <span className="text-xs text-muted-foreground">
+            keine gespeichert
+          </span>
+        ) : (
+          gespeicherte.map((v) => (
+            <span
+              key={v.id}
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-card py-0.5 pe-1 ps-2.5 text-xs"
+            >
+              <button
+                type="button"
+                onClick={() => wendeAnsichtAn(v.definition)}
+                className="font-medium text-foreground hover:underline"
+              >
+                {v.label}
+              </button>
+              <button
+                type="button"
+                onClick={() => workspace.deleteView(v.id)}
+                aria-label={`Ansicht ${v.label} löschen`}
+                className="rounded-full px-1 text-muted-foreground hover:text-destructive"
+              >
+                ×
+              </button>
+            </span>
+          ))
+        )}
+        <span className="mx-1 h-4 w-px bg-border" aria-hidden="true" />
+        <input
+          value={viewName}
+          onChange={(e) => setViewName(e.target.value)}
+          placeholder="Aktuelle Ansicht benennen…"
+          aria-label="Name der zu speichernden Ansicht"
+          className="h-7 w-44 rounded-md border border-border bg-card px-2 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={!viewName.trim()}
+          onClick={speichereAnsicht}
+        >
+          Speichern
+        </Button>
+      </div>
 
       {auswahl.size > 0 ? (
         <div

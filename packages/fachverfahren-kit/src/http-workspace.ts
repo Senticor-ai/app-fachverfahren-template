@@ -20,6 +20,7 @@ import type {
   AufgabeKommentar,
   BeziehungsTyp,
   BulkErgebnis,
+  GespeicherteAnsicht,
   InboxItem,
   LeistungConfig,
   Prioritaet,
@@ -34,6 +35,7 @@ import type { WorkspaceStore } from "./store.js";
 import { createWorkspaceStore } from "./store.js";
 import {
   aktivitaetVonApp,
+  ansichtVonApp,
   aufgabeVonAppTask,
   beziehungVonApp,
   inboxVonAppIntake,
@@ -41,6 +43,7 @@ import {
   vorgangVonAppCase,
   type AppCaseDTO,
   type AppIntakeDTO,
+  type AppSavedViewDTO,
   type AppTaskActivityDTO,
   type AppTaskCommentDTO,
   type AppTaskDTO,
@@ -134,6 +137,7 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
   let taskCache: Aufgabe[] = [];
   const caseCache = new Map<string, CaseEintrag<T>>();
   let inboxCache: InboxItem[] = [];
+  let savedViewCache: GespeicherteAnsicht[] = [];
   const detailCache = new Map<string, DetailEintrag>();
   const detailLaedt = new Set<string>();
 
@@ -198,12 +202,21 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
     inboxCache = items.map(inboxVonAppIntake);
     bump();
   }
+  async function ladeViews(): Promise<void> {
+    const { views } = await api<{ views: AppSavedViewDTO[] }>(
+      "GET",
+      "/api/views",
+    );
+    savedViewCache = views.map(ansichtVonApp);
+    bump();
+  }
   async function refresh(): Promise<void> {
     // Fälle VOR/parallel zu Aufgaben — die Liste/Board leiten den Status aus dem Case-Cache ab.
     const ergebnisse = await Promise.allSettled([
       ladeAufgaben(),
       ladeFaelle(),
       ladeInbox(),
+      ladeViews(),
     ]);
     for (const e of ergebnisse)
       if (e.status === "rejected") melde(e.reason, "refresh");
@@ -655,6 +668,48 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
     );
   };
 
+  // ── Gespeicherte Ansichten (optimistisch + POST/DELETE gegen /api/views) ──
+  const listSavedViews = (): GespeicherteAnsicht[] => savedViewCache;
+  const saveView = (input: {
+    label: string;
+    layout: string;
+    scope?: "personal" | "geteilt";
+    definition?: Record<string, unknown>;
+  }): void => {
+    void (async () => {
+      try {
+        const { view } = await api<{ view: AppSavedViewDTO }>(
+          "POST",
+          "/api/views",
+          {
+            label: input.label,
+            layout: input.layout,
+            ...(input.scope ? { scope: input.scope } : {}),
+            ...(input.definition ? { definition: input.definition } : {}),
+          },
+        );
+        savedViewCache = [...savedViewCache, ansichtVonApp(view)];
+        bump();
+      } catch (err) {
+        melde(err, "saveView");
+      }
+    })();
+  };
+  const deleteView = (id: string): void => {
+    const vorher = savedViewCache;
+    savedViewCache = savedViewCache.filter((v) => v.id !== id);
+    bump();
+    void (async () => {
+      try {
+        await api("DELETE", `/api/views/${enc(id)}`);
+      } catch (err) {
+        melde(err, "deleteView");
+        savedViewCache = vorher;
+        bump();
+      }
+    })();
+  };
+
   return {
     config,
     subscribe: (listener) => {
@@ -684,6 +739,9 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
     listBeziehungen,
     addBeziehung,
     entferneBeziehung,
+    listSavedViews,
+    saveView,
+    deleteView,
     listInbox,
     triageInbox,
     acceptInbox,

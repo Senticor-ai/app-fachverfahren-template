@@ -565,3 +565,33 @@ describe("Verfahrens-FREIE Aufgaben (generisches Projekt-/Workflow-Management)",
     );
   });
 });
+
+describe("Gespeicherte Ansichten (in-memory)", () => {
+  it("saveView legt an, listSavedViews liefert sie, deleteView entfernt", () => {
+    const store = createWorkspaceStore(macheWorkspace(), { now: NOW });
+    expect(store.listSavedViews()).toEqual([]);
+    store.saveView({
+      label: "Meine dringenden",
+      layout: "liste",
+      definition: { prioritaet: ["dringend"] },
+    });
+    const views = store.listSavedViews();
+    expect(views).toHaveLength(1);
+    expect(views[0]?.label).toBe("Meine dringenden");
+    expect(views[0]?.scope).toBe("personal");
+    expect(views[0]?.definition).toEqual({ prioritaet: ["dringend"] });
+    store.deleteView(views[0]!.id);
+    expect(store.listSavedViews()).toEqual([]);
+  });
+
+  it("saveView/deleteView bumpen die Version (Reaktivität)", () => {
+    const store = createWorkspaceStore(macheWorkspace(), { now: NOW });
+    const v0 = store.snapshot();
+    store.saveView({ label: "A", layout: "liste" });
+    expect(store.snapshot()).toBeGreaterThan(v0);
+    const id = store.listSavedViews()[0]!.id;
+    const v1 = store.snapshot();
+    store.deleteView(id);
+    expect(store.snapshot()).toBeGreaterThan(v1);
+  });
+});

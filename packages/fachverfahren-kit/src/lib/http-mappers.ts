@@ -10,6 +10,7 @@ import type {
   AufgabeBeziehung,
   AufgabeKommentar,
   BeziehungsTyp,
+  GespeicherteAnsicht,
   InboxItem,
   Prioritaet,
   TriageStatus,
@@ -156,6 +157,28 @@ export function aktivitaetVonApp(a: AppTaskActivityDTO): AufgabeAktivitaet {
     typ: a.activityType,
     ...(a.payload ? { payload: a.payload } : {}),
     zeitpunktIso: a.occurredAt,
+  };
+}
+
+/** Gespeicherte Ansicht, wie die Domain-API sie liefert (`GET /api/views` → `{ views }`). */
+export interface AppSavedViewDTO {
+  viewId: string;
+  label: string;
+  layout: string;
+  scope: "personal" | "geteilt";
+  definition: Record<string, unknown>;
+  createdAt: string;
+}
+
+/** Server-Ansicht → Kit-`GespeicherteAnsicht`. */
+export function ansichtVonApp(v: AppSavedViewDTO): GespeicherteAnsicht {
+  return {
+    id: v.viewId,
+    label: v.label,
+    layout: v.layout,
+    scope: v.scope,
+    definition: v.definition ?? {},
+    erstelltIso: v.createdAt,
   };
 }
 

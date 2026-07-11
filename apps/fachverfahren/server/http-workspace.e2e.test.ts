@@ -156,7 +156,7 @@ function macheIntake(over: Partial<AppIntakeItem> = {}): AppIntakeItem {
 }
 
 const PERMS =
-  "task.read,task.write,case.read,case.transition,case.decide,inbox.read,inbox.triage,comment.read,comment.write,audit.read";
+  "task.read,task.write,case.read,case.transition,case.decide,inbox.read,inbox.triage,comment.read,comment.write,audit.read,view.read,view.write";
 
 const SB = (actor: string) => ({
   "x-actor-id": actor,
@@ -476,6 +476,27 @@ describe("HttpWorkspacePort e2e — Filter-Parität zum In-Memory-Store (Reflect
     await new Promise((r) => setTimeout(r, 50));
     expect(anzahlAngenommen).toBe(1);
     expect(port.listTasks().length).toBe(1);
+    await aufbau.app.close();
+  });
+});
+
+describe("HttpWorkspacePort e2e — Gespeicherte Ansichten (echte /api/views-Routen)", () => {
+  it("saveView → POST /api/views → listSavedViews; deleteView entfernt", async () => {
+    const aufbau = baueServer();
+    const port = machePort(aufbau);
+    await port.refresh(); // initialen Load (inkl. ladeViews) deterministisch abwarten
+    expect(port.listSavedViews()).toEqual([]);
+    port.saveView({
+      label: "Dringend",
+      layout: "liste",
+      definition: { prioritaet: ["hoch"] },
+    });
+    await warteBis(() => port.listSavedViews().length === 1);
+    const v = port.listSavedViews()[0];
+    expect(v?.label).toBe("Dringend");
+    expect(v?.definition).toEqual({ prioritaet: ["hoch"] });
+    port.deleteView(v!.id);
+    await warteBis(() => port.listSavedViews().length === 0);
     await aufbau.app.close();
   });
 });
