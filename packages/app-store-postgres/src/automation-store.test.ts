@@ -403,3 +403,189 @@ for (const impl of impls) {
     },
   );
 }
+
+// ── Multi-Consumer-Fan-out (Skalierungsplan #24): MEHRERE unabhängige Consumer bekommen JEDES getypte Event; je
+//    Consumer eine Zustell-Buchhaltung (Lease/at-least-once/DLQ) — die Engine (processed_at) bleibt unberührt. ──
+const T0 = "2026-06-02T00:00:00.000Z";
+const T_SPAETER = "2026-06-02T00:01:00.000Z";
+
+for (const impl of impls) {
+  describe.skipIf(!impl.enabled)(
+    `AutomationStore — Multi-Consumer-Fan-out (#24) — ${impl.name}`,
+    () => {
+      let store: AutomationStore;
+      beforeAll(() => {
+        store = impl.make();
+      });
+
+      // Der Store ist über die Tests GETEILT (beforeAll) und der Fan-out ist NICHT mandanten-scoped — ein frischer
+      // Consumer würde sonst ALLE je eingereihten getypten Events greifen. Isolation je Test über einen EINDEUTIGEN
+      // event_type + eventTypes-Filter (funktioniert auch gegen die persistente PG-DB).
+      function ctx() {
+        const tid = `t-${uid()}`;
+        const et = `x.${tid}`;
+        return {
+          et,
+          claim: (
+            consumer: string,
+            over: { now?: string; visibilityMs?: number } = {},
+          ) =>
+            store.claimForConsumer({
+              consumer: `${consumer}-${tid}`,
+              now: over.now ?? T0,
+              limit: 10,
+              eventTypes: [et],
+              ...(over.visibilityMs !== undefined
+                ? { visibilityMs: over.visibilityMs }
+                : {}),
+            }),
+          konsument: (name: string) => `${name}-${tid}`,
+          event: (over: Partial<AppAutomationEvent> = {}) =>
+            macheEvent({
+              tenantId: tid,
+              eventId: `evt-${uid()}`,
+              eventType: et,
+              ...over,
+            }),
+        };
+      }
+
+      it("zwei Consumer bekommen JEDES getypte Event UNABHÄNGIG (+ tie-stabile Reihenfolge bei gleichem createdAt)", async () => {
+        const c = ctx();
+        const gleich = "2026-06-01T00:00:00.000Z"; // GLEICHER createdAt → Tie
+        const e1 = c.event({ eventId: `evt-a-${uid()}`, createdAt: gleich });
+        const e2 = c.event({ eventId: `evt-b-${uid()}`, createdAt: gleich });
+        await store.enqueueEvent(e1);
+        await store.enqueueEvent(e2);
+
+        const search = await c.claim("search");
+        const notifier = await c.claim("notifier");
+        expect(search.map((d) => d.event.eventId).sort()).toEqual(
+          [e1.eventId, e2.eventId].sort(),
+        );
+        expect(notifier.map((d) => d.event.eventId).sort()).toEqual(
+          [e1.eventId, e2.eventId].sort(),
+        );
+        // Tie-stabil: gleicher createdAt → eventId entscheidet, deterministisch in beiden Runtimes.
+        const ids = search.map((d) => d.event.eventId);
+        expect(ids).toEqual([...ids].sort());
+        expect(search.every((d) => d.attempts === 1)).toBe(true);
+      });
+
+      it("markDelivered schliesst NUR diesen Consumer ab; ein anderer Consumer bekommt das Event weiterhin", async () => {
+        const c = ctx();
+        const e1 = c.event();
+        await store.enqueueEvent(e1);
+        const first = await c.claim("search", { visibilityMs: 1000 });
+        expect(first.map((d) => d.event.eventId)).toEqual([e1.eventId]);
+        await store.markDelivered({
+          consumer: c.konsument("search"),
+          eventId: e1.eventId,
+          now: T0,
+        });
+        // search: auch nach Lease-Ablauf KEIN Re-Claim (done).
+        expect(
+          (await c.claim("search", { now: T_SPAETER })).map(
+            (d) => d.event.eventId,
+          ),
+        ).not.toContain(e1.eventId);
+        // notifier: nie zugestellt → bekommt es jetzt (unabhängig).
+        expect(
+          (await c.claim("notifier", { now: T_SPAETER })).map(
+            (d) => d.event.eventId,
+          ),
+        ).toContain(e1.eventId);
+      });
+
+      it("at-least-once je Consumer: Crash vor markDelivered → Re-Claim nach Lease-Ablauf (attempts=2)", async () => {
+        const c = ctx();
+        const e1 = c.event();
+        await store.enqueueEvent(e1);
+        const c1 = await c.claim("search", { visibilityMs: 1000 });
+        expect(c1[0]?.attempts).toBe(1);
+        // Innerhalb der Lease NICHT re-claimbar.
+        expect(
+          (await c.claim("search", { now: "2026-06-02T00:00:00.500Z" })).map(
+            (d) => d.event.eventId,
+          ),
+        ).not.toContain(e1.eventId);
+        // Nach Lease-Ablauf: erneut (attempts=2).
+        const c2 = await c.claim("search", {
+          now: T_SPAETER,
+          visibilityMs: 1000,
+        });
+        expect(c2.find((d) => d.event.eventId === e1.eventId)?.attempts).toBe(
+          2,
+        );
+      });
+
+      it("deadLetterDelivery → kein Re-Claim; Zustellstand 'dead' + reason sichtbar", async () => {
+        const c = ctx();
+        const e1 = c.event();
+        await store.enqueueEvent(e1);
+        await c.claim("search", { visibilityMs: 1000 });
+        await store.deadLetterDelivery({
+          consumer: c.konsument("search"),
+          eventId: e1.eventId,
+          now: "2026-06-02T00:00:01.000Z",
+          reason: "poison",
+        });
+        expect(
+          (await c.claim("search", { now: "2026-06-02T00:05:00.000Z" })).map(
+            (d) => d.event.eventId,
+          ),
+        ).not.toContain(e1.eventId);
+        const del = (
+          await store.listDeliveries({
+            eventId: e1.eventId,
+            consumer: c.konsument("search"),
+          })
+        )[0];
+        expect(del?.status).toBe("dead");
+        expect(del?.reason).toBe("poison");
+      });
+
+      it("fächert NUR GETYPTE Events (#16); eventTypes filtert je Consumer", async () => {
+        const c = ctx();
+        const typed = c.event({ eventId: `evt-typed-${uid()}` });
+        const untyped = macheEvent({
+          tenantId: `t-${uid()}`,
+          eventId: `evt-untyped-${uid()}`,
+        }); // KEIN eventType
+        await store.enqueueEvent(typed);
+        await store.enqueueEvent(untyped);
+        // Filter auf den Test-Typ: nur das getypte Event (ungetypte bleiben der Engine via trigger_event überlassen).
+        const alle = await c.claim("search");
+        expect(alle.map((d) => d.event.eventId)).toEqual([typed.eventId]);
+        // Typ-Filter, der NICHT passt → nichts.
+        const gefiltert = await store.claimForConsumer({
+          consumer: c.konsument("notifier"),
+          now: T0,
+          limit: 10,
+          eventTypes: ["task.frist-erreicht"],
+        });
+        expect(gefiltert).toHaveLength(0);
+      });
+
+      it("Fan-out rührt die Engine NICHT an: claimDueEvents/processed_at bleiben orthogonal", async () => {
+        const c = ctx();
+        const e1 = c.event();
+        await store.enqueueEvent(e1);
+        // Fan-out claimt für einen Consumer ...
+        expect((await c.claim("search")).map((d) => d.event.eventId)).toContain(
+          e1.eventId,
+        );
+        // ... die ENGINE claimt DASSELBE Event trotzdem (unberührt) + schliesst es für SICH ab (processed_at).
+        const engine = await store.claimDueEvents({ now: T0, limit: 50 });
+        expect(engine.map((e) => e.eventId)).toContain(e1.eventId);
+        await store.markProcessed({ eventId: e1.eventId, now: T0 });
+        // Der Engine-Abschluss (processed_at) hält KEINEN Fan-out-Consumer auf — der Fan-out ignoriert processed_at.
+        expect(
+          (await c.claim("notifier", { now: T_SPAETER })).map(
+            (d) => d.event.eventId,
+          ),
+        ).toContain(e1.eventId);
+      });
+    },
+  );
+}

@@ -76,6 +76,38 @@ export interface ListRulesQuery {
   activeOnly?: boolean;
 }
 
+// ── Multi-Consumer-Fan-out (#24) ────────────────────────────────────────────────────────────────────
+export type DeliveryStatus = "pending" | "done" | "dead";
+
+/** Zustellstand EINES Events an EINEN Consumer (Fan-out-Buchhaltung, getrennt von der Engine-Lease am Event). */
+export interface AppEventDelivery {
+  eventId: string;
+  consumer: string;
+  status: DeliveryStatus;
+  attempts: number;
+  lockedUntil: string | null;
+  firstClaimedAt: string;
+  deliveredAt: string | null;
+  reason: string | null;
+}
+
+export interface ClaimForConsumerInput {
+  consumer: string;
+  now: string;
+  limit: number;
+  /** #16-Envelope-Filter: nur Events dieser Domänen-Typen an DIESEN Consumer. Fehlend ⇒ ALLE getypten Events. */
+  eventTypes?: string[];
+  visibilityMs?: number;
+}
+
+/** Claim-Ergebnis: das Event PLUS die Zustell-Buchhaltung DIESES Consumers. `attempts` ist die DELIVERY-attempts
+ *  (NICHT die Engine-`attempts` am Event) — der Consumer-Driver braucht sie für seinen EIGENEN DLQ-Cap. */
+export interface ClaimedDelivery {
+  event: AppAutomationEvent;
+  attempts: number;
+  lockedUntil: string;
+}
+
 export interface AutomationStore {
   insertRule(rule: AppAutomationRule): Promise<AppAutomationRule>;
   getRule(input: {
@@ -122,12 +154,41 @@ export interface AutomationStore {
     ruleId?: string;
     limit?: number;
   }): Promise<AppAutomationRun[]>;
+
+  /** FAN-OUT (#24): LEAST bis `limit` GETYPTE Events, die `consumer` noch NICHT terminal zugestellt sind (keine
+   *  done/dead-Row), exklusiv je Consumer-Worker (Lease auf der Delivery-Row, attempts+1). Rührt `processed_at` NICHT
+   *  an → die Engine bleibt ungestört. `eventTypes` filtert über #16. Lease-Ablauf ⇒ Re-Claim für DIESEN Consumer
+   *  (at-least-once je Consumer). `visibilityMs` fehlend ⇒ `LEASE_MS`. Zeit-gegatet auf `scheduled_for`. */
+  claimForConsumer(input: ClaimForConsumerInput): Promise<ClaimedDelivery[]>;
+  /** Zustellung an `consumer` TERMINAL abschliessen (status='done', delivered_at=now, Lease frei). Idempotent. */
+  markDelivered(input: {
+    consumer: string;
+    eventId: string;
+    now: string;
+  }): Promise<void>;
+  /** DEAD-LETTER je Consumer (#9-Analog, getrennt von der Engine-DLQ): status='dead' + reason. Kein Re-Claim. */
+  deadLetterDelivery(input: {
+    consumer: string;
+    eventId: string;
+    now: string;
+    reason?: string;
+  }): Promise<void>;
+  /** Beobachtbarkeit/Tests: Zustellstand je Event (über alle Consumer) und/oder je Consumer. */
+  listDeliveries(input: {
+    eventId?: string;
+    consumer?: string;
+    limit?: number;
+  }): Promise<AppEventDelivery[]>;
 }
 
 /** Default-Lease-Fenster (Visibility-Timeout) in ms: so lange gilt ein geclaimtes Event als „in Arbeit", bevor es
  *  (bei ausbleibendem `markProcessed`) erneut claimbar wird. Grosszügig gegenüber der Batch-Verarbeitungszeit
  *  gewählt, damit ein lebender Consumer nicht sich selbst das Event wegzieht. */
 export const LEASE_MS = 30_000;
+
+/** Default-Zeilenobergrenze für `listDeliveries` OHNE explizites `limit` — EINE Wahrheit für beide Laufzeiten, damit
+ *  InMemory und Postgres nie divergieren (Postgres kann sonst still bei 1000 kappen, während InMemory alles liefert). */
+const DELIVERY_LIST_DEFAULT_LIMIT = 1000;
 
 /** ISO-Zeitpunkt + `ms` → ISO. Für den Lease-Ablauf (`locked_until`). */
 function addMillis(iso: string, ms: number): string {
@@ -141,6 +202,8 @@ export class InMemoryAutomationStore implements AutomationStore {
   private readonly runs: AppAutomationRun[] = [];
   /** Idempotenz-Riegel: gesehene (rule_id, idempotency_key). */
   private readonly seenRuns = new Set<string>();
+  /** Fan-out-Zustellungen (#24), Schlüssel `${consumer}::${eventId}`. */
+  private readonly deliveries = new Map<string, AppEventDelivery>();
 
   private k(tenantId: string, id: string) {
     return `${tenantId}:${id}`;
@@ -252,6 +315,106 @@ export class InMemoryAutomationStore implements AutomationStore {
     // Idempotent: unbekanntes/bereits verarbeitetes Event ⇒ no-op.
     if (!e || e.processedAt !== null) return;
     this.events.set(input.eventId, { ...e, processedAt: input.now });
+  }
+
+  // ── Fan-out (#24): rührt `events`/`processedAt` NICHT an — nur die `deliveries`-Map je Consumer. ──
+  async claimForConsumer(
+    input: ClaimForConsumerInput,
+  ): Promise<ClaimedDelivery[]> {
+    const lockedUntil = addMillis(input.now, input.visibilityMs ?? LEASE_MS);
+    const typeSet = input.eventTypes ? new Set(input.eventTypes) : null;
+    const candidates = [...this.events.values()]
+      .filter((e) => {
+        if (e.eventType == null) return false; // nur GETYPTE Events (#16)
+        if (typeSet && !typeSet.has(e.eventType)) return false; // Typ-Filter
+        if (e.scheduledFor != null && e.scheduledFor > input.now) return false; // Zeit-Gating
+        const d = this.deliveries.get(`${input.consumer}::${e.eventId}`);
+        if (!d) return true; // nie an diesen Consumer zugestellt
+        return d.status === "pending" && (d.lockedUntil ?? "") <= input.now; // Lease abgelaufen (Crash) → Wiederaufnahme
+      })
+      // TIE-STABIL (createdAt, eventId) — deckungsgleich zur PG-ORDER BY; createdAt ALLEIN wäre instabil (Deadline-
+      // Scanner reiht viele Events mit gleichem createdAt=now ein).
+      .sort((a, b) =>
+        a.createdAt < b.createdAt
+          ? -1
+          : a.createdAt > b.createdAt
+            ? 1
+            : a.eventId < b.eventId
+              ? -1
+              : 1,
+      )
+      .slice(0, input.limit);
+
+    const out: ClaimedDelivery[] = [];
+    for (const e of candidates) {
+      const key = `${input.consumer}::${e.eventId}`;
+      const prev = this.deliveries.get(key);
+      const attempts = (prev?.attempts ?? 0) + 1;
+      this.deliveries.set(key, {
+        eventId: e.eventId,
+        consumer: input.consumer,
+        status: "pending",
+        attempts,
+        lockedUntil,
+        firstClaimedAt: prev?.firstClaimedAt ?? input.now,
+        deliveredAt: null,
+        reason: null,
+      });
+      out.push({
+        event: { ...e, payload: { ...e.payload } },
+        attempts,
+        lockedUntil,
+      });
+    }
+    return out;
+  }
+
+  async markDelivered(input: {
+    consumer: string;
+    eventId: string;
+    now: string;
+  }): Promise<void> {
+    const key = `${input.consumer}::${input.eventId}`;
+    const d = this.deliveries.get(key);
+    if (!d || d.status !== "pending") return; // idempotent
+    this.deliveries.set(key, {
+      ...d,
+      status: "done",
+      deliveredAt: input.now,
+      lockedUntil: null,
+    });
+  }
+
+  async deadLetterDelivery(input: {
+    consumer: string;
+    eventId: string;
+    now: string;
+    reason?: string;
+  }): Promise<void> {
+    const key = `${input.consumer}::${input.eventId}`;
+    const d = this.deliveries.get(key);
+    if (!d || d.status !== "pending") return;
+    this.deliveries.set(key, {
+      ...d,
+      status: "dead",
+      deliveredAt: input.now,
+      lockedUntil: null,
+      reason: input.reason ?? null,
+    });
+  }
+
+  async listDeliveries(input: {
+    eventId?: string;
+    consumer?: string;
+    limit?: number;
+  }): Promise<AppEventDelivery[]> {
+    let out = [...this.deliveries.values()];
+    if (input.eventId !== undefined)
+      out = out.filter((d) => d.eventId === input.eventId);
+    if (input.consumer !== undefined)
+      out = out.filter((d) => d.consumer === input.consumer);
+    out.sort((a, b) => (a.firstClaimedAt < b.firstClaimedAt ? -1 : 1));
+    return out.slice(0, input.limit ?? DELIVERY_LIST_DEFAULT_LIMIT);
   }
 
   async listActiveRuleScopes(
@@ -416,6 +579,115 @@ export class PostgresAutomationStore implements AutomationStore {
          WHERE event_id = $2 AND processed_at IS NULL`,
         [input.now, input.eventId],
       );
+    });
+  }
+
+  // ── Fan-out (#24): LIEST app_automation_events (kein FOR UPDATE), SCHREIBT nur app_event_deliveries → MVCC-isoliert
+  //    gegen die Engine (die app_automation_events UPDATEt). `processed_at` wird NIE berührt. ──
+  async claimForConsumer(
+    input: ClaimForConsumerInput,
+  ): Promise<ClaimedDelivery[]> {
+    const lockedUntil = addMillis(input.now, input.visibilityMs ?? LEASE_MS);
+    const eventTypes = input.eventTypes ?? null;
+    return this.withClient(async (c) => {
+      // Self-arbitrierend OHNE FOR UPDATE: der Anti-Join findet neue/lease-abgelaufene Events, das UPSERT mit
+      // `WHERE locked_until <= now` im DO UPDATE lässt genau EINEN Worker je (event,consumer) gewinnen (der Verlierer
+      // re-evaluiert gegen die eben gesetzte Zukunfts-Lease → kein RETURNING → kein Doppel-Claim).
+      const r = await c.query<
+        EventRow & {
+          delivery_attempts: number;
+          delivery_locked_until: Date | string;
+        }
+      >(
+        `WITH candidates AS (
+           SELECT e.event_id, e.created_at
+           FROM app_automation_events e
+           LEFT JOIN app_event_deliveries d
+             ON d.event_id = e.event_id AND d.consumer = $1
+           WHERE e.event_type IS NOT NULL
+             AND ($5::text[] IS NULL OR e.event_type = ANY($5))
+             AND (e.scheduled_for IS NULL OR e.scheduled_for <= $2)
+             AND (
+               d.event_id IS NULL
+               OR (d.status = 'pending' AND d.locked_until <= $2)
+             )
+           ORDER BY e.created_at ASC, e.event_id ASC
+           LIMIT $3
+         ),
+         claimed AS (
+           INSERT INTO app_event_deliveries AS d
+                 (event_id, consumer, status, attempts, locked_until, first_claimed_at)
+           SELECT c.event_id, $1, 'pending', 1, $4, $2 FROM candidates c
+           ON CONFLICT (event_id, consumer) DO UPDATE
+              SET attempts = d.attempts + 1, locked_until = $4
+              WHERE d.status = 'pending' AND d.locked_until <= $2
+           RETURNING event_id, attempts, locked_until
+         )
+         SELECT ${EVENT_COLS},
+                cl.attempts     AS delivery_attempts,
+                cl.locked_until AS delivery_locked_until
+         FROM claimed cl
+         JOIN app_automation_events e USING (event_id)
+         ORDER BY e.created_at ASC, e.event_id ASC`,
+        [input.consumer, input.now, input.limit, lockedUntil, eventTypes],
+      );
+      return r.rows.map((row) => ({
+        event: eventFromRow(row),
+        attempts: row.delivery_attempts,
+        lockedUntil: isoOrNull(row.delivery_locked_until)!,
+      }));
+    });
+  }
+
+  async markDelivered(input: {
+    consumer: string;
+    eventId: string;
+    now: string;
+  }): Promise<void> {
+    await this.withClient(async (c) => {
+      await c.query(
+        `UPDATE app_event_deliveries SET status='done', delivered_at=$3, locked_until=NULL
+         WHERE event_id=$2 AND consumer=$1 AND status='pending'`,
+        [input.consumer, input.eventId, input.now],
+      );
+    });
+  }
+
+  async deadLetterDelivery(input: {
+    consumer: string;
+    eventId: string;
+    now: string;
+    reason?: string;
+  }): Promise<void> {
+    await this.withClient(async (c) => {
+      await c.query(
+        `UPDATE app_event_deliveries SET status='dead', delivered_at=$3, locked_until=NULL, reason=$4
+         WHERE event_id=$2 AND consumer=$1 AND status='pending'`,
+        [input.consumer, input.eventId, input.now, input.reason ?? null],
+      );
+    });
+  }
+
+  async listDeliveries(input: {
+    eventId?: string;
+    consumer?: string;
+    limit?: number;
+  }): Promise<AppEventDelivery[]> {
+    return this.withClient(async (c) => {
+      const r = await c.query<DeliveryRow>(
+        `SELECT event_id, consumer, status, attempts, locked_until, first_claimed_at, delivered_at, reason
+         FROM app_event_deliveries
+         WHERE ($1::text IS NULL OR event_id = $1)
+           AND ($2::text IS NULL OR consumer = $2)
+         ORDER BY first_claimed_at ASC
+         LIMIT $3`,
+        [
+          input.eventId ?? null,
+          input.consumer ?? null,
+          input.limit ?? DELIVERY_LIST_DEFAULT_LIMIT,
+        ],
+      );
+      return r.rows.map(deliveryFromRow);
     });
   }
 
@@ -657,6 +929,30 @@ function eventFromRow(r: EventRow): AppAutomationEvent {
   if (typeof r.attempts === "number") e.attempts = r.attempts;
   if (r.locked_until !== undefined) e.lockedUntil = isoOrNull(r.locked_until);
   return e;
+}
+
+interface DeliveryRow extends Record<string, unknown> {
+  event_id: string;
+  consumer: string;
+  status: string;
+  attempts: number;
+  locked_until: Date | string | null;
+  first_claimed_at: Date | string;
+  delivered_at: Date | string | null;
+  reason: string | null;
+}
+
+function deliveryFromRow(r: DeliveryRow): AppEventDelivery {
+  return {
+    eventId: r.event_id,
+    consumer: r.consumer,
+    status: r.status as DeliveryStatus,
+    attempts: r.attempts,
+    lockedUntil: isoOrNull(r.locked_until),
+    firstClaimedAt: isoOrNull(r.first_claimed_at)!,
+    deliveredAt: isoOrNull(r.delivered_at),
+    reason: r.reason,
+  };
 }
 
 const RUN_COLS = `run_id, rule_id, event_id, idempotency_key, status, detail, created_at`;
