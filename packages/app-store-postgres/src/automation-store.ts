@@ -43,6 +43,17 @@ export interface AppAutomationEvent {
    *  Event erneut claimbar. Optional/additiv: bestehende Konstruktoren setzen sie nicht (Default `0`/`null`). */
   attempts?: number;
   lockedUntil?: string | null;
+  /** DOMAIN-EVENT-ENVELOPE (#16, additiv/nullbar) — Fundament für getypten Multi-Consumer-Fan-out (#24).
+   *  `eventType` ist der stabile DOMÄNEN-Ereignisname (was geschah, z. B. `case.transitioned`) — ABGEGRENZT vom
+   *  `triggerEvent` (dem Automations-Regel-Match-Key). `correlationId` traced eine auslösende Anfrage über mehrere
+   *  Events; `causationId` verweist auf das unmittelbar verursachende Event (bei Wurzel-Events null — wird in #24 für
+   *  Automations-Ketten gesetzt); `occurredAt` ist die DOMÄNEN-Zeit (bei Fristen der Fälligkeitszeitpunkt, nicht die
+   *  Scan-Zeit). Bestehende Events lassen die Felder weg → NULL, kein Verhaltensbruch. */
+  eventType?: string | null;
+  eventVersion?: number | null;
+  correlationId?: string | null;
+  causationId?: string | null;
+  occurredAt?: string | null;
 }
 
 export type AutomationRunStatus = "applied" | "blocked" | "skipped" | "failed";
@@ -188,6 +199,12 @@ export class InMemoryAutomationStore implements AutomationStore {
       // Lease-Buchhaltung initialisieren (parität zu den DB-Defaults attempts=0 / locked_until=NULL).
       attempts: event.attempts ?? 0,
       lockedUntil: event.lockedUntil ?? null,
+      // Envelope normalisieren (#16): fehlend → null, damit InMemory- und PG-Round-Trip identisch sind (null, nicht undefined).
+      eventType: event.eventType ?? null,
+      eventVersion: event.eventVersion ?? null,
+      correlationId: event.correlationId ?? null,
+      causationId: event.causationId ?? null,
+      occurredAt: event.occurredAt ?? null,
       payload: { ...event.payload },
     });
     return { ...event };
@@ -559,9 +576,10 @@ function ruleFromRow(r: RuleRow): AppAutomationRule {
 }
 
 const EVENT_COLS = `event_id, tenant_id, authority_id, procedure_id, case_id, task_id, trigger_event,
-  payload, created_at, processed_at, scheduled_for`;
+  payload, created_at, processed_at, scheduled_for, event_type, event_version, correlation_id,
+  causation_id, occurred_at`;
 const EVENT_INSERT_VALUES = `INSERT INTO app_automation_events (${EVENT_COLS})
-  VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11)`;
+  VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13,$14,$15,$16)`;
 // Standalone-`enqueueEvent` (u. a. der Deadline-Scanner): IDEMPOTENT — die deterministische event_id je fälliger Frist
 // darf beim erneuten Scan-Tick kein PK-Fehler/Re-Fire sein.
 const EVENT_INSERT_SQL = `${EVENT_INSERT_VALUES} ON CONFLICT (event_id) DO NOTHING`;
@@ -583,6 +601,12 @@ interface EventRow extends Record<string, unknown> {
   created_at: Date | string;
   processed_at: Date | string | null;
   scheduled_for: Date | string | null;
+  // Envelope (#16) — Teil von EVENT_COLS, daher immer im RETURNING (nullbar).
+  event_type: string | null;
+  event_version: number | null;
+  correlation_id: string | null;
+  causation_id: string | null;
+  occurred_at: Date | string | null;
   // Nur im claimDueEvents-RETURNING vorhanden (nicht in der schlanken EVENT_COLS-Spaltenliste); daher optional.
   attempts?: number;
   locked_until?: Date | string | null;
@@ -601,6 +625,11 @@ function eventInsertParams(e: AppAutomationEvent): readonly unknown[] {
     e.createdAt,
     e.processedAt,
     e.scheduledFor ?? null,
+    e.eventType ?? null, // $12
+    e.eventVersion ?? null, // $13
+    e.correlationId ?? null, // $14
+    e.causationId ?? null, // $15
+    e.occurredAt ?? null, // $16
   ];
 }
 
@@ -617,6 +646,12 @@ function eventFromRow(r: EventRow): AppAutomationEvent {
     createdAt: isoOrNull(r.created_at)!,
     processedAt: isoOrNull(r.processed_at),
     scheduledFor: isoOrNull(r.scheduled_for),
+    // Envelope (#16) — immer im RETURNING (Teil von EVENT_COLS), nullbar.
+    eventType: r.event_type ?? null,
+    eventVersion: r.event_version ?? null,
+    correlationId: r.correlation_id ?? null,
+    causationId: r.causation_id ?? null,
+    occurredAt: isoOrNull(r.occurred_at),
   };
   // Lease-Felder nur setzen, wenn die Query sie mitliefert (claimDueEvents-RETURNING) — exactOptional-konform.
   if (typeof r.attempts === "number") e.attempts = r.attempts;

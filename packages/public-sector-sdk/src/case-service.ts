@@ -65,6 +65,13 @@ export interface TransitionOutboxEvent {
   payload: Record<string, unknown>;
   createdAt: string;
   processedAt: string | null;
+  /** DOMAIN-EVENT-ENVELOPE (#16, additiv/nullbar) — strukturell gespiegelt zu `AppAutomationEvent`, damit die Werte
+   *  auf dem Weg in die Persistenz nicht verloren gehen. `eventType` = stabiler Domänen-Ereignisname (≠ triggerEvent). */
+  eventType?: string | null;
+  eventVersion?: number | null;
+  correlationId?: string | null;
+  causationId?: string | null;
+  occurredAt?: string | null;
 }
 
 /** Persistenz-PORT — strukturell erfüllt vom `CaseStore` (app-store-postgres). Nur die drei nötigen Methoden. */
@@ -273,6 +280,14 @@ export async function executeCaseTransition(
           },
           createdAt: now(),
           processedAt: null,
+          // Envelope (#16): eventType SPIEGELT den Audit-Ereignisnamen (`case.${action}`) — EINE Domänen-Taxonomie
+          // für Audit + Outbox. correlationId = die auslösende Anfrage (Request-Trace); causationId=null (Wurzel-Event,
+          // durch ein menschliches Kommando ausgelöst, kein Upstream-Event). occurredAt = Emissions-/Domänen-Zeit.
+          eventType: `case.${input.action}`,
+          eventVersion: 1,
+          correlationId: input.requestId,
+          causationId: null,
+          occurredAt: now(),
         }
       : undefined;
 

@@ -354,3 +354,52 @@ for (const impl of impls) {
     },
   );
 }
+
+// ── Domain-Event-Envelope (Skalierungsplan #16): das Outbox-Event trägt einen getypten Umschlag (event_type/version/
+//    correlation/causation/occurred_at); additiv/nullbar. Round-Trip beweist INSERT + claim-RETURNING in beiden Impls. ──
+for (const impl of impls) {
+  describe.skipIf(!impl.enabled)(
+    `AutomationStore — Domain-Event-Envelope (#16) — ${impl.name}`,
+    () => {
+      let store: AutomationStore;
+      beforeAll(() => {
+        store = impl.make();
+      });
+
+      it("persistiert + liest die Envelope-Felder round-trip (enqueue → claim)", async () => {
+        const ev = macheEvent({
+          tenantId: `t-${uid()}`,
+          eventType: "case.transitioned",
+          eventVersion: 1,
+          correlationId: "req-abc",
+          causationId: null,
+          occurredAt: "2026-06-01T00:00:00.000Z",
+        });
+        await store.enqueueEvent(ev);
+        const claimed = await store.claimDueEvents({
+          now: "2026-06-02T00:00:00.000Z",
+          limit: 50,
+        });
+        const zurueck = claimed.find((e) => e.eventId === ev.eventId);
+        expect(zurueck?.eventType).toBe("case.transitioned");
+        expect(zurueck?.eventVersion).toBe(1);
+        expect(zurueck?.correlationId).toBe("req-abc");
+        expect(zurueck?.causationId).toBeNull();
+        expect(zurueck?.occurredAt).toBe("2026-06-01T00:00:00.000Z");
+      });
+
+      it("Envelope ist OPTIONAL — ein Event ohne Umschlag claimt als NULL (rückwärtskompatibel, kein Wurf)", async () => {
+        const ev = macheEvent({ tenantId: `t-${uid()}` });
+        await store.enqueueEvent(ev);
+        const claimed = await store.claimDueEvents({
+          now: "2026-06-02T00:00:00.000Z",
+          limit: 50,
+        });
+        const zurueck = claimed.find((e) => e.eventId === ev.eventId);
+        expect(zurueck?.eventType ?? null).toBeNull();
+        expect(zurueck?.correlationId ?? null).toBeNull();
+        expect(zurueck?.occurredAt ?? null).toBeNull();
+      });
+    },
+  );
+}

@@ -135,6 +135,35 @@ describe("executeCaseTransition — server-autoritative Fall-Entscheidung", () =
     expect(p.audit[0]!.eventType).toBe("case.vorlegen");
   });
 
+  it("das Transition-Outbox-Event trägt die #16-Envelope (eventType = case.<action>, correlationId = requestId)", async () => {
+    const p = new FakePersistence();
+    p.seed(macheCase());
+    const res = await executeCaseTransition(deps(p), {
+      session: session(),
+      caseId: "c1",
+      action: "vorlegen",
+      expectedVersion: 1,
+      requestId: "req-42",
+      outboxTrigger: "beim-uebergang",
+    });
+    expect(res.ok).toBe(true);
+    expect(p.outbox).toHaveLength(1);
+    const ev = p.outbox[0] as {
+      eventType?: string;
+      eventVersion?: number;
+      correlationId?: string;
+      causationId?: string | null;
+      triggerEvent?: string;
+    };
+    // eventType SPIEGELT das Audit (case.<action>) — EINE Domänen-Taxonomie; ABGEGRENZT vom triggerEvent (Match-Key).
+    expect(ev.eventType).toBe("case.vorlegen");
+    expect(ev.eventType).toBe(p.audit[0]!.eventType);
+    expect(ev.triggerEvent).toBe("beim-uebergang");
+    expect(ev.eventVersion).toBe(1);
+    expect(ev.correlationId).toBe("req-42");
+    expect(ev.causationId).toBeNull();
+  });
+
   it("404 wenn der Fall (im Mandanten-Scope) nicht existiert", async () => {
     const p = new FakePersistence();
     const res = await executeCaseTransition(deps(p), {

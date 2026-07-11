@@ -673,6 +673,29 @@ describe("Deadline-Scanner — zeitgetriebener frist-erreicht-Trigger", () => {
     ).toBe("dringend");
   });
 
+  it("das emittierte Fristereignis trägt die #16-Envelope (eventType, occurredAt = FÄLLIGKEIT statt Scan-now)", async () => {
+    const { deps, caseStore, taskStore, automationStore } = makeDeps();
+    const c = macheCase();
+    await caseStore.insertCase(c);
+    const task = { ...macheTask(c.caseId), dueAt: UEBERFAELLIG };
+    await taskStore.insertTask(task);
+    await fristRegel(automationStore);
+
+    expect((await emitDueDeadlineEvents(deps)).scanned).toBe(1);
+    // Das eingereihte Event direkt claimen und die Envelope prüfen (vor der Verarbeitung).
+    const claimed = await automationStore.claimDueEvents({
+      now: NOW,
+      limit: 10,
+    });
+    const ev = claimed.find((e) => e.taskId === task.taskId);
+    expect(ev?.eventType).toBe("task.frist-erreicht");
+    expect(ev?.eventVersion).toBe(1);
+    expect(ev?.correlationId).toBeNull();
+    // occurredAt = FÄLLIGKEIT (kanonisierter dueAt), NICHT die Scan-Zeit NOW — deterministisch zur eventId.
+    expect(ev?.occurredAt).toBe(UEBERFAELLIG);
+    expect(ev?.occurredAt).not.toBe(NOW);
+  });
+
   it("ignoriert fällige Aufgaben in Verfahren OHNE frist-erreicht-Regel (kein Event-Rauschen)", async () => {
     const { deps, caseStore, taskStore } = makeDeps();
     const c = macheCase();

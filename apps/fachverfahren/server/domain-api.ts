@@ -814,6 +814,13 @@ export function registerDomainApi(
                 payload: { actor: session.actorId, source: intake.source },
                 createdAt: now(),
                 processedAt: null,
+                // Envelope (#16): eventType SPIEGELT den Audit-Ereignisnamen (`case.eingegangen`). correlationId = die
+                // auslösende Anfrage (Request-Trace); causationId=null (Wurzel-Event); occurredAt = Domänen-Zeit.
+                eventType: "case.eingegangen",
+                eventVersion: 1,
+                correlationId: reply.request.id ?? null,
+                causationId: null,
+                occurredAt: now(),
               },
             }
           : {}),

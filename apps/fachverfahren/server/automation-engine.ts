@@ -140,6 +140,13 @@ export async function emitDueDeadlineEvents(
         scheduledFor: faellig,
         createdAt: now,
         processedAt: null,
+        // Envelope (#16): getyptes Fristereignis. correlationId=null (zeitgetriebene Wurzel, keine Anfrage);
+        // occurredAt = FÄLLIGKEIT (nicht Scan-now) → deterministisch/idempotent zur eventId `frist::taskId::faellig`.
+        eventType: "task.frist-erreicht",
+        eventVersion: 1,
+        correlationId: null,
+        causationId: null,
+        occurredAt: faellig,
       });
       // Diese Frist als emittiert markieren → nächster Tick re-scannt sie nicht (kein Event-/Write-Sturm). Der Marker
       // nutzt den ROHEN dueAt (nicht die kanonische Form), damit das Ausschluss-Prädikat `deadline_emitted_at < dueAt`
