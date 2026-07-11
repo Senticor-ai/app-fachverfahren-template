@@ -600,4 +600,131 @@ describe("Deadline-Scanner — zeitgetriebener frist-erreicht-Trigger", () => {
     });
     expect((await emitDueDeadlineEvents(deps)).scanned).toBe(1);
   });
+
+  it("PER-EVENT-ISOLATION: ein getCase-Wurf bei EINEM Event bricht den Batch NICHT ab und wird als failed auditiert (kein stiller Verlust)", async () => {
+    const { deps, caseStore, taskStore, automationStore } = makeDeps();
+    const cGift = macheCase();
+    const cOk = macheCase();
+    await caseStore.insertCase(cGift);
+    await caseStore.insertCase(cOk);
+    const taskGift = macheTask(cGift.caseId);
+    const taskOk = macheTask(cOk.caseId);
+    await taskStore.insertTask(taskGift);
+    await taskStore.insertTask(taskOk);
+    // getCase für den Gift-Fall transient werfen lassen (simulierter DB-Fehler mitten in der Verarbeitung).
+    const echtesGetCase = caseStore.getCase.bind(caseStore);
+    caseStore.getCase = async (input) => {
+      if (input.caseId === cGift.caseId)
+        throw new Error("transienter DB-Fehler (getCase)");
+      return echtesGetCase(input);
+    };
+    await automationStore.insertRule({
+      ruleId: "r-prio",
+      tenantId: "t1",
+      authorityId: "b1",
+      procedureId: "leistung",
+      triggerEvent: "beim-eingang",
+      condition: { feld: "$procedureId", op: "==", wert: "leistung" },
+      actions: [{ art: "setze-prioritaet", wert: "hoch" }],
+      requiresFourEyes: false,
+      active: true,
+      createdAt: NOW,
+    });
+    for (const [eventId, c, task] of [
+      ["e-gift", cGift, taskGift],
+      ["e-ok", cOk, taskOk],
+    ] as const) {
+      await automationStore.enqueueEvent({
+        eventId,
+        tenantId: "t1",
+        authorityId: "b1",
+        procedureId: "leistung",
+        caseId: c.caseId,
+        taskId: task.taskId,
+        triggerEvent: "beim-eingang",
+        payload: {},
+        createdAt: NOW,
+        processedAt: null,
+      });
+    }
+
+    const res = await processDueAutomationEvents(deps);
+
+    // Batch NICHT abgebrochen: das OK-Event lief trotz des Wurfs beim Gift-Event.
+    expect(res.claimed).toBe(2);
+    expect(res.applied).toBe(1);
+    expect(res.failed).toBe(1);
+    expect(
+      (await taskStore.getTask({ tenantId: "t1", taskId: taskOk.taskId }))
+        ?.priorityKey,
+    ).toBe("hoch");
+    // Gift-Event ist NICHT still verloren, sondern ehrlich als failed protokolliert.
+    const runs = await automationStore.listRuns({ ruleId: "r-prio" });
+    expect(runs.find((r) => r.eventId === "e-gift")?.status).toBe("failed");
+  });
+
+  it("PER-EVENT-ISOLATION: ein listRules-Wurf reißt den restlichen Batch nicht mit und wird als orchestration-error auditiert", async () => {
+    const { deps, caseStore, taskStore, automationStore } = makeDeps();
+    const cOk = macheCase();
+    await caseStore.insertCase(cOk);
+    const taskOk = macheTask(cOk.caseId);
+    await taskStore.insertTask(taskOk);
+    // listRules für die „Gift"-Behörde transient werfen lassen (vor jeder Regel → Orchestrierungs-Fehler).
+    const echtesListRules = automationStore.listRules.bind(automationStore);
+    automationStore.listRules = async (q) => {
+      if (q.authorityId === "b-gift")
+        throw new Error("transienter DB-Fehler (listRules)");
+      return echtesListRules(q);
+    };
+    await automationStore.insertRule({
+      ruleId: "r-prio",
+      tenantId: "t1",
+      authorityId: "b1",
+      procedureId: "leistung",
+      triggerEvent: "beim-eingang",
+      condition: { feld: "$procedureId", op: "==", wert: "leistung" },
+      actions: [{ art: "setze-prioritaet", wert: "hoch" }],
+      requiresFourEyes: false,
+      active: true,
+      createdAt: NOW,
+    });
+    // Gift-Event (andere Behörde, caseId null) + OK-Event.
+    await automationStore.enqueueEvent({
+      eventId: "e-gift",
+      tenantId: "t1",
+      authorityId: "b-gift",
+      procedureId: "leistung",
+      caseId: null,
+      taskId: null,
+      triggerEvent: "beim-eingang",
+      payload: {},
+      createdAt: NOW,
+      processedAt: null,
+    });
+    await automationStore.enqueueEvent({
+      eventId: "e-ok",
+      tenantId: "t1",
+      authorityId: "b1",
+      procedureId: "leistung",
+      caseId: cOk.caseId,
+      taskId: taskOk.taskId,
+      triggerEvent: "beim-eingang",
+      payload: {},
+      createdAt: NOW,
+      processedAt: null,
+    });
+
+    const res = await processDueAutomationEvents(deps);
+
+    expect(res.claimed).toBe(2);
+    expect(res.applied).toBe(1); // e-ok trotz des Wurfs bei e-gift
+    expect(res.failed).toBe(1); // e-gift
+    // Der Orchestrierungs-Fehler ist sichtbar auditiert (Sentinel-run), kein stiller Verlust.
+    const alle = await automationStore.listRuns({});
+    const orch = alle.find(
+      (r) =>
+        r.eventId === "e-gift" && r.detail["reason"] === "orchestration-error",
+    );
+    expect(orch?.status).toBe("failed");
+  });
 });

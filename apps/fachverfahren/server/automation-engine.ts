@@ -79,6 +79,11 @@ export async function runAutomationTick(
 
 const FRIST_TRIGGER = "frist-erreicht";
 
+/** Sentinel-`rule_id` für einen ORCHESTRIERUNGS-Fehler (z. B. `listRules`-Wurf), bevor eine konkrete Regel bekannt
+ *  ist. `app_automation_runs.rule_id` trägt keinen Fremdschlüssel, daher ist dieser Marker schema-sicher; er macht
+ *  den sonst stillen Verlust eines geclaimten Events im revisionssicheren Protokoll SICHTBAR. */
+const ORCHESTRATION_RULE_ID = "__orchestration__";
+
 /** ZEITGETRIEBENER Deadline-Scanner (der fehlende Prozess-Ort für `frist-erreicht`): findet Aufgaben mit ERREICHTER
  *  Frist (`dueAt ≤ now`) in Verfahren mit AKTIVER `frist-erreicht`-Regel und reiht je Frist EIN Outbox-Event ein.
  *  Die event_id ist DETERMINISTISCH (`frist::<taskId>::<dueAt>`) → idempotent: ein erneuter Scan reiht nichts nach
@@ -202,21 +207,57 @@ export async function processDueAutomationEvents(
     // Rekursions-Sperre: von der Automation selbst erzeugte Events nicht erneut verarbeiten.
     if (event.payload["actor"] === AUTOMATION_ACTOR) continue;
 
-    const rules = await deps.automationStore.listRules({
-      tenantId: event.tenantId,
-      // Behörden-Scope: eine Regel EINER Behörde darf nicht auf Events einer ANDEREN Behörde desselben Mandanten feuern.
-      authorityId: event.authorityId,
-      procedureId: event.procedureId,
-      triggerEvent: event.triggerEvent,
-      activeOnly: true,
-    });
+    // PER-EVENT-ISOLATION: `claimDueEvents` hat den GANZEN Batch (bis 50) bereits als processed_at≠NULL committet.
+    // Ein Orchestrierungs-Fehler bei EINEM Event (transienter `listRules`-Wurf oder ein `record`-Wurf in `applyRule`
+    // bei DB-Störung) darf daher NIE die restlichen, ebenfalls schon geclaimten Events des Batches mitreißen — die
+    // würden sonst nie erneut geclaimt (WHERE processed_at IS NULL) und liefen spurlos verloren. Den einen Event
+    // ehrlich als `failed` zählen und best-effort auditieren; der Batch läuft weiter.
+    try {
+      const rules = await deps.automationStore.listRules({
+        tenantId: event.tenantId,
+        // Behörden-Scope: eine Regel EINER Behörde darf nicht auf Events einer ANDEREN Behörde desselben Mandanten feuern.
+        authorityId: event.authorityId,
+        procedureId: event.procedureId,
+        triggerEvent: event.triggerEvent,
+        activeOnly: true,
+      });
 
-    for (const rule of rules) {
-      const status = await applyRule(deps, event, rule);
-      if (status) result[status] += 1;
+      for (const rule of rules) {
+        const status = await applyRule(deps, event, rule);
+        if (status) result[status] += 1;
+      }
+    } catch (error) {
+      result.failed += 1;
+      await protokolliereOrchestrierungsFehler(deps, event, error);
     }
   }
   return result;
+}
+
+/** Best-effort-Audit für einen ORCHESTRIERUNGS-Fehler, bevor/ohne dass eine konkrete Regel bekannt ist — macht den
+ *  sonst stillen Verlust eines geclaimten Events sichtbar. Selbst best-effort: schlägt auch dieses `recordRun` fehl
+ *  (fortbestehende DB-Störung), wird der Fehler geschluckt, damit der restliche Batch dennoch weiterläuft. */
+async function protokolliereOrchestrierungsFehler(
+  deps: AutomationEngineDeps,
+  event: AppAutomationEvent,
+  error: unknown,
+): Promise<void> {
+  try {
+    await deps.automationStore.recordRun({
+      runId: `run.${deps.newId()}`,
+      ruleId: ORCHESTRATION_RULE_ID,
+      eventId: event.eventId,
+      idempotencyKey: `${event.eventId}::${ORCHESTRATION_RULE_ID}`,
+      status: "failed",
+      detail: {
+        error: String(error instanceof Error ? error.message : error),
+        reason: "orchestration-error",
+      },
+      createdAt: deps.now(),
+    });
+  } catch {
+    /* Audit ist best-effort — bei fortbestehender DB-Störung wenigstens den Batch-Rest nicht abbrechen. */
+  }
 }
 
 async function applyRule(
@@ -225,59 +266,62 @@ async function applyRule(
   rule: AppAutomationRule,
 ): Promise<Exclude<keyof ProcessResult, "claimed"> | undefined> {
   const idempotencyKey = `${event.eventId}::${rule.ruleId}`;
-  const mutating = istMutierend(rule);
-
-  // FAIL-CLOSED (wie der Kit): eine mutierende Regel OHNE Bedingung würde sonst bei jedem Trigger unbeabsichtigt
-  // dauerfeuern (die Bedingungs-Auswertung ist fail-open für „keine Bedingung"). Solche Regeln NIE ausführen.
-  if (mutating && rule.condition === null) {
-    await record(deps, rule, event, idempotencyKey, "skipped", {
-      reason: "mutierend-ohne-wenn",
-    });
-    return "skipped";
-  }
-  // FAIL-CLOSED: mutierende Regel mit nicht vollständig verstandener Bedingung ⇒ nicht ausführen.
-  if (mutating && !bedingungUnterstuetzt(rule.condition)) {
-    await record(deps, rule, event, idempotencyKey, "skipped", {
-      reason: "unsupported-condition",
-    });
-    return "skipped";
-  }
-
-  const appCase = event.caseId
-    ? await deps.caseStore.getCase({
-        tenantId: event.tenantId,
-        caseId: event.caseId,
-      })
-    : undefined;
-
-  // Bedingung nicht erfüllt ⇒ still (kein Lauf, kein Rauschen).
-  if (!evalBedingungNodeSafe(rule.condition, bauDaten(event, appCase))) {
-    return undefined;
-  }
-
-  const acts = aktionen(rule);
-
-  // VIER-AUGEN-HARTGUARD: fordert die Regel oder irgendein Status-Übergang Vier-Augen ⇒ blockieren (Mensch nötig).
-  if (rule.requiresFourEyes || fordertVierAugen(deps, acts, appCase)) {
-    await record(deps, rule, event, idempotencyKey, "blocked", {
-      reason: "four-eyes-requires-human",
-    });
-    return "blocked";
-  }
-
-  // Teil-Effekte werden in DIESE Liste akkumuliert, damit der catch bei einem Wurf die bereits (dauerhaft)
-  // committeten Vor-Effekte kennt und EHRLICH protokollieren kann.
+  // Teil-Effekte werden hier akkumuliert, damit der catch bei einem Wurf die bereits (dauerhaft) committeten
+  // Vor-Effekte kennt und EHRLICH protokollieren kann.
   const effekte: string[] = [];
+  // GESAMTE Verarbeitung im try: nicht nur die Effekt-Ausführung, sondern AUCH die Orchestrierungs-Schritte
+  // (`getCase`, die Guard-`record`-Aufrufe) müssen bei einem transienten Wurf als „failed" auditiert werden — sonst
+  // verschwände ein bereits geclaimtes Event spurlos aus dem revisionssicheren Lauf-Protokoll (stiller Verlust).
   try {
+    const mutating = istMutierend(rule);
+
+    // FAIL-CLOSED (wie der Kit): eine mutierende Regel OHNE Bedingung würde sonst bei jedem Trigger unbeabsichtigt
+    // dauerfeuern (die Bedingungs-Auswertung ist fail-open für „keine Bedingung"). Solche Regeln NIE ausführen.
+    if (mutating && rule.condition === null) {
+      await record(deps, rule, event, idempotencyKey, "skipped", {
+        reason: "mutierend-ohne-wenn",
+      });
+      return "skipped";
+    }
+    // FAIL-CLOSED: mutierende Regel mit nicht vollständig verstandener Bedingung ⇒ nicht ausführen.
+    if (mutating && !bedingungUnterstuetzt(rule.condition)) {
+      await record(deps, rule, event, idempotencyKey, "skipped", {
+        reason: "unsupported-condition",
+      });
+      return "skipped";
+    }
+
+    const appCase = event.caseId
+      ? await deps.caseStore.getCase({
+          tenantId: event.tenantId,
+          caseId: event.caseId,
+        })
+      : undefined;
+
+    // Bedingung nicht erfüllt ⇒ still (kein Lauf, kein Rauschen).
+    if (!evalBedingungNodeSafe(rule.condition, bauDaten(event, appCase))) {
+      return undefined;
+    }
+
+    const acts = aktionen(rule);
+
+    // VIER-AUGEN-HARTGUARD: fordert die Regel oder irgendein Status-Übergang Vier-Augen ⇒ blockieren (Mensch nötig).
+    if (rule.requiresFourEyes || fordertVierAugen(deps, acts, appCase)) {
+      await record(deps, rule, event, idempotencyKey, "blocked", {
+        reason: "four-eyes-requires-human",
+      });
+      return "blocked";
+    }
+
     await fuehreAktionenAus(deps, event, appCase, acts, effekte);
     await record(deps, rule, event, idempotencyKey, "applied", { effekte });
     return "applied";
   } catch (error) {
-    // Dauerhaft scheiterndes Event wird NICHT re-claimt (bereits verarbeitet). WICHTIG: bereits committete Teil-
-    // Effekte MIT protokollieren — sonst behauptete das revisionssichere Lauf-Protokoll fälschlich, es sei nichts
-    // mutiert worden (stille Mutation). HINWEIS/GRENZE: die Mehr-Aktions-Ausführung ist (noch) NICHT atomar — die
-    // Stores teilen keine gemeinsame Transaktion; committete Vor-Effekte bleiben bestehen. `partiell` macht das im
-    // Protokoll sichtbar, bis ein `withTransaction`-Pfad über beide Stores existiert.
+    // Orchestrierungs- (getCase/Guard-record) ODER Effekt-Fehler → EHRLICH als „failed" protokollieren, nie stiller
+    // Verlust. Bereits committete Teil-Effekte MIT protokollieren — sonst behauptete das Protokoll fälschlich, es sei
+    // nichts mutiert worden. GRENZE: die Mehr-Aktions-Ausführung ist (noch) NICHT atomar (Stores teilen keine TX);
+    // `partiell` macht das sichtbar, bis ein `withTransaction`-Pfad über beide Stores existiert. Der record-Aufruf
+    // ist best-effort: wirft er selbst (DB down), fängt ihn die per-Event-Isolation in `processDueAutomationEvents`.
     await record(deps, rule, event, idempotencyKey, "failed", {
       error: String(error instanceof Error ? error.message : error),
       ...(effekte.length > 0
