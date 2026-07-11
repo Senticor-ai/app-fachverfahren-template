@@ -458,6 +458,179 @@ describe("automation engine — server-autoritative Ausführung", () => {
         ?.priorityKey,
     ).toBeNull();
   });
+
+  it("dead-lettert ein POISON-Event nach Überschreiten von maxAttempts (kein Re-Claim, poison-Lauf sichtbar)", async () => {
+    const { deps, automationStore } = makeDeps();
+    deps.maxAttempts = 2;
+    await automationStore.enqueueEvent({
+      eventId: "poison-1",
+      tenantId: "t1",
+      authorityId: "b1",
+      procedureId: "leistung",
+      caseId: null,
+      taskId: null,
+      triggerEvent: "beim-eingang",
+      payload: {},
+      createdAt: "2026-07-10T00:00:00.000Z",
+      processedAt: null,
+    });
+    // Simulierter wiederholter Prozess-Crash: 2x claimen OHNE markProcessed, Lease jeweils vor NOW (12:00) abgelaufen
+    // → attempts steigt auf 2, das Event ist bei NOW wieder claimbar.
+    await automationStore.claimDueEvents({
+      now: "2026-07-10T10:00:00.000Z",
+      limit: 10,
+      visibilityMs: 1000,
+    });
+    await automationStore.claimDueEvents({
+      now: "2026-07-10T11:00:00.000Z",
+      limit: 10,
+      visibilityMs: 1000,
+    });
+
+    // Der Engine-Claim macht attempts=3 > maxAttempts=2 → DEAD-LETTER statt Verarbeitung (der attempts-Check steht
+    // vor jeder Payload-Verarbeitung, bricht also den Crash-Loop).
+    const res = await processDueAutomationEvents(deps);
+    expect(res).toMatchObject({
+      claimed: 1,
+      deadLettered: 1,
+      applied: 0,
+      failed: 0,
+    });
+
+    // Sichtbar/auswertbar: ein failed-Lauf mit reason=poison-max-attempts (+ attempts) statt stillem Verlust.
+    const runs = await automationStore.listRuns({});
+    const poison = runs.find(
+      (r) => r.detail?.["reason"] === "poison-max-attempts",
+    );
+    expect(poison?.status).toBe("failed");
+    expect(poison?.detail?.["attempts"]).toBe(3);
+
+    // Terminal quarantänt: ein weiterer Tick claimt NICHTS mehr (kein Endlos-Re-Claim).
+    const res2 = await processDueAutomationEvents(deps);
+    expect(res2.claimed).toBe(0);
+  });
+
+  it("verarbeitet ein Event UNTER der Obergrenze normal (kein fälschliches Dead-Letter)", async () => {
+    const { deps, caseStore, taskStore, automationStore } = makeDeps();
+    deps.maxAttempts = 2;
+    const c = macheCase();
+    await caseStore.insertCase(c);
+    const task = macheTask(c.caseId);
+    await taskStore.insertTask(task);
+    await automationStore.insertRule({
+      ruleId: "r-prio-cap",
+      tenantId: "t1",
+      authorityId: "b1",
+      procedureId: "leistung",
+      triggerEvent: "beim-eingang",
+      condition: { feld: "$procedureId", op: "==", wert: "leistung" },
+      actions: [{ art: "setze-prioritaet", wert: "hoch" }],
+      requiresFourEyes: false,
+      active: true,
+      createdAt: NOW,
+    });
+    await automationStore.enqueueEvent({
+      eventId: "unter-cap",
+      tenantId: "t1",
+      authorityId: "b1",
+      procedureId: "leistung",
+      caseId: c.caseId,
+      taskId: task.taskId,
+      triggerEvent: "beim-eingang",
+      payload: {},
+      createdAt: NOW,
+      processedAt: null,
+    });
+    // Erster Engine-Claim → attempts=1 (< 2) → normale Verarbeitung, KEIN Dead-Letter.
+    const res = await processDueAutomationEvents(deps);
+    expect(res).toMatchObject({ claimed: 1, applied: 1, deadLettered: 0 });
+  });
+
+  it("dead-lettert ein Poison-Event, verschont aber ein co-fälliges GESUNDES Event (limit-1-Claim → Crash eindeutig zugeordnet)", async () => {
+    const { deps, caseStore, taskStore, automationStore } = makeDeps();
+    deps.maxAttempts = 2;
+    const c = macheCase();
+    await caseStore.insertCase(c);
+    const task = macheTask(c.caseId);
+    await taskStore.insertTask(task);
+    await automationStore.insertRule({
+      ruleId: "r-prio-collat",
+      tenantId: "t1",
+      authorityId: "b1",
+      procedureId: "leistung",
+      triggerEvent: "beim-eingang",
+      condition: { feld: "$procedureId", op: "==", wert: "leistung" },
+      actions: [{ art: "setze-prioritaet", wert: "hoch" }],
+      requiresFourEyes: false,
+      active: true,
+      createdAt: NOW,
+    });
+    // Poison-Event, FRÜHER erstellt → steht in der created_at-Ordnung VORN.
+    await automationStore.enqueueEvent({
+      eventId: "poison",
+      tenantId: "t1",
+      authorityId: "b1",
+      procedureId: "leistung",
+      caseId: c.caseId,
+      taskId: null,
+      triggerEvent: "beim-eingang",
+      payload: {},
+      createdAt: "2026-07-10T00:00:00.000Z",
+      processedAt: null,
+    });
+    // GESUNDES Event, SPÄTER erstellt, mit passender Regel (soll Priorität setzen).
+    await automationStore.enqueueEvent({
+      eventId: "gesund",
+      tenantId: "t1",
+      authorityId: "b1",
+      procedureId: "leistung",
+      caseId: c.caseId,
+      taskId: task.taskId,
+      triggerEvent: "beim-eingang",
+      payload: {},
+      createdAt: "2026-07-10T00:00:01.000Z",
+      processedAt: null,
+    });
+
+    // Simulierte Crash-Zyklen — GENAU wie der limit-1-Consumer sie fährt: jeder Claim greift das ÄLTESTE claimbare
+    // Event = „poison". „gesund" wird NIE co-geclaimt → sein attempts bleibt 0 (das ist der Kern des Fixes).
+    for (const t of [
+      "2026-07-10T08:00:00.000Z",
+      "2026-07-10T09:00:00.000Z",
+      "2026-07-10T10:00:00.000Z",
+    ]) {
+      const cl = await automationStore.claimDueEvents({
+        now: t,
+        limit: 1,
+        visibilityMs: 1000,
+      });
+      expect(cl.map((e) => e.eventId)).toEqual(["poison"]);
+    }
+
+    // Der Tick (limit-1-Loop) bei NOW: dead-lettert „poison", verarbeitet DANACH „gesund" normal.
+    const res = await processDueAutomationEvents(deps);
+    expect(res).toMatchObject({ claimed: 2, deadLettered: 1, applied: 1 });
+    // „gesund" wurde VERARBEITET (Priorität gesetzt), NICHT fälschlich quarantänt.
+    expect(
+      (await taskStore.getTask({ tenantId: "t1", taskId: task.taskId }))
+        ?.priorityKey,
+    ).toBe("hoch");
+    const runs = await automationStore.listRuns({});
+    expect(
+      runs.find(
+        (r) =>
+          r.eventId === "gesund" &&
+          r.detail?.["reason"] === "poison-max-attempts",
+      ),
+    ).toBeUndefined();
+    expect(
+      runs.find(
+        (r) =>
+          r.eventId === "poison" &&
+          r.detail?.["reason"] === "poison-max-attempts",
+      ),
+    ).toBeDefined();
+  });
 });
 
 describe("Deadline-Scanner — zeitgetriebener frist-erreicht-Trigger", () => {

@@ -39,6 +39,12 @@ import {
  *  Re-Export der SDK-Wahrheit, damit Aufrufer/Tests EINEN Wert teilen. */
 export const AUTOMATION_ACTOR = AUTOMATION_SERVICE_ACTOR;
 
+/** Zustell-Obergrenze (Dead-Letter, Skalierungsplan #9): wie oft ein Event geclaimt werden darf, bevor es als POISON
+ *  quarantänt wird. `attempts` (aus dem at-least-once-Lease, #8) zählt jeden Claim; ein Event, dessen Behandlung den
+ *  Prozess wiederholt tötet, würde ohne diese Grenze nach jedem Lease-Ablauf endlos re-claimt (Crash-Loop). Grosszügig,
+ *  damit ein legitim langsames Event (mehrfacher Lease-Ablauf bei paralleler Verarbeitung) nicht fälschlich landet. */
+export const DEFAULT_MAX_ATTEMPTS = 10;
+
 export interface AutomationEngineDeps {
   automationStore: AutomationStore;
   caseStore: CaseStore;
@@ -48,6 +54,8 @@ export interface AutomationEngineDeps {
   now: Clock;
   newId: IdGenerator;
   procedureVersion: string;
+  /** Zustell-Obergrenze vor Dead-Letter (#9). Fehlt ⇒ `DEFAULT_MAX_ATTEMPTS`. */
+  maxAttempts?: number;
 }
 
 export interface ProcessResult {
@@ -56,6 +64,8 @@ export interface ProcessResult {
   blocked: number;
   skipped: number;
   failed: number;
+  /** Als POISON quarantänte Events (attempts > maxAttempts) — terminal markiert, NICHT verarbeitet (#9). */
+  deadLettered: number;
 }
 
 export interface EmitDeadlineResult {
@@ -83,6 +93,8 @@ const FRIST_TRIGGER = "frist-erreicht";
  *  ist. `app_automation_runs.rule_id` trägt keinen Fremdschlüssel, daher ist dieser Marker schema-sicher; er macht
  *  den sonst stillen Verlust eines geclaimten Events im revisionssicheren Protokoll SICHTBAR. */
 const ORCHESTRATION_RULE_ID = "__orchestration__";
+/** Grund-Marker eines Dead-Letter-Laufs (#9) — im `app_automation_runs`-Protokoll als `failed` mit diesem `reason`. */
+const POISON_REASON = "poison-max-attempts";
 
 /** ZEITGETRIEBENER Deadline-Scanner (der fehlende Prozess-Ort für `frist-erreicht`): findet Aufgaben mit ERREICHTER
  *  Frist (`dueAt ≤ now`) in Verfahren mit AKTIVER `frist-erreicht`-Regel und reiht je Frist EIN Outbox-Event ein.
@@ -191,28 +203,48 @@ export async function processDueAutomationEvents(
   deps: AutomationEngineDeps,
   opts: { limit?: number } = {},
 ): Promise<ProcessResult> {
-  const events = await deps.automationStore.claimDueEvents({
-    now: deps.now(),
-    limit: opts.limit ?? 50,
-  });
   const result: ProcessResult = {
-    claimed: events.length,
+    claimed: 0,
     applied: 0,
     blocked: 0,
     skipped: 0,
     failed: 0,
+    deadLettered: 0,
   };
+  const maxAttempts = deps.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+  const maxEvents = opts.limit ?? 50;
 
-  for (const event of events) {
-    // PER-EVENT-ISOLATION: `claimDueEvents` LEAST den Batch (locked_until gesetzt, processed_at noch NULL). Ein
-    // Orchestrierungs-Fehler bei EINEM Event (transienter `listRules`-Wurf oder ein `record`-Wurf in `applyRule` bei
-    // DB-Störung) darf NIE die restlichen Events mitreißen — den einen ehrlich als `failed` zählen + best-effort
-    // auditieren; der Batch läuft weiter.
+  // EINZELN claimen (limit 1) statt eines grossen Batches — ENTSCHEIDEND für den Dead-Letter-Cap (#9): ein PROZESS-
+  // Crash ist so EINDEUTIG dem GERADE verarbeiteten Event zuzuordnen. Bei Batch-Claim würden co-geclaimte GESUNDE
+  // Events denselben attempts-Anstieg erben (der Crash tötet den Prozess, bevor sie überhaupt an die Reihe kommen)
+  // und nach genug Zyklen fälschlich mit-quarantänt — ein stiller, terminaler Verlust legitimer Effekte. Mit limit 1
+  // steigt `attempts` nur beim tatsächlich verarbeiteten Event; ein co-fälliges gesundes Event wird gar nicht erst
+  // geclaimt, solange das Poison-Event vorn steht. `maxEvents` begrenzt die Tick-Dauer; der nächste Tick nimmt den
+  // Rest (Durchsatz-Kompromiss: mehr Claim-Round-Trips, dafür korrekte Crash-Zuordnung).
+  for (let verarbeitet = 0; verarbeitet < maxEvents; verarbeitet += 1) {
+    const claimed = await deps.automationStore.claimDueEvents({
+      now: deps.now(),
+      limit: 1,
+    });
+    const event = claimed[0];
+    if (!event) break;
+    result.claimed += 1;
+
+    // PER-EVENT-ISOLATION: ein Orchestrierungs-Fehler bei EINEM Event (transienter `listRules`-Wurf oder ein
+    // `record`-Wurf in `applyRule` bei DB-Störung) den einen ehrlich als `failed` zählen + best-effort auditieren;
+    // der Tick läuft weiter.
     try {
-      // Rekursions-Sperre: von der Automation selbst erzeugte Events nicht erneut verarbeiten. WICHTIG: NICHT per
-      // `continue` überspringen — das Event MUSS unten terminal markiert werden, sonst liefe die Lease ab und es
-      // würde endlos neu geclaimt (Übersprungen ≠ unbearbeitet). Der Sprung ist eine Entscheidung, kein Crash.
-      if (event.payload["actor"] !== AUTOMATION_ACTOR) {
+      // DEAD-LETTER (#9): hat das Event die Zustell-Obergrenze überschritten (wiederholter Prozess-Crash → attempts
+      // steigt bei jedem Lease-Ablauf), NICHT erneut verarbeiten — das löste denselben Crash aus. Der attempts-Check
+      // steht VOR jeder Payload-Verarbeitung, deshalb bricht er den Crash-Loop, den at-least-once (#8) sonst offen
+      // liesse. Terminal quarantänen (markProcessed unten) + sichtbar als poison-Lauf protokollieren.
+      if (event.attempts !== undefined && event.attempts > maxAttempts) {
+        result.deadLettered += 1;
+        await protokollierePoisonEvent(deps, event);
+      } else if (event.payload["actor"] !== AUTOMATION_ACTOR) {
+        // Rekursions-Sperre: von der Automation selbst erzeugte Events nicht erneut verarbeiten. WICHTIG: NICHT per
+        // `continue` überspringen — das Event MUSS unten terminal markiert werden, sonst liefe die Lease ab und es
+        // würde endlos neu geclaimt (Übersprungen ≠ unbearbeitet). Der Sprung ist eine Entscheidung, kein Crash.
         const rules = await deps.automationStore.listRules({
           tenantId: event.tenantId,
           // Behörden-Scope: eine Regel EINER Behörde darf nicht auf Events einer ANDEREN Behörde desselben Mandanten feuern.
@@ -239,15 +271,15 @@ export async function processDueAutomationEvents(
     // DOPPEL-EFFEKTE beim Re-Claim: die aktuellen Aktionen sind dagegen sicher, weil sie IDEMPOTENT bzw.
     // OPTIMISTIC-LOCK-geschützt sind (`status-uebergang` via expectedVersion; `setze-prioritaet`/`zuweisen`/`label`
     // wertsetzend). `recordRun` (ON CONFLICT) dedupliziert ZUSÄTZLICH die Audit-Zeile — es riegelt NICHT die
-    // Effekt-Ausführung ab. Eine künftige nicht-idempotente Aktion bräuchte einen Effekt-Vorab-Riegel (Folge-Härtung
-    // zusammen mit dem attempts-Cap/Dead-Letter, Skalierungsplan #9).
+    // Effekt-Ausführung ab. Eine künftige nicht-idempotente Aktion bräuchte zusätzlich einen Effekt-Vorab-Riegel
+    // (`recordRun` als Claim VOR den Effekten) — offene Folge-Härtung.
     try {
       await deps.automationStore.markProcessed({
         eventId: event.eventId,
         now: deps.now(),
       });
     } catch {
-      /* Re-Claim nach Lease-Ablauf ist der sichere Fallback; den Batch-Rest nicht abbrechen. */
+      /* Re-Claim nach Lease-Ablauf ist der sichere Fallback; den Tick nicht abbrechen. */
     }
   }
   return result;
@@ -276,6 +308,33 @@ async function protokolliereOrchestrierungsFehler(
     });
   } catch {
     /* Audit ist best-effort — bei fortbestehender DB-Störung wenigstens den Batch-Rest nicht abbrechen. */
+  }
+}
+
+/** Best-effort-Protokoll eines DEAD-LETTER/POISON-Events (#9): das Event hat die Zustell-Obergrenze überschritten und
+ *  wird terminal quarantänt (markProcessed) statt erneut verarbeitet — ein `failed`-Lauf mit `reason=poison-max-attempts`
+ *  macht das sichtbar/auswertbar (nicht stiller Verlust). Idempotenz-Key trägt den Grund, damit er sich nicht mit einem
+ *  Orchestrierungs-Fehler-Lauf desselben Events kollidiert. */
+async function protokollierePoisonEvent(
+  deps: AutomationEngineDeps,
+  event: AppAutomationEvent,
+): Promise<void> {
+  try {
+    await deps.automationStore.recordRun({
+      runId: `run.${deps.newId()}`,
+      ruleId: ORCHESTRATION_RULE_ID,
+      eventId: event.eventId,
+      idempotencyKey: `${event.eventId}::${POISON_REASON}`,
+      status: "failed",
+      detail: {
+        reason: POISON_REASON,
+        attempts: event.attempts ?? null,
+        triggerEvent: event.triggerEvent,
+      },
+      createdAt: deps.now(),
+    });
+  } catch {
+    /* Audit ist best-effort — die terminal-Markierung quarantänt das Event ohnehin, kein Re-Claim. */
   }
 }
 

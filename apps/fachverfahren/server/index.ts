@@ -28,6 +28,7 @@ import {
 import { pmModuleManifest } from "./pm-module-manifest.js";
 import { DefaultDenyPolicyEngine } from "@senticor/public-sector-sdk";
 import {
+  DEFAULT_MAX_ATTEMPTS,
   runAutomationTick,
   type AutomationEngineDeps,
 } from "./automation-engine.js";
@@ -551,6 +552,11 @@ export function automationEngineDepsFrom(
     now: domainApi.now ?? (() => new Date().toISOString()),
     newId: domainApi.newId ?? (() => randomUUID()),
     procedureVersion: domainApi.procedureVersion ?? "1",
+    // Dead-Letter-Obergrenze (#9): nach so vielen Claims ohne Abschluss wird ein Event als POISON quarantänt.
+    maxAttempts: parsePositiveInt(
+      process.env["APP_AUTOMATION_MAX_ATTEMPTS"],
+      DEFAULT_MAX_ATTEMPTS,
+    ),
   };
 }
 
@@ -584,6 +590,7 @@ export function automationTickRunner(
             blocked: r.blocked,
             skipped: r.skipped,
             failed: r.failed,
+            deadLettered: r.deadLettered,
           });
       })
       .catch((error: unknown) => {
