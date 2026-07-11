@@ -5,8 +5,21 @@
 //
 // Das ist weiterhin der gesamte „fachliche" Code der App: NULL. Verfahren stecken in den Configs (verfahren.registry
 // → leistung.config), die UX in den Kit-Bausteinen. Ein weiteres Verfahren = ein weiterer Registry-Eintrag.
-import { createWorkspacePortFromEnv } from "@senticor/fachverfahren-kit";
+import {
+  createWorkspacePortFromEnv,
+  waehleVerfahren,
+} from "@senticor/fachverfahren-kit";
 import { workspaceConfig } from "./verfahren.registry.js";
+
+// PORTAL-NAHT (mehrere Bürger-Applikationen aus EINER Registry): `VITE_ENABLED_PROCEDURES` (komma-separierte
+// procedureIds) beschränkt DIESES Portal auf eine Teilmenge der Verfahren; unset ⇒ alle (rückwärtskompatibel).
+const enabledProcedures = (
+  import.meta.env.VITE_ENABLED_PROCEDURES as string | undefined
+)
+  ?.split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+const portalConfig = waehleVerfahren(workspaceConfig, enabledProcedures);
 
 // PROD-NAHT (die EINE austauschbare Datenquelle): ist `VITE_API_BASE_URL` gesetzt, spricht der Workspace die
 // server-autoritative Fastify-Domain-API (/api/*) über den `HttpWorkspacePort` (async Fetch → synchroner Snapshot,
@@ -50,7 +63,7 @@ export function setWorkspaceAufgabeAngenommen(
 
 /** Der verfahrensübergreifende Workspace-Store — In-Memory (DEV) oder HTTP (PROD, `VITE_API_BASE_URL`). Beide erfüllen
  *  denselben synchronen `WorkspaceStore`-Vertrag; die Bausteine merken den Unterschied nicht. */
-export const workspace = createWorkspacePortFromEnv(workspaceConfig, {
+export const workspace = createWorkspacePortFromEnv(portalConfig, {
   ...(apiBaseUrl ? { apiBaseUrl } : {}),
   ...(apiBaseUrl && !devHeaders ? { credentials: "include" as const } : {}),
   ...(devHeaders ? { headers: devHeaders } : {}),
@@ -60,7 +73,7 @@ export const workspace = createWorkspacePortFromEnv(workspaceConfig, {
 
 /** Das PRIMÄRE Verfahren (erster Registry-Eintrag) — trägt die bestehenden Ein-Verfahren-Routen (Bürger-Antrag,
  *  Eingangskorb). Rückwärtskompatibel: `store`/`config` verhalten sich wie zuvor für dieses eine Verfahren. */
-export const primaryProcedureId = workspaceConfig.verfahren[0]!.procedureId;
+export const primaryProcedureId = portalConfig.verfahren[0]!.procedureId;
 
 /** Der fachliche `VorgangPort` des primären Verfahrens (mit workspace-integriertem `einreichen`). */
 export const store = workspace.portFor(primaryProcedureId)!;

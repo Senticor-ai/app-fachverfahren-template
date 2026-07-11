@@ -24,6 +24,7 @@ export * from "./lib/benachrichtigungen.js";
 // Builder-Aspekt: reine strukturelle Prüfung + Kennzahlen einer `LeistungConfig` (Verfahren-Inspektor).
 export * from "./lib/verfahren-pruefung.js";
 export * from "./lib/automation-run.js";
+export * from "./lib/portal.js";
 // KI-Extraktions-PORT (Dokument → Feld-Vorschläge mit Konfidenz) — vendor-neutral, Stub-Default.
 export * from "./lib/dokument-extraktion.js";
 // Nachweis-Upload-Regeln als DATEN: accept-Attribut, Einschränkungs-Text + reine Fail-Fast-Vorprüfung (Typ/Größe).
