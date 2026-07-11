@@ -53,7 +53,12 @@ import {
 } from "./store.js";
 import { WorkspaceListe } from "./WorkspaceListe.js";
 import { VorgangBoard } from "./VorgangBoard.js";
-import { AkteurProvider, AkteurWechsler, useAkteur } from "./akteur.js";
+import {
+  AkteurProvider,
+  AkteurWechsler,
+  DEV_AKTEURE,
+  useAkteur,
+} from "./akteur.js";
 
 // ── Reaktivität: die Bausteine lesen ihren Port synchron. Über diesen Hook re-rendert der Routen-Baum, sobald sich
 //    IRGENDEIN Verfahren ODER die Task-Metadaten ändern — der Workspace-Store bleibt die EINE Quelle. ──
@@ -352,6 +357,7 @@ function AmtBoard(): React.JSX.Element {
       <VorgangBoard
         workspace={workspace}
         aktuellerAkteur={akteur}
+        zuweisbareAkteure={DEV_AKTEURE}
         onOpen={(procedureId, vorgangId) =>
           navigate(
             `/amt/vorgang/${encodeURIComponent(`${procedureId}::${vorgangId}`)}`,

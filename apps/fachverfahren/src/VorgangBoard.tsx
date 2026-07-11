@@ -9,7 +9,7 @@
 // (Priorität/Zuweisung/Rang) tragen kein Gate. Server-Autorität folgt in Phase 3; hier spiegelt der DEV-Store die
 // Guards für die UX.
 import { useMemo, useState } from "react";
-import { MoreHorizontal, PanelRightOpen } from "lucide-react";
+import { Check, MoreHorizontal, PanelRightOpen } from "lucide-react";
 import {
   AKTIVITAET_TYP_LABELS,
   AktivitaetsFeed,
@@ -44,6 +44,9 @@ export interface VorgangBoardProps {
   workspace: WorkspaceStore;
   onOpen: (procedureId: string, vorgangId: string) => void;
   aktuellerAkteur: string;
+  /** Konkrete, zuweisbare Personen (Kollegen) für den Assignee-Picker. In PROD aus der Zuständigkeit (actor_roles);
+   *  im DEV die umschaltbaren Demo-Akteure. Leer = nur „mir zuweisen"/„entfernen". */
+  zuweisbareAkteure?: readonly { id: string; name: string }[];
 }
 
 const ROLLE = "sachbearbeitung";
@@ -52,6 +55,7 @@ export function VorgangBoard({
   workspace,
   onOpen,
   aktuellerAkteur,
+  zuweisbareAkteure = [],
 }: VorgangBoardProps): React.JSX.Element {
   const [dragId, setDragId] = useState<string | null>(null);
   const [meldung, setMeldung] = useState("");
@@ -359,6 +363,10 @@ export function VorgangBoard({
                               onZuweisen={(an) =>
                                 workspace.assign(a.id, an, aktuellerAkteur)
                               }
+                              zuweisbareAkteure={zuweisbareAkteure}
+                              {...(a.zugewiesenAn
+                                ? { zugewiesenAn: a.zugewiesenAn }
+                                : {})}
                               onReihenfolge={(r) => reihenfolge(a, r)}
                             />
                           </div>
@@ -464,6 +472,8 @@ interface KartenMenueProps {
   onPrioritaet: (key: string | undefined) => void;
   onZuweisen: (an: string | undefined) => void;
   onReihenfolge: (richtung: -1 | 1) => void;
+  zuweisbareAkteure: readonly { id: string; name: string }[];
+  zugewiesenAn?: string;
 }
 
 function KartenMenue({
@@ -476,6 +486,8 @@ function KartenMenue({
   onPrioritaet,
   onZuweisen,
   onReihenfolge,
+  zuweisbareAkteure,
+  zugewiesenAn,
 }: KartenMenueProps): React.JSX.Element {
   // Radix DropdownMenu statt nativem <details>: bringt Fokusfalle, Pfeiltasten-/Typeahead-Navigation, ESC-Schließen
   // und Fokus-Rückkehr auf den Trigger — die BITV/WCAG-2.2-Menü-Semantik, die das <details>-Konstrukt nicht bot.
@@ -520,10 +532,31 @@ function KartenMenue({
 
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Zuweisung & Reihenfolge</DropdownMenuLabel>
+        {/* Assignee-Picker: konkrete Kollegen (das Häkchen markiert die aktuelle Zuweisung, unsichtbar sonst → Ausrichtung). */}
+        {zuweisbareAkteure.map((kollege) => (
+          <DropdownMenuItem
+            key={kollege.id}
+            onSelect={() => onZuweisen(kollege.id)}
+          >
+            <Check
+              className={cn(
+                "mr-2 h-4 w-4",
+                zugewiesenAn === kollege.id ? "opacity-100" : "opacity-0",
+              )}
+              aria-hidden="true"
+            />
+            Zuweisen an {kollege.name}
+            {zugewiesenAn === kollege.id ? (
+              <span className="sr-only"> (aktuell zugewiesen)</span>
+            ) : null}
+          </DropdownMenuItem>
+        ))}
         <DropdownMenuItem onSelect={() => onZuweisen(aktuellerAkteur)}>
+          <span className="mr-2 inline-block h-4 w-4" aria-hidden="true" />
           Mir zuweisen
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => onZuweisen(undefined)}>
+          <span className="mr-2 inline-block h-4 w-4" aria-hidden="true" />
           Zuweisung entfernen
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => onReihenfolge(-1)}>
