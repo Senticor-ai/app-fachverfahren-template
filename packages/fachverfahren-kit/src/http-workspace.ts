@@ -502,16 +502,27 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
 
   // Bulk = N unabhängige Einzelaktionen (NIE eine Bulk-Entscheidung). Die synchrone Bilanz ist optimistisch:
   // unbekannte Aufgaben werden sofort als Fehler gemeldet, der Rest läuft als Einzel-PATCH mit eigenem Reconcile.
-  const bulkAssign = (
+  const bulkBilanz = (
     taskIds: string[],
-    zugewiesenAn: string | undefined,
+    aktion: (id: string) => void,
   ): BulkErgebnis[] =>
     taskIds.map((id) => {
       if (!taskCache.some((t) => t.id === id))
         return { taskId: id, ok: false, fehler: "unbekannte Aufgabe" };
-      assign(id, zugewiesenAn);
+      aktion(id);
       return { taskId: id, ok: true };
     });
+  const bulkAssign = (
+    taskIds: string[],
+    zugewiesenAn: string | undefined,
+  ): BulkErgebnis[] => bulkBilanz(taskIds, (id) => assign(id, zugewiesenAn));
+  const bulkPrioritaet = (
+    taskIds: string[],
+    prioritaet: Prioritaet | undefined,
+  ): BulkErgebnis[] =>
+    bulkBilanz(taskIds, (id) => setPrioritaet(id, prioritaet));
+  const bulkLabel = (taskIds: string[], label: string): BulkErgebnis[] =>
+    bulkBilanz(taskIds, (id) => addLabel(id, label));
 
   const taskUebergang = (
     taskId: string,
@@ -795,6 +806,8 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
     removeLabel,
     move,
     bulkAssign,
+    bulkPrioritaet,
+    bulkLabel,
     taskUebergang,
     listKommentare,
     addKommentar,

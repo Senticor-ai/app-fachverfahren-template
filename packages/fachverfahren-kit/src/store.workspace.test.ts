@@ -176,6 +176,29 @@ describe("Board-Metadaten (kein fachliches Gate)", () => {
     expect(ergebnis.find((r) => r.taskId === "unbekannt")?.ok).toBe(false);
     expect(store.getTask("b-v1")?.zugewiesenAn).toBe("sb.x");
   });
+
+  it("bulkPrioritaet/bulkLabel setzen Metadaten je Aufgabe mit Einzel-Bilanz (kein Bulk-ENTSCHEIDUNG)", () => {
+    const store = createWorkspaceStore(macheWorkspace(), { now: NOW });
+
+    const rp = store.bulkPrioritaet(
+      ["a-v1", "unbekannt", "b-v1"],
+      "hoch",
+      "sb.eins",
+    );
+    expect(rp.find((r) => r.taskId === "a-v1")?.ok).toBe(true);
+    expect(rp.find((r) => r.taskId === "unbekannt")?.ok).toBe(false); // Bilanz je Aufgabe
+    expect(store.getTask("a-v1")?.prioritaet).toBe("hoch");
+    expect(store.getTask("b-v1")?.prioritaet).toBe("hoch");
+
+    const rl = store.bulkLabel(["a-v1", "b-v1"], "eilt", "sb.eins");
+    expect(rl.every((r) => r.ok)).toBe(true);
+    expect(store.getTask("a-v1")?.labels).toContain("eilt");
+
+    // Change-Log: jede Bulk-Teilaktion erzeugt die passende Aktivität mit Akteur (Metadaten, kein Statuswechsel).
+    const typen = store.listAktivitaet("a-v1").map((x) => x.typ);
+    expect(typen).toContain("task.prioritaet-geaendert");
+    expect(typen).toContain("task.label-hinzugefuegt");
+  });
 });
 
 describe("Fachlicher Übergang (getrennt von Metadaten, mit Guards)", () => {

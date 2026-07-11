@@ -117,6 +117,14 @@ export function WorkspaceListe({
     workspace.bulkAssign([...auswahl], an, aktuellerAkteur);
     setAuswahl(new Set());
   };
+  const bulkPrioritaet = (key: string | undefined) => {
+    workspace.bulkPrioritaet([...auswahl], key, aktuellerAkteur);
+    setAuswahl(new Set());
+  };
+  const bulkLabel = (label: string) => {
+    workspace.bulkLabel([...auswahl], label, aktuellerAkteur);
+    setAuswahl(new Set());
+  };
 
   const statusOf = (a: Aufgabe): string | undefined =>
     a.vorgangId
@@ -273,6 +281,50 @@ export function WorkspaceListe({
           >
             Zuweisung entfernen
           </Button>
+          <label className="flex items-center gap-1 text-xs text-muted-foreground">
+            Priorität:
+            <select
+              aria-label="Priorität für die Auswahl setzen"
+              value=""
+              onChange={(e) => {
+                if (!e.target.value) return;
+                bulkPrioritaet(
+                  e.target.value === "__keine" ? undefined : e.target.value,
+                );
+              }}
+              className="rounded-md border border-border bg-background px-2 py-1 text-foreground"
+            >
+              <option value="" disabled>
+                wählen …
+              </option>
+              {prioritaeten.map((p) => (
+                <option key={p.key} value={p.key}>
+                  {p.label}
+                </option>
+              ))}
+              <option value="__keine">— entfernen —</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-1 text-xs text-muted-foreground">
+            Label:
+            <select
+              aria-label="Label zur Auswahl hinzufügen"
+              value=""
+              onChange={(e) => {
+                if (e.target.value) bulkLabel(e.target.value);
+              }}
+              className="rounded-md border border-border bg-background px-2 py-1 text-foreground"
+            >
+              <option value="" disabled>
+                hinzufügen …
+              </option>
+              {labels.map((l) => (
+                <option key={l.key} value={l.key}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <Button
             type="button"
             size="sm"

@@ -1138,6 +1138,14 @@ export interface WorkspacePort<TAntragsdaten = Record<string, unknown>> {
     zugewiesenAn: string | undefined,
     akteur?: string,
   ): BulkErgebnis[];
+  /** Bulk-Priorität — Metadaten, N unabhängige Einzelaktionen mit Einzel-Bilanz; NIE eine Bulk-Entscheidung. */
+  bulkPrioritaet(
+    taskIds: string[],
+    prioritaet: Prioritaet | undefined,
+    akteur?: string,
+  ): BulkErgebnis[];
+  /** Bulk-Label — Metadaten, N unabhängige Einzelaktionen mit Einzel-Bilanz; NIE eine Bulk-Entscheidung. */
+  bulkLabel(taskIds: string[], label: string, akteur?: string): BulkErgebnis[];
 
   /** FACHLICHER Statusübergang einer Aufgabe — delegiert an den Sub-Store des Verfahrens; prüft
    *  Rolle/Detail/Vier-Augen (in PROD server-autoritativ). GETRENNT von den Metadaten-Mutationen oben. */

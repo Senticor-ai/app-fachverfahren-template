@@ -360,6 +360,25 @@ export function createWorkspaceStore<T = Record<string, unknown>>(
     bump();
   };
 
+  // Bulk = N UNABHÄNGIGE Einzelaktionen mit Einzel-Bilanz ({taskId, ok, fehler}) — NIE eine Bulk-Entscheidung.
+  // Ein Fehlschlag EINER Aufgabe stoppt die übrigen nicht. Geteilt von bulkAssign/bulkPrioritaet/bulkLabel.
+  const bulkBilanz = (
+    taskIds: string[],
+    aktion: (taskId: string) => void,
+  ): BulkErgebnis[] =>
+    taskIds.map((taskId) => {
+      try {
+        aktion(taskId);
+        return { taskId, ok: true };
+      } catch (e) {
+        return {
+          taskId,
+          ok: false,
+          fehler: e instanceof Error ? e.message : String(e),
+        };
+      }
+    });
+
   const hoechsterRang = (meta: Record<string, TaskMeta>): string => {
     let max = "";
     for (const m of Object.values(meta)) if (m.sortRank > max) max = m.sortRank;
@@ -689,22 +708,14 @@ export function createWorkspaceStore<T = Record<string, unknown>>(
         };
       }),
 
-    bulkAssign: (taskIds, zugewiesenAn, akteur) => {
-      const ergebnisse: BulkErgebnis[] = [];
-      for (const taskId of taskIds) {
-        try {
-          port.assign(taskId, zugewiesenAn, akteur);
-          ergebnisse.push({ taskId, ok: true });
-        } catch (e) {
-          ergebnisse.push({
-            taskId,
-            ok: false,
-            fehler: e instanceof Error ? e.message : String(e),
-          });
-        }
-      }
-      return ergebnisse;
-    },
+    bulkAssign: (taskIds, zugewiesenAn, akteur) =>
+      bulkBilanz(taskIds, (id) => port.assign(id, zugewiesenAn, akteur)),
+
+    bulkPrioritaet: (taskIds, prioritaet, akteur) =>
+      bulkBilanz(taskIds, (id) => port.setPrioritaet(id, prioritaet, akteur)),
+
+    bulkLabel: (taskIds, label, akteur) =>
+      bulkBilanz(taskIds, (id) => port.addLabel(id, label, akteur)),
 
     taskUebergang: (taskId, to, rolle, detail, akteur) => {
       const ref = resolveTaskId(taskId);
