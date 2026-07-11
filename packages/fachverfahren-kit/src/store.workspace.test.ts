@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import type { LeistungConfig, Vorgang, WorkspaceConfig } from "./types.js";
 import { createWorkspaceStore } from "./store.js";
+import {
+  istWurzel,
+  kinderAnzahl,
+  unteraufgabenVon,
+} from "./lib/unteraufgaben.js";
 
 function vorgang(
   id: string,
@@ -702,5 +707,32 @@ describe("createWorkspaceStore — Aktivitäts-Change-Log", () => {
         .listAktivitaet(t1.id)
         .filter((a) => a.typ === "task.beziehung-hinzugefuegt"),
     ).toHaveLength(1);
+  });
+});
+
+describe("Unteraufgaben (Sub-Issues, DEV)", () => {
+  it("createFreieAufgabe mit parentAufgabeId legt eine Unteraufgabe an — als Kind auffindbar, Elternteil bleibt Wurzel", () => {
+    const store = createWorkspaceStore(macheWorkspace(), { now: NOW });
+    const parent = store.createFreieAufgabe("Eltern-Projekt");
+    const kind = store.createFreieAufgabe("Teilschritt A", {
+      parentAufgabeId: parent.id,
+    });
+    expect(kind.parentAufgabeId).toBe(parent.id);
+
+    const alle = store.listTasks();
+    expect(unteraufgabenVon(alle, parent.id).map((x) => x.id)).toEqual([
+      kind.id,
+    ]);
+    // Elternteil = Wurzel (eigene Board-Karte), Kind = keine Wurzel (nur im Detail).
+    expect(istWurzel(store.getTask(parent.id)!)).toBe(true);
+    expect(istWurzel(store.getTask(kind.id)!)).toBe(false);
+    expect(kinderAnzahl(alle).get(parent.id)).toBe(1);
+  });
+
+  it("eine gewöhnliche freie Aufgabe hat keinen Parent (rückwärtskompatibel)", () => {
+    const store = createWorkspaceStore(macheWorkspace(), { now: NOW });
+    const frei = store.createFreieAufgabe("Ohne Eltern");
+    expect(frei.parentAufgabeId).toBeUndefined();
+    expect(istWurzel(frei)).toBe(true);
   });
 });

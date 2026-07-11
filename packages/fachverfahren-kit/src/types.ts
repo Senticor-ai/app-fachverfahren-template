@@ -1111,6 +1111,8 @@ export interface WorkspacePort<TAntragsdaten = Record<string, unknown>> {
       prioritaet?: Prioritaet;
       zugewiesenAn?: string;
       labels?: string[];
+      /** Übergeordnete Aufgabe (Sub-Issue/Unteraufgabe, Plane-Muster) — flache Ein-Ebenen-Gruppierung. */
+      parentAufgabeId?: string;
     },
   ): Aufgabe;
 

@@ -216,6 +216,9 @@ interface TaskMeta {
   sortRank: string;
   version: number;
   boardSpalte: string | undefined;
+  /** Übergeordnete Aufgabe (Sub-Issue/Unteraufgabe, Plane). Gesetzt nur bei createFreieAufgabe mit parentAufgabeId
+   *  — optional, damit die bestehenden Meta-Literale (Seed/Verfahrens-Aufgaben) unverändert bleiben. */
+  parentAufgabeId?: string;
 }
 
 export interface WorkspaceStore<
@@ -461,6 +464,7 @@ export function createWorkspaceStore<T = Record<string, unknown>>(
       sortRank: m.sortRank,
       version: m.version,
       ...(m.boardSpalte ? { boardSpalte: m.boardSpalte } : {}),
+      ...(m.parentAufgabeId ? { parentAufgabeId: m.parentAufgabeId } : {}),
     };
   };
 
@@ -477,6 +481,7 @@ export function createWorkspaceStore<T = Record<string, unknown>>(
     sortRank: m.sortRank,
     version: m.version,
     ...(m.boardSpalte ? { boardSpalte: m.boardSpalte } : {}),
+    ...(m.parentAufgabeId ? { parentAufgabeId: m.parentAufgabeId } : {}),
   });
 
   /** Filter für verfahrens-FREIE Aufgaben (ohne Vorgang): Verfahrens-/Status-Filter schließen sie aus (sie haben
@@ -746,6 +751,9 @@ export function createWorkspaceStore<T = Record<string, unknown>>(
             sortRank: neuerRangAmEnde(meta),
             version: 1,
             boardSpalte: undefined,
+            ...(opts?.parentAufgabeId
+              ? { parentAufgabeId: opts.parentAufgabeId }
+              : {}),
           },
         },
       });

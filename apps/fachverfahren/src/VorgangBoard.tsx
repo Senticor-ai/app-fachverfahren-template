@@ -9,7 +9,7 @@
 // (Priorität/Zuweisung/Rang) tragen kein Gate. Server-Autorität folgt in Phase 3; hier spiegelt der DEV-Store die
 // Guards für die UX.
 import { useMemo, useState } from "react";
-import { Check, MoreHorizontal, PanelRightOpen } from "lucide-react";
+import { Check, ListTree, MoreHorizontal, PanelRightOpen } from "lucide-react";
 import {
   AKTIVITAET_TYP_LABELS,
   AktivitaetsFeed,
@@ -38,9 +38,13 @@ import {
   StatusPill,
   boardSpalten,
   cn,
+  boardKarten,
+  boardWurzeln,
   erlaubteUebergaenge as erlaubteUebergaengeKit,
+  kinderAnzahl,
   raengeFuerEinordnung,
   rankZwischen,
+  unteraufgabenVon,
   type Aufgabe,
   type LeistungConfig,
   type TaskFilter,
@@ -73,6 +77,10 @@ export function VorgangBoard({
   // reaktiv über den Store-Snapshot; PROD: dieselbe Schnittstelle gegen die Server-Routen).
   const [detailId, setDetailId] = useState<string | null>(null);
   const detail = detailId ? workspace.getTask(detailId) : undefined;
+  // Sub-Issues (Unteraufgaben): Eingabe + Fehler beim Anlegen. `createFreieAufgabe` kann in einer nicht-
+  // unterstützten Datenquelle (HTTP-PROD) werfen — im Event-Handler abfangen (keine Error-Boundary).
+  const [subTitel, setSubTitel] = useState("");
+  const [subFehler, setSubFehler] = useState<string | null>(null);
 
   const prioritaeten = workspace.config.prioritaeten;
   const labels = workspace.config.labels;
@@ -145,8 +153,16 @@ export function VorgangBoard({
     [primaryConfig, prioritaeten],
   );
 
-  const alle = workspace.listTasks(filter);
-  const gesamt = workspace.listTasks().length;
+  const alleUngefiltert = workspace.listTasks();
+  // Board zeigt Board-Wurzeln als eigene Karten; Kinder mit SICHTBAREM Parent nur im Detail (kein Doppel-Eintrag).
+  // `boardKarten` promotet aber ein gefiltertes Kind zur eigenen Karte, wenn sein Parent weggefiltert ist — sonst
+  // verschwände eine filter-treffende Unteraufgabe unsichtbar/unerreichbar (z. B. „Nur meine", Kind mir zugewiesen,
+  // Parent nicht). Kind-Anzahl fürs Rollup-Badge aus dem Gesamtbestand.
+  const alle = boardKarten(alleUngefiltert, workspace.listTasks(filter));
+  // Zähler-Bezug = Top-Level-Wurzeln, aber nie kleiner als die sichtbaren Karten (promotete Kinder), damit die
+  // FilterBar nie ein widersprüchliches „X von <X" zeigt.
+  const gesamt = Math.max(boardWurzeln(alleUngefiltert).length, alle.length);
+  const kinder = kinderAnzahl(alleUngefiltert);
   const statusOf = (a: Aufgabe): string | undefined =>
     a.vorgangId
       ? workspace.portFor(a.procedureId)?.get(a.vorgangId)?.status
@@ -564,6 +580,19 @@ export function VorgangBoard({
                                 </Badge>
                               );
                             })}
+                            {(kinder.get(a.id) ?? 0) > 0 ? (
+                              <span
+                                className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-0.5 text-xs text-muted-foreground"
+                                title={`${kinder.get(a.id)} Unteraufgaben`}
+                              >
+                                <ListTree
+                                  aria-hidden="true"
+                                  className="h-3 w-3"
+                                />
+                                {kinder.get(a.id)}
+                                <span className="sr-only"> Unteraufgaben</span>
+                              </span>
+                            ) : null}
                           </div>
                           {a.zugewiesenAn ? (
                             <p className="mt-2 text-xs text-muted-foreground">
@@ -586,7 +615,11 @@ export function VorgangBoard({
       <Sheet
         open={detail !== undefined}
         onOpenChange={(offen) => {
-          if (!offen) setDetailId(null);
+          if (!offen) {
+            setDetailId(null);
+            setSubTitel("");
+            setSubFehler(null);
+          }
         }}
       >
         <SheetContent
@@ -639,6 +672,78 @@ export function VorgangBoard({
                     workspace.entferneBeziehung(detail.id, id)
                   }
                 />
+                {/* Unteraufgaben (Sub-Issues, Plane): Kinder dieser Aufgabe auflisten + eine neue anlegen. Kinder
+                    erscheinen NICHT als eigene Board-Karte, nur hier. `createFreieAufgabe` ist DEV-seitig (der
+                    HTTP-PROD-Pfad wirft — verfahrens-freie Aufgaben brauchen ein nullbares Verfahren im Schema). */}
+                <section aria-label="Unteraufgaben">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Unteraufgaben
+                  </h3>
+                  <ul className="mt-2 flex flex-col gap-1">
+                    {unteraufgabenVon(alleUngefiltert, detail.id).length ===
+                    0 ? (
+                      <li className="text-xs text-muted-foreground">
+                        Keine Unteraufgaben.
+                      </li>
+                    ) : (
+                      unteraufgabenVon(alleUngefiltert, detail.id).map((k) => (
+                        <li key={k.id}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSubTitel("");
+                              setSubFehler(null);
+                              setDetailId(k.id);
+                            }}
+                            className="w-full rounded-md border border-border bg-card px-3 py-1.5 text-left text-sm text-foreground hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            {k.titel}
+                          </button>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const t = subTitel.trim();
+                      if (!t) return;
+                      try {
+                        workspace.createFreieAufgabe(t, {
+                          parentAufgabeId: detail.id,
+                        });
+                        setSubTitel("");
+                        setSubFehler(null);
+                      } catch (err) {
+                        setSubFehler(
+                          err instanceof Error
+                            ? err.message
+                            : "Anlegen fehlgeschlagen.",
+                        );
+                      }
+                    }}
+                    className="mt-2 flex items-center gap-2"
+                  >
+                    <input
+                      value={subTitel}
+                      onChange={(e) => setSubTitel(e.target.value)}
+                      placeholder="Neue Unteraufgabe …"
+                      aria-label="Titel der neuen Unteraufgabe"
+                      className="h-8 flex-1 rounded-md border border-border bg-card px-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                    <Button
+                      type="submit"
+                      size="sm"
+                      variant="outline"
+                      disabled={!subTitel.trim()}
+                    >
+                      Hinzufügen
+                    </Button>
+                  </form>
+                  {subFehler ? (
+                    <p className="mt-1 text-xs text-destructive">{subFehler}</p>
+                  ) : null}
+                </section>
               </div>
             </>
           ) : null}
