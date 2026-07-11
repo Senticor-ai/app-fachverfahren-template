@@ -294,3 +294,81 @@ describe.skipIf(!pgUrl)("transitionCase — Outbox ist ATOMAR (Postgres)", () =>
     expect(after?.version).toBe(1);
   });
 });
+
+// ── Adversariale Mandanten-Isolation (Skalierungsplan #2): ein Mandant darf über KEINE Store-Methode Fälle/Audits
+//    eines ANDEREN Mandanten lesen ODER ändern. Der Store scoped über die (tenant, id)-Schlüssel — diese Tests
+//    beweisen es je Methode + schützen vor Regression (in-DB-Isolation, nicht nur App-WHERE). ──
+for (const impl of impls) {
+  describe.skipIf(!impl.enabled)(
+    `CaseStore — Cross-Tenant-Isolation (adversarial) — ${impl.name}`,
+    () => {
+      let store: CaseStore;
+      beforeAll(() => {
+        store = impl.make();
+      });
+
+      it("kein Lesen/Ändern/Auditieren fremder Mandanten-Fälle (get/list/transition/audit)", async () => {
+        await store.insertCase(
+          macheCase({ tenantId: "t-a", caseId: "x-case-a" }),
+        );
+        await store.insertCase(
+          macheCase({ tenantId: "t-b", caseId: "x-case-b" }),
+        );
+
+        // getCase: t-a bekommt t-b's Fall NICHT (auch nicht über dessen caseId).
+        expect(
+          await store.getCase({ tenantId: "t-a", caseId: "x-case-b" }),
+        ).toBeUndefined();
+        expect(
+          (await store.getCase({ tenantId: "t-b", caseId: "x-case-b" }))
+            ?.caseId,
+        ).toBe("x-case-b");
+
+        // listCases: t-a sieht AUSSCHLIESSLICH eigene Fälle.
+        const listeA = await store.listCases({
+          tenantId: "t-a",
+          authorityId: "b1",
+        });
+        expect(listeA.map((c) => c.caseId)).toContain("x-case-a");
+        expect(listeA.map((c) => c.caseId)).not.toContain("x-case-b");
+        expect(listeA.every((c) => c.tenantId === "t-a")).toBe(true);
+
+        // transitionCase: t-a kann t-b's Fall NICHT übergehen (nicht gefunden → Wurf).
+        await expect(
+          store.transitionCase({
+            tenantId: "t-a",
+            caseId: "x-case-b",
+            expectedVersion: 1,
+            toState: "geprueft",
+            auditEvent: macheAudit("x-case-b", "sb.a", { tenantId: "t-a" }),
+          }),
+        ).rejects.toThrow();
+
+        // t-b macht einen legitimen Übergang → Audit entsteht; t-a sieht dieses Audit NICHT.
+        await store.transitionCase({
+          tenantId: "t-b",
+          caseId: "x-case-b",
+          expectedVersion: 1,
+          toState: "geprueft",
+          auditEvent: macheAudit("x-case-b", "sb.b", { tenantId: "t-b" }),
+        });
+        expect(
+          await store.listAuditEvents({ tenantId: "t-a", caseId: "x-case-b" }),
+        ).toEqual([]);
+        expect(
+          (
+            await store.listAuditEvents({
+              tenantId: "t-b",
+              caseId: "x-case-b",
+            })
+          ).length,
+        ).toBe(1);
+        // t-b's Fall blieb durch t-a's fehlgeschlagenen Versuch unangetastet (genau EIN Übergang).
+        expect(
+          (await store.getCase({ tenantId: "t-b", caseId: "x-case-b" }))
+            ?.version,
+        ).toBe(2);
+      });
+    },
+  );
+}

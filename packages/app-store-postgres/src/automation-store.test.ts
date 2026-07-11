@@ -305,3 +305,52 @@ for (const impl of impls) {
     },
   );
 }
+
+// ── Adversariale Mandanten-Isolation (Skalierungsplan #2): kein Zugriff auf Regeln eines FREMDEN Mandanten. NB:
+//    `claimDueEvents` ist BEWUSST mandanten-ÜBERGREIFEND (EIN Worker bedient alle Mandanten); die Isolation liegt
+//    dort darin, dass die Engine die Regel-Suche mit `event.tenantId` scoped (Engine-Test), nicht im Claim. ──
+for (const impl of impls) {
+  describe.skipIf(!impl.enabled)(
+    `AutomationStore — Cross-Tenant-Isolation (adversarial) — ${impl.name}`,
+    () => {
+      let store: AutomationStore;
+      beforeAll(() => {
+        store = impl.make();
+      });
+
+      it("kein Lesen/Ändern fremder Mandanten-Regeln (get/list/setActive)", async () => {
+        await store.insertRule(
+          macheRegel({ tenantId: "t-a", ruleId: "x-rule-a" }),
+        );
+        await store.insertRule(
+          macheRegel({ tenantId: "t-b", ruleId: "x-rule-b" }),
+        );
+
+        // getRule: t-a bekommt t-b's Regel NICHT.
+        expect(
+          await store.getRule({ tenantId: "t-a", ruleId: "x-rule-b" }),
+        ).toBeUndefined();
+
+        // listRules: t-a sieht AUSSCHLIESSLICH eigene Regeln.
+        const listeA = await store.listRules({ tenantId: "t-a" });
+        expect(listeA.map((r) => r.ruleId)).toContain("x-rule-a");
+        expect(listeA.map((r) => r.ruleId)).not.toContain("x-rule-b");
+        expect(listeA.every((r) => r.tenantId === "t-a")).toBe(true);
+
+        // setRuleActive: t-a kann t-b's Regel NICHT umschalten (nicht gefunden → Wurf).
+        await expect(
+          store.setRuleActive({
+            tenantId: "t-a",
+            ruleId: "x-rule-b",
+            active: false,
+          }),
+        ).rejects.toThrow();
+        // t-b's Regel blieb aktiv (Default).
+        expect(
+          (await store.getRule({ tenantId: "t-b", ruleId: "x-rule-b" }))
+            ?.active,
+        ).toBe(true);
+      });
+    },
+  );
+}

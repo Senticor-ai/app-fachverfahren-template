@@ -446,3 +446,53 @@ for (const impl of impls) {
     });
   });
 }
+
+// ── Adversariale Mandanten-Isolation (Skalierungsplan #2): kein Zugriff auf Aufgaben eines FREMDEN Mandanten. ──
+for (const impl of impls) {
+  describe.skipIf(!impl.enabled)(
+    `TaskStore — Cross-Tenant-Isolation (adversarial) — ${impl.name}`,
+    () => {
+      let store: TaskStore;
+      beforeAll(() => {
+        store = impl.make();
+      });
+
+      it("kein Lesen/Ändern fremder Mandanten-Aufgaben (get/list/patch)", async () => {
+        await store.insertTask(
+          macheTask({ tenantId: "t-a", taskId: "x-task-a" }),
+        );
+        await store.insertTask(
+          macheTask({ tenantId: "t-b", taskId: "x-task-b" }),
+        );
+
+        // getTask: t-a bekommt t-b's Aufgabe NICHT.
+        expect(
+          await store.getTask({ tenantId: "t-a", taskId: "x-task-b" }),
+        ).toBeUndefined();
+
+        // listTasks: t-a sieht AUSSCHLIESSLICH eigene Aufgaben.
+        const listeA = await store.listTasks({
+          tenantId: "t-a",
+          authorityId: "b1",
+        });
+        expect(listeA.map((t) => t.taskId)).toContain("x-task-a");
+        expect(listeA.map((t) => t.taskId)).not.toContain("x-task-b");
+        expect(listeA.every((t) => t.tenantId === "t-a")).toBe(true);
+
+        // patchTask: t-a kann t-b's Aufgabe NICHT ändern (nicht gefunden → Wurf).
+        await expect(
+          store.patchTask({
+            tenantId: "t-a",
+            taskId: "x-task-b",
+            priorityKey: "hoch",
+          }),
+        ).rejects.toThrow();
+        // t-b's Aufgabe blieb unverändert.
+        expect(
+          (await store.getTask({ tenantId: "t-b", taskId: "x-task-b" }))
+            ?.priorityKey,
+        ).toBeNull();
+      });
+    },
+  );
+}

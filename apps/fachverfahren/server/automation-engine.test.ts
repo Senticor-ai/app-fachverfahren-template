@@ -901,3 +901,43 @@ describe("Deadline-Scanner — zeitgetriebener frist-erreicht-Trigger", () => {
     expect(orch?.status).toBe("failed");
   });
 });
+
+describe("automation engine — Mandanten-Isolation (adversarial, Skalierungsplan #2)", () => {
+  it("eine Regel eines FREMDEN Mandanten feuert NICHT auf ein Event (Regel-Suche via event.tenantId)", async () => {
+    const { deps, automationStore } = makeDeps();
+    // `claimDueEvents` ist mandanten-ÜBERGREIFEND (ein Worker); die Isolation entsteht dadurch, dass die Engine die
+    // passenden Regeln mit event.tenantId sucht. Diese Regel gehört Mandant t-b (gleicher Trigger/Verfahren).
+    await automationStore.insertRule({
+      ruleId: "regel-fremd",
+      tenantId: "t-b",
+      authorityId: "b1",
+      procedureId: "leistung",
+      triggerEvent: "beim-eingang",
+      condition: { feld: "$procedureId", op: "==", wert: "leistung" },
+      actions: [{ art: "setze-prioritaet", wert: "hoch" }],
+      requiresFourEyes: false,
+      active: true,
+      createdAt: NOW,
+    });
+    // Das Event gehört Mandant t-a — die t-b-Regel darf NICHT darauf feuern.
+    await automationStore.enqueueEvent({
+      eventId: "evt-ta",
+      tenantId: "t-a",
+      authorityId: "b1",
+      procedureId: "leistung",
+      caseId: null,
+      taskId: null,
+      triggerEvent: "beim-eingang",
+      payload: {},
+      createdAt: NOW,
+      processedAt: null,
+    });
+
+    const res = await processDueAutomationEvents(deps);
+    // Geclaimt, aber die FREMDE Regel feuerte NICHT (mandanten-scopte Regel-Suche) → kein applied.
+    expect(res).toMatchObject({ claimed: 1, applied: 0, deadLettered: 0 });
+    expect(
+      await automationStore.listRuns({ ruleId: "regel-fremd" }),
+    ).toHaveLength(0);
+  });
+});
