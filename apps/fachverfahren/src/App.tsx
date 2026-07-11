@@ -52,10 +52,7 @@ import {
 } from "./store.js";
 import { WorkspaceListe } from "./WorkspaceListe.js";
 import { VorgangBoard } from "./VorgangBoard.js";
-
-// AKTEUR (Person, nicht Rolle): in PROD die angemeldete BundID-Identität. Im DEV-Demo (keine Anmeldung) ein
-// stabiles Pseudonym, damit Vier-Augen greift und die History WER-nachweisbar ist (history[].akteur).
-const AKTEUR = "sb.angemeldet";
+import { AkteurProvider, AkteurWechsler, useAkteur } from "./akteur.js";
 
 // ── Reaktivität: die Bausteine lesen ihren Port synchron. Über diesen Hook re-rendert der Routen-Baum, sobald sich
 //    IRGENDEIN Verfahren ODER die Task-Metadaten ändern — der Workspace-Store bleibt die EINE Quelle. ──
@@ -96,15 +93,19 @@ function Shell({
     if (item.href) navigate(item.href);
   };
   return (
-    <FachverfahrenShell
-      config={config}
-      persona={persona}
-      onPersonaChange={onPersonaChange}
-      {...(activeNavKey ? { activeNavKey } : {})}
-      onNavigate={onNavigate}
-    >
-      {children}
-    </FachverfahrenShell>
+    <>
+      {/* DEV-Identitätsband nur in der Sachbearbeitung — dort greift Vier-Augen (Vorbereiter ≠ Freigeber). */}
+      {persona === "sachbearbeitung" ? <AkteurWechsler /> : null}
+      <FachverfahrenShell
+        config={config}
+        persona={persona}
+        onPersonaChange={onPersonaChange}
+        {...(activeNavKey ? { activeNavKey } : {})}
+        onNavigate={onNavigate}
+      >
+        {children}
+      </FachverfahrenShell>
+    </>
   );
 }
 
@@ -242,6 +243,7 @@ function BuergerBestaetigung(): React.JSX.Element {
 function AmtWorkspace(): React.JSX.Element {
   useStoreVersion();
   const navigate = useNavigate();
+  const akteur = useAkteur();
   const [neuerTitel, setNeuerTitel] = useState("");
   const [anlegeFehler, setAnlegeFehler] = useState<string | null>(null);
   return (
@@ -287,7 +289,7 @@ function AmtWorkspace(): React.JSX.Element {
       </form>
       <WorkspaceListe
         workspace={workspace}
-        aktuellerAkteur={AKTEUR}
+        aktuellerAkteur={akteur}
         onOpen={(procedureId, vorgangId) =>
           navigate(
             `/amt/vorgang/${encodeURIComponent(`${procedureId}::${vorgangId}`)}`,
@@ -302,6 +304,7 @@ function AmtWorkspace(): React.JSX.Element {
 function AmtInbox(): React.JSX.Element {
   useStoreVersion();
   const navigate = useNavigate();
+  const akteur = useAkteur();
   // Im HTTP-Modus liefert acceptInbox die neue Id NICHT synchron (die Annahme ist server-atomar/async) → sie kommt
   // über diesen Haken; im In-Memory-DEV kommt sie synchron als Rückgabewert (unten). Beide Pfade navigieren gleich.
   useEffect(() => {
@@ -326,7 +329,7 @@ function AmtInbox(): React.JSX.Element {
             register: "Register",
           }}
           onAnnehmen={(id) => {
-            const taskId = workspace.acceptInbox(id, AKTEUR);
+            const taskId = workspace.acceptInbox(id, akteur);
             // Nach Annahme direkt in die Prüf-/Entscheidungssicht des neu erzeugten Vorgangs.
             if (taskId) navigate(`/amt/vorgang/${encodeURIComponent(taskId)}`);
           }}
@@ -341,12 +344,13 @@ function AmtInbox(): React.JSX.Element {
 function AmtBoard(): React.JSX.Element {
   useStoreVersion();
   const navigate = useNavigate();
+  const akteur = useAkteur();
   return (
     <Shell persona="sachbearbeitung" activeNavKey="eingang">
       <AmtSubNav />
       <VorgangBoard
         workspace={workspace}
-        aktuellerAkteur={AKTEUR}
+        aktuellerAkteur={akteur}
         onOpen={(procedureId, vorgangId) =>
           navigate(
             `/amt/vorgang/${encodeURIComponent(`${procedureId}::${vorgangId}`)}`,
@@ -403,6 +407,7 @@ function AmtVorgang(): React.JSX.Element {
   useStoreVersion();
   const { id = "" } = useParams();
   const navigate = useNavigate();
+  const akteur = useAkteur();
   // Der Routen-Parameter ist die verfahrens-qualifizierte Aufgaben-Id (`procedureId::vorgangId`) — global eindeutig,
   // daher kein mehrdeutiges `resolveTaskId`. Verfahren + ROHE Vorgangs-Id werden daraus abgeleitet; die
   // Prüf-Sicht arbeitet gegen den Sub-Store des richtigen Verfahrens. Fallback auf das primäre Verfahren
@@ -422,7 +427,7 @@ function AmtVorgang(): React.JSX.Element {
             port={port}
             vorgangId={vorgangId}
             rolle="sachbearbeitung"
-            akteur={AKTEUR}
+            akteur={akteur}
             onClose={() => navigate("/amt")}
           />
           {/* Zusammenarbeit an der Aufgabe: interne Vermerke (append-only), Aktivitäts-Feed, Beziehungen —
@@ -433,7 +438,7 @@ function AmtVorgang(): React.JSX.Element {
                 kommentare={workspace.listKommentare(task.id)}
                 schreibenErlaubt
                 onVermerk={(text) =>
-                  workspace.addKommentar(task.id, text, AKTEUR)
+                  workspace.addKommentar(task.id, text, akteur)
                 }
               />
               <AktivitaetsFeed
@@ -462,7 +467,7 @@ function AmtVorgang(): React.JSX.Element {
                 funktionsName="Priorisierung"
                 // HITL: der Mensch übernimmt → die Priorität wird gesetzt (Metadaten, KEIN Vier-Augen-Gate).
                 onUebernahme={(ergebnis) =>
-                  workspace.setPrioritaet(task.id, ergebnis.wert, AKTEUR)
+                  workspace.setPrioritaet(task.id, ergebnis.wert, akteur)
                 }
               />
             </div>
@@ -716,12 +721,13 @@ function AmtVerfahren(): React.JSX.Element {
  *  (Ihnen zugewiesen · Fristwarnungen), gerendert im generischen NotificationCenter mit lokalem Gelesen-Zustand. */
 function AmtBenachrichtigungen(): React.JSX.Element {
   useStoreVersion();
+  const akteur = useAkteur();
   // „Jetzt" EINMAL beim Mounten festhalten (kein Date.now() im Render → keine Hydration-Diskrepanz, stabile Sortierung).
   const [nowIso] = useState(() => new Date().toISOString());
   const [gelesen, setGelesen] = useState<Set<string>>(new Set());
   const roh = leiteWorkspaceBenachrichtigungen({
     aufgaben: workspace.listTasks(),
-    aktuellerAkteur: AKTEUR,
+    aktuellerAkteur: akteur,
     nowIso,
   });
   const benachrichtigungen = roh.map((b) => ({
@@ -777,7 +783,7 @@ function WorkspaceFehlerToast(): React.JSX.Element | null {
 
 export function App(): React.JSX.Element {
   return (
-    <>
+    <AkteurProvider>
       <WorkspaceFehlerToast />
       <Routes>
         <Route path="/" element={<Navigate to="/buerger" replace />} />
@@ -805,7 +811,7 @@ export function App(): React.JSX.Element {
         <Route path="/aufsicht" element={<Aufsicht />} />
         <Route path="*" element={<Navigate to="/buerger" replace />} />
       </Routes>
-    </>
+    </AkteurProvider>
   );
 }
 

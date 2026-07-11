@@ -233,6 +233,27 @@ export const leistungConfig: LeistungConfig = {
       ki?: { confidence: number; flags: string[] },
     ): Vorgang<MusterAntrag> => {
       const vn = vorgangsnummer();
+      const history: Vorgang<MusterAntrag>["history"] = [
+        {
+          ts: new Date(Date.UTC(2026, 5, 26, 8, 0)).toISOString(),
+          aktion: "Antrag eingegangen",
+          rolle: "buerger",
+          art: "eingang",
+        },
+      ];
+      // Seed-Vorgänge, die BEREITS über „eingegangen" hinaus sind, tragen einen AUFGEZEICHNETEN Vorbereiter
+      // (art:"uebergang" + akteur) — sonst wäre letzterVorbereiter=undefined und ein EINZELNER Akteur dürfte den
+      // Review-Fall ALLEIN festsetzen: die Vier-Augen-Kontrolle (Vorbereiter ≠ Freigeber) griffe auf den Demo-Daten
+      // gar nicht. „sb.eins" ist der Default-DEV-Akteur → die Zweitfreigabe muss durch „sb.zwei" erfolgen.
+      if (status !== "eingegangen") {
+        history.push({
+          ts: new Date(Date.UTC(2026, 5, 26, 8, 30)).toISOString(),
+          aktion: "In Prüfung genommen",
+          rolle: "sachbearbeitung",
+          art: "uebergang",
+          akteur: "sb.eins",
+        });
+      }
       return {
         id: `seed-${vn}`,
         vorgangsnummer: vn,
@@ -244,13 +265,7 @@ export const leistungConfig: LeistungConfig = {
         berechnung: berechneDemo(antragsdaten),
         ki: ki ?? { confidence: 0.94, flags: [] },
         nachweise: [],
-        history: [
-          {
-            ts: new Date(Date.UTC(2026, 5, 26, 8, 0)).toISOString(),
-            aktion: "Antrag eingegangen",
-            rolle: "buerger",
-          },
-        ],
+        history,
       };
     };
     return [
