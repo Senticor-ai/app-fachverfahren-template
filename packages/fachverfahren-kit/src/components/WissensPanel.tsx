@@ -7,6 +7,7 @@ import { BookOpen } from "lucide-react";
 
 import type { WissensArtikel } from "../types.js";
 import { cn } from "../lib/cn.js";
+import { filtereWissen, hatHierarchie, wissensBaum } from "../lib/wissen.js";
 import { EmptyState } from "./EmptyState.js";
 import { MarkdownView } from "./MarkdownView.js";
 
@@ -34,9 +35,24 @@ export function WissensPanel({
   titel = "Wissensbasis",
 }: WissensPanelProps): ReactElement {
   const [aktivId, setAktivId] = useState<string>(artikel[0]?.id ?? "");
-  const aktiv = artikel.find((a) => a.id === aktivId) ?? artikel[0];
+  const [suche, setSuche] = useState("");
+  const suchend = suche.trim() !== "";
 
-  // Nach Kategorie gruppieren (stabile Einfüge-Reihenfolge).
+  const gefiltert = useMemo(
+    () => filtereWissen(artikel, suche),
+    [artikel, suche],
+  );
+  // Beim Suchen dem ersten Treffer folgen, wenn der aktuell gewählte Artikel nicht (mehr) im Filter ist.
+  const aktivKandidat = artikel.find((a) => a.id === aktivId) ?? artikel[0];
+  const aktiv =
+    suchend && !gefiltert.some((a) => a.id === aktivId)
+      ? (gefiltert[0] ?? aktivKandidat)
+      : aktivKandidat;
+
+  const benutzeBaum = useMemo(() => hatHierarchie(artikel), [artikel]);
+  const baum = useMemo(() => wissensBaum(artikel), [artikel]);
+
+  // Nach Kategorie gruppieren (stabile Einfüge-Reihenfolge) — der flache Fallback ohne Hierarchie.
   const gruppen = useMemo(() => {
     const m = new Map<string, WissensArtikel[]>();
     for (const a of artikel) {
@@ -47,6 +63,31 @@ export function WissensPanel({
     }
     return [...m.entries()];
   }, [artikel]);
+
+  const artikelButton = (a: WissensArtikel, tiefe: number): ReactElement => {
+    const aktivEintrag = a.id === (aktiv?.id ?? "");
+    return (
+      <li key={a.id}>
+        <button
+          type="button"
+          onClick={() => setAktivId(a.id)}
+          aria-current={aktivEintrag ? "true" : undefined}
+          style={
+            tiefe > 0 ? { paddingLeft: `${0.5 + tiefe * 0.85}rem` } : undefined
+          }
+          className={cn(
+            "w-full rounded-md px-2 py-1.5 text-left text-sm transition-colors ease-out motion-reduce:transition-none",
+            "outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+            aktivEintrag
+              ? "bg-primary text-primary-foreground"
+              : "text-foreground hover:bg-secondary/60",
+          )}
+        >
+          {a.titel}
+        </button>
+      </li>
+    );
+  };
 
   if (artikel.length === 0) {
     return (
@@ -71,38 +112,40 @@ export function WissensPanel({
       </header>
 
       <div className="grid gap-6 md:grid-cols-[16rem_1fr]">
-        {/* Master: gruppierte Navigation */}
-        <nav aria-label="Wissensartikel" className="space-y-4">
-          {gruppen.map(([kategorie, liste]) => (
-            <div key={kategorie}>
-              <h2 className="mb-1 px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {kategorie}
-              </h2>
-              <ul className="space-y-0.5">
-                {liste.map((a) => {
-                  const aktivEintrag = a.id === (aktiv?.id ?? "");
-                  return (
-                    <li key={a.id}>
-                      <button
-                        type="button"
-                        onClick={() => setAktivId(a.id)}
-                        aria-current={aktivEintrag ? "true" : undefined}
-                        className={cn(
-                          "w-full rounded-md px-2 py-1.5 text-left text-sm transition-colors ease-out motion-reduce:transition-none",
-                          "outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-                          aktivEintrag
-                            ? "bg-primary text-primary-foreground"
-                            : "text-foreground hover:bg-secondary/60",
-                        )}
-                      >
-                        {a.titel}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
+        {/* Master: Suche + Navigation (Suchtreffer flach · sonst Baum bei Hierarchie · sonst Kategorie-Gruppen) */}
+        <nav aria-label="Wissensartikel" className="space-y-3">
+          <input
+            type="search"
+            value={suche}
+            onChange={(e) => setSuche(e.target.value)}
+            placeholder="Wissen durchsuchen …"
+            aria-label="Wissensbasis durchsuchen"
+            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+          />
+          {gefiltert.length === 0 ? (
+            <p className="px-2 text-sm text-muted-foreground" role="status">
+              Keine Treffer für „{suche.trim()}".
+            </p>
+          ) : suchend ? (
+            <ul className="space-y-0.5">
+              {gefiltert.map((a) => artikelButton(a, 0))}
+            </ul>
+          ) : benutzeBaum ? (
+            <ul className="space-y-0.5">
+              {baum.map(({ artikel: a, tiefe }) => artikelButton(a, tiefe))}
+            </ul>
+          ) : (
+            gruppen.map(([kategorie, liste]) => (
+              <div key={kategorie}>
+                <h2 className="mb-1 px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {kategorie}
+                </h2>
+                <ul className="space-y-0.5">
+                  {liste.map((a) => artikelButton(a, 0))}
+                </ul>
+              </div>
+            ))
+          )}
         </nav>
 
         {/* Detail: der gewählte Artikel */}

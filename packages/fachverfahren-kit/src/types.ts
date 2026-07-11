@@ -1036,6 +1036,9 @@ export interface WissensArtikel {
   kategorie?: string;
   /** Optionaler ISO-Zeitstempel der letzten Änderung. */
   standIso?: string;
+  /** Optionale Eltern-Artikel-Id für eine MEHRSTUFIGE Hierarchie (Baum). Fehlt sie bei allen Artikeln, bleibt es
+   *  bei der flachen `kategorie`-Gruppierung (rückwärtskompatibel). */
+  parentId?: string;
 }
 
 /** Die WORKSPACE-KONFIGURATION — die neue, N-wertige „Naht": EIN Sachbearbeiter-Workspace über MEHRERE Verfahren,

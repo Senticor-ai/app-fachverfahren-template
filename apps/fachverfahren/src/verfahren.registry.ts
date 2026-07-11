@@ -115,6 +115,20 @@ export const workspaceConfig: WorkspaceConfig = {
       ].join("\n"),
     },
     {
+      id: "handbuch.board",
+      parentId: "handbuch.arbeitsvorrat",
+      kategorie: "Handbuch",
+      titel: "Das Board (Kanban)",
+      standIso: "2026-07-10T00:00:00.000Z",
+      markdown: [
+        "# Board",
+        "",
+        "Das **Board** zeigt die Aufgaben als Kanban nach **Status**. Karten lassen sich per **Drag&Drop** ODER",
+        "vollständig per **Tastatur-Aktionsmenü** verschieben (BITV-konform). Ein Board-Move ändert **nie** den",
+        "fachlichen Status — dafür ist die geprüfte Entscheidung zuständig.",
+      ].join("\n"),
+    },
+    {
       id: "prozesse.vier-augen",
       kategorie: "Prozesse",
       titel: "Vier-Augen-Prinzip",
