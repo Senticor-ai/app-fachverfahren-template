@@ -9,10 +9,12 @@
 // server-AUTORITATIV (kein optimistisches Umschreiben — der Server prüft Rolle/Vier-Augen/Locking und darf ablehnen;
 // erst die Antwort aktualisiert den Cache).
 //
-// GRENZE (ehrlich benannt): `/api/cases` liefert den Fall OHNE strukturierte Antragsdaten (nur `state`), daher ist der
-// `portFor().get()`-`Vorgang` eine STATUS-Projektion — genug für die verfahrensübergreifende Liste/Board, aber die
-// vertiefte Prüfsicht (ReviewWorkspace) und der Bürger-Antrag (`einreichen`) über HTTP sind Folgeschritte. Verfahrens-
-// freie Aufgaben (`createFreieAufgabe`) sind server-seitig nicht darstellbar (AppTask.procedure_id ist NOT NULL).
+// ANTRAGSDATEN: `GET /api/cases` (Liste) liefert nur `state`, daher ist der Fall-Cache initial eine STATUS-Projektion
+// (genug für Liste/Board). `portFor().get()` lädt die Antragsdaten LAZY nach (`GET /api/cases/:id` rekonstruiert sie
+// server-seitig aus dem Wurzel-Audit), sodass die vertiefte Prüfsicht (ReviewWorkspace) sie über HTTP zeigt.
+// GRENZE (ehrlich benannt): `nachweise`/`history`/`berechnung` am Vorgang bleiben über HTTP leer (die API liefert sie
+// nicht strukturiert) und der Bürger-Antrag (`einreichen`) ist ein Folgeschritt. Verfahrens-freie Aufgaben
+// (`createFreieAufgabe`) sind server-seitig nicht darstellbar (AppTask.procedure_id ist NOT NULL).
 import type {
   Aufgabe,
   AufgabeAktivitaet,
