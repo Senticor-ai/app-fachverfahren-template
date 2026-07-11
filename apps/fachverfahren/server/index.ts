@@ -366,32 +366,52 @@ export function assertHeaderAuthAllowed(env: NodeJS.ProcessEnv): void {
 export async function buildDomainApiFromEnv(
   env: NodeJS.ProcessEnv,
 ): Promise<DomainApiDeps | undefined> {
-  const contractPath = env["APP_LEISTUNG_CONTRACT"];
-  if (!contractPath) return undefined;
-  let contract: {
+  // „Eine Behörde führt N Verfahren": `APP_LEISTUNG_CONTRACT` ist eine (komma-separierte) Liste von Contract-Pfaden.
+  // Ein einzelner Pfad (ohne Komma) bleibt unverändert gültig — rückwärtskompatibel.
+  const contractPaths = (env["APP_LEISTUNG_CONTRACT"] ?? "")
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (contractPaths.length === 0) return undefined;
+  type Contract = {
     id?: string;
     statusMachine?: Parameters<
       typeof catalogFromStatusMachines
     >[0][number]["statusMachine"] & { initial?: string };
   };
-  try {
-    contract = JSON.parse(await readFile(contractPath, "utf8"));
-  } catch {
-    return undefined;
+  const contracts: {
+    id: string;
+    statusMachine: NonNullable<Contract["statusMachine"]>;
+  }[] = [];
+  for (const pfad of contractPaths) {
+    let contract: Contract;
+    try {
+      contract = JSON.parse(await readFile(pfad, "utf8"));
+    } catch {
+      continue; // unlesbaren/defekten Contract überspringen — die übrigen Verfahren bleiben nutzbar
+    }
+    if (contract.id && contract.statusMachine)
+      contracts.push({
+        id: contract.id,
+        statusMachine: contract.statusMachine,
+      });
   }
-  if (!contract.id || !contract.statusMachine) return undefined;
+  if (contracts.length === 0) return undefined;
   // Hinweis: die Header-Auth-Sperre (`assertHeaderAuthAllowed`) wird NICHT hier geprüft, sondern erst beim Verdrahten
   // des HTTP-Servers (`startRuntime`). So triggert der reine Automations-WORKER (der diese Deps nutzt, aber KEINE
   // Session auflöst / keinen HTTP-Traffic serviert) die HTTP-spezifische Auth-Policy nicht.
   const procedureVersion = env["APP_PROCEDURE_VERSION"] ?? "1";
-  const catalog = catalogFromStatusMachines([
-    {
-      procedureId: contract.id,
+  // Katalog aus ALLEN Verfahren der Behörde (nicht nur einem) — server-autoritativ, je procedureId@version isoliert.
+  const catalog = catalogFromStatusMachines(
+    contracts.map((c) => ({
+      procedureId: c.id,
       procedureVersion,
-      statusMachine: contract.statusMachine,
-    },
-  ]);
-  const initialState = contract.statusMachine.initial;
+      statusMachine: c.statusMachine,
+    })),
+  );
+  const initialStates = new Map(
+    contracts.map((c) => [c.id, c.statusMachine.initial] as const),
+  );
   // Automations-Store ZUERST: die In-Memory-Stores teilen GENAU DIESE Instanz, damit ein in-TX emittiertes Event in
   // demselben Store landet, aus dem die Engine via `claimDueEvents` liest (Postgres schreibt ohnehin in-TX in die DB).
   const automationStore =
@@ -417,8 +437,7 @@ export async function buildDomainApiFromEnv(
     catalog,
     resolveSession: headerSession,
     procedureVersion,
-    procedureInitialState: (procedureId) =>
-      procedureId === contract.id ? initialState : undefined,
+    procedureInitialState: (procedureId) => initialStates.get(procedureId),
   };
 }
 

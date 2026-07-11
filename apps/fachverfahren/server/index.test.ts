@@ -318,6 +318,76 @@ describe("fachverfahren runtime", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it("baut den Katalog aus MEHREREN Verfahren (komma-separierte Contracts) — je procedureId isoliert", async () => {
+    const dir = join(tmpdir(), `fv-multi-${Date.now()}-${randomSuffix()}`);
+    await mkdir(dir, { recursive: true });
+    const pA = join(dir, "a.contract.json");
+    const pB = join(dir, "b.contract.json");
+    await writeFile(
+      pA,
+      JSON.stringify({
+        id: "verfahren-a",
+        statusMachine: {
+          initial: "eingegangen",
+          states: [{ key: "eingegangen" }, { key: "a-final", terminal: true }],
+          transitions: [{ from: "eingegangen", to: "a-final", rollen: ["sb"] }],
+        },
+      }),
+    );
+    await writeFile(
+      pB,
+      JSON.stringify({
+        id: "verfahren-b",
+        statusMachine: {
+          initial: "neu",
+          states: [{ key: "neu" }, { key: "b-final", terminal: true }],
+          transitions: [
+            { from: "neu", to: "b-final", rollen: ["sb"], vierAugen: true },
+          ],
+        },
+      }),
+    );
+    try {
+      const deps = await buildDomainApiFromEnv({
+        APP_LEISTUNG_CONTRACT: `${pA},${pB}`,
+      } as NodeJS.ProcessEnv);
+      expect(deps).toBeDefined();
+      // Beide Verfahren im Katalog, je isoliert nach procedureId.
+      const tA = deps!.catalog.transitionsFor("verfahren-a", "1");
+      const tB = deps!.catalog.transitionsFor("verfahren-b", "1");
+      expect(tA.map((t) => t.action)).toEqual(["a-final"]);
+      expect(tB.map((t) => t.action)).toEqual(["b-final"]);
+      // Vier-Augen nur bei Verfahren B (keine Vermischung).
+      expect(tA[0]?.requiresFourEyes).toBeUndefined();
+      expect(tB[0]?.requiresFourEyes).toBe(true);
+      // Initial-States je Verfahren; unbekanntes Verfahren → undefined.
+      expect(deps!.procedureInitialState?.("verfahren-a", "1")).toBe(
+        "eingegangen",
+      );
+      expect(deps!.procedureInitialState?.("verfahren-b", "1")).toBe("neu");
+      expect(deps!.procedureInitialState?.("unbekannt", "1")).toBeUndefined();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("bleibt rückwärtskompatibel: ein einzelner Contract-Pfad (ohne Komma) liefert genau ein Verfahren", async () => {
+    const { path, dir } = await writeContract();
+    try {
+      const deps = await buildDomainApiFromEnv({
+        APP_LEISTUNG_CONTRACT: path,
+      } as NodeJS.ProcessEnv);
+      expect(
+        deps!.catalog.transitionsFor("leistung-test", "1").map((t) => t.action),
+      ).toEqual(["entschieden"]);
+      expect(deps!.procedureInitialState?.("leistung-test", "1")).toBe(
+        "eingegangen",
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 async function createStaticDir(): Promise<string> {
