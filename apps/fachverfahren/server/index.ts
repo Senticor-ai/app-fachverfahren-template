@@ -13,10 +13,12 @@ import {
   createActorRoleStoreFromEnv,
   createAutomationStoreFromEnv,
   createCaseStoreFromEnv,
+  createNotificationStoreFromEnv,
   createTaskStoreFromEnv,
   InMemoryActorRoleStore,
   InMemoryAutomationStore,
   InMemoryCaseStore,
+  InMemoryNotificationStore,
   InMemoryTaskStore,
 } from "@senticor/app-store-postgres";
 import {
@@ -428,6 +430,10 @@ export async function buildDomainApiFromEnv(
   // gegen einen echten LLM-Adapter (derselbe `KiAssistPort`). KI bleibt strukturell assistiv.
   const actorRoleStore =
     createActorRoleStoreFromEnv(env) ?? new InMemoryActorRoleStore();
+  // Benachrichtigungs-Store (#18): vom Notification-Projektor (2. Fan-out-Backend) gespeist, von /api/notifications
+  // gelesen. In-Memory-Default teilt den Prozess; PROD nutzt den geteilten Postgres-Store.
+  const notificationStore =
+    createNotificationStoreFromEnv(env) ?? new InMemoryNotificationStore();
   const aiAssist = new HeuristicKiAssist();
   // Mandanten-Allowlist dieses Deployments (komma-separiert). Gesetzt ⇒ Tenant-Pinning (fail-closed, 403 bei
   // fremdem tenantId); leer/unset ⇒ keine Einschränkung (rückwärtskompatibel).
@@ -439,6 +445,7 @@ export async function buildDomainApiFromEnv(
     caseStore,
     taskStore,
     automationStore,
+    notificationStore,
     actorRoleStore,
     aiAssist,
     catalog,

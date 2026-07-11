@@ -12,6 +12,7 @@ import type {
   AppTask,
   AutomationStore,
   CaseStore,
+  NotificationStore,
   TaskStore,
 } from "@senticor/app-store-postgres";
 import {
@@ -49,6 +50,9 @@ export interface DomainApiDeps {
   taskStore?: TaskStore;
   /** OPTIONAL — die Automations-Datenschicht (Regeln/Outbox/Läufe). Fehlt sie, gibt es keine /api/automations-Routen. */
   automationStore?: AutomationStore;
+  /** OPTIONAL — die Benachrichtigungs-Datenschicht (persistierte Meldungen, vom Notification-Projektor #18 gespeist).
+   *  Fehlt sie, gibt es keine /api/notifications-Routen (der Client fällt auf abgeleitete Meldungen zurück). */
+  notificationStore?: NotificationStore;
   /** OPTIONAL — die KI-Assistenz-Naht. Fehlt sie, gibt es keine /api/tasks/:id/ai-Routen. */
   aiAssist?: KiAssistPort;
   /** OPTIONAL — der Zuständigkeits-Lesepfad (app_actor_roles). Für die KI-Zuweisungsprüfung. */
@@ -547,6 +551,50 @@ export function registerDomainApi(
   const automationStore = deps.automationStore;
   if (automationStore) {
     registerAutomationRoutes(app, deps, automationStore, now, newId);
+  }
+
+  // ── Persistierte Benachrichtigungen (#18): sitzungs-/mandanten-scoped lesen + gelesen markieren. Der Scope kommt
+  //    NUR aus der Server-Session; gespeist vom Notification-Projektor (2. Fan-out-Backend). ──
+  const notificationStore = deps.notificationStore;
+  if (notificationStore) {
+    app.get<{ Querystring: { unread?: string } }>(
+      "/api/notifications",
+      async (request, reply) => {
+        const session = requireSession(deps, request, reply);
+        if (!session) return reply;
+        if (!session.permissions.includes("inbox.read")) {
+          return reply.code(403).header("Cache-Control", NO_STORE).send({
+            error: "forbidden",
+            reason: "missing permission inbox.read",
+          });
+        }
+        const notifications = await notificationStore.listNotifications({
+          tenantId: session.tenantId,
+          ...(request.query.unread === "true" ? { unreadOnly: true } : {}),
+        });
+        return reply.header("Cache-Control", NO_STORE).send({ notifications });
+      },
+    );
+
+    app.post<{ Params: { id: string } }>(
+      "/api/notifications/:id/read",
+      async (request, reply) => {
+        const session = requireSession(deps, request, reply);
+        if (!session) return reply;
+        if (!session.permissions.includes("inbox.read")) {
+          return reply.code(403).header("Cache-Control", NO_STORE).send({
+            error: "forbidden",
+            reason: "missing permission inbox.read",
+          });
+        }
+        // markRead ist mandanten-scoped + idempotent (fremde/unbekannte id ⇒ no-op) → immer 204.
+        await notificationStore.markRead({
+          tenantId: session.tenantId,
+          notificationId: request.params.id,
+        });
+        return reply.code(204).header("Cache-Control", NO_STORE).send();
+      },
+    );
   }
 
   // ── Management-Ebene: Aufgaben/Board + Triage-Inbox (nur wenn ein taskStore konfiguriert ist) ──

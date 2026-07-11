@@ -34,6 +34,7 @@ export type {
   ListRulesQuery,
 } from "./automation-store.js";
 export {
+  createNotificationStoreFromEnv,
   InMemoryNotificationStore,
   PostgresNotificationStore,
 } from "./notification-store.js";

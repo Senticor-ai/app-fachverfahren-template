@@ -182,6 +182,15 @@ interface NotificationRow extends Record<string, unknown> {
   created_at: Date | string;
 }
 
+/** Baut den Notification-Store aus der Umgebung: Postgres (geteilt, PROD) falls `APP_PG_URL`/`APP_PG_DIRECT_URL`
+ *  gesetzt, sonst `undefined` (der Aufrufer fällt auf den In-Memory-Store zurück — analog `createAutomationStoreFromEnv`). */
+export function createNotificationStoreFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): NotificationStore | undefined {
+  const url = env["APP_PG_URL"] ?? env["APP_PG_DIRECT_URL"];
+  return url ? new PostgresNotificationStore(url) : undefined;
+}
+
 function notificationFromRow(r: NotificationRow): AppNotification {
   return {
     notificationId: r.notification_id,

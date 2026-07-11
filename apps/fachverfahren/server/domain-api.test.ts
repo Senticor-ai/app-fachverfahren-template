@@ -3,12 +3,15 @@ import fastify, { type FastifyInstance } from "fastify";
 import {
   type AppCase,
   type AppIntakeItem,
+  type AppNotification,
   type AppTask,
   type AutomationStore,
   type CaseStore,
+  type NotificationStore,
   type TaskStore,
   InMemoryAutomationStore,
   InMemoryCaseStore,
+  InMemoryNotificationStore,
   InMemoryTaskStore,
   PostgresCaseStore,
   PostgresTaskStore,
@@ -1388,5 +1391,114 @@ describe("Domain-API KI-Assistenz (HTTP inject)", () => {
     const ki = activity.find((a) => a.activityType === "task.ki-uebernommen");
     expect(ki?.payload).toMatchObject({ marking: "ki-vorschlag" });
     await app.close();
+  });
+});
+
+describe("/api/notifications (#18) — persistierte Meldungen, sitzungs-/mandanten-scoped", () => {
+  function appMitNotifs(notificationStore: NotificationStore): FastifyInstance {
+    const app = fastify({ logger: false });
+    registerDomainApi(app, {
+      caseStore: new InMemoryCaseStore(),
+      catalog,
+      resolveSession: headerSession,
+      now: () => "2026-06-01T00:00:00.000Z",
+      newAuditId: uid,
+      notificationStore,
+    });
+    return app;
+  }
+
+  function macheNotif(over: Partial<AppNotification> = {}): AppNotification {
+    return {
+      notificationId: `notif-${uid()}`,
+      tenantId: "t1",
+      authorityId: "b1",
+      recipientActorId: null,
+      eventType: "case.eingegangen",
+      title: "Neuer Eingang",
+      body: "Ein Vorgang ist eingegangen.",
+      caseId: "c1",
+      taskId: null,
+      read: false,
+      createdAt: "2026-06-01T00:00:00.000Z",
+      ...over,
+    };
+  }
+
+  it("GET listet NUR die eigenen (mandanten-scoped); ?unread filtert; POST :id/read markiert", async () => {
+    const store = new InMemoryNotificationStore();
+    await store.insertNotification(macheNotif({ notificationId: "n1" }));
+    // Fremder Mandant — darf NICHT erscheinen.
+    await store.insertNotification(
+      macheNotif({ notificationId: "n2", tenantId: "fremd" }),
+    );
+    const app = appMitNotifs(store);
+    try {
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/notifications",
+        headers: SB("sb.a", "inbox.read"),
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as {
+        notifications: { notificationId: string }[];
+      };
+      expect(body.notifications.map((n) => n.notificationId)).toEqual(["n1"]);
+
+      // Gelesen markieren → 204.
+      const read = await app.inject({
+        method: "POST",
+        url: "/api/notifications/n1/read",
+        headers: SB("sb.a", "inbox.read"),
+      });
+      expect(read.statusCode).toBe(204);
+
+      // ?unread=true → jetzt leer.
+      const unread = await app.inject({
+        method: "GET",
+        url: "/api/notifications?unread=true",
+        headers: SB("sb.a", "inbox.read"),
+      });
+      expect(
+        (unread.json() as { notifications: unknown[] }).notifications,
+      ).toHaveLength(0);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("403 ohne inbox.read-Berechtigung", async () => {
+    const app = appMitNotifs(new InMemoryNotificationStore());
+    try {
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/notifications",
+        headers: SB("sb.a", "case.read"),
+      });
+      expect(res.statusCode).toBe(403);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("keine /api/notifications-Route ohne notificationStore (404)", async () => {
+    const app = fastify({ logger: false });
+    registerDomainApi(app, {
+      caseStore: new InMemoryCaseStore(),
+      catalog,
+      resolveSession: headerSession,
+      now: () => "2026-06-01T00:00:00.000Z",
+      newAuditId: uid,
+    });
+    try {
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/notifications",
+        headers: SB("sb.a", "inbox.read"),
+      });
+      expect(res.statusCode).toBe(404);
+    } finally {
+      await app.close();
+    }
   });
 });
