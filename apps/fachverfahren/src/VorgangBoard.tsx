@@ -31,6 +31,7 @@ import {
   boardSpalten,
   cn,
   erlaubteUebergaenge as erlaubteUebergaengeKit,
+  raengeFuerEinordnung,
   rankZwischen,
   type Aufgabe,
   type LeistungConfig,
@@ -141,15 +142,19 @@ export function VorgangBoard({
   const zielLabel = (a: Aufgabe, statusKey: string): string =>
     statesOf(a).find((s) => s.key === statusKey)?.label ?? statusKey;
 
-  /** Rang neu setzen, um `a` VOR `ziel` (oder ans Ende `zielKarten`) einzuordnen (Reihenfolge in derselben Spalte). */
+  /** Rang neu setzen, um `a` VOR der Karte `vorZielId` (oder ans Ende, `null`) in `zielKarten` einzuordnen. Nutzt
+   *  die reine Kit-Funktion `raengeFuerEinordnung` (entfernt `a` und nimmt die TATSÄCHLICHEN Nachbarn — kein
+   *  Off-by-one aus der Voll-Liste). Rein-defensiv: rankZwischen kann bei zu dichten Nachbarn werfen → Meldung. */
   const ordneEin = (
     a: Aufgabe,
     zielKarten: Aufgabe[],
-    vorIndex: number,
+    vorZielId: string | null,
   ): void => {
-    const ohneMich = zielKarten.filter((k) => k.id !== a.id);
-    const vorher = ohneMich[vorIndex - 1]?.sortRank;
-    const nachher = ohneMich[vorIndex]?.sortRank;
+    const { vorher, nachher } = raengeFuerEinordnung(
+      zielKarten,
+      a.id,
+      vorZielId,
+    );
     try {
       const rang = rankZwischen(vorher, nachher);
       workspace.move(a.id, a.boardSpalte, rang, a.version);
@@ -167,12 +172,8 @@ export function VorgangBoard({
     if (!a || spalteKey === "__weitere") return;
     const vonStatus = statusOf(a);
     if (vonStatus === spalteKey) {
-      // Gleiche Spalte, leerer Bereich → ans Ende.
-      ordneEin(
-        a,
-        jeSpalte.get(spalteKey) ?? [],
-        (jeSpalte.get(spalteKey) ?? []).length,
-      );
+      // Gleiche Spalte, leerer Bereich → ans Ende (vorZielId = null).
+      ordneEin(a, jeSpalte.get(spalteKey) ?? [], null);
     } else {
       versucheUebergang(a, spalteKey);
     }
@@ -190,9 +191,9 @@ export function VorgangBoard({
     const vonStatus = statusOf(a);
     if (!zielStatus) return;
     if (zielStatus === vonStatus) {
-      const karten = jeSpalte.get(inSpalte(zielStatus)) ?? [];
-      const idx = karten.findIndex((k) => k.id === ziel.id);
-      ordneEin(a, karten, idx);
+      // Drop AUF eine Karte → `a` VOR diese Zielkarte einordnen (die Kit-Funktion rechnet den Index korrekt aus
+      // der Liste OHNE `a` — früher übergab dieser Aufruf den Voll-Listen-Index und ordnete abwärts 1 zu tief ein).
+      ordneEin(a, jeSpalte.get(inSpalte(zielStatus)) ?? [], ziel.id);
     } else {
       versucheUebergang(a, zielStatus);
     }
@@ -203,25 +204,14 @@ export function VorgangBoard({
     const spalte = inSpalte(statusOf(a) ?? "__weitere");
     const karten = jeSpalte.get(spalte) ?? [];
     const idx = karten.findIndex((k) => k.id === a.id);
+    if (idx < 0) return;
     const zielIdx = idx + richtung;
     if (zielIdx < 0 || zielIdx >= karten.length) return;
-    // Karte an die Zielposition setzen (Rang zwischen die dortigen Nachbarn).
-    const ohneMich = karten.filter((k) => k.id !== a.id);
-    const einfuegeIndex = richtung === -1 ? idx - 1 : idx + 1;
-    const vorher = ohneMich[einfuegeIndex - 1]?.sortRank;
-    const nachher = ohneMich[einfuegeIndex]?.sortRank;
-    try {
-      workspace.move(
-        a.id,
-        a.boardSpalte,
-        rankZwischen(vorher, nachher),
-        a.version,
-      );
-    } catch (e) {
-      setMeldung(
-        e instanceof Error ? e.message : "Verschieben fehlgeschlagen.",
-      );
-    }
+    // „nach oben" → vor den unmittelbaren Vorgänger; „nach unten" → vor die Karte ZWEI Positionen weiter (bzw. ans
+    // Ende, wenn `a` vorletzt ist). Dieselbe eindeutige `vorZielId`-Semantik wie beim Drop → eine Einordnungs-Wahrheit.
+    const vorZielId =
+      (richtung === -1 ? karten[idx - 1] : karten[idx + 2])?.id ?? null;
+    ordneEin(a, karten, vorZielId);
   };
 
   return (

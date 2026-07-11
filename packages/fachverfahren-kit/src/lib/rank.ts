@@ -81,6 +81,35 @@ export function rangVergleich(a: string, b: string): number {
 }
 
 /**
+ * Berechnet die Nachbar-Ränge, um eine bewegte Karte in eine rang-sortierte Spaltenliste einzuordnen — die EINE
+ * Wahrheit fürs Board-Neuordnen (Drop-auf-Karte, Drop-auf-Spaltenende, Tastatur „nach oben/unten").
+ *
+ * `sortierte` ist die rang-sortierte Liste und ENTHÄLT die bewegte Karte selbst; sie wird ZUERST entfernt, damit die
+ * Nachbarn aus den TATSÄCHLICHEN künftigen Nachbarn stammen (nicht aus der Voll-Liste inkl. der bewegten Karte —
+ * genau diese Index-Verschiebung war die Off-by-one-Wurzel: beim Abwärtsziehen rutschte das Ziel um 1). `vorZielId`
+ * benennt die Karte, VOR die eingeordnet wird; `null` ⇒ ans Ende. Ist das Ziel nicht (mehr) vorhanden ⇒ ans Ende.
+ * Rein. Das Ergebnis {vorher, nachher} geht direkt in `rankZwischen`.
+ */
+export function raengeFuerEinordnung(
+  sortierte: readonly { id: string; sortRank: string }[],
+  bewegteId: string,
+  vorZielId: string | null,
+): { vorher?: string; nachher?: string } {
+  const ohneMich = sortierte.filter((k) => k.id !== bewegteId);
+  const zielIndex =
+    vorZielId === null
+      ? ohneMich.length
+      : ohneMich.findIndex((k) => k.id === vorZielId);
+  const i = zielIndex < 0 ? ohneMich.length : zielIndex;
+  const result: { vorher?: string; nachher?: string } = {};
+  const vorher = ohneMich[i - 1]?.sortRank;
+  const nachher = ohneMich[i]?.sortRank;
+  if (vorher !== undefined) result.vorher = vorher;
+  if (nachher !== undefined) result.nachher = nachher;
+  return result;
+}
+
+/**
  * Erzeugt `anzahl` aufsteigend geordnete Ränge (z. B. um Seed-Aufgaben eine Startordnung zu geben). Rein.
  */
 export function verteilteRaenge(anzahl: number): string[] {

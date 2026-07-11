@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { rankZwischen, verteilteRaenge, RANG_DIGITS } from "./rank.js";
+import {
+  raengeFuerEinordnung,
+  rankZwischen,
+  verteilteRaenge,
+  RANG_DIGITS,
+} from "./rank.js";
 
 describe("rankZwischen — reine Fractional-Index-Ordnung (lexikografisch)", () => {
   it("liefert bei fehlenden Grenzen einen mittleren Anker-Rang", () => {
@@ -71,6 +76,58 @@ describe("rankZwischen — reine Fractional-Index-Ordnung (lexikografisch)", () 
       expect(mid < hi).toBe(true);
       lo = mid; // immer weiter nach oben rücken — bleibt < hi
     }
+  });
+});
+
+describe("raengeFuerEinordnung — Board-Neuordnen ohne Off-by-one", () => {
+  const karten = [
+    { id: "T1", sortRank: "1" },
+    { id: "T2", sortRank: "2" },
+    { id: "T3", sortRank: "3" },
+    { id: "T4", sortRank: "4" },
+  ];
+
+  it("ABWÄRTS gezogene Karte landet VOR der Zielkarte (nicht dahinter)", () => {
+    // Regression: T1 auf T3 fallen lassen → T1 zwischen T2 und T3 (vorher T2, nachher T3). Früher rutschte T1
+    // wegen des Voll-Listen-Index zwischen T3 und T4 (eine Position zu tief).
+    expect(raengeFuerEinordnung(karten, "T1", "T3")).toEqual({
+      vorher: "2",
+      nachher: "3",
+    });
+  });
+
+  it("AUFWÄRTS gezogene Karte landet ebenfalls vor der Zielkarte", () => {
+    expect(raengeFuerEinordnung(karten, "T4", "T2")).toEqual({
+      vorher: "1",
+      nachher: "2",
+    });
+  });
+
+  it("Drop auf die LETZTE Karte ordnet DAVOR ein (nicht ganz ans Ende)", () => {
+    expect(raengeFuerEinordnung(karten, "T1", "T4")).toEqual({
+      vorher: "3",
+      nachher: "4",
+    });
+  });
+
+  it("Drop auf die ERSTE Karte ordnet an den Anfang (offener unterer Rand)", () => {
+    expect(raengeFuerEinordnung(karten, "T4", "T1")).toEqual({ nachher: "1" });
+  });
+
+  it("vorZielId=null ordnet ans Ende (offener oberer Rand)", () => {
+    expect(raengeFuerEinordnung(karten, "T1", null)).toEqual({ vorher: "4" });
+  });
+
+  it("unbekannte Zielkarte → ans Ende statt Absturz", () => {
+    expect(raengeFuerEinordnung(karten, "T1", "GIBTSNICHT")).toEqual({
+      vorher: "4",
+    });
+  });
+
+  it("liefert einen mit rankZwischen verträglichen, strikt einordnenden Rang", () => {
+    const { vorher, nachher } = raengeFuerEinordnung(karten, "T1", "T3");
+    const rang = rankZwischen(vorher, nachher);
+    expect("2" < rang && rang < "3").toBe(true);
   });
 });
 
