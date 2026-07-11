@@ -41,6 +41,10 @@ export interface DomainApiDeps {
   policy?: PolicyEngine;
   /** Löst die authentifizierte Sitzung aus dem Request auf (Session-Cookie/OIDC in PROD; Header im DEV). */
   resolveSession: (request: FastifyRequest) => CaseworkerSession | undefined;
+  /** OPTIONAL — Allowlist der Mandanten, die DIESES Deployment bedient. Ist sie gesetzt (nicht leer), wird eine
+   *  Sitzung mit fremdem `tenantId` fail-closed abgewiesen (403) — Defense-in-Depth gegen einen zu permissiven
+   *  IdP/Fehlkonfiguration in der GETEILTEN Datenbank. Fehlt/leer = keine Einschränkung (rückwärtskompatibel). */
+  allowedTenants?: readonly string[];
   /** OPTIONAL — die Management-Datenschicht (Aufgaben/Board/Inbox). Fehlt sie, gibt es keine /api/tasks|/api/inbox-Routen. */
   taskStore?: TaskStore;
   /** OPTIONAL — die Automations-Datenschicht (Regeln/Outbox/Läufe). Fehlt sie, gibt es keine /api/automations-Routen. */
@@ -133,6 +137,18 @@ function requireSession(
       .code(401)
       .header("Cache-Control", NO_STORE)
       .send({ error: "unauthorized" });
+    return undefined;
+  }
+  // TENANT-PINNING (fail-closed): Bedient dieses Deployment eine feste Mandanten-Allowlist, wird ein fremder
+  // `tenantId` VERWEIGERT — selbst mit gültiger Sitzung. Schützt die geteilte DB davor, dass ein zu permissiver
+  // IdP/Header einem Aufrufer Zugriff auf Daten eines nicht-bedienten Mandanten gäbe (der Scope kommt danach aus
+  // genau diesem `tenantId`). Ohne Allowlist unverändert (rückwärtskompatibel).
+  if (
+    deps.allowedTenants &&
+    deps.allowedTenants.length > 0 &&
+    !deps.allowedTenants.includes(session.tenantId)
+  ) {
+    forbidden(reply, "tenant-not-served");
     return undefined;
   }
   return session;

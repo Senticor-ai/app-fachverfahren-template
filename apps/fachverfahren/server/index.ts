@@ -428,6 +428,12 @@ export async function buildDomainApiFromEnv(
   const actorRoleStore =
     createActorRoleStoreFromEnv(env) ?? new InMemoryActorRoleStore();
   const aiAssist = new HeuristicKiAssist();
+  // Mandanten-Allowlist dieses Deployments (komma-separiert). Gesetzt ⇒ Tenant-Pinning (fail-closed, 403 bei
+  // fremdem tenantId); leer/unset ⇒ keine Einschränkung (rückwärtskompatibel).
+  const allowedTenants = (env["APP_ALLOWED_TENANTS"] ?? "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
   return {
     caseStore,
     taskStore,
@@ -438,6 +444,7 @@ export async function buildDomainApiFromEnv(
     resolveSession: headerSession,
     procedureVersion,
     procedureInitialState: (procedureId) => initialStates.get(procedureId),
+    ...(allowedTenants.length > 0 ? { allowedTenants } : {}),
   };
 }
 

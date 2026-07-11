@@ -96,6 +96,60 @@ const SB = (
   "x-permissions": perms,
 });
 
+describe("Tenant-Pinning — Mandanten-Allowlist (fail-closed)", () => {
+  function appMitAllowlist(store: CaseStore, allowedTenants: string[]) {
+    const app = fastify({ logger: false });
+    registerDomainApi(app, {
+      caseStore: store,
+      catalog,
+      resolveSession: headerSession,
+      now: () => "2026-06-01T00:00:00.000Z",
+      newAuditId: uid,
+      allowedTenants,
+    });
+    return app;
+  }
+
+  it("weist eine gültige Sitzung mit FREMDEM tenantId ab (403), lässt den EIGENEN durch", async () => {
+    const store = new InMemoryCaseStore();
+    await store.insertCase(macheCase()); // tenantId "t1"
+    const app = appMitAllowlist(store, ["t1"]);
+    try {
+      const eigen = await app.inject({
+        method: "GET",
+        url: "/api/cases",
+        headers: SB("sb.a"), // x-tenant-id t1
+      });
+      expect(eigen.statusCode).toBe(200);
+      const fremd = await app.inject({
+        method: "GET",
+        url: "/api/cases",
+        headers: { ...SB("sb.a"), "x-tenant-id": "t2" }, // gültige Session, aber nicht bedienter Mandant
+      });
+      expect(fremd.statusCode).toBe(403);
+      expect(fremd.json().reason).toBe("tenant-not-served");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("ohne Allowlist bleibt es unverändert (rückwärtskompatibel — jeder tenantId zulässig)", async () => {
+    const store = new InMemoryCaseStore();
+    await store.insertCase(macheCase());
+    const app = appMitAllowlist(store, []); // leere Allowlist = keine Einschränkung
+    try {
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/cases",
+        headers: { ...SB("sb.a"), "x-tenant-id": "t-beliebig" },
+      });
+      expect(res.statusCode).toBe(200);
+    } finally {
+      await app.close();
+    }
+  });
+});
+
 function runContract(
   name: string,
   makeStore: () => CaseStore,
