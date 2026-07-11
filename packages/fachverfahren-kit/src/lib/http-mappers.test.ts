@@ -152,6 +152,13 @@ describe("vorgangVonAppCase", () => {
     closedAt: null,
   };
 
+  it("optionale antragsdaten werden übernommen (Detail-Load), sonst leer", () => {
+    expect(vorgangVonAppCase(c).antragsdaten).toEqual({});
+    expect(
+      vorgangVonAppCase(c, { antragsteller: { name: "Muster" } }).antragsdaten,
+    ).toEqual({ antragsteller: { name: "Muster" } });
+  });
+
   it("projiziert state→status und behält version (für Optimistic-Locking beim Übergang)", () => {
     const v = vorgangVonAppCase(c);
     expect(v.id).toBe("case.1");

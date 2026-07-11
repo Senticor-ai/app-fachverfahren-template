@@ -426,7 +426,21 @@ export function registerDomainApi(
           .code(404)
           .header("Cache-Control", NO_STORE)
           .send({ error: "not-found" });
-      return reply.header("Cache-Control", NO_STORE).send({ case: found });
+      // Antragsdaten server-seitig aus dem WURZEL-Audit rekonstruieren (der AppCase trägt sie nicht): das
+      // `case.eingegangen`-Event verankert die Rohdaten revisionssicher (siehe accept-Route). KEIN zusätzliches
+      // Client-Recht nötig — der Server liest das Audit im bereits geprüften case.read-Scope. So zeigt die Prüf-/
+      // Detailsicht (ReviewWorkspace) auch über HTTP die echten Antragsdaten statt nur den Status.
+      const events = await deps.caseStore.listAuditEvents({
+        tenantId: session.tenantId,
+        caseId: request.params.id,
+      });
+      const roh = events.find((e) => e.eventType === "case.eingegangen")
+        ?.payload["rohdaten"];
+      const antragsdaten =
+        roh && typeof roh === "object" ? (roh as Record<string, unknown>) : {};
+      return reply
+        .header("Cache-Control", NO_STORE)
+        .send({ case: found, antragsdaten });
     },
   );
 

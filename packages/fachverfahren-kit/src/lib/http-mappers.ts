@@ -124,12 +124,15 @@ export interface AppTaskRelationDTO {
  *  strukturiert ausliefert. */
 export function vorgangVonAppCase<T = Record<string, unknown>>(
   c: AppCaseDTO,
+  antragsdaten?: T,
 ): Vorgang<T> {
   return {
     id: c.caseId,
     vorgangsnummer: c.caseId,
     eingangIso: c.openedAt,
-    antragsdaten: {} as T,
+    // Antragsdaten kommen NICHT aus dem AppCase, sondern (optional) aus dem Wurzel-Audit (`GET /api/cases/:id`
+    // liefert sie mit). Ohne sie eine leere Projektion (genug für Liste/Board, die nur den Status brauchen).
+    antragsdaten: antragsdaten ?? ({} as T),
     status: c.state,
     ki: { confidence: 0, flags: [] },
     nachweise: [],

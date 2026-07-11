@@ -140,6 +140,9 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
   let savedViewCache: GespeicherteAnsicht[] = [];
   const detailCache = new Map<string, DetailEintrag>();
   const detailLaedt = new Set<string>();
+  // Fälle, deren Antragsdaten bereits per Einzel-Load (`GET /api/cases/:id`) angereichert wurden bzw. gerade laden.
+  const antragsdatenGeladen = new Set<string>();
+  const antragsdatenLaedt = new Set<string>();
 
   const enc = encodeURIComponent;
   const melde = (fehler: unknown, kontext: string): void =>
@@ -188,12 +191,20 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
   }
   async function ladeFaelle(): Promise<void> {
     const { cases } = await api<{ cases: AppCaseDTO[] }>("GET", "/api/cases");
+    // Bereits per Detail-Load angereicherte Antragsdaten über den Voll-Reload BEWAHREN (die Listen-Route liefert sie
+    // nicht) — sonst fiele ein Fall nach jedem refresh() auf die Status-Projektion zurück.
+    const altAntrag = new Map(
+      [...caseCache.entries()].map(([k, v]) => [k, v.vorgang.antragsdaten]),
+    );
     caseCache.clear();
     for (const c of cases)
       caseCache.set(c.caseId, {
         procedureId: c.procedureId,
         version: c.version,
-        vorgang: vorgangVonAppCase<T>(c),
+        vorgang: vorgangVonAppCase<T>(
+          c,
+          altAntrag.get(c.caseId) as T | undefined,
+        ),
       });
     bump();
   }
@@ -209,6 +220,29 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
     );
     savedViewCache = views.map(ansichtVonApp);
     bump();
+  }
+  // Einzel-Fall MIT Antragsdaten laden (`GET /api/cases/:id` liefert `{ case, antragsdaten }`) und den Cache-Eintrag
+  // anreichern — so kann die vertiefte Prüfsicht (ReviewWorkspace) über HTTP die echten Antragsdaten zeigen.
+  async function ladeFallDetail(caseId: string): Promise<void> {
+    const { case: c, antragsdaten } = await api<{
+      case: AppCaseDTO;
+      antragsdaten: Record<string, unknown>;
+    }>("GET", `/api/cases/${enc(caseId)}`);
+    caseCache.set(c.caseId, {
+      procedureId: c.procedureId,
+      version: c.version,
+      vorgang: vorgangVonAppCase<T>(c, antragsdaten as T),
+    });
+    antragsdatenGeladen.add(c.caseId);
+    bump();
+  }
+  function ladeFallDetailEinmal(caseId: string): void {
+    if (antragsdatenGeladen.has(caseId) || antragsdatenLaedt.has(caseId))
+      return;
+    antragsdatenLaedt.add(caseId);
+    void ladeFallDetail(caseId)
+      .catch((e) => melde(e, `fallDetail:${caseId}`))
+      .finally(() => antragsdatenLaedt.delete(caseId));
   }
   async function refresh(): Promise<void> {
     // Fälle VOR/parallel zu Aufgaben — die Liste/Board leiten den Status aus dem Case-Cache ab.
@@ -262,10 +296,13 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
           `/api/cases/${enc(caseId)}/transitions`,
           body,
         );
+        // Antragsdaten über den Statuswechsel BEWAHREN (ein Übergang ändert sie nicht; die Transition-Antwort trägt
+        // sie nicht) — sonst fiele ein bereits angereicherter Fall zurück auf die Status-Projektion.
+        const altAntrag = caseCache.get(c.caseId)?.vorgang.antragsdaten;
         caseCache.set(c.caseId, {
           procedureId: c.procedureId,
           version: c.version,
-          vorgang: vorgangVonAppCase<T>(c),
+          vorgang: vorgangVonAppCase<T>(c, altAntrag as T | undefined),
         });
         bump();
         // Der Übergang kann Titel/Board der Aufgabe verändern → Aufgaben nachziehen.
@@ -287,7 +324,12 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
         [...caseCache.values()]
           .filter((e) => e.procedureId === procedureId)
           .map((e) => e.vorgang),
-      get: (id) => caseCache.get(id)?.vorgang,
+      get: (id) => {
+        // Lazy: beim ersten Zugriff die Antragsdaten des Falls nachladen (Einzel-Route), damit die Prüfsicht sie
+        // zeigt. Synchron wird der aktuelle (ggf. noch status-only) Cache-Stand geliefert; der Load bumpt bei Ankunft.
+        ladeFallDetailEinmal(id);
+        return caseCache.get(id)?.vorgang;
+      },
       einreichen: () => {
         throw new Error(
           "einreichen (Bürger-Antrag) wird über HTTP noch nicht unterstützt — die Antrags-Route ist ein Folgeschritt.",

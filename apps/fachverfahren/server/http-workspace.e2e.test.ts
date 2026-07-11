@@ -501,6 +501,45 @@ describe("HttpWorkspacePort e2e — Gespeicherte Ansichten (echte /api/views-Rou
   });
 });
 
+describe("HttpWorkspacePort e2e — Antragsdaten über HTTP (portFor lazy single-case-load)", () => {
+  it("GET /api/cases/:id reichert antragsdaten aus dem Wurzel-Audit an → portFor().get() zeigt sie", async () => {
+    const aufbau = baueServer();
+    const c = macheCase();
+    await aufbau.caseStore.insertCase(c);
+    // Wurzel-Audit mit den Antragsdaten (wie die accept-Route es anlegt).
+    await aufbau.caseStore.appendAuditEvent({
+      auditEventId: "audit-1",
+      caseId: c.caseId,
+      tenantId: "t1",
+      authorityId: "b1",
+      jurisdictionId: "de",
+      actorId: "buerger",
+      eventType: "case.eingegangen",
+      purpose: "intake-accepted",
+      legalBasisId: "inbox.triage",
+      requestId: "req",
+      payload: { rohdaten: { antragsteller: { name: "Muster" } } },
+      occurredAt: "2026-07-01T00:00:00.000Z",
+    });
+    const port = machePort(aufbau);
+    await port.refresh();
+    // Vor dem Detail-Zugriff: reine Status-Projektion (leere antragsdaten).
+    expect(port.portFor("leistung")?.get(c.caseId)?.antragsdaten).toEqual({});
+    // Der Zugriff triggert den Lazy-Load; nach der Ankunft sind die Antragsdaten angereichert.
+    await warteBis(() => {
+      const a = port.portFor("leistung")?.get(c.caseId)?.antragsdaten as
+        | Record<string, unknown>
+        | undefined;
+      return a !== undefined && "antragsteller" in a;
+    });
+    const antrag = port.portFor("leistung")?.get(c.caseId)?.antragsdaten as {
+      antragsteller?: { name?: string };
+    };
+    expect(antrag.antragsteller?.name).toBe("Muster");
+    await aufbau.app.close();
+  });
+});
+
 describe("createWorkspacePortFromEnv — die austauschbare Naht", () => {
   it("ohne apiBaseUrl → In-Memory-Store (kein refresh)", () => {
     const port = createWorkspacePortFromEnv(workspaceConfig, {});
