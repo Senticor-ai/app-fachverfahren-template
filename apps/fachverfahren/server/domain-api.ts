@@ -4,7 +4,7 @@
 // `executeCaseTransition`, 403), Optimistic-Locking (409), append-only Audit. Der Mandanten-Scope kommt
 // AUSSCHLIESSLICH aus der Server-Session, NIE aus Query/Body. Der CaseStore ist austauschbar (In-Memory/Postgres);
 // dieselbe Route läuft im Test (inject) und in PROD (echte DB).
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import type {
   ActorRoleStore,
   AppAutomationRule,
@@ -19,6 +19,7 @@ import {
   bedingungUnterstuetzt,
   evalBedingungNodeSafe,
 } from "./automation-eval.js";
+import { forbidden, NO_STORE, requireSession } from "./http-guards.js";
 import type { KiAssistPort } from "./ai-assist.js";
 import {
   DefaultDenyPolicyEngine,
@@ -34,7 +35,8 @@ import {
 // EINE Wahrheit der Session-Auflösung: der framework-neutrale SDK-Resolver (DEV: x-*-Header; PROD: OIDC-Seam).
 const sdkHeaderResolver = headerSessionResolver();
 
-const NO_STORE = "no-store";
+// `NO_STORE`/`requireSession`/`forbidden` leben jetzt in ./http-guards.js (ModuleHost-Phase 0) — dieselbe Wahrheit
+// für den Monolithen UND den kommenden ModuleHost. Hier importiert (siehe oben), nicht mehr lokal definiert.
 
 export interface DomainApiDeps {
   caseStore: CaseStore;
@@ -128,42 +130,6 @@ export function catalogFromStatusMachines(
     transitionsFor: (procedureId, procedureVersion) =>
       byKey.get(`${procedureId}@${procedureVersion}`) ?? [],
   };
-}
-
-function requireSession(
-  deps: DomainApiDeps,
-  request: FastifyRequest,
-  reply: FastifyReply,
-): CaseworkerSession | undefined {
-  const session = deps.resolveSession(request);
-  if (!session) {
-    reply
-      .code(401)
-      .header("Cache-Control", NO_STORE)
-      .send({ error: "unauthorized" });
-    return undefined;
-  }
-  // TENANT-PINNING (fail-closed): Bedient dieses Deployment eine feste Mandanten-Allowlist, wird ein fremder
-  // `tenantId` VERWEIGERT — selbst mit gültiger Sitzung. Schützt die geteilte DB davor, dass ein zu permissiver
-  // IdP/Header einem Aufrufer Zugriff auf Daten eines nicht-bedienten Mandanten gäbe (der Scope kommt danach aus
-  // genau diesem `tenantId`). Ohne Allowlist unverändert (rückwärtskompatibel).
-  if (
-    deps.allowedTenants &&
-    deps.allowedTenants.length > 0 &&
-    !deps.allowedTenants.includes(session.tenantId)
-  ) {
-    forbidden(reply, "tenant-not-served");
-    return undefined;
-  }
-  return session;
-}
-
-/** Einheitliche 403-Antwort (fehlendes Recht) — eine Wahrheit für den RBAC-Deny. */
-function forbidden(reply: FastifyReply, reason?: string): FastifyReply {
-  return reply
-    .code(403)
-    .header("Cache-Control", NO_STORE)
-    .send({ error: "forbidden", ...(reason ? { reason } : {}) });
 }
 
 const MUTIERENDE_ARTEN: ReadonlySet<string> = new Set([
