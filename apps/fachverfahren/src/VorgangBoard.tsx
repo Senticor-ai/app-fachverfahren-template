@@ -22,8 +22,14 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  FilterBar,
   KommentarThread,
   RelationPanel,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Sheet,
   SheetContent,
   SheetDescription,
@@ -37,6 +43,7 @@ import {
   rankZwischen,
   type Aufgabe,
   type LeistungConfig,
+  type TaskFilter,
   type Transition,
   type WorkspaceStore,
 } from "@senticor/fachverfahren-kit";
@@ -51,6 +58,8 @@ export interface VorgangBoardProps {
 }
 
 const ROLLE = "sachbearbeitung";
+
+type Zuweisungsmodus = "alle" | "meine" | "niemand";
 
 export function VorgangBoard({
   workspace,
@@ -68,6 +77,63 @@ export function VorgangBoard({
   const prioritaeten = workspace.config.prioritaeten;
   const labels = workspace.config.labels;
 
+  // ── Filter (dieselben Achsen wie die Liste: Suche + Priorität + Zuweisung) — das Board zeigt nur die passenden
+  //    Karten; die Spalten-Zähler spiegeln die gefilterte Menge. Rein clientseitig über denselben `TaskFilter`.
+  const [suche, setSuche] = useState("");
+  const [prioAktiv, setPrioAktiv] = useState<Set<string>>(new Set());
+  const [zuweisung, setZuweisung] = useState<Zuweisungsmodus>("alle");
+  const filter = useMemo<TaskFilter>(() => {
+    const f: TaskFilter = {};
+    if (suche.trim()) f.suche = suche.trim();
+    if (prioAktiv.size) f.prioritaet = [...prioAktiv];
+    if (zuweisung === "meine") f.zugewiesenAn = aktuellerAkteur;
+    if (zuweisung === "niemand") f.zugewiesenAn = "$niemand";
+    return f;
+  }, [suche, prioAktiv, zuweisung, aktuellerAkteur]);
+  const hatFilter =
+    suche.trim().length > 0 || prioAktiv.size > 0 || zuweisung !== "alle";
+  const zuruecksetzen = (): void => {
+    setSuche("");
+    setPrioAktiv(new Set());
+    setZuweisung("alle");
+  };
+  const togglePrio = (key: string): void =>
+    setPrioAktiv((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  // ── Gespeicherte Board-Ansichten: der aktuelle Filter als benannte Ansicht (layout="board", getrennt von den
+  //    Listen-Ansichten — dieselbe Store-Naht, nach `layout` skopiert, damit sich die Sichten nicht vermischen).
+  const [viewName, setViewName] = useState("");
+  const gespeicherte = workspace
+    .listSavedViews()
+    .filter((v) => v.layout === "board");
+  const speichereAnsicht = (): void => {
+    const label = viewName.trim();
+    if (!label) return;
+    workspace.saveView({
+      label,
+      layout: "board",
+      definition: { ...filter } as Record<string, unknown>,
+    });
+    setViewName("");
+  };
+  const wendeAnsichtAn = (def: Record<string, unknown>): void => {
+    const f = def as TaskFilter;
+    setSuche(typeof f.suche === "string" ? f.suche : "");
+    setPrioAktiv(new Set(Array.isArray(f.prioritaet) ? f.prioritaet : []));
+    setZuweisung(
+      f.zugewiesenAn === "$niemand"
+        ? "niemand"
+        : f.zugewiesenAn === aktuellerAkteur
+          ? "meine"
+          : "alle",
+    );
+  };
+
   // Board-Achse Status: die Spalten des PRIMÄREN Verfahrens (State-Group-Normalisierung über mehrere Verfahren ist
   // eine spätere Ausbaustufe). Eine Auffang-Spalte „Weitere" fängt Status, die keiner Spalte entsprechen.
   const primary = workspace.verfahren()[0];
@@ -79,7 +145,8 @@ export function VorgangBoard({
     [primaryConfig, prioritaeten],
   );
 
-  const alle = workspace.listTasks();
+  const alle = workspace.listTasks(filter);
+  const gesamt = workspace.listTasks().length;
   const statusOf = (a: Aufgabe): string | undefined =>
     a.vorgangId
       ? workspace.portFor(a.procedureId)?.get(a.vorgangId)?.status
@@ -229,6 +296,109 @@ export function VorgangBoard({
           Aktionsmenü jeder Karte (vollständig per Tastatur bedienbar).
         </p>
       </header>
+
+      <FilterBar
+        value={suche}
+        onValueChange={setSuche}
+        placeholder="Karten durchsuchen…"
+        resultCount={alle.length}
+        totalCount={gesamt}
+        hasActiveFilters={hatFilter}
+        onReset={zuruecksetzen}
+        filters={
+          <div className="flex flex-wrap items-center gap-2">
+            <fieldset className="flex flex-wrap items-center gap-1.5">
+              <legend className="sr-only">Nach Priorität filtern</legend>
+              {prioritaeten.map((p) => {
+                const aktiv = prioAktiv.has(p.key);
+                return (
+                  <button
+                    key={p.key}
+                    type="button"
+                    aria-pressed={aktiv}
+                    onClick={() => togglePrio(p.key)}
+                    className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors motion-reduce:transition-none ${
+                      aktiv
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </fieldset>
+            <Select
+              value={zuweisung}
+              onValueChange={(v) => setZuweisung(v as Zuweisungsmodus)}
+            >
+              <SelectTrigger
+                className="ml-1 h-8 w-44 text-xs"
+                aria-label="Nach Zuweisung filtern"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="alle">Alle Zuweisungen</SelectItem>
+                <SelectItem value="meine">Nur meine</SelectItem>
+                <SelectItem value="niemand">Nicht zugewiesen</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        }
+      />
+
+      {/* Gespeicherte Board-Ansichten: aktuellen Filter benannt sichern, per Klick anwenden, löschen. */}
+      <div className="mb-3 mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs uppercase tracking-wide text-muted-foreground">
+          Ansichten:
+        </span>
+        {gespeicherte.length === 0 ? (
+          <span className="text-xs text-muted-foreground">
+            keine gespeichert
+          </span>
+        ) : (
+          gespeicherte.map((v) => (
+            <span
+              key={v.id}
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-card py-0.5 pe-1 ps-2.5 text-xs"
+            >
+              <button
+                type="button"
+                onClick={() => wendeAnsichtAn(v.definition)}
+                className="font-medium text-foreground hover:underline"
+              >
+                {v.label}
+              </button>
+              <button
+                type="button"
+                onClick={() => workspace.deleteView(v.id)}
+                aria-label={`Ansicht ${v.label} löschen`}
+                className="rounded-full px-1 text-muted-foreground hover:text-destructive"
+              >
+                ×
+              </button>
+            </span>
+          ))
+        )}
+        <span className="mx-1 h-4 w-px bg-border" aria-hidden="true" />
+        <input
+          value={viewName}
+          onChange={(e) => setViewName(e.target.value)}
+          placeholder="Aktuelle Ansicht benennen…"
+          aria-label="Name der zu speichernden Board-Ansicht"
+          className="h-7 w-44 rounded-md border border-border bg-card px-2 text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={!viewName.trim()}
+          onClick={speichereAnsicht}
+        >
+          Speichern
+        </Button>
+      </div>
 
       {/* Live-Region: Ergebnis jeder Aktion (auch abgelehnter Move) wird angesagt. */}
       <p aria-live="assertive" className="sr-only">

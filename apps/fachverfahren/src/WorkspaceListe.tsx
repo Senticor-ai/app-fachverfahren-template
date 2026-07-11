@@ -66,7 +66,9 @@ export function WorkspaceListe({
 
   // ── Gespeicherte Ansichten: den aktuellen Filter als benannte, wiederverwendbare Ansicht sichern/anwenden/löschen.
   const [viewName, setViewName] = useState("");
-  const gespeicherte = workspace.listSavedViews();
+  const gespeicherte = workspace
+    .listSavedViews()
+    .filter((v) => v.layout === "liste");
   const speichereAnsicht = () => {
     const label = viewName.trim();
     if (!label) return;
