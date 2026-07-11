@@ -95,6 +95,40 @@ function ordneStationen(
   return reihenfolge;
 }
 
+/**
+ * Menge der Status-Keys, die als „erledigt" gelten — die VORGÄNGER des aktuellen Status im Transitions-Graph.
+ *
+ * Eine Station gilt als durchlaufen, wenn der aktuelle Status von ihr aus über die `transitions` erreichbar ist
+ * (Rückwärts-BFS ab `aktuellerStatus` über die umgekehrten Kanten). Bei VERZWEIGENDEN Maschinen ist das der
+ * springende Punkt: der nicht-genommene Alternativzweig (etwa der gegenteilige Endzustand „Festgesetzt", wenn der
+ * Vorgang „Abgelehnt" wurde) ist KEIN Vorgänger und darf nicht fälschlich als erledigt (grünes Häkchen) erscheinen.
+ * Rein strukturell, deterministisch, ohne fachliche Annahme — genau wie `ordneStationen`.
+ */
+export function erledigteStationen(
+  transitions: { from: string; to: string }[],
+  aktuellerStatus: string,
+): Set<string> {
+  const vorgaenger = new Map<string, string[]>();
+  for (const t of transitions) {
+    const liste = vorgaenger.get(t.to) ?? [];
+    liste.push(t.from);
+    vorgaenger.set(t.to, liste);
+  }
+  const erreicht = new Set<string>();
+  const queue: string[] = [aktuellerStatus];
+  while (queue.length > 0) {
+    const key = queue.shift()!;
+    for (const vor of vorgaenger.get(key) ?? []) {
+      // Der aktuelle Status selbst zählt nie als erledigt (auch bei Zyklen zurück auf ihn).
+      if (vor !== aktuellerStatus && !erreicht.has(vor)) {
+        erreicht.add(vor);
+        queue.push(vor);
+      }
+    }
+  }
+  return erreicht;
+}
+
 /** Zeitstempel stabil-absolut rendern (kein Date.now() → keine Hydration-Diskrepanz). */
 function zeitText(iso: string): string {
   const d = new Date(iso);
@@ -144,6 +178,13 @@ export function StatusVerfolgung<T = Record<string, unknown>>({
   const aktuelleDef =
     aktuellerIndex >= 0 ? stationen[aktuellerIndex] : undefined;
 
+  // „Erledigt" = die Station wurde tatsächlich durchlaufen (Erreichbarkeit, nicht Positionsindex — sonst zeigte
+  // ein ABGELEHNTER Vorgang den gegenteiligen Endzustand „Festgesetzt" fälschlich als erledigt). Reine Funktion.
+  const erledigtKeys = useMemo(
+    () => erledigteStationen(transitions, vorgang.status),
+    [transitions, vorgang.status],
+  );
+
   // Verlauf neuester-zuerst, ohne das Original zu mutieren.
   const verlauf = useMemo(
     () => [...vorgang.history].reverse(),
@@ -191,9 +232,10 @@ export function StatusVerfolgung<T = Record<string, unknown>>({
       >
         {stationen.map((s, i) => {
           const istAktuell = i === aktuellerIndex;
-          // Vor dem aktuellen Status (oder, falls Status unbekannt, keine Station) = erledigt.
-          const istErledigt = aktuellerIndex >= 0 && i < aktuellerIndex;
-          const istZukuenftig = aktuellerIndex < 0 || i > aktuellerIndex;
+          // Erledigt = die Station liegt auf einem Pfad zum aktuellen Status (Erreichbarkeit, nicht Position).
+          // So bleibt bei VERZWEIGENDEN Maschinen der nicht-genommene (evtl. terminale) Alternativzweig blass.
+          const istErledigt = !istAktuell && erledigtKeys.has(s.key);
+          const istZukuenftig = !istAktuell && !istErledigt;
           const istLetzte = i === stationen.length - 1;
           const Icon = TONE_ICON[s.tone];
 
