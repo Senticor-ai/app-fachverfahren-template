@@ -19,7 +19,9 @@ tatsächlich kopiert (nicht nur der Eintrag persistiert). Breitere persistierte
 Muster zählen als Override (ein `docs/**: consumer` blockiert einen neuen,
 spezifischeren Default, statt per Longest-Match ausgehebelt zu werden) —
 engere Wildcards wie `apps/*/server/*` blockieren einen breiteren Default
-`apps/*/server/**` dagegen nicht. Opt-out: Strategie auf `consumer` setzen
+`apps/*/server/**` dagegen nicht — behalten aber für die von ihnen gematchten
+Pfade Vorrang, weil `explainOwnership` jetzt nach Spezifizität (literale
+Zeichen, dann weniger `**`) statt roher Musterlänge entscheidet. Opt-out: Strategie auf `consumer` setzen
 statt die Zeile zu löschen — gelöschte Einträge werden wieder ergänzt.
 Bootstrap für Prä-Merge-Konsumenten: das ERSTE Update mit der CLI der Quelle
 fahren (`node --experimental-strip-types <quelle>/tooling/template/cli.ts --

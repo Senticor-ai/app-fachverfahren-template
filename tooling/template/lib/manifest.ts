@@ -224,7 +224,10 @@ export function formatOwnershipYaml(ownership: TemplateOwnership): string {
  *  (dafür gibt es Template-Migrationen — es existiert keine Provenienz, um Override von veraltetem Snapshot
  *  zu unterscheiden). Das gilt auch für BREITERE persistierte Muster: deckt z.B. `docs/**: consumer` einen
  *  neuen, spezifischeren Default `docs/reference/**` ab, wird dieser NICHT ergänzt — sonst gewönne er als
- *  längstes Pattern in explainOwnership und hebelte das Konsumenten-Opt-out aus (Codex-Review PR #26).
+ *  spezifischeres Pattern in explainOwnership und hebelte das Konsumenten-Opt-out aus (Codex-Review PR #26).
+ *  Umgekehrt werden BREITERE Defaults trotz engerer persistierter Muster ergänzt (verschachtelte Pfade
+ *  brauchen Verwaltung); für die vom engeren Muster gematchten Pfade behält dieses Vorrang, weil
+ *  explainOwnership nach Spezifizität statt roher Länge entscheidet (isMoreSpecificOwnershipPattern).
  *  Gelöschte Einträge werden beim nächsten Update wieder ergänzt; dauerhaftes Opt-out = Strategie auf
  *  `consumer` setzen statt die Zeile zu löschen. */
 export function mergeOwnershipDefaults(
@@ -347,7 +350,10 @@ export function explainOwnership(
   let bestMatch = undefined;
   for (const [pattern, strategy] of Object.entries(ownership.paths ?? {})) {
     if (matchesOwnershipPattern(pattern, path)) {
-      if (!bestMatch || pattern.length > bestMatch.pattern.length) {
+      if (
+        !bestMatch ||
+        isMoreSpecificOwnershipPattern(pattern, bestMatch.pattern)
+      ) {
         bestMatch = { pattern, strategy };
       }
     }
@@ -358,6 +364,25 @@ export function explainOwnership(
       strategy: "merge" as const,
     }
   );
+}
+
+/** Spezifizität statt roher Länge: erst mehr LITERALE Zeichen, dann weniger `**`-Wildcards,
+ *  dann Länge (bisheriger Tie-Break). Reine Längenwertung ließe einen ergänzten breiteren
+ *  Default (`apps/{star}/server/{star}{star}`, 16 Zeichen) das engere persistierte
+ *  Konsumenten-Muster (`apps/{star}/server/{star}`, 15 Zeichen) auch für dessen EIGENE
+ *  Pfade schlagen — "persistiert gewinnt" gilt aber pro Pfad (Codex-Review PR #26, Runde 3). */
+function isMoreSpecificOwnershipPattern(a: string, b: string): boolean {
+  const literalsA = a.replaceAll("*", "").length;
+  const literalsB = b.replaceAll("*", "").length;
+  if (literalsA !== literalsB) {
+    return literalsA > literalsB;
+  }
+  const doubleStarsA = (a.match(/\*\*/g) ?? []).length;
+  const doubleStarsB = (b.match(/\*\*/g) ?? []).length;
+  if (doubleStarsA !== doubleStarsB) {
+    return doubleStarsA < doubleStarsB;
+  }
+  return a.length > b.length;
 }
 
 export function matchesOwnershipPattern(

@@ -135,6 +135,26 @@ describe("template manifest metadata", () => {
     ).toMatchObject({ strategy: "replace" });
   });
 
+  it("keeps narrower consumer globs winning over broader added defaults", () => {
+    // Codex-Finding PR #26 (Runde 3): der breitere Default wird zwar ergänzt (Runde 2),
+    // darf aber für Pfade, die das ENGERE persistierte Konsumenten-Muster matcht, nicht
+    // per Längen-Tie-Break gewinnen — "persistiert gewinnt" gilt pro Pfad.
+    const persisted = { paths: { "apps/*/server/*": "consumer" as const } };
+    const defaults = { paths: { "apps/*/server/**": "replace" as const } };
+
+    const { ownership, added } = mergeOwnershipDefaults(persisted, defaults);
+
+    expect(added).toEqual([{ path: "apps/*/server/**", strategy: "replace" }]);
+    // Direkte Kinder: das engere Konsumenten-Muster behält Vorrang …
+    expect(
+      explainOwnership(ownership, "apps/foo/server/index.ts"),
+    ).toMatchObject({ strategy: "consumer", pattern: "apps/*/server/*" });
+    // … verschachtelte Pfade (die es nie abdeckte) verwaltet der neue Default.
+    expect(
+      explainOwnership(ownership, "apps/foo/server/routes/index.ts"),
+    ).toMatchObject({ strategy: "replace" });
+  });
+
   it("still adds broader defaults when only a more specific override exists", () => {
     const persisted = {
       paths: { "docs/reference/api.md": "consumer" as const },
