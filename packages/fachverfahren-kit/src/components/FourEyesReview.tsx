@@ -38,11 +38,7 @@ import { useStatusRegion } from "./StatusRegion.js";
 
 /** Lebenszyklus einer rechtsnahen Entscheidung im Vier-Augen-Verfahren. */
 export type FourEyesStatus =
-  | "entwurf"
-  | "vorgelegt"
-  | "inPruefung"
-  | "freigegeben"
-  | "abgelehnt";
+  "entwurf" | "vorgelegt" | "inPruefung" | "freigegeben" | "abgelehnt";
 
 /** Die zu prüfende Vorlage (vom Ersteller verfasst, alle Werte generisch aus der Config). */
 export interface FourEyesVorlage {

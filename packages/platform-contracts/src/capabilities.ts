@@ -13,11 +13,7 @@ export type CapabilityId =
   | "ai-assist";
 
 export type DataClassification =
-  | "public"
-  | "internal"
-  | "confidential"
-  | "restricted"
-  | "special-category";
+  "public" | "internal" | "confidential" | "restricted" | "special-category";
 
 export type IdempotencyRequirement = "not-supported" | "optional" | "required";
 

@@ -1,11 +1,7 @@
 import { type ReactNode, useId } from "react";
 
 export type DocumentChecklistStatus =
-  | "available"
-  | "missing"
-  | "expired"
-  | "review"
-  | "optional";
+  "available" | "missing" | "expired" | "review" | "optional";
 
 export type DocumentRequirement = "required" | "optional";
 

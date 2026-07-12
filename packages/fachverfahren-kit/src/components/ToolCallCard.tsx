@@ -125,7 +125,7 @@ export function ToolCallCard({
 
         {parameter && parameter.length > 0 ? (
           <div>
-            <p className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground/80">
+            <p className="mb-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">
               Parameter
             </p>
             <div className="overflow-x-auto rounded-md border border-border bg-surface-2">

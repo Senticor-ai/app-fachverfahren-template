@@ -20,12 +20,13 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "fractional-indexing": "^4.0.0",
     "pg": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
-    "typescript": "catalog:",
+    "typescript": "6.0.3",
     "vitest": "catalog:"
   }
 }

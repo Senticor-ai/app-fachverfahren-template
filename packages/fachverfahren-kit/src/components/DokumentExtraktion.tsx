@@ -203,6 +203,7 @@ export function DokumentExtraktion({
         ref={inputRef}
         type="file"
         className="sr-only"
+        aria-label={`Datei auswählen: ${titel}`}
         aria-describedby={beschreibungId}
         {...(accept ? { accept } : {})}
         onChange={(e) => {

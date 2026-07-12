@@ -1,4 +1,4 @@
-// shadcn/ui Calendar — react-day-picker v9 DayPicker, token-getrieben.
+// shadcn/ui Calendar — react-day-picker v10 DayPicker, token-getrieben.
 // Generisch: keine Domänen-Literale; deutsche Locale via date-fns/locale/de.
 // Tastatur/aria/Fokus liefert DayPicker selbst (WCAG 2.2 AA, BITV).
 "use client";
@@ -88,7 +88,9 @@ function Calendar({
           "rounded-md border border-border",
           "[&>button]:font-semibold",
         ),
-        outside: "text-muted-foreground opacity-50 aria-selected:opacity-30",
+        // Kein opacity-Dimmen: 50 % muted-foreground fällt auf ~2.1:1 (axe color-contrast).
+        // Volles muted-foreground unterscheidet Nachbarmonats-Tage weiterhin sichtbar.
+        outside: "text-muted-foreground",
         disabled: "text-muted-foreground opacity-40",
         hidden: "invisible",
         week_number: "w-9 text-center text-xs text-muted-foreground",
