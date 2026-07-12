@@ -1,29 +1,36 @@
 # Codesphere-Deploy-Pipeline (GovTech-DE-Plattform, vendorportal.gtplatforms.org).
 # Dies ist die Laufzeit-Wahrheit, die `cs start pipeline prepare test run` ausführt — sie SPIEGELT das Dockerfile
-# (dasselbe Build-Rezept: corepack→pnpm install→build:packages/app/server), damit Codesphere-Deploy und Container-Build
-# NICHT auseinanderlaufen (eine Wahrheit). Der Server lauscht auf $PORT (Default 8080; Codesphere setzt $PORT) und
-# einem internen Port 9090. Kein floating Tag / kein `latest` — reproduzierbar wie der Dockerfile-Build.
-# Die `run`-Stufe migriert die Datenbank VOR dem Serverstart (APP_PG_DIRECT_URL oder APP_PG_URL muss im
-# Workspace gesetzt sein) — sonst würde ein Deploy mit neuen Migrationen gegen ein veraltetes Schema laufen.
+# (dasselbe Build-Rezept: pnpm install→build:packages/app/server), damit Codesphere-Deploy und Container-Build
+# NICHT auseinanderlaufen (eine Wahrheit). Der Server lauscht auf $PORT (Default 8080; im Workspace-Env setzen).
+#
+# Codesphere-Eigenheiten (live verifiziert auf Workspace 748, Team 119 — Details:
+# Senticor-ai/infrastructure codesphere-vendorportal/fachverfahren-demo/README.md):
+# - Das Base-Image shippt Node 18.5/pnpm 8 als root-eigene /usr/local-Symlinks; `corepack enable`
+#   scheitert dort mit EACCES. Daher installiert Step 1 Node 24 + pnpm 11 checksummen-geprüft
+#   und PERSISTENT nach <app>/.local (übersteht Pod-Restarts und `git reset --hard`).
+# - Jeder Step ist eine eigene Shell → der PATH/COREPACK_HOME-Export steht in jedem Step neu.
+# - Die run-Stufe ist EIN Step (`migrate && node …`): die Reihenfolge Migration-vor-Server ist
+#   damit per Shell erzwungen statt von Codesphere-Step-Semantik abhängig — und ein Crash-Restart
+#   (der nur `run` erneut ausführt, nie `prepare`) migriert ebenfalls zuerst.
+# - ACHTUNG: Änderungen am run-Kommando liest ein bestehender Workspace NIE nach (kein kill 1,
+#   kein pipeline-Restart) — nur Workspace delete+recreate übernimmt ein neues run-Kommando.
 schemaVersion: v0.2
 
 prepare:
   steps:
-    - name: Enable pnpm
-      command: corepack enable pnpm && corepack prepare pnpm@11.1.0 --activate
+    - name: Node 24 + pnpm 11 (persistent unter <app>/.local)
+      command: sh scripts/codesphere-toolchain.sh
     - name: Install (frozen lockfile)
-      command: pnpm install --frozen-lockfile
+      command: export PATH="$PWD/.local/node24/bin:$PATH" COREPACK_HOME="$PWD/.local/corepack" && pnpm install --frozen-lockfile
     - name: Build packages + app + server
-      command: pnpm run build:packages && pnpm run build:app && pnpm run build:server
+      command: export PATH="$PWD/.local/node24/bin:$PATH" COREPACK_HOME="$PWD/.local/corepack" && pnpm run build:packages && pnpm run build:app && pnpm run build:server
 
 test:
   steps:
     - name: Validate (typecheck + unit)
-      command: pnpm run --if-present typecheck && pnpm run --if-present test
+      command: export PATH="$PWD/.local/node24/bin:$PATH" COREPACK_HOME="$PWD/.local/corepack" && pnpm run --if-present typecheck && pnpm run --if-present test
 
 run:
   steps:
-    - name: Run DB migrations
-      command: pnpm --filter @senticor/app-store-postgres db:migrate
-    - name: Fachverfahren-Server
-      command: node apps/fachverfahren/dist-server/index.js
+    - name: Fachverfahren-Server (migriert die DB VOR dem Start — APP_PG_DIRECT_URL/APP_PG_URL muss im Workspace-Env stehen)
+      command: export PATH="$PWD/.local/node24/bin:$PATH" COREPACK_HOME="$PWD/.local/corepack" && pnpm --filter @senticor/app-store-postgres db:migrate && node apps/fachverfahren/dist-server/index.js

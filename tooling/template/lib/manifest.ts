@@ -40,6 +40,7 @@ export const defaultOwnership: TemplateOwnership = {
     "ADOPTERS.md": "consumer",
     ".gitlab-ci.yml": "replace",
     "ci.yml": "replace",
+    "scripts/codesphere-toolchain.sh": "replace",
     ".gitlab/CODEOWNERS": "consumer",
     ".gitlab/issue_templates/**": "replace",
     ".gitlab/merge_request_templates/**": "replace",

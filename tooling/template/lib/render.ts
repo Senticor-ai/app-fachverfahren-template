@@ -50,7 +50,17 @@ const ignoredNames = new Set([
   "tmp",
 ]);
 
-const repositoryOnlyPaths = new Set([".gitlab/CODEOWNERS"]);
+// Template-only GitHub-Workflows werden NIE in Konsumenten kopiert: die Text-Substitution
+// schriebe sonst z.B. den repository-Guard des Deploy-Workflows auf den Konsumenten-Namen um
+// (live verifiziert: `app-fachverfahren-template` → `app-beispiel`), womit die Konsumenten-Kopie
+// nach jedem Konsumenten-CI liefe und — mit gesetztem Secret — einen "Enkel"-Scaffold erzeugte;
+// scaffold-nightly liefe nächtlich im Konsumenten. mirror-gitlab.yml bleibt absichtlich drin:
+// Konsumenten sollen ihren eigenen (substituierten) GitLab-Mirror bekommen.
+const repositoryOnlyPaths = new Set([
+  ".gitlab/CODEOWNERS",
+  ".github/workflows/deploy-demo-consumer.yml",
+  ".github/workflows/scaffold-nightly.yml",
+]);
 
 // Die generische Template-Engine wird VERBATIM kopiert — NIE textersetzt. Sie enthält ihre eigene
 // Ersetzungs-Tabelle sowie Identitäts-/Provenienz-Konstanten als DATEN (z.B. `fachverfahren-template`,
