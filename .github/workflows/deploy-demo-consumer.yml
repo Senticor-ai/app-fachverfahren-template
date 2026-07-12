@@ -30,7 +30,11 @@ jobs:
     name: Scaffold/update + migrate + build demo consumer
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # Der repository-Guard ist nötig, weil renderDomainApp .github/workflows/ mit in den
+    # Konsumenten kopiert: ohne ihn liefe die Konsumenten-Kopie dieses Template-only-Workflows
+    # nach jedem Konsumenten-CI mit — und würde, falls dort je DEMO_CONSUMER_DEPLOY_TOKEN
+    # gesetzt wird, ein "Enkel"-Scaffold erzeugen.
+    if: ${{ github.repository == 'Senticor-ai/app-fachverfahren-template' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') }}
 
     services:
       postgres:
