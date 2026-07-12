@@ -683,6 +683,7 @@ function AmtWissen(): React.JSX.Element {
       <WissensPanel
         artikel={workspace.listWissen()}
         onSpeichern={(input) => workspace.speichereWissen(input)}
+        revisionen={(id) => workspace.listWissenRevisionen(id)}
       />
     </Shell>
   );

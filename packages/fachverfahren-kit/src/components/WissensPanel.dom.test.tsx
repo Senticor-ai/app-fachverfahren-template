@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import type { WissensArtikel } from "../types.js";
+import type { WissensArtikel, WissensRevision } from "../types.js";
 import { WissensPanel } from "./WissensPanel.js";
 
 // react-dom braucht dieses Flag, damit `act()` die Updates ohne Warnung synchron flusht.
@@ -135,5 +135,84 @@ describe("WissensPanel — Authoring (#20 Phase 3b, jsdom, dep-frei)", () => {
     tippe(feld("wissen-markdown"), "ohne Titel");
     sende();
     expect(onSpeichern).not.toHaveBeenCalled();
+  });
+});
+
+const REVS: WissensRevision[] = [
+  {
+    version: 2,
+    titel: "Handbuch",
+    markdown: "zeile eins\nzeile NEU",
+    standIso: "2026-07-02T00:00:00.000Z",
+    editorActorId: "sb.b",
+  },
+  {
+    version: 1,
+    titel: "Handbuch",
+    markdown: "zeile eins\nzeile alt",
+    standIso: "2026-07-01T00:00:00.000Z",
+    editorActorId: "sb.a",
+  },
+];
+
+describe("WissensPanel — Verlauf/Diff (#20 Phase 4b, jsdom)", () => {
+  it("ohne revisionen-Prop kein Verlauf-Tab (rückwärtskompatibel)", () => {
+    render(<WissensPanel artikel={ARTIKEL} />);
+    expect(knopf("Verlauf")).toBeUndefined();
+    expect(knopf("Artikel")).toBeUndefined();
+  });
+
+  it("Verlauf-Tab zeigt die Revisionsliste + Zeilen-Diff (Zeichen-Codierung +/-)", () => {
+    render(<WissensPanel artikel={ARTIKEL} revisionen={() => REVS} />);
+    // Standard: Artikel-Ansicht (kein Diff sichtbar).
+    expect(container.querySelector("[role='group']")).toBeNull();
+    // Zum Verlauf wechseln.
+    klick(knopf("Verlauf")!);
+    // Revisionsliste (neueste zuerst).
+    const revListe = container.querySelector("ol[aria-label='Revisionen']");
+    expect(revListe?.textContent).toContain("v2");
+    expect(revListe?.textContent).toContain("v1");
+    expect(revListe?.textContent).toContain("sb.b");
+    // Diff zwischen v1 (Default „von") und v2 (Default „bis"): „zeile alt" weg, „zeile NEU" hinzu.
+    const diff = container.querySelector(
+      "[role='group'][aria-label='Zeilen-Diff']",
+    );
+    expect(diff).not.toBeNull();
+    const zeilen = [...diff!.querySelectorAll(":scope > div")];
+    const prefixe = zeilen.map(
+      (d) => d.querySelector("span[aria-hidden='true']")?.textContent,
+    );
+    // Zeichen-Codierung (BITV-Wahrheit) ist im DOM vorhanden — nicht nur Farbe.
+    expect(prefixe).toContain("+");
+    expect(prefixe).toContain("-");
+    expect(diff!.textContent).toContain("zeile NEU");
+    expect(diff!.textContent).toContain("zeile alt");
+    // „+1 -1"-Bilanz.
+    expect(container.textContent).toContain("+1");
+    expect(container.textContent).toContain("-1");
+  });
+
+  it("wählbare Von/Bis-Revisionen steuern den Diff (v2→v2 = keine Änderung)", () => {
+    render(<WissensPanel artikel={ARTIKEL} revisionen={() => REVS} />);
+    klick(knopf("Verlauf")!);
+    // „Von" auf v2 stellen (wie „Bis") → identischer Vergleich, keine +/- Zeilen.
+    const von = feld("wissen-diff-von") as HTMLSelectElement;
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLSelectElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(von, "2");
+      von.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    const diff = container.querySelector(
+      "[role='group'][aria-label='Zeilen-Diff']",
+    );
+    const zeilen = [...diff!.querySelectorAll(":scope > div")];
+    const prefixe = zeilen.map((d) =>
+      d.querySelector("span[aria-hidden='true']")?.textContent?.trim(),
+    );
+    // Nur unveränderte Zeilen (leerer Prefix) — kein + und kein -.
+    expect(prefixe.every((p) => p === "")).toBe(true);
   });
 });

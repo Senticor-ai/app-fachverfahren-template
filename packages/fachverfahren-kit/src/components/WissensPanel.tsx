@@ -5,9 +5,10 @@
 import { useMemo, useState, type ReactElement } from "react";
 import { BookOpen } from "lucide-react";
 
-import type { WissensArtikel } from "../types.js";
+import type { WissensArtikel, WissensRevision } from "../types.js";
 import { cn } from "../lib/cn.js";
 import { filtereWissen, hatHierarchie, wissensBaum } from "../lib/wissen.js";
+import { wikiDiff, diffBilanz } from "../lib/wiki-diff.js";
 import { EmptyState } from "./EmptyState.js";
 import { MarkdownView } from "./MarkdownView.js";
 
@@ -26,6 +27,10 @@ export interface WissensPanelProps {
     kategorie?: string;
     expectedVersion: number;
   }) => void;
+  /** OPTIONAL Verlauf/Diff (#20 Phase 4b): liefert die Revisionshistorie eines Artikels (neueste zuerst). Ist der
+   *  Callback gesetzt, zeigt der aktive Artikel einen „Verlauf"-Tab mit Revisionsliste + Zeilen-Diff. OHNE ihn bleibt
+   *  es die reine Artikelansicht (rückwärtskompatibel). */
+  revisionen?: (articleId: string) => WissensRevision[];
 }
 
 const stand = new Intl.DateTimeFormat("de-DE", {
@@ -68,16 +73,160 @@ const knopfPrimaer =
   "rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors ease-out motion-reduce:transition-none hover:bg-primary/90 outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]";
 const knopfSekundaer =
   "rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground transition-colors ease-out motion-reduce:transition-none hover:bg-secondary/60 outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]";
+const selectKlasse =
+  "rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]";
+const tabKlasse = (aktiv: boolean): string =>
+  cn(
+    "rounded-md px-2.5 py-1 text-sm font-medium transition-colors ease-out motion-reduce:transition-none outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+    aktiv
+      ? "bg-primary text-primary-foreground"
+      : "text-foreground hover:bg-secondary/60",
+  );
+
+/** Der „Verlauf"-Tab eines Artikels: Revisionsliste (neueste zuerst) + ein Zeilen-Diff zwischen zwei gewählten
+ *  Revisionen. Die Diff-Zeilen sind ZEICHEN- (Prefix +/−/Leer) UND farbcodiert — die Zeichen-Codierung ist die
+ *  barrierefreie Wahrheit (BITV; Farbe nur zusätzlich). Eigener State (von/bis) — beim Artikelwechsel via `key` frisch. */
+function VerlaufDiff({
+  revisionen,
+}: {
+  revisionen: WissensRevision[];
+}): ReactElement {
+  const neuesteV = revisionen[0]?.version ?? 0;
+  const vorherigeV = revisionen[1]?.version ?? neuesteV;
+  const [vonV, setVonV] = useState<number>(vorherigeV);
+  const [bisV, setBisV] = useState<number>(neuesteV);
+
+  if (revisionen.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground" role="status">
+        Noch keine Revisionen — der Verlauf erscheint nach der ersten
+        Speicherung.
+      </p>
+    );
+  }
+
+  const von =
+    revisionen.find((r) => r.version === vonV) ??
+    revisionen[revisionen.length - 1]!;
+  const bis = revisionen.find((r) => r.version === bisV) ?? revisionen[0]!;
+  const diff = wikiDiff(von.markdown, bis.markdown);
+  const bilanz = diffBilanz(diff);
+
+  return (
+    <div className="space-y-4">
+      <ol className="space-y-1" aria-label="Revisionen">
+        {revisionen.map((r) => (
+          <li
+            key={r.version}
+            className="flex flex-wrap items-baseline gap-x-2 text-sm"
+          >
+            <span className="font-medium text-foreground">v{r.version}</span>
+            {standText(r.standIso) ? (
+              <span className="text-xs text-muted-foreground">
+                {standText(r.standIso)}
+              </span>
+            ) : null}
+            {r.editorActorId ? (
+              <span className="text-xs text-muted-foreground">
+                · {r.editorActorId}
+              </span>
+            ) : null}
+            {r.changeNote ? (
+              <span className="text-xs text-muted-foreground">
+                · {r.changeNote}
+              </span>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+
+      {revisionen.length >= 2 ? (
+        <div className="space-y-3 border-t border-border pt-3">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <label htmlFor="wissen-diff-von" className="text-foreground">
+              Von
+            </label>
+            <select
+              id="wissen-diff-von"
+              value={vonV}
+              onChange={(e) => setVonV(Number(e.target.value))}
+              className={selectKlasse}
+            >
+              {revisionen.map((r) => (
+                <option key={r.version} value={r.version}>
+                  v{r.version}
+                </option>
+              ))}
+            </select>
+            <label htmlFor="wissen-diff-bis" className="text-foreground">
+              Bis
+            </label>
+            <select
+              id="wissen-diff-bis"
+              value={bisV}
+              onChange={(e) => setBisV(Number(e.target.value))}
+              className={selectKlasse}
+            >
+              {revisionen.map((r) => (
+                <option key={r.version} value={r.version}>
+                  v{r.version}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs tabular-nums">
+              <span className="text-status-ok">+{bilanz.hinzu}</span>{" "}
+              <span className="text-status-err">-{bilanz.weg}</span>
+            </span>
+          </div>
+
+          <div
+            className="overflow-x-auto rounded-md border border-border"
+            role="group"
+            aria-label="Zeilen-Diff"
+          >
+            {diff.map((z, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "flex gap-2 whitespace-pre-wrap px-2 font-mono text-sm",
+                  z.typ === "hinzu"
+                    ? "bg-status-ok-soft text-status-ok"
+                    : z.typ === "weg"
+                      ? "text-status-err"
+                      : "text-muted-foreground",
+                )}
+              >
+                <span
+                  aria-hidden="true"
+                  className="w-3 shrink-0 select-none text-center"
+                >
+                  {z.typ === "hinzu" ? "+" : z.typ === "weg" ? "-" : " "}
+                </span>
+                <span>{z.zeile || " "}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Nur eine Revision — ein Diff braucht mindestens zwei.
+        </p>
+      )}
+    </div>
+  );
+}
 
 /** Rendert die Wissensbasis als Master-Detail: gruppierte Artikel-Navigation + Markdown-Ansicht des gewählten Artikels. */
 export function WissensPanel({
   artikel,
   titel = "Wissensbasis",
   onSpeichern,
+  revisionen,
 }: WissensPanelProps): ReactElement {
   const [aktivId, setAktivId] = useState<string>(artikel[0]?.id ?? "");
   const [suche, setSuche] = useState("");
   const [entwurf, setEntwurf] = useState<Entwurf | null>(null);
+  const [ansicht, setAnsicht] = useState<"artikel" | "verlauf">("artikel");
   const suchend = suche.trim() !== "";
 
   const gefiltert = useMemo(
@@ -344,17 +493,60 @@ export function WissensPanel({
                     </p>
                   ) : null}
                 </div>
-                {onSpeichern ? (
-                  <button
-                    type="button"
-                    onClick={starteBearbeiten}
-                    className={cn(knopfSekundaer, "shrink-0")}
-                  >
-                    Bearbeiten
-                  </button>
-                ) : null}
+                <div className="flex shrink-0 items-center gap-2">
+                  {revisionen ? (
+                    <div
+                      role="tablist"
+                      aria-label="Ansicht"
+                      className="flex gap-1"
+                    >
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={ansicht === "artikel"}
+                        onClick={() => setAnsicht("artikel")}
+                        className={tabKlasse(ansicht === "artikel")}
+                      >
+                        Artikel
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={ansicht === "verlauf"}
+                        onClick={() => setAnsicht("verlauf")}
+                        className={tabKlasse(ansicht === "verlauf")}
+                      >
+                        Verlauf
+                      </button>
+                    </div>
+                  ) : null}
+                  {onSpeichern ? (
+                    <button
+                      type="button"
+                      onClick={starteBearbeiten}
+                      className={knopfSekundaer}
+                    >
+                      Bearbeiten
+                    </button>
+                  ) : null}
+                </div>
               </div>
-              <MarkdownView>{aktiv.markdown}</MarkdownView>
+              {revisionen && ansicht === "verlauf" ? (
+                <div role="tabpanel" aria-label="Verlauf">
+                  {/* key=aktiv.id → beim Artikelwechsel wird die von/bis-Auswahl frisch initialisiert */}
+                  <VerlaufDiff
+                    key={aktiv.id}
+                    revisionen={revisionen(aktiv.id)}
+                  />
+                </div>
+              ) : (
+                <div
+                  role={revisionen ? "tabpanel" : undefined}
+                  aria-label={revisionen ? "Artikel" : undefined}
+                >
+                  <MarkdownView>{aktiv.markdown}</MarkdownView>
+                </div>
+              )}
             </>
           ) : null}
         </article>
