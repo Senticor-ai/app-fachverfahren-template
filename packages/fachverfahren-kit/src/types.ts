@@ -1203,4 +1203,11 @@ export interface WorkspacePort<TAntragsdaten = Record<string, unknown>> {
   /** Nimmt einen Eingang AN: erzeugt im richtigen Verfahren einen `Vorgang` (+ Aufgabe) und markiert den Eingang als
    *  `accepted`. Gibt die neue Aufgaben-Id zurück (oder `undefined`, wenn der Eingang fehlt/schon angenommen ist). */
   acceptInbox(inboxId: string, akteur?: string): string | undefined;
+
+  // ── Wissensbasis / Wiki (#20) ──
+  // SYNCHRONER Accessor (kein `await` im Render): der DEV-Store liefert das statische `config.wissen`; der HTTP-Store
+  // seedet aus `config.wissen` und lädt `GET /api/wiki` NACH — ersetzt den Cache und bumpt (kein Leerflackern). Ein
+  // Deployment ohne wikiStore (404) bleibt beim Config-Wissen.
+  /** Die Wissensbasis-Artikel im Scope (versioniert server-seitig; als flache `WissensArtikel` fürs Rendern). */
+  listWissen(): WissensArtikel[];
 }

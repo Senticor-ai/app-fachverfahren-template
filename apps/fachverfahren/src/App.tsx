@@ -675,10 +675,12 @@ function AmtRegeln(): React.JSX.Element {
  *  (kategorisierte Navigation + Markdown-Ansicht). Neutrale Arbeitshilfen zum System selbst. */
 function AmtWissen(): React.JSX.Element {
   useStoreVersion();
+  // #20: SYNCHRON aus dem Port (kein await im Render) — DEV liefert das Config-Wissen, PROD seedet daraus und lädt
+  // die versionierte Wissensbasis per /api/wiki nach (der Snapshot-Bump rendert dann neu, kein Leerflackern).
   return (
     <Shell persona="sachbearbeitung" activeNavKey="eingang">
       <AmtSubNav />
-      <WissensPanel artikel={workspace.config.wissen ?? []} />
+      <WissensPanel artikel={workspace.listWissen()} />
     </Shell>
   );
 }

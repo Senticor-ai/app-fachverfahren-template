@@ -866,6 +866,10 @@ export function createWorkspaceStore<T = Record<string, unknown>>(
         .sort((a, b) => b.eingangIso.localeCompare(a.eingangIso))
         .map((i) => ({ ...i, rohdaten: { ...i.rohdaten } })),
 
+    // Wissensbasis (#20): der DEV-Store hat keine API — er liefert schlicht das statische Config-Wissen (defensive
+    // Kopie). Der HTTP-Store lädt es aus /api/wiki nach; die Naht (synchron) ist für beide dieselbe.
+    listWissen: () => (config.wissen ?? []).map((a) => ({ ...a })),
+
     triageInbox: (inboxId, status) => {
       const item = inbox.find((i) => i.id === inboxId);
       if (!item || item.triageStatus === "accepted") return;

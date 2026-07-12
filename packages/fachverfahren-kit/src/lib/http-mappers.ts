@@ -15,6 +15,7 @@ import type {
   Prioritaet,
   TriageStatus,
   Vorgang,
+  WissensArtikel,
 } from "../types.js";
 
 /** Die Aufgaben-Repräsentation, wie die Domain-API sie liefert (`GET /api/tasks`, `PATCH /api/tasks/:id` → `{ task }`). */
@@ -182,6 +183,32 @@ export function ansichtVonApp(v: AppSavedViewDTO): GespeicherteAnsicht {
     scope: v.scope,
     definition: v.definition ?? {},
     erstelltIso: v.createdAt,
+  };
+}
+
+/** Der Wiki-Artikel-Kopf, wie die Domain-API ihn liefert (`GET /api/wiki` → `{ articles }`). `status`/`version`
+ *  tragen keinen `WissensArtikel`-Platz und werden im Overlay verworfen (das Config-Wissen kennt sie nicht). */
+export interface AppWikiArticleDTO {
+  articleId: string;
+  title: string;
+  markdown: string;
+  category: string | null;
+  parentId: string | null;
+  status: string;
+  version: number;
+  updatedAt: string;
+}
+
+/** Server-Wiki-Artikel → Kit-`WissensArtikel` (das Overlay über `WorkspaceConfig.wissen`). exactOptionalPropertyTypes:
+ *  `kategorie`/`parentId` werden bei `null` WEGGELASSEN, nie als `undefined` gesetzt. */
+export function wissenVonAppWiki(a: AppWikiArticleDTO): WissensArtikel {
+  return {
+    id: a.articleId,
+    titel: a.title,
+    markdown: a.markdown,
+    standIso: a.updatedAt,
+    ...(a.category !== null ? { kategorie: a.category } : {}),
+    ...(a.parentId !== null ? { parentId: a.parentId } : {}),
   };
 }
 

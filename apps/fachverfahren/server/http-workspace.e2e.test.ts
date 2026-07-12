@@ -9,8 +9,10 @@ import {
   type AppCase,
   type AppIntakeItem,
   type AppTask,
+  type WikiStore,
   InMemoryCaseStore,
   InMemoryTaskStore,
+  InMemoryWikiStore,
 } from "@senticor/app-store-postgres";
 import {
   createHttpWorkspacePort,
@@ -95,6 +97,10 @@ const workspaceConfig: WorkspaceConfig = {
     { key: "normal", label: "Normal", tone: "info", ordinal: 1 },
   ],
   labels: [{ key: "eilt", label: "Eilt", tone: "warn" }],
+  // Statisches Config-Wissen — der Seed, den das /api/wiki-Overlay (#20) ersetzt (bzw. bei 404 beibehält).
+  wissen: [
+    { id: "config-seed", titel: "Nur aus Config", markdown: "statisch" },
+  ],
 };
 
 function macheCase(over: Partial<AppCase> = {}): AppCase {
@@ -156,7 +162,7 @@ function macheIntake(over: Partial<AppIntakeItem> = {}): AppIntakeItem {
 }
 
 const PERMS =
-  "task.read,task.write,case.read,case.transition,case.decide,inbox.read,inbox.triage,comment.read,comment.write,audit.read,view.read,view.write";
+  "task.read,task.write,case.read,case.transition,case.decide,inbox.read,inbox.triage,comment.read,comment.write,audit.read,view.read,view.write,wiki.read";
 
 const SB = (actor: string) => ({
   "x-actor-id": actor,
@@ -173,7 +179,7 @@ interface Aufbau {
   fetchShim: typeof fetch;
 }
 
-function baueServer(): Aufbau {
+function baueServer(opts: { wikiStore?: WikiStore } = {}): Aufbau {
   const caseStore = new InMemoryCaseStore();
   const taskStore = new InMemoryTaskStore();
   const app = fastify({ logger: false });
@@ -186,6 +192,7 @@ function baueServer(): Aufbau {
     now: () => "2026-07-05T00:00:00.000Z",
     newAuditId: uid,
     newId: uid,
+    ...(opts.wikiStore ? { wikiStore: opts.wikiStore } : {}),
   });
   // Fetch-Shim: fetch(url, init) → app.inject(...) → Response-ähnliches Objekt (nur .ok/.status/.text/.json genutzt).
   const fetchShim = (async (input: string | URL, init?: RequestInit) => {
@@ -555,5 +562,57 @@ describe("createWorkspacePortFromEnv — die austauschbare Naht", () => {
     });
     expect("refresh" in port).toBe(true);
     void aufbau.app.close();
+  });
+});
+
+describe("HttpWorkspacePort e2e — Wissensbasis/Wiki-Overlay (#20, echte /api/wiki-Route)", () => {
+  it("ersetzt das Config-Wissen nach refresh durch die server-persistierten Artikel", async () => {
+    const wikiStore = new InMemoryWikiStore();
+    await wikiStore.upsertArticle({
+      tenantId: "t1",
+      authorityId: "b1",
+      jurisdictionId: "de",
+      articleId: "handbuch",
+      title: "Server-Handbuch",
+      markdown: "vom Server, versioniert",
+      category: "Handbuch",
+      editorActorId: "sb.a",
+      expectedVersion: 0,
+    });
+    const { app, fetchShim } = baueServer({ wikiStore });
+    try {
+      const port = createHttpWorkspacePort(workspaceConfig, {
+        baseUrl: "",
+        fetch: fetchShim,
+        headers: SB("sb.a"),
+      });
+      // SEED sofort (kein Leerflackern): synchron das Config-Wissen, bevor /api/wiki geladen hat.
+      expect(port.listWissen().map((a) => a.id)).toEqual(["config-seed"]);
+      // Nach dem Laden: die server-persistierten Artikel ersetzen den Seed.
+      await port.refresh();
+      const artikel = port.listWissen();
+      expect(artikel.map((a) => a.id)).toEqual(["handbuch"]); // kein "config-seed" mehr
+      expect(artikel[0]?.titel).toBe("Server-Handbuch");
+      expect(artikel[0]?.kategorie).toBe("Handbuch");
+      expect(artikel[0]?.standIso).toBeTruthy(); // updatedAt → standIso
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("ohne wikiStore (GET /api/wiki → 404) bleibt das Config-Wissen erhalten", async () => {
+    const { app, fetchShim } = baueServer(); // kein wikiStore
+    try {
+      const port = createHttpWorkspacePort(workspaceConfig, {
+        baseUrl: "",
+        fetch: fetchShim,
+        headers: SB("sb.a"),
+      });
+      // Ein voller refresh (inkl. des 404 auf /api/wiki) darf den Config-Seed NICHT leeren.
+      await port.refresh();
+      expect(port.listWissen().map((a) => a.id)).toEqual(["config-seed"]);
+    } finally {
+      await app.close();
+    }
   });
 });

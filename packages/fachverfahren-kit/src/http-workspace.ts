@@ -31,6 +31,7 @@ import type {
   VerfahrenEintrag,
   Vorgang,
   VorgangPort,
+  WissensArtikel,
   WorkspaceConfig,
 } from "./types.js";
 import type { WorkspaceStore } from "./store.js";
@@ -43,6 +44,7 @@ import {
   inboxVonAppIntake,
   kommentarVonApp,
   vorgangVonAppCase,
+  wissenVonAppWiki,
   type AppCaseDTO,
   type AppIntakeDTO,
   type AppSavedViewDTO,
@@ -50,6 +52,7 @@ import {
   type AppTaskCommentDTO,
   type AppTaskDTO,
   type AppTaskRelationDTO,
+  type AppWikiArticleDTO,
 } from "./lib/http-mappers.js";
 
 /** Fehler eines Domain-API-Aufrufs — trägt Statuscode + Kontext, damit `onError` sie einordnen kann. */
@@ -140,6 +143,8 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
   const caseCache = new Map<string, CaseEintrag<T>>();
   let inboxCache: InboxItem[] = [];
   let savedViewCache: GespeicherteAnsicht[] = [];
+  // Wissensbasis (#20): aus dem Config-Wissen GESEEDET (sofort da, kein Leerflackern), dann per GET /api/wiki ersetzt.
+  let wissenCache: WissensArtikel[] = config.wissen ?? [];
   const detailCache = new Map<string, DetailEintrag>();
   const detailLaedt = new Set<string>();
   // Monoton steigende Ladungs-Generation je Aufgabe: eine verspätet eintreffende ÄLTERE Detail-Ladung darf einen
@@ -226,6 +231,21 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
     savedViewCache = views.map(ansichtVonApp);
     bump();
   }
+  async function ladeWissen(): Promise<void> {
+    try {
+      const { articles } = await api<{ articles: AppWikiArticleDTO[] }>(
+        "GET",
+        "/api/wiki",
+      );
+      wissenCache = articles.map(wissenVonAppWiki);
+      bump();
+    } catch (e) {
+      // 404 = dieses Deployment hat KEINEN wikiStore → beim Config-Wissen bleiben (kein Fehler, kein Cache-Leeren).
+      // Andere Fehler (403/500) weiterreichen, damit `refresh()` sie meldet.
+      if (e instanceof HttpWorkspaceError && e.status === 404) return;
+      throw e;
+    }
+  }
   // Einzel-Fall MIT Antragsdaten laden (`GET /api/cases/:id` liefert `{ case, antragsdaten }`) und den Cache-Eintrag
   // anreichern — so kann die vertiefte Prüfsicht (ReviewWorkspace) über HTTP die echten Antragsdaten zeigen.
   async function ladeFallDetail(caseId: string): Promise<void> {
@@ -256,6 +276,7 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
       ladeFaelle(),
       ladeInbox(),
       ladeViews(),
+      ladeWissen(),
     ]);
     for (const e of ergebnisse)
       if (e.status === "rejected") melde(e.reason, "refresh");
@@ -649,6 +670,9 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
     })();
   };
 
+  // ── Wissensbasis / Wiki (#20) — synchroner Accessor über dem Cache (aus Config geseedet, per /api/wiki ersetzt) ──
+  const listWissen = (): WissensArtikel[] => wissenCache.map((a) => ({ ...a }));
+
   // ── Inbox / Triage ──
   const listInbox = (triageStatus: TriageStatus = "pending"): InboxItem[] =>
     // Neueste zuerst — wie der In-Memory-Store (DEV/PROD-Parität). `.filter()` liefert ein frisches Array, daher
@@ -821,6 +845,7 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
     listInbox,
     triageInbox,
     acceptInbox,
+    listWissen,
   };
 }
 
