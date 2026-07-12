@@ -15,11 +15,11 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@senticor/jurisdiction-eu": "workspace:*",
     "@senticor/platform-contracts": "workspace:*",
-    "@senticor/public-sector-sdk": "workspace:*",
-    "@senticor/jurisdiction-eu": "workspace:*"
+    "@senticor/public-sector-sdk": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "catalog:"
+    "typescript": "6.0.3"
   }
 }

@@ -1,11 +1,7 @@
 import { type ReactNode, useId } from "react";
 
 export type SourceCoverageStatus =
-  | "covered"
-  | "missing"
-  | "review"
-  | "stale"
-  | "conflict";
+  "covered" | "missing" | "review" | "stale" | "conflict";
 
 export interface SourceCoverageAction {
   label: string;

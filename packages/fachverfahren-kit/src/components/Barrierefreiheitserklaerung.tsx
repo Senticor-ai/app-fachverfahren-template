@@ -31,9 +31,7 @@ import { Badge, type BadgeProps } from "../ui/badge.js";
 
 /** Konformitätsstand nach BITV 2.0 § 7 Abs. 1. */
 export type BarrierefreiheitStatus =
-  | "konform"
-  | "teilweise-konform"
-  | "nicht-konform";
+  "konform" | "teilweise-konform" | "nicht-konform";
 
 export interface BarrierefreiheitStand {
   /** Datum der Erstellung/letzten Überprüfung als ISO-8601-String (z. B. "2026-06-27"). */

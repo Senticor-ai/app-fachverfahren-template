@@ -13,7 +13,11 @@ const config: StorybookConfig = {
     "../modules/**/ui/**/*.stories.@(ts|tsx)",
     "../packages/public-sector-ui/src/**/*.stories.@(ts|tsx)",
   ],
-  addons: ["@storybook/addon-a11y", "@storybook/addon-docs"],
+  addons: [
+    "@storybook/addon-a11y",
+    "@storybook/addon-docs",
+    "@storybook/addon-vitest",
+  ],
   typescript: {
     reactDocgen: "react-docgen",
   },

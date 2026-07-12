@@ -10,5 +10,9 @@
     "types": ["node"],
     "tsBuildInfoFile": "dist-server/.tsbuildinfo"
   },
+  "references": [
+    { "path": "../../packages/app-store-postgres" },
+    { "path": "../../packages/provider-local-auth" }
+  ],
   "include": ["server/**/*.ts"]
 }

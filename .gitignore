@@ -9,6 +9,8 @@ storybook-static/
 coverage/
 playwright-report/
 test-results/
+.vitest-attachments/
+__screenshots__/
 .env
 .env.local
 .agent/

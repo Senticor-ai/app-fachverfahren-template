@@ -2,6 +2,8 @@
 // folgen in ./components und werden hier re-exportiert.
 export * from "./types.js";
 export * from "./store.js";
+export * from "./board-types.js";
+export * from "./board-store.js";
 export * from "./contract-snapshot.js";
 export * from "./format.js";
 // Business-Logik als DATEN: Feldwert-/Options-Auflösung + der generische reine Interpreter (Tarif/Regeln/Codelisten).
@@ -45,6 +47,14 @@ export * from "./components/ConsentBanner.js";
 export * from "./components/KommandoPalette.js";
 export * from "./components/StatCard.js";
 export * from "./components/ErrorSummary.js";
+export * from "./components/KanbanCard.js";
+export * from "./components/MoveCardMenu.js";
+export * from "./components/KanbanColumn.js";
+export * from "./components/KanbanBoard.js";
+export * from "./components/CreateBoardDialog.js";
+export * from "./components/BoardList.js";
+export * from "./components/BoardCardDetail.js";
+export * from "./components/ArchivedCardsPanel.js";
 
 // ── Standardisierungs-Layer (M0/M1): der EINE Zustands-/Ansage-/Theming-Vertrag, auf den alle ──
 // ── Komponenten zurückgreifen (shadcn/ui + Tailwind-Token). Eine Wahrheit pro Belang. ──

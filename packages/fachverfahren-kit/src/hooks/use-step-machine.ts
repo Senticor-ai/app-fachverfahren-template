@@ -17,11 +17,7 @@ export interface FlowStep {
 
 /** Globale Phase des Flows. */
 export type FlowPhase =
-  | "in-progress"
-  | "review"
-  | "submitting"
-  | "confirmed"
-  | "error";
+  "in-progress" | "review" | "submitting" | "confirmed" | "error";
 
 export interface UseStepMachineOptions {
   steps: FlowStep[];

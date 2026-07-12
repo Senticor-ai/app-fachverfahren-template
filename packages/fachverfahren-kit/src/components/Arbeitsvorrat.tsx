@@ -68,11 +68,7 @@ export interface ArbeitsvorratBulkAction {
 // ── Sort-State (inlined, generisch — keine externe Util-Abhängigkeit) ────────
 type SortDir = "asc" | "desc" | null;
 type ColKey =
-  | "vorgang"
-  | "eingang"
-  | "berechnung"
-  | "status"
-  | `feld:${string}`;
+  "vorgang" | "eingang" | "berechnung" | "status" | `feld:${string}`;
 
 /** Liefert einen verschachtelten Wert (Pfad wie "person.nachname") aus den Antragsdaten als String. */
 function readPfad(antragsdaten: unknown, pfad: string): string {

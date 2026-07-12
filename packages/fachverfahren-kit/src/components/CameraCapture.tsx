@@ -47,11 +47,7 @@ export interface CaptureResult {
 
 /** Grund eines Fehlschlags — für gezielte, handlungsleitende Hinweistexte. */
 type KameraFehler =
-  | "nicht-unterstuetzt"
-  | "verweigert"
-  | "keine-kamera"
-  | "belegt"
-  | "unbekannt";
+  "nicht-unterstuetzt" | "verweigert" | "keine-kamera" | "belegt" | "unbekannt";
 
 export interface CameraCaptureProps {
   /** Gewünschte Auflösung als [breite, hoehe]. Default [720, 720]. Wird als „ideal" an getUserMedia gereicht. */

@@ -1,9 +1,13 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { registerServiceWorker } from "@senticor/fachverfahren-kit";
+import {
+  registerServiceWorker,
+  StatusRegionProvider,
+} from "@senticor/fachverfahren-kit";
 import { App } from "./App.js";
 import { AppErrorBoundary } from "./AppErrorBoundary.js";
+import { SessionProvider } from "./session.js";
 import "./styles.css";
 
 const el = document.getElementById("root");
@@ -20,9 +24,13 @@ const routerBase = import.meta.env.BASE_URL.replace(/\/+$/, "") || "/";
 createRoot(el).render(
   <StrictMode>
     <AppErrorBoundary>
-      <BrowserRouter basename={routerBase}>
-        <App />
-      </BrowserRouter>
+      <StatusRegionProvider>
+        <SessionProvider>
+          <BrowserRouter basename={routerBase}>
+            <App />
+          </BrowserRouter>
+        </SessionProvider>
+      </StatusRegionProvider>
     </AppErrorBoundary>
   </StrictMode>,
 );
