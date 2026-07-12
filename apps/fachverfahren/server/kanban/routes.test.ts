@@ -237,6 +237,76 @@ describe("board CRUD routes", () => {
     expect(archiveAttempt.statusCode).toBe(400);
   });
 
+  it("rejects card create and move targeting a column of ANOTHER board (400)", async () => {
+    // Fremde Spalte: eigenes Zweit-Board desselben Owners — der FK allein würde das zulassen,
+    // die Karte hinge dann unsichtbar am Lebenszyklus des fremden Boards.
+    const otherBoard = await app.inject({
+      method: "POST",
+      url: "/api/v1/boards",
+      headers: { cookie: ownerCookie },
+      payload: { title: "Other Board" },
+    });
+    const otherBoardId = otherBoard.json().boardId as string;
+    const foreignColumn = await app.inject({
+      method: "POST",
+      url: `/api/v1/boards/${otherBoardId}/columns`,
+      headers: { cookie: ownerCookie },
+      payload: { title: "Foreign Column" },
+    });
+    const foreignColumnId = foreignColumn.json().columnId as string;
+
+    const created = await app.inject({
+      method: "POST",
+      url: `/api/v1/boards/${boardIdFromBootstrap}/cards`,
+      headers: { cookie: ownerCookie },
+      payload: { columnId: foreignColumnId, title: "Stray card" },
+    });
+    expect(created.statusCode).toBe(400);
+
+    const board = await app.inject({
+      method: "GET",
+      url: `/api/v1/boards/${boardIdFromBootstrap}`,
+      headers: { cookie: ownerCookie },
+    });
+    const victim = board.json().cards[0] as {
+      cardId: string;
+      version: number;
+    };
+    const moved = await app.inject({
+      method: "POST",
+      url: `/api/v1/boards/${boardIdFromBootstrap}/cards/${victim.cardId}/move`,
+      headers: { cookie: ownerCookie, "if-match": `"${victim.version}"` },
+      payload: { toColumnId: foreignColumnId },
+    });
+    expect(moved.statusCode).toBe(400);
+  });
+
+  it("lists archived cards for the archive panel (restore loop)", async () => {
+    const board = await app.inject({
+      method: "GET",
+      url: `/api/v1/boards/${boardIdFromBootstrap}`,
+      headers: { cookie: ownerCookie },
+    });
+    const card = board.json().cards[0] as { cardId: string; version: number };
+
+    const archived = await app.inject({
+      method: "POST",
+      url: `/api/v1/boards/${boardIdFromBootstrap}/cards/${card.cardId}/archive`,
+      headers: { cookie: ownerCookie, "if-match": `"${card.version}"` },
+    });
+    expect(archived.statusCode).toBe(200);
+
+    const list = await app.inject({
+      method: "GET",
+      url: `/api/v1/boards/${boardIdFromBootstrap}/cards/archived`,
+      headers: { cookie: ownerCookie },
+    });
+    expect(list.statusCode).toBe(200);
+    const cards = list.json() as { cardId: string; archivedAt: string }[];
+    expect(cards.map((c) => c.cardId)).toContain(card.cardId);
+    expect(cards.every((c) => c.archivedAt !== null)).toBe(true);
+  });
+
   it("quick-adds a card with only a title (no other fields required)", async () => {
     const columns = await app.inject({
       method: "GET",

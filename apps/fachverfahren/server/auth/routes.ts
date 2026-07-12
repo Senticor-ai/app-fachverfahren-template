@@ -63,25 +63,37 @@ export function registerAuthRoutes(
       ) {
         return reply.code(400).send({ error: "invalid bootstrap request" });
       }
+      // In Konstanten festhalten: die Narrowings oben gelten nicht innerhalb der Lock-Closure.
+      const token = body.token;
+      const email = body.email;
+      const password = body.password;
+      const displayName = body.displayName;
 
       try {
-        const result = await bootstrapWorkspace(
-          {
-            authStore: deps.authStore,
-            kanbanStore: deps.kanbanStore,
-            bootstrapToken: deps.bootstrapToken,
-            ...(deps.now ? { now: deps.now } : {}),
-            ...(deps.generateId ? { generateId: deps.generateId } : {}),
-          },
-          {
-            token: body.token,
-            email: body.email,
-            password: body.password,
-            displayName: body.displayName,
-            ...(typeof body.contentLocale === "string"
-              ? { contentLocale: body.contentLocale }
-              : {}),
-          },
+        // Advisory Lock über den GESAMTEN Bootstrap (kanban plan decision 3): zwei
+        // gleichzeitige Setup-POSTs würden sonst beide `countUsers() === 0` sehen und
+        // zwei Erstbenutzer anlegen — der zweite läuft jetzt in "already-bootstrapped".
+        const result = await deps.authStore.withBootstrapLock(
+          DEFAULT_TENANT_ID,
+          () =>
+            bootstrapWorkspace(
+              {
+                authStore: deps.authStore,
+                kanbanStore: deps.kanbanStore,
+                bootstrapToken: deps.bootstrapToken,
+                ...(deps.now ? { now: deps.now } : {}),
+                ...(deps.generateId ? { generateId: deps.generateId } : {}),
+              },
+              {
+                token,
+                email,
+                password,
+                displayName,
+                ...(typeof body.contentLocale === "string"
+                  ? { contentLocale: body.contentLocale }
+                  : {}),
+              },
+            ),
         );
         await issueSession(deps.authStore, reply, result.user, now());
         return reply.code(201).send({

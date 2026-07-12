@@ -83,7 +83,8 @@ export function KanbanColumn<TCardData = Record<string, unknown>>({
     <section
       ref={setNodeRef}
       className={cn(
-        "ps-kanban-column flex h-full w-72 shrink-0 flex-col rounded-lg border border-border bg-secondary/30",
+        // Volle Breite im gestapelten Reflow-Layout (<sm, z. B. 400 % Zoom), feste Spaltenbreite ab sm.
+        "ps-kanban-column flex h-auto w-full shrink-0 flex-col rounded-lg border border-border bg-secondary/30 sm:h-full sm:w-72",
         isOver && "ring-ring/60 ring-2",
       )}
       aria-label={`Spalte ${column.title}`}

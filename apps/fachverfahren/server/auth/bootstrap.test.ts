@@ -102,4 +102,35 @@ describe("bootstrapWorkspace", () => {
       expect(error).toBeInstanceOf(BootstrapError);
     }
   });
+
+  it("rolls the created user back when a later step fails, so a retry succeeds", async () => {
+    const deps = makeDeps({ bootstrapToken: "correct-token" });
+    // Discovery-Board-Seed schlägt fehl (z. B. Migration fehlt) — der schon angelegte
+    // Benutzer darf den Tenant NICHT dauerhaft als „bootstrapped" hinterlassen.
+    const failingCreateBoard = deps.kanbanStore.createBoard.bind(
+      deps.kanbanStore,
+    );
+    let failNext = true;
+    deps.kanbanStore.createBoard = async (board) => {
+      if (failNext) {
+        failNext = false;
+        throw new Error("relation app_boards does not exist");
+      }
+      return failingCreateBoard(board);
+    };
+
+    await expect(bootstrapWorkspace(deps, validInput)).rejects.toThrow(
+      "app_boards",
+    );
+    await expect(
+      deps.authStore.countUsers({ tenantId: "default" }),
+    ).resolves.toBe(0);
+
+    // Retry mit reparierter Umgebung: läuft durch, statt in "already-bootstrapped" zu enden.
+    const retried = await bootstrapWorkspace(deps, validInput);
+    expect(retried.user.email).toBe(validInput.email);
+    expect(
+      await deps.authStore.getLocalCredential(retried.user.actorId),
+    ).toBeDefined();
+  });
 });

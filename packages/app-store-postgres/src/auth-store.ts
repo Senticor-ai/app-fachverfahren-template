@@ -47,6 +47,14 @@ export interface AuthStore {
     actorId: string;
   }): Promise<UserAccount | undefined>;
   countUsers(input: { tenantId: string }): Promise<number>;
+  /** Kompensations-Löschung für abgebrochene Bootstraps: entfernt Benutzer samt Credential
+   *  und Sessions (Postgres: ON DELETE CASCADE), damit `countUsers()` wieder 0 meldet und der
+   *  Operator das Setup erneut versuchen kann. */
+  deleteUser(input: { tenantId: string; actorId: string }): Promise<void>;
+  /** Serialisiert konkurrierende First-User-Bootstraps eines Tenants (kanban plan decision 3):
+   *  Postgres = Advisory Lock über die gesamte Bootstrap-Ausführung, In-Memory = Mutex.
+   *  Ohne dieses Gate können zwei gleichzeitige Setup-POSTs beide `countUsers() === 0` sehen. */
+  withBootstrapLock<T>(tenantId: string, run: () => Promise<T>): Promise<T>;
 
   createLocalCredential(credential: LocalCredential): Promise<LocalCredential>;
   getLocalCredential(actorId: string): Promise<LocalCredential | undefined>;
@@ -70,6 +78,7 @@ export class InMemoryAuthStore implements AuthStore {
   private readonly users = new Map<string, UserAccount>();
   private readonly credentials = new Map<string, LocalCredential>();
   private readonly sessions = new Map<string, SessionRecord>();
+  private readonly bootstrapLocks = new Map<string, Promise<unknown>>();
 
   async createUser(user: UserAccount): Promise<UserAccount> {
     this.users.set(userKey(user.tenantId, user.actorId), { ...user });
@@ -101,6 +110,34 @@ export class InMemoryAuthStore implements AuthStore {
     return [...this.users.values()].filter(
       (user) => user.tenantId === input.tenantId,
     ).length;
+  }
+
+  async deleteUser(input: {
+    tenantId: string;
+    actorId: string;
+  }): Promise<void> {
+    this.users.delete(userKey(input.tenantId, input.actorId));
+    this.credentials.delete(input.actorId);
+    for (const [hash, session] of this.sessions) {
+      if (session.actorId === input.actorId) {
+        this.sessions.delete(hash);
+      }
+    }
+  }
+
+  async withBootstrapLock<T>(
+    tenantId: string,
+    run: () => Promise<T>,
+  ): Promise<T> {
+    const previous = this.bootstrapLocks.get(tenantId) ?? Promise.resolve();
+    const next = previous.then(run, run);
+    // Fehler nur im zurückgegebenen Promise sichtbar — die Kette selbst darf nie rejecten,
+    // sonst bliebe der Mutex nach einem fehlgeschlagenen Bootstrap dauerhaft „kaputt".
+    this.bootstrapLocks.set(
+      tenantId,
+      next.catch(() => undefined),
+    );
+    return next;
   }
 
   async createLocalCredential(
@@ -215,6 +252,12 @@ export class UnavailableAuthStore implements AuthStore {
     this.fail();
   }
   async countUsers(): Promise<number> {
+    this.fail();
+  }
+  async deleteUser(): Promise<void> {
+    this.fail();
+  }
+  async withBootstrapLock<T>(): Promise<T> {
     this.fail();
   }
   async createLocalCredential(): Promise<LocalCredential> {
@@ -355,6 +398,41 @@ export class PostgresAuthStore implements AuthStore {
         [input.tenantId],
       );
       return Number(result.rows[0]?.count ?? "0");
+    });
+  }
+
+  async deleteUser(input: {
+    tenantId: string;
+    actorId: string;
+  }): Promise<void> {
+    await this.withClient(async (client) => {
+      // Credentials + Sessions hängen per ON DELETE CASCADE am Benutzer (Migration local_auth).
+      await client.query(
+        `DELETE FROM app_users WHERE tenant_id = $1 AND actor_id = $2`,
+        [input.tenantId, input.actorId],
+      );
+    });
+  }
+
+  async withBootstrapLock<T>(
+    tenantId: string,
+    run: () => Promise<T>,
+  ): Promise<T> {
+    // Session-Advisory-Lock auf einer DEDIZIERTEN Verbindung, die für die gesamte
+    // Bootstrap-Ausführung offen bleibt — die eigentlichen Schreibzugriffe laufen über
+    // eigene Verbindungen, konkurrierende Bootstraps serialisiert der Lock trotzdem.
+    return this.withClient(async (client) => {
+      await client.query(`SELECT pg_advisory_lock(hashtextextended($1, 0))`, [
+        `auth-bootstrap:${tenantId}`,
+      ]);
+      try {
+        return await run();
+      } finally {
+        await client.query(
+          `SELECT pg_advisory_unlock(hashtextextended($1, 0))`,
+          [`auth-bootstrap:${tenantId}`],
+        );
+      }
     });
   }
 

@@ -1,6 +1,7 @@
 // LoginPage — zeigt je nach `/auth/status` entweder das Einmal-Setup (Bootstrap, token-gated) oder
 // den normalen Login. Kein Fachliches: nur die App-Komposition der Kit-Primitive.
 import * as React from "react";
+import { Navigate } from "react-router-dom";
 import {
   Button,
   Card,
@@ -9,10 +10,16 @@ import {
   CardTitle,
   Input,
 } from "@senticor/fachverfahren-kit";
+import { apiPath } from "./board-client.js";
 import { useSession } from "./session.js";
 
 export function LoginPage(): React.ReactElement {
-  const { bootstrapped, refresh } = useSession();
+  const { status, bootstrapped, refresh } = useSession();
+  // Nach erfolgreichem Login (oder bereits bestehender Session) zurück in den Workspace —
+  // sonst bliebe der Benutzer trotz gültiger Session auf dem Login-Formular stehen.
+  if (status === "authenticated") {
+    return <Navigate to="/boards" replace />;
+  }
   return (
     <div className="flex min-h-screen items-center justify-center bg-secondary/20 px-4">
       <Card className="w-full max-w-sm">
@@ -48,7 +55,7 @@ function LoginForm({
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch("/auth/login", {
+      const response = await fetch(apiPath("/auth/login"), {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },
@@ -118,7 +125,7 @@ function BootstrapForm({
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch("/auth/bootstrap", {
+      const response = await fetch(apiPath("/auth/bootstrap"), {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },

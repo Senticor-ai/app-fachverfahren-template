@@ -17,6 +17,7 @@ import type {
   LabelColor,
 } from "../board-types.js";
 import { cn } from "../lib/cn.js";
+import { nextPositionKey } from "../lib/position.js";
 import { Button } from "../ui/button.js";
 import { Checkbox } from "../ui/checkbox.js";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../ui/sheet.js";
@@ -68,6 +69,9 @@ export interface BoardCardDetailProps<TCardData = Record<string, unknown>> {
   card: BoardCard<TCardData> | null;
   board: Board | null;
   columns: BoardColumn[];
+  /** Alle Karten des Boards — nötig, um beim Verschieben „An den Anfang" einen echten
+   *  `positionKey` VOR der ersten Zielkarte zu berechnen. Ohne Liste landet die Karte am Ende. */
+  cards?: BoardCard<TCardData>[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   port: BoardPort<TCardData>;
@@ -78,6 +82,7 @@ export function BoardCardDetail<TCardData = Record<string, unknown>>({
   card,
   board,
   columns,
+  cards,
   open,
   onOpenChange,
   port,
@@ -234,15 +239,26 @@ export function BoardCardDetail<TCardData = Record<string, unknown>>({
   }) {
     if (!local) return;
     const targetColumn = columns.find((c) => c.columnId === input.toColumnId);
+    // „An den Anfang" braucht einen ECHTEN Schlüssel VOR der ersten Zielkarte: ein leerer
+    // Sentinel-String fällt im HTTP-Client als falsy aus dem Request-Body (Karte landet am
+    // Ende) und wäre im In-Memory-Store ein ungültiger Order-Key.
+    const firstTargetKey =
+      (cards ?? [])
+        .filter(
+          (c) =>
+            c.columnId === input.toColumnId &&
+            c.cardId !== local.cardId &&
+            c.archivedAt === null,
+        )
+        .map((c) => c.positionKey)
+        .sort((a, b) => a.localeCompare(b))[0] ?? null;
     const updated = await runMutation(() =>
       port.moveCard(
         local.boardId,
         local.cardId,
         local.version,
         input.toColumnId,
-        // Grobe Positionierung genügt hier — die genaue Reihenfolge lässt sich anschließend
-        // per Drag-and-Drop auf dem Board feinjustieren.
-        input.toStart ? "" : undefined,
+        input.toStart ? nextPositionKey(null, firstTargetKey) : undefined,
       ),
     );
     if (updated) {

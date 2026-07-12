@@ -109,30 +109,44 @@ export async function bootstrapWorkspace(
     updatedAt: nowIso,
   });
 
-  const passwordHash = await hashPassword(input.password);
-  await deps.authStore.createLocalCredential({
-    actorId,
-    passwordHash,
-    hashAlgo: "argon2id",
-    passwordChangedAt: nowIso,
-    failedAttempts: 0,
-    lockedUntil: null,
-    createdAt: nowIso,
-    updatedAt: nowIso,
-  });
+  // Rollback-Grenze: scheitert NACH dem User-Insert irgendetwas (Credential-Persistenz,
+  // Discovery-Board-Seed), würde `countUsers() > 0` den Tenant dauerhaft als „bootstrapped"
+  // melden — ohne Credential wäre der Workspace unbenutzbar UND nicht erneut einrichtbar.
+  // Auth- und Kanban-Store teilen keine Verbindung (jeder Call öffnet seine eigene), eine
+  // echte DB-Transaktion über beide gibt es daher nicht; die Kompensations-Löschung stellt
+  // `countUsers() === 0` wieder her, sodass der Operator das Setup erneut versuchen kann.
+  try {
+    const passwordHash = await hashPassword(input.password);
+    await deps.authStore.createLocalCredential({
+      actorId,
+      passwordHash,
+      hashAlgo: "argon2id",
+      passwordChangedAt: nowIso,
+      failedAttempts: 0,
+      lockedUntil: null,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    });
 
-  const board = await seedDiscoveryBoard(
-    deps.kanbanStore,
-    {
-      tenantId,
-      authorityId: DEFAULT_AUTHORITY_ID,
-      jurisdictionId: DEFAULT_JURISDICTION_ID,
-      ownerActorId: actorId,
-      contentLocale: input.contentLocale ?? "de",
-      now,
-    },
-    { generateId },
-  );
+    const board = await seedDiscoveryBoard(
+      deps.kanbanStore,
+      {
+        tenantId,
+        authorityId: DEFAULT_AUTHORITY_ID,
+        jurisdictionId: DEFAULT_JURISDICTION_ID,
+        ownerActorId: actorId,
+        contentLocale: input.contentLocale ?? "de",
+        now,
+      },
+      { generateId },
+    );
 
-  return { user, board };
+    return { user, board };
+  } catch (error) {
+    await deps.authStore.deleteUser({ tenantId, actorId }).catch(() => {
+      // Best effort: schlägt auch die Kompensation fehl (z. B. DB weg), gewinnt der
+      // ursprüngliche Fehler — er beschreibt die eigentliche Ursache.
+    });
+    throw error;
+  }
 }

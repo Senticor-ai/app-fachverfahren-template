@@ -262,6 +262,50 @@ export function KanbanBoard<TCardData = Record<string, unknown>>({
     );
   }
 
+  const addColumnControl = addingColumn ? (
+    <form
+      onSubmit={handleAddColumn}
+      className="rounded-lg border border-border bg-secondary/30 p-2"
+    >
+      <Input
+        autoFocus
+        value={newColumnTitle}
+        onChange={(event) => setNewColumnTitle(event.target.value)}
+        onBlur={() => {
+          if (!newColumnTitle.trim()) setAddingColumn(false);
+        }}
+        placeholder="Spaltentitel…"
+        aria-label="Titel der neuen Spalte"
+      />
+      <div className="mt-2 flex gap-1.5">
+        <Button type="submit" size="sm" disabled={!newColumnTitle.trim()}>
+          Hinzufügen
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setAddingColumn(false);
+            setNewColumnTitle("");
+          }}
+        >
+          Abbrechen
+        </Button>
+      </div>
+    </form>
+  ) : (
+    <Button
+      type="button"
+      variant="ghost"
+      className="w-full justify-start text-muted-foreground"
+      onClick={() => setAddingColumn(true)}
+    >
+      <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />
+      Spalte hinzufügen
+    </Button>
+  );
+
   return (
     <section className="flex h-full min-h-0 flex-col">
       <header className="flex items-start justify-between border-b border-border px-4 py-3">
@@ -298,11 +342,16 @@ export function KanbanBoard<TCardData = Record<string, unknown>>({
         </div>
       )}
       {data.columns.length === 0 ? (
-        <EmptyState
-          icon={LayoutGrid}
-          title="Noch keine Spalten"
-          description="Dieses Board hat noch keine Spalten."
-        />
+        // Neue Boards starten mit NULL Spalten — ohne den Anlege-Weg hier würde der
+        // primäre „Neues Board"-Workflow in einer Sackgasse enden (nur Text, keine Aktion).
+        <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
+          <EmptyState
+            icon={LayoutGrid}
+            title="Noch keine Spalten"
+            description="Legen Sie die erste Spalte an, um Karten zu erfassen."
+          />
+          <div className="w-full sm:mx-auto sm:w-72">{addColumnControl}</div>
+        </div>
       ) : (
         <DndContext
           sensors={sensors}
@@ -310,7 +359,9 @@ export function KanbanBoard<TCardData = Record<string, unknown>>({
           onDragStart={handleDragStart}
           onDragEnd={(event) => void handleDragEnd(event)}
         >
-          <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-4">
+          {/* Reflow (WCAG 1.4.10 / Screen-Contract): unterhalb `sm` — d. h. auch bei 400 %
+              Zoom — stapeln die Spalten vertikal statt horizontal zu scrollen. */}
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 sm:flex-row sm:overflow-x-auto sm:overflow-y-visible">
             {data.columns.map((column) => (
               <KanbanColumn
                 key={column.columnId}
@@ -326,55 +377,7 @@ export function KanbanBoard<TCardData = Record<string, unknown>>({
                 onArchiveAllCards={handleArchiveAllCards}
               />
             ))}
-            <div className="w-72 shrink-0">
-              {addingColumn ? (
-                <form
-                  onSubmit={handleAddColumn}
-                  className="rounded-lg border border-border bg-secondary/30 p-2"
-                >
-                  <Input
-                    autoFocus
-                    value={newColumnTitle}
-                    onChange={(event) => setNewColumnTitle(event.target.value)}
-                    onBlur={() => {
-                      if (!newColumnTitle.trim()) setAddingColumn(false);
-                    }}
-                    placeholder="Spaltentitel…"
-                    aria-label="Titel der neuen Spalte"
-                  />
-                  <div className="mt-2 flex gap-1.5">
-                    <Button
-                      type="submit"
-                      size="sm"
-                      disabled={!newColumnTitle.trim()}
-                    >
-                      Hinzufügen
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setAddingColumn(false);
-                        setNewColumnTitle("");
-                      }}
-                    >
-                      Abbrechen
-                    </Button>
-                  </div>
-                </form>
-              ) : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="w-full justify-start text-muted-foreground"
-                  onClick={() => setAddingColumn(true)}
-                >
-                  <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                  Spalte hinzufügen
-                </Button>
-              )}
-            </div>
+            <div className="w-full shrink-0 sm:w-72">{addColumnControl}</div>
           </div>
           <DragOverlay>
             {activeCard ? (
@@ -392,6 +395,7 @@ export function KanbanBoard<TCardData = Record<string, unknown>>({
         card={detailCard}
         board={data.board}
         columns={data.columns}
+        cards={data.cards}
         open={detailCard !== null}
         onOpenChange={(open) => {
           if (!open) setDetailCard(null);

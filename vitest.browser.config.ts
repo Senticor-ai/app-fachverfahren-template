@@ -26,6 +26,9 @@ export default defineConfig({
       enabled: true,
       provider: playwright(),
       headless: true,
+      // Desktop-Viewport festnageln: unterhalb `sm` stapelt das Kanban-Board seine Spalten
+      // (WCAG-Reflow) — die Drag-and-Drop-Tests testen bewusst das Spalten-NEBENEINANDER.
+      viewport: { width: 1280, height: 720 },
       instances: [{ browser: "chromium" }],
     },
   },

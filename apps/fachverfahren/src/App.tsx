@@ -75,7 +75,9 @@ function BoardsShell({
           </Button>
         </div>
       </header>
-      <div className="min-h-0 flex-1">{children}</div>
+      {/* main-Landmark (Screen-Contract der Board-Routen): Landmark-Navigation von
+          Screenreadern springt damit direkt zum Workspace-Inhalt. */}
+      <main className="min-h-0 flex-1">{children}</main>
     </div>
   );
 }

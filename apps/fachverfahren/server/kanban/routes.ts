@@ -427,6 +427,46 @@ export function registerBoardRoutes(
 
   // ─── Cards ───────────────────────────────────────────────────────────
 
+  // Ziel-Spalte gehört zum geladenen Board? Weder Route noch Schema erzwingen das sonst
+  // (FK zeigt nur auf app_board_columns.column_id) — eine fremde columnId würde eine Karte
+  // erzeugen, die in keiner Spalte dieses Boards rendert und am Lebenszyklus des fremden
+  // Boards hängt. Gilt für Anlegen UND Verschieben; archivierte Spalten sind kein Ziel.
+  async function requireBoardColumn(
+    reply: FastifyReply,
+    scope: { tenantId: string; boardId: string },
+    columnId: string,
+  ): Promise<boolean> {
+    const columns = await store.listColumns(scope);
+    if (!columns.some((column) => column.columnId === columnId)) {
+      await reply
+        .code(400)
+        .send({ error: `column "${columnId}" does not belong to this board` });
+      return false;
+    }
+    return true;
+  }
+
+  app.get<{ Params: { boardId: string } }>(
+    "/api/v1/boards/:boardId/cards/archived",
+    { preHandler: requirePrincipal },
+    async (request, reply) => {
+      const loaded = await loadOwnedBoard(
+        request,
+        reply,
+        request.params.boardId,
+      );
+      if (!loaded) {
+        return;
+      }
+      const cards = await store.listCards({
+        tenantId: loaded.principal.tenantId,
+        boardId: loaded.board.boardId,
+        includeArchived: true,
+      });
+      return reply.send(cards.filter((card) => card.archivedAt !== null));
+    },
+  );
+
   app.post<{
     Params: { boardId: string };
     Body: {
@@ -454,6 +494,13 @@ export function registerBoardRoutes(
       }
       if (typeof body.title !== "string" || body.title.trim() === "") {
         return reply.code(400).send({ error: "title is required" });
+      }
+      const columnScope = {
+        tenantId: loaded.principal.tenantId,
+        boardId: loaded.board.boardId,
+      };
+      if (!(await requireBoardColumn(reply, columnScope, body.columnId))) {
+        return;
       }
       const existingCards = await store.listCards({
         tenantId: loaded.principal.tenantId,
@@ -550,6 +597,13 @@ export function registerBoardRoutes(
       const body = request.body ?? {};
       if (typeof body.toColumnId !== "string") {
         return reply.code(400).send({ error: "toColumnId is required" });
+      }
+      const moveScope = {
+        tenantId: loaded.principal.tenantId,
+        boardId: loaded.board.boardId,
+      };
+      if (!(await requireBoardColumn(reply, moveScope, body.toColumnId))) {
+        return;
       }
       let toPositionKey: string;
       if (typeof body.toPositionKey === "string") {

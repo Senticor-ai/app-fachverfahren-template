@@ -33,6 +33,7 @@ export default defineConfig({
       "@senticor/public-sector-sdk": pkg("public-sector-sdk"),
       "@senticor/platform-contracts": pkg("platform-contracts"),
       "@senticor/conformance-kit": pkg("conformance-kit"),
+      "@senticor/app-store-postgres": pkg("app-store-postgres"),
     },
   },
   test: {

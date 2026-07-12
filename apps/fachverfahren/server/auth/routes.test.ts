@@ -93,6 +93,23 @@ describe("auth routes", () => {
     expect(second.statusCode).toBe(409);
   });
 
+  it("serializes CONCURRENT bootstrap attempts — exactly one succeeds", async () => {
+    // Ohne Lock sähen beide Requests `countUsers() === 0` und legten zwei Erstbenutzer an.
+    const [first, second] = await Promise.all([
+      app.inject({
+        method: "POST",
+        url: "/auth/bootstrap",
+        payload: bootstrapBody,
+      }),
+      app.inject({
+        method: "POST",
+        url: "/auth/bootstrap",
+        payload: { ...bootstrapBody, email: "rival@example.org" },
+      }),
+    ]);
+    expect([first.statusCode, second.statusCode].sort()).toEqual([201, 409]);
+  });
+
   it("grants access to a protected route using the bootstrap session cookie", async () => {
     const bootstrapResponse = await app.inject({
       method: "POST",

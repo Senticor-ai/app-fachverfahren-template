@@ -1,6 +1,7 @@
 // session — Client-seitiger Session-Zustand: wer ist angemeldet, ist das Board-Workspace schon
 // eingerichtet (bootstrapped)? EIN Hook, den LoginPage und die geschützten Routen gemeinsam nutzen.
 import * as React from "react";
+import { apiPath } from "./board-client.js";
 
 export interface SessionPrincipal {
   actorId: string;
@@ -35,14 +36,14 @@ export function SessionProvider({
   });
 
   const refresh = React.useCallback(async () => {
-    const statusResponse = await fetch("/auth/status", {
+    const statusResponse = await fetch(apiPath("/auth/status"), {
       credentials: "include",
     });
     const { bootstrapped } = (await statusResponse.json()) as {
       bootstrapped: boolean;
     };
 
-    const sessionResponse = await fetch("/auth/session", {
+    const sessionResponse = await fetch(apiPath("/auth/session"), {
       credentials: "include",
     });
     if (sessionResponse.ok) {
@@ -54,7 +55,10 @@ export function SessionProvider({
   }, []);
 
   const logout = React.useCallback(async () => {
-    await fetch("/auth/logout", { method: "POST", credentials: "include" });
+    await fetch(apiPath("/auth/logout"), {
+      method: "POST",
+      credentials: "include",
+    });
     await refresh();
   }, [refresh]);
 
