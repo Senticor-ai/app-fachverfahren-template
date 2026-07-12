@@ -35,6 +35,10 @@ EXPECTED_SHA="${EXPECTED_SHA:-}"
 CS_BIN="${CS_BIN:-$(command -v cs 2>/dev/null || true)}"
 [ -n "$CS_BIN" ] || die "cs CLI nicht gefunden (codesphere-cloud/cs-go)"
 
+# Team 119 ist dc-2 (Hetzner): die generische API-Base 307-redirected dorthin und verliert
+# den Bearer-Header (401). Ohne explizites CS_API daher die DC-scoped Base verwenden.
+export CS_API="${CS_API:-https://2.vendorportal.gtplatforms.org/api}"
+
 ws_head() {
   "$CS_BIN" exec -t "$CS_TEAM" -w "$CS_WORKSPACE" -- "git -C /home/user/app rev-parse HEAD" 2>/dev/null | tail -1
 }
@@ -69,8 +73,10 @@ if [ -n "$EXPECTED_SHA" ]; then
     || die "Workspace-HEAD ($got) != gepushter Stand ($EXPECTED_SHA) nach pull+reset — Mirror hinkt?" 3
 fi
 
-note "Pipeline prepare → test → run (flaglos, 20m Timeout) …"
-"$CS_BIN" start pipeline -t "$CS_TEAM" -w "$CS_WORKSPACE" --timeout 20m prepare test run 2>&1 \
+# WICHTIG: --team/--workspace lang ausschreiben — bei `cs start pipeline` ist -t das
+# Timeout-Kürzel (CLI-Hilfe: `-t 5m`), nicht das Team.
+note "Pipeline prepare → test → run (ohne --profile, 20m Timeout) …"
+"$CS_BIN" start pipeline --team "$CS_TEAM" --workspace "$CS_WORKSPACE" --timeout 20m prepare test run 2>&1 \
   || die "Pipeline fehlgeschlagen" 3
 
 note "erzwungener Neustart (kill 1), damit der neue Stand wirklich läuft …"
