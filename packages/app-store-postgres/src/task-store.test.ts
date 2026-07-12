@@ -316,6 +316,62 @@ for (const impl of impls) {
       expect(feed[0]?.payload).toEqual({ to: "sb.b" });
     });
 
+    // Tie-Stabilität: bei GLEICHEM Zeitstempel MUSS die id-Sekundärsortierung greifen — sonst
+    // divergieren InMemory (Insert-Reihenfolge) und Postgres (physische Row-Reihenfolge). Vermerke
+    // tragen denselben created_at (z. B. Bulk-Import, gleiche Uhr) → deterministisch nach comment_id.
+    it("sortiert Vermerke bei gleichem Zeitstempel deterministisch nach comment_id (InMemory==PG)", async () => {
+      const task = macheTask();
+      await store.insertTask(task);
+      const gleich = "2026-06-03T08:00:00.000Z";
+      // In ABSTEIGENDER id-Reihenfolge einfügen — nur ein id-Tiebreak stellt die aufsteigende Ordnung her.
+      for (const cid of ["c-tie-3", "c-tie-1", "c-tie-2"]) {
+        await store.insertTaskComment({
+          commentId: cid,
+          taskId: task.taskId,
+          tenantId: "t1",
+          authorityId: "b1",
+          authorActorId: "sb.a",
+          body: cid,
+          createdAt: gleich,
+        });
+      }
+      const list = await store.listTaskComments({
+        tenantId: "t1",
+        taskId: task.taskId,
+      });
+      expect(list.map((c) => c.commentId)).toEqual([
+        "c-tie-1",
+        "c-tie-2",
+        "c-tie-3",
+      ]);
+    });
+
+    it("sortiert Aktivität bei gleichem Zeitstempel deterministisch nach activity_id (InMemory==PG)", async () => {
+      const task = macheTask();
+      await store.insertTask(task);
+      const gleich = "2026-06-03T09:00:00.000Z";
+      for (const aid of ["a-tie-3", "a-tie-1", "a-tie-2"]) {
+        await store.insertTaskActivity({
+          activityId: aid,
+          taskId: task.taskId,
+          tenantId: "t1",
+          actorId: "sb.a",
+          activityType: "task.assigned",
+          payload: {},
+          occurredAt: gleich,
+        });
+      }
+      const feed = await store.listTaskActivity({
+        tenantId: "t1",
+        taskId: task.taskId,
+      });
+      expect(feed.map((a) => a.activityId)).toEqual([
+        "a-tie-1",
+        "a-tie-2",
+        "a-tie-3",
+      ]);
+    });
+
     it("speichert persönliche + geteilte Ansichten und löscht wieder (nicht append-only)", async () => {
       // Eindeutiger Mandant → volle Isolation gegen andere Testdateien in einer geteilten Postgres-DB.
       const tid = `t-${uid()}`;

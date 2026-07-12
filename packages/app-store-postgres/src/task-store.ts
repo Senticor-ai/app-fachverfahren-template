@@ -510,11 +510,25 @@ export class InMemoryTaskStore implements TaskStore {
     taskId: string;
     limit?: number;
   }): Promise<AppTaskComment[]> {
-    return this.comments
-      .filter((c) => c.tenantId === query.tenantId && c.taskId === query.taskId)
-      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
-      .slice(0, query.limit ?? 200)
-      .map((c) => ({ ...c }));
+    return (
+      this.comments
+        .filter(
+          (c) => c.tenantId === query.tenantId && c.taskId === query.taskId,
+        )
+        // TIE-STABIL (created_at, comment_id) — deckungsgleich zur PG-ORDER-BY. created_at ALLEIN divergiert
+        // InMemory↔PG bei gleich-gestempelten Rows (Lehre aus #24; hier war es ein realer Bug).
+        .sort((a, b) =>
+          a.createdAt !== b.createdAt
+            ? a.createdAt < b.createdAt
+              ? -1
+              : 1
+            : a.commentId < b.commentId
+              ? -1
+              : 1,
+        )
+        .slice(0, query.limit ?? 200)
+        .map((c) => ({ ...c }))
+    );
   }
 
   async insertTaskActivity(
@@ -529,11 +543,24 @@ export class InMemoryTaskStore implements TaskStore {
     taskId: string;
     limit?: number;
   }): Promise<AppTaskActivity[]> {
-    return this.activity
-      .filter((a) => a.tenantId === query.tenantId && a.taskId === query.taskId)
-      .sort((a, b) => (a.occurredAt < b.occurredAt ? -1 : 1))
-      .slice(0, query.limit ?? 200)
-      .map((a) => ({ ...a, payload: { ...a.payload } }));
+    return (
+      this.activity
+        .filter(
+          (a) => a.tenantId === query.tenantId && a.taskId === query.taskId,
+        )
+        // TIE-STABIL (occurred_at, activity_id) — deckungsgleich zur PG-ORDER-BY.
+        .sort((a, b) =>
+          a.occurredAt !== b.occurredAt
+            ? a.occurredAt < b.occurredAt
+              ? -1
+              : 1
+            : a.activityId < b.activityId
+              ? -1
+              : 1,
+        )
+        .slice(0, query.limit ?? 200)
+        .map((a) => ({ ...a, payload: { ...a.payload } }))
+    );
   }
 
   async insertSavedView(view: AppSavedView): Promise<AppSavedView> {
@@ -923,7 +950,7 @@ export class PostgresTaskStore implements TaskStore {
     return this.withClient(async (c) => {
       const r = await c.query<CommentRow>(
         `${COMMENT_SELECT} WHERE tenant_id = $1 AND task_id = $2
-         ORDER BY created_at ASC LIMIT $3`,
+         ORDER BY created_at ASC, comment_id ASC LIMIT $3`,
         [query.tenantId, query.taskId, query.limit ?? 200],
       );
       return r.rows.map(commentFromRow);
@@ -955,7 +982,7 @@ export class PostgresTaskStore implements TaskStore {
     return this.withClient(async (c) => {
       const r = await c.query<ActivityRow>(
         `${ACTIVITY_SELECT} WHERE tenant_id = $1 AND task_id = $2
-         ORDER BY occurred_at ASC LIMIT $3`,
+         ORDER BY occurred_at ASC, activity_id ASC LIMIT $3`,
         [query.tenantId, query.taskId, query.limit ?? 200],
       );
       return r.rows.map(activityFromRow);
