@@ -680,7 +680,10 @@ function AmtWissen(): React.JSX.Element {
   return (
     <Shell persona="sachbearbeitung" activeNavKey="eingang">
       <AmtSubNav />
-      <WissensPanel artikel={workspace.listWissen()} />
+      <WissensPanel
+        artikel={workspace.listWissen()}
+        onSpeichern={(input) => workspace.speichereWissen(input)}
+      />
     </Shell>
   );
 }

@@ -16,6 +16,16 @@ export interface WissensPanelProps {
   artikel: WissensArtikel[];
   /** Überschrift der Region. Default „Wissensbasis". */
   titel?: string;
+  /** OPTIONAL Authoring (#20 Phase 3b): ist der Callback gesetzt, zeigt das Panel „Bearbeiten"/„Neuer Artikel" und
+   *  ruft ihn beim Speichern. `expectedVersion` = die aktuelle `version` des Artikels (0 = Neuanlage) — der Port
+   *  erzwingt damit Optimistic-Locking. OHNE den Callback bleibt es die reine Leseansicht (rückwärtskompatibel). */
+  onSpeichern?: (input: {
+    id: string;
+    titel: string;
+    markdown: string;
+    kategorie?: string;
+    expectedVersion: number;
+  }) => void;
 }
 
 const stand = new Intl.DateTimeFormat("de-DE", {
@@ -29,13 +39,45 @@ function standText(iso: string | undefined): string | null {
   return Number.isNaN(d.getTime()) ? null : stand.format(d);
 }
 
+/** Ein bearbeiteter/neuer Artikel im Formular. `id === null` ⇒ Neuanlage (id wird beim Speichern aus dem Titel
+ *  abgeleitet); `expectedVersion` trägt die Optimistic-Lock-Version des Ausgangsartikels (0 = Neuanlage). */
+interface Entwurf {
+  id: string | null;
+  titel: string;
+  markdown: string;
+  kategorie: string;
+  expectedVersion: number;
+}
+
+/** Leitet aus dem Titel eine stabile, ASCII-nahe Artikel-Id ab (deutsche Umlaute transliteriert). Rein & deterministisch
+ *  (kein Date/Random). Eine Kollision fängt der Server per 409 ab (→ onError im Port). */
+function wissenSlug(titel: string): string {
+  return titel
+    .toLowerCase()
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+const eingabeKlasse =
+  "w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]";
+const knopfPrimaer =
+  "rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors ease-out motion-reduce:transition-none hover:bg-primary/90 outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]";
+const knopfSekundaer =
+  "rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground transition-colors ease-out motion-reduce:transition-none hover:bg-secondary/60 outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]";
+
 /** Rendert die Wissensbasis als Master-Detail: gruppierte Artikel-Navigation + Markdown-Ansicht des gewählten Artikels. */
 export function WissensPanel({
   artikel,
   titel = "Wissensbasis",
+  onSpeichern,
 }: WissensPanelProps): ReactElement {
   const [aktivId, setAktivId] = useState<string>(artikel[0]?.id ?? "");
   const [suche, setSuche] = useState("");
+  const [entwurf, setEntwurf] = useState<Entwurf | null>(null);
   const suchend = suche.trim() !== "";
 
   const gefiltert = useMemo(
@@ -64,6 +106,129 @@ export function WissensPanel({
     return [...m.entries()];
   }, [artikel]);
 
+  // ── Authoring (#20 Phase 3b): nur aktiv, wenn `onSpeichern` gesetzt ist ──
+  const starteNeu = (): void =>
+    setEntwurf({
+      id: null,
+      titel: "",
+      markdown: "",
+      kategorie: "",
+      expectedVersion: 0,
+    });
+  const starteBearbeiten = (): void => {
+    if (!aktiv) return;
+    setEntwurf({
+      id: aktiv.id,
+      titel: aktiv.titel,
+      markdown: aktiv.markdown,
+      kategorie: aktiv.kategorie ?? "",
+      expectedVersion: aktiv.version ?? 0,
+    });
+  };
+  const speichere = (): void => {
+    if (!entwurf || !onSpeichern) return;
+    const titelTrim = entwurf.titel.trim();
+    const id = entwurf.id ?? wissenSlug(titelTrim);
+    // Leerer Titel oder (bei Neuanlage) leerer Slug → nicht speichern (der Server lehnt leeren Titel ohnehin 400 ab).
+    if (!titelTrim || !id) return;
+    onSpeichern({
+      id,
+      titel: titelTrim,
+      markdown: entwurf.markdown,
+      expectedVersion: entwurf.expectedVersion,
+      ...(entwurf.kategorie.trim()
+        ? { kategorie: entwurf.kategorie.trim() }
+        : {}),
+    });
+    setEntwurf(null);
+    if (entwurf.id === null) setAktivId(id); // neu angelegten Artikel gleich anwählen
+  };
+
+  // Editor-Ansicht (bearbeiten ODER neu) — verdrängt die Leseansicht, solange ein Entwurf offen ist.
+  if (entwurf) {
+    const neu = entwurf.id === null;
+    return (
+      <section className="mx-auto max-w-3xl p-4 md:p-6">
+        <header className="mb-4 flex items-center gap-2">
+          <BookOpen className="h-5 w-5 text-foreground" aria-hidden="true" />
+          <h1 className="text-xl font-semibold text-foreground">
+            {neu ? "Neuer Wissensartikel" : "Artikel bearbeiten"}
+          </h1>
+        </header>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            speichere();
+          }}
+          className="space-y-4 rounded-lg border border-border bg-card p-5 shadow-sm"
+        >
+          <div className="space-y-1">
+            <label
+              htmlFor="wissen-titel"
+              className="block text-sm font-medium text-foreground"
+            >
+              Titel
+            </label>
+            <input
+              id="wissen-titel"
+              value={entwurf.titel}
+              onChange={(e) =>
+                setEntwurf({ ...entwurf, titel: e.target.value })
+              }
+              className={eingabeKlasse}
+            />
+          </div>
+          <div className="space-y-1">
+            <label
+              htmlFor="wissen-kategorie"
+              className="block text-sm font-medium text-foreground"
+            >
+              Kategorie{" "}
+              <span className="text-muted-foreground">(optional)</span>
+            </label>
+            <input
+              id="wissen-kategorie"
+              value={entwurf.kategorie}
+              onChange={(e) =>
+                setEntwurf({ ...entwurf, kategorie: e.target.value })
+              }
+              className={eingabeKlasse}
+            />
+          </div>
+          <div className="space-y-1">
+            <label
+              htmlFor="wissen-markdown"
+              className="block text-sm font-medium text-foreground"
+            >
+              Inhalt (Markdown)
+            </label>
+            <textarea
+              id="wissen-markdown"
+              value={entwurf.markdown}
+              onChange={(e) =>
+                setEntwurf({ ...entwurf, markdown: e.target.value })
+              }
+              rows={14}
+              className={cn(eingabeKlasse, "font-mono")}
+            />
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" className={knopfPrimaer}>
+              Speichern
+            </button>
+            <button
+              type="button"
+              onClick={() => setEntwurf(null)}
+              className={knopfSekundaer}
+            >
+              Abbrechen
+            </button>
+          </div>
+        </form>
+      </section>
+    );
+  }
+
   const artikelButton = (a: WissensArtikel, tiefe: number): ReactElement => {
     const aktivEintrag = a.id === (aktiv?.id ?? "");
     return (
@@ -91,12 +256,19 @@ export function WissensPanel({
 
   if (artikel.length === 0) {
     return (
-      <section className="mx-auto max-w-4xl p-4 md:p-6">
+      <section className="mx-auto max-w-4xl space-y-4 p-4 md:p-6">
         <EmptyState
           icon={BookOpen}
           title="Keine Wissensartikel"
           description="Für diesen Workspace ist keine Wissensbasis hinterlegt."
         />
+        {onSpeichern ? (
+          <div className="text-center">
+            <button type="button" onClick={starteNeu} className={knopfPrimaer}>
+              Neuer Artikel
+            </button>
+          </div>
+        ) : null}
       </section>
     );
   }
@@ -109,6 +281,15 @@ export function WissensPanel({
         <span className="text-sm text-muted-foreground">
           · {artikel.length} {artikel.length === 1 ? "Artikel" : "Artikel"}
         </span>
+        {onSpeichern ? (
+          <button
+            type="button"
+            onClick={starteNeu}
+            className={cn(knopfSekundaer, "ml-auto")}
+          >
+            Neuer Artikel
+          </button>
+        ) : null}
       </header>
 
       <div className="grid gap-6 md:grid-cols-[16rem_1fr]">
@@ -152,14 +333,25 @@ export function WissensPanel({
         <article className="min-w-0 rounded-lg border border-border bg-card p-5 shadow-sm">
           {aktiv ? (
             <>
-              <div className="mb-3 border-b border-border pb-3">
-                <h2 className="text-lg font-semibold text-foreground">
-                  {aktiv.titel}
-                </h2>
-                {standText(aktiv.standIso) ? (
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Stand: {standText(aktiv.standIso)}
-                  </p>
+              <div className="mb-3 flex items-start justify-between gap-2 border-b border-border pb-3">
+                <div className="min-w-0">
+                  <h2 className="text-lg font-semibold text-foreground">
+                    {aktiv.titel}
+                  </h2>
+                  {standText(aktiv.standIso) ? (
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Stand: {standText(aktiv.standIso)}
+                    </p>
+                  ) : null}
+                </div>
+                {onSpeichern ? (
+                  <button
+                    type="button"
+                    onClick={starteBearbeiten}
+                    className={cn(knopfSekundaer, "shrink-0")}
+                  >
+                    Bearbeiten
+                  </button>
                 ) : null}
               </div>
               <MarkdownView>{aktiv.markdown}</MarkdownView>

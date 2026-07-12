@@ -64,6 +64,25 @@ export default defineConfig({
           // riss auf den opencode.de-Runnern trotzdem nicht-deterministisch — 20s stabilisieren die
           // GitLab-Pipeline, ohne echte Hänger zu verstecken.
           name: "unit",
+          // `*.dom.test.tsx` laufen im jsdom-Projekt (unten), NICHT hier im node-Env.
+          exclude: [
+            ...sharedExclude,
+            "tooling/template/**",
+            "**/*.dom.test.tsx",
+          ],
+          testTimeout: 20000,
+          hookTimeout: 20000,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          // Komponenten-/DOM-Tests (#20 Phase 3b): render über `react-dom/client` in jsdom, Queries via
+          // `@testing-library/dom`. Bewusst OHNE `@testing-library/react` (offline nicht im pnpm-Store) —
+          // jsdom + @testing-library/dom + react-dom reichen und sind alle vorhanden.
+          name: "dom",
+          environment: "jsdom",
+          include: ["**/*.dom.test.tsx"],
           exclude: [...sharedExclude, "tooling/template/**"],
           testTimeout: 20000,
           hookTimeout: 20000,
