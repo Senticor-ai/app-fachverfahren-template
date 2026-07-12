@@ -1317,10 +1317,16 @@ async function listModuleDirectories(root: string) {
   const entries = await readdir(modulesRoot, { withFileTypes: true }).catch(
     () => [],
   );
-  return entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => join(modulesRoot, entry.name))
-    .sort();
+  return (
+    entries
+      .filter((entry) => entry.isDirectory())
+      // Reservierte Container-Ordner mit `_`-Präfix (z. B. `modules/_backends/` — der ModuleHost-Ort für
+      // framework-agnostische Domänen-BACKENDS ohne das 9-Dir-Fach-Domänen-Regime) werden übersprungen — konsistent zu
+      // `check-domain-contracts.mjs` (listDomainModuleNames). `check:module-boundaries` schützt sie weiterhin.
+      .filter((entry) => !entry.name.startsWith("_"))
+      .map((entry) => join(modulesRoot, entry.name))
+      .sort()
+  );
 }
 
 async function listSkillNames(root: string) {
