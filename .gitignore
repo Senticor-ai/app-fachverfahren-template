@@ -23,3 +23,8 @@ __screenshots__/
 # Extern provisionierte Steuerungsdateien werden nicht in das offene Template aufgenommen.
 governance.yaml
 dist-types/
+
+# Codesphere-Workspace-Laufzeitartefakte (ci.yml/Redeploy): Node-24-Toolchain unter <app>/.local
+# und der Deploy-Erfolgsmarker — untracked wären sie "Dirty"-Rauschen für die Provenienz-Tests.
+.local/
+.deployed-sha

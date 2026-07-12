@@ -34,6 +34,9 @@ interface RenderDomainAppOptions {
 const ignoredNames = new Set([
   ".git",
   ".agent",
+  // Codesphere-Workspace-Toolchain (ci.yml installiert Node 24 + pnpm nach <app>/.local):
+  // Laufzeitartefakt, nie mitscaffolden/scannen.
+  ".local",
   ".pnpm",
   ".pnpm-tools",
   ".pnpm-store",

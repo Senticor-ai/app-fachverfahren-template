@@ -27,8 +27,15 @@ prepare:
 
 test:
   steps:
+    # CI=1 ist PFLICHT: vitest.config deckelt maxWorkers nur unter process.env.CI — der
+    # Workspace-Container sieht 96 Host-Kerne, und ein ungedeckelter vitest-Lauf killt die
+    # Replica ("reached unexpected state failure", live auf Workspace 749 passiert).
+    # NUR das unit-Projekt, NICHT template-tooling: dessen Full-Repo-Render-Tests reißen auf
+    # dem CephFS-Workspace-Volume jedes 120s-Budget (live gemessen, auch ohne .local-Kopie) —
+    # und sie prüfen die TEMPLATE-ENGINE, die bereits zweifach auf GitHub gegated ist
+    # (Template-CI + Konsumenten-CI). Diese Stage validiert die APP.
     - name: Validate (typecheck + unit)
-      command: export PATH="$PWD/.local/node24/bin:$PATH" COREPACK_HOME="$PWD/.local/corepack" && pnpm run --if-present typecheck && pnpm run --if-present test
+      command: export PATH="$PWD/.local/node24/bin:$PATH" COREPACK_HOME="$PWD/.local/corepack" CI=1 && pnpm run --if-present typecheck && pnpm exec vitest run --project unit
 
 run:
   steps:
