@@ -15,7 +15,13 @@ Report-Sektion „Ownership Updates" (JSON: `ownershipUpdates`) und persistiert
 sie beim Apply. Die Defaults stammen dabei aus der Ziel-Template-Quelle
 (dynamischer Import ihres manifest.ts), nicht aus der laufenden — beim
 Konsumenten-Update älteren — CLI; quell-exklusiv verwaltete Pfade werden auch
-tatsächlich kopiert (nicht nur der Eintrag persistiert). Breitere persistierte
+tatsächlich kopiert (nicht nur der Eintrag persistiert). Der Update-Plan
+berücksichtigt dabei ALLE replace-/structured-merge-verwalteten
+Ownership-Pfade (Globs gegen den gerenderten Incoming-Baum expandiert), nicht
+nur eine hartkodierte Kandidatenliste — damit erreichen auch
+Doku-/Skill-/Schema-Änderungen unter bestehenden Globs (z.B.
+`.agents/skills/**`, `docs/reference/**`) die Konsumenten; Pfade mit
+merge-Strategie bleiben bewusst bei der kuratierten Liste. Breitere persistierte
 Muster zählen als Override (ein `docs/**: consumer` blockiert einen neuen,
 spezifischeren Default, statt per Longest-Match ausgehebelt zu werden) —
 engere Wildcards wie `apps/*/server/*` blockieren einen breiteren Default

@@ -1379,11 +1379,18 @@ async function computeUpdatePlan({ dryRun }: { dryRun: boolean }) {
     root: process.cwd(),
     incomingRoot,
     ownership,
-    // Frisch gemergte Defaults können Pfade verwalten, die diese (ggf. ältere) CLI nicht in
-    // ihrer Kandidatenliste führt — sie müssen explizit in den Plan (Codex-Review PR #26).
-    extraOwnershipPaths: ownershipUpdates
-      .filter((entry) => entry.strategy !== "consumer")
-      .map((entry) => entry.path),
+    // ALLE replace-/structured-merge-verwalteten Ownership-Pfade in den Plan geben (Globs werden
+    // gegen den Incoming-Baum expandiert) — nicht nur frisch gemergte: Dateien unter bestehenden
+    // Globs (.agents/skills/**, docs/reference/**, …) stehen nicht in der hartkodierten
+    // Kandidatenliste und blieben sonst bei Updates stale (Codex-Review PR #26, Runde 4).
+    // merge-Strategie-Pfade bleiben bewusst bei der kuratierten Liste: README/SECURITY/CHANGELOG
+    // sind konsumenten-editiert und würden sonst zum Dauer-Konflikt.
+    extraOwnershipPaths: Object.entries(ownership.paths)
+      .filter(
+        ([, strategy]) =>
+          strategy === "replace" || strategy === "structured-merge",
+      )
+      .map(([path]) => path),
   });
   const report = {
     title: dryRun ? "Template Update Dry Run" : "Template Update",

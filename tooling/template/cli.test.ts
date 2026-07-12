@@ -187,6 +187,19 @@ describe("template CLI", () => {
         const ciPath = join(target, "ci.yml");
         const marker = "# stale consumer marker\n";
         await writeFile(ciPath, `${await readFile(ciPath, "utf8")}${marker}`);
+        // Datei unter einem BESTEHENDEN replace-Glob (docs/reference/**), die NICHT in der
+        // hartkodierten Kandidatenliste steht: muss trotzdem geplant und ersetzt werden
+        // (Codex-Review PR #26, Runde 4) — sonst blieben template-verwaltete Doku/Skills stale.
+        const lifecyclePath = join(
+          target,
+          "docs",
+          "reference",
+          "template-lifecycle.md",
+        );
+        await writeFile(
+          lifecyclePath,
+          `${await readFile(lifecyclePath, "utf8")}${marker}`,
+        );
 
         process.chdir(target);
         try {
@@ -227,6 +240,7 @@ describe("template CLI", () => {
           );
           expect(update.status).toBe("ok");
           expect(await readFile(ciPath, "utf8")).not.toContain(marker);
+          expect(await readFile(lifecyclePath, "utf8")).not.toContain(marker);
           expect(await readFile(ownershipPath, "utf8")).toContain(
             '"ci.yml": replace',
           );
