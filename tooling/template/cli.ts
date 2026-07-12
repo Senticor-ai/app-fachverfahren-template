@@ -31,6 +31,8 @@ import {
   defaultOwnership,
   explainOwnership,
   hasTemplateMetadata,
+  loadSourceOwnershipDefaults,
+  mergeOwnershipDefaults,
   readOwnership,
   readTemplateAnswers,
   readTemplateLock,
@@ -1354,6 +1356,17 @@ async function computeUpdatePlan({ dryRun }: { dryRun: boolean }) {
     option("--template-source-dir") ??
     process.env["TEMPLATE_SOURCE_DIR"] ??
     process.cwd();
+  // Neue Template-Defaults (z.B. ein nach dem Scaffold des Konsumenten ergänzter ownership-Eintrag)
+  // in die persistierte Sicht mergen, BEVOR geplant wird — sonst fiele die Datei auf den
+  // merge-Fallback zurück und ein Replace-Kandidat erschiene fälschlich als Konflikt (#24).
+  // Die Defaults kommen aus der ZIEL-Quelle, nicht aus der laufenden CLI: beim Update eines
+  // Konsumenten läuft dessen ältere CLI, deren kompilierte defaultOwnership den neuen Eintrag
+  // ebenfalls noch nicht kennt (Codex-Review PR #26).
+  const ownershipDefaults = await loadSourceOwnershipDefaults(sourceDir);
+  const { ownership, added: ownershipUpdates } = mergeOwnershipDefaults(
+    metadata.ownership,
+    ownershipDefaults,
+  );
   const toVersion = option("--to") ?? metadata.lock.templateVersion;
   const incomingParent = await mkdtemp(join(tmpdir(), "template-incoming-"));
   const incomingRoot = join(incomingParent, "incoming");
@@ -1365,7 +1378,19 @@ async function computeUpdatePlan({ dryRun }: { dryRun: boolean }) {
   const { changes, conflicts } = await planOwnershipUpdate({
     root: process.cwd(),
     incomingRoot,
-    ownership: metadata.ownership,
+    ownership,
+    // ALLE replace-/structured-merge-verwalteten Ownership-Pfade in den Plan geben (Globs werden
+    // gegen den Incoming-Baum expandiert) — nicht nur frisch gemergte: Dateien unter bestehenden
+    // Globs (.agents/skills/**, docs/reference/**, …) stehen nicht in der hartkodierten
+    // Kandidatenliste und blieben sonst bei Updates stale (Codex-Review PR #26, Runde 4).
+    // merge-Strategie-Pfade bleiben bewusst bei der kuratierten Liste: README/SECURITY/CHANGELOG
+    // sind konsumenten-editiert und würden sonst zum Dauer-Konflikt.
+    extraOwnershipPaths: Object.entries(ownership.paths)
+      .filter(
+        ([, strategy]) =>
+          strategy === "replace" || strategy === "structured-merge",
+      )
+      .map(([path]) => path),
   });
   const report = {
     title: dryRun ? "Template Update Dry Run" : "Template Update",
@@ -1374,6 +1399,7 @@ async function computeUpdatePlan({ dryRun }: { dryRun: boolean }) {
     from: metadata.lock.templateVersion,
     to: toVersion,
     incomingRoot,
+    ownershipUpdates,
     sections: [
       {
         title: "Managed Changes",
@@ -1385,9 +1411,22 @@ async function computeUpdatePlan({ dryRun }: { dryRun: boolean }) {
           (conflict) => `${conflict.path}: ${conflict.reason}`,
         ),
       },
+      {
+        title: "Ownership Updates",
+        items: ownershipUpdates.map(
+          (entry) => `${entry.path}: ${entry.strategy} (new template default)`,
+        ),
+      },
     ],
   };
-  return { changes, conflicts, incomingRoot, report };
+  return {
+    changes,
+    conflicts,
+    incomingRoot,
+    report,
+    ownershipUpdates,
+    ownershipDefaults,
+  };
 }
 
 async function applyComputedUpdate(updatePlan, requestedVersion?: string) {
@@ -1398,6 +1437,13 @@ async function applyComputedUpdate(updatePlan, requestedVersion?: string) {
   });
   await runPendingMigrations({ dryRun: false });
   const metadata = await readMetadataOrSourceDefaults();
+  // Bewusst RE-mergen statt die geplante Map durchzureichen: die Migrationen eine Zeile weiter oben
+  // dürfen ownership.yaml legitim editieren; der Merge ist idempotent und persistiert gewinnt.
+  // Die Defaults der ZIEL-Quelle kommen aus dem Plan (siehe computeUpdatePlan).
+  metadata.ownership = mergeOwnershipDefaults(
+    metadata.ownership,
+    updatePlan.ownershipDefaults ?? defaultOwnership,
+  ).ownership;
   const toVersion = requestedVersion ?? metadata.lock.templateVersion;
   metadata.lock.templateVersion = toVersion;
   metadata.lock.generatorVersion = toVersion;

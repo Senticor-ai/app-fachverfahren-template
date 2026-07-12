@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -86,11 +86,19 @@ async function runTemplate(args: string[]): Promise<string> {
   return `${lines.join("\n")}\n`;
 }
 
+const repoRoot = process.cwd();
+
 afterEach(() => {
   // Belt-and-suspenders: runTemplate always restores this itself, but a
   // thrown assertion inside a test body could otherwise leave a stale
   // exitCode bleeding into whichever test runs next in this same worker.
   process.exitCode = undefined;
+  // Ditto für cwd: das chdir-basierte Update-E2E stellt cwd selbst wieder her,
+  // aber ein per Timeout abgebrochener Testkörper läuft als Zombie weiter und
+  // ließe cwd sonst in einem (bald gelöschten) Temp-Verzeichnis zurück — jeder
+  // Folgetest mit Subprozess stürbe dann an uv_cwd/ENOENT (beobachtet unter
+  // CPU-Starvation im pre-push-Gate).
+  process.chdir(repoRoot);
 });
 
 describe("template CLI", () => {
@@ -139,6 +147,172 @@ describe("template CLI", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  // Eigenes 300s-Budget: Scaffold + zwei volle Incoming-Renders sind unter CPU-Starvation (z.B.
+  // pre-push-Gate parallel zu anderen Workern) deutlich langsamer als die default 120s — ein
+  // Timeout hier hinterließe einen Zombie-Testkörper, dessen chdir/rm Folgetests vergiftet.
+  it(
+    "merges new default ownership entries during template:update",
+    { timeout: 300_000 },
+    async () => {
+      const templateRoot = process.cwd();
+      const root = await mkdtemp(join(tmpdir(), "template-cli-update-test-"));
+      try {
+        const target = join(root, "app");
+        await runTemplate([
+          "scaffold",
+          "--domain",
+          "fachverfahren",
+          "--display-name",
+          "Fachverfahren",
+          "--target",
+          target,
+          "--allow-existing-empty",
+          "--allow-dirty",
+          "--json",
+        ]);
+
+        // Prä-#24-Konsument simulieren: dessen ownership.yaml-Snapshot kennt `ci.yml` noch nicht,
+        // und die lokale Datei ist gegenüber dem Template veraltet.
+        const ownershipPath = join(target, ".template", "ownership.yaml");
+        const persisted = await readFile(ownershipPath, "utf8");
+        expect(persisted).toContain('"ci.yml": replace');
+        await writeFile(
+          ownershipPath,
+          persisted
+            .split("\n")
+            .filter((line) => !line.includes('"ci.yml"'))
+            .join("\n"),
+        );
+        const ciPath = join(target, "ci.yml");
+        const marker = "# stale consumer marker\n";
+        await writeFile(ciPath, `${await readFile(ciPath, "utf8")}${marker}`);
+        // Datei unter einem BESTEHENDEN replace-Glob (docs/reference/**), die NICHT in der
+        // hartkodierten Kandidatenliste steht: muss trotzdem geplant und ersetzt werden
+        // (Codex-Review PR #26, Runde 4) — sonst blieben template-verwaltete Doku/Skills stale.
+        const lifecyclePath = join(
+          target,
+          "docs",
+          "reference",
+          "template-lifecycle.md",
+        );
+        await writeFile(
+          lifecyclePath,
+          `${await readFile(lifecyclePath, "utf8")}${marker}`,
+        );
+
+        process.chdir(target);
+        try {
+          const dryRun = JSON.parse(
+            await runTemplate([
+              "diff",
+              "--template-source-dir",
+              templateRoot,
+              "--json",
+            ]),
+          );
+          expect(dryRun.status).toBe("ok");
+          expect(dryRun.ownershipUpdates).toContainEqual({
+            path: "ci.yml",
+            strategy: "replace",
+          });
+          const dryRunSections = Object.fromEntries(
+            dryRun.sections.map((section) => [section.title, section.items]),
+          );
+          expect(dryRunSections["Ownership Updates"]).toContain(
+            "ci.yml: replace (new template default)",
+          );
+          expect(dryRunSections["Managed Changes"]).toContain(
+            "ci.yml: replace",
+          );
+          // Dry-Run persistiert nichts.
+          expect(await readFile(ownershipPath, "utf8")).not.toContain(
+            '"ci.yml"',
+          );
+
+          const update = JSON.parse(
+            await runTemplate([
+              "update",
+              "--template-source-dir",
+              templateRoot,
+              "--json",
+            ]),
+          );
+          expect(update.status).toBe("ok");
+          expect(await readFile(ciPath, "utf8")).not.toContain(marker);
+          expect(await readFile(lifecyclePath, "utf8")).not.toContain(marker);
+          expect(await readFile(ownershipPath, "utf8")).toContain(
+            '"ci.yml": replace',
+          );
+
+          // Cross-Version-Szenario (Codex-Review PR #26): die Defaults müssen aus der
+          // ZIEL-Quelle kommen, nicht aus der laufenden CLI — und eine quell-exklusiv
+          // verwaltete Datei muss auch KOPIERT werden, obwohl sie nicht in der
+          // managedCandidateFiles-Liste der laufenden CLI steht. Ein zweiter Scaffold
+          // dient als "neuere" Quelle: manifest.ts erhält einen Eintrag, den die laufende
+          // CLI nicht kennt, plus die zugehörige Datei.
+          const source2 = join(root, "source2");
+          await runTemplate([
+            "scaffold",
+            "--domain",
+            "fachverfahren",
+            "--display-name",
+            "Fachverfahren",
+            "--target",
+            source2,
+            "--allow-existing-empty",
+            "--allow-dirty",
+            "--json",
+          ]);
+          const sourceManifestPath = join(
+            source2,
+            "tooling",
+            "template",
+            "lib",
+            "manifest.ts",
+          );
+          const sourceManifest = await readFile(sourceManifestPath, "utf8");
+          await writeFile(
+            sourceManifestPath,
+            sourceManifest.replace(
+              '"README.md": "merge",',
+              '"EXTRA-SOURCE-ONLY.md": "replace",\n    "README.md": "merge",',
+            ),
+          );
+          await writeFile(
+            join(source2, "EXTRA-SOURCE-ONLY.md"),
+            "# Quell-exklusiv verwaltete Datei\n",
+          );
+
+          const crossVersion = JSON.parse(
+            await runTemplate([
+              "update",
+              "--template-source-dir",
+              source2,
+              "--json",
+            ]),
+          );
+          expect(crossVersion.status).toBe("ok");
+          expect(crossVersion.ownershipUpdates).toContainEqual({
+            path: "EXTRA-SOURCE-ONLY.md",
+            strategy: "replace",
+          });
+          // Die quell-exklusive Datei wurde tatsächlich in den Konsumenten kopiert …
+          expect(
+            await readFile(join(target, "EXTRA-SOURCE-ONLY.md"), "utf8"),
+          ).toContain("Quell-exklusiv");
+          // … und der Eintrag persistiert.
+          expect(await readFile(ownershipPath, "utf8")).toContain(
+            '"EXTRA-SOURCE-ONLY.md": replace',
+          );
+        } finally {
+          process.chdir(templateRoot);
+        }
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("discovers vendor-neutral agent workflows", async () => {
     const output = await runTemplate(["agent:discover", "--json"]);
