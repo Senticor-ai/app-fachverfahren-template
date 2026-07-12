@@ -102,8 +102,12 @@ do_update() {
   echo "deploy-demo-consumer: pre-update migrate (bestehender Schema-Stand vor dem Update)"
   run_migration_gate "pre-update"
 
-  echo "deploy-demo-consumer: template:update --to ${TEMPLATE_VERSION}"
-  if ! (cd "$TARGET_DIR" && pnpm run template:update -- --to "$TEMPLATE_VERSION" --template-source-dir "$TEMPLATE_DIR"); then
+  echo "deploy-demo-consumer: template:update --to ${TEMPLATE_VERSION} (Quell-CLI)"
+  # Bewusst die CLI der VORLAGE statt der bereits kopierten Konsumenten-CLI: die Update-Logik
+  # (z.B. der Ownership-Defaults-Merge aus #24) lebt in der CLI, die man aufruft — die Kopie im
+  # Konsumenten stammt vom LETZTEN Update und hinge sonst immer eine Version hinterher
+  # (Codex-Review PR #26). Die Abhängigkeiten der Quell-CLI liegen im Vorlagen-Checkout.
+  if ! (cd "$TARGET_DIR" && node --experimental-strip-types "$TEMPLATE_DIR/tooling/template/cli.ts" -- update --to "$TEMPLATE_VERSION" --template-source-dir "$TEMPLATE_DIR"); then
     echo "deploy-demo-consumer: template:update konnte nicht konfliktfrei angewendet werden — falle auf rescaffold zurück"
     do_rescaffold
     return 0

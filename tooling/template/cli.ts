@@ -1379,6 +1379,11 @@ async function computeUpdatePlan({ dryRun }: { dryRun: boolean }) {
     root: process.cwd(),
     incomingRoot,
     ownership,
+    // Frisch gemergte Defaults können Pfade verwalten, die diese (ggf. ältere) CLI nicht in
+    // ihrer Kandidatenliste führt — sie müssen explizit in den Plan (Codex-Review PR #26).
+    extraOwnershipPaths: ownershipUpdates
+      .filter((entry) => entry.strategy !== "consumer")
+      .map((entry) => entry.path),
   });
   const report = {
     title: dryRun ? "Template Update Dry Run" : "Template Update",

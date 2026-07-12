@@ -14,11 +14,17 @@ Jetzt ergänzt der Update-Plan fehlende Default-Einträge vor der Planung
 Report-Sektion „Ownership Updates" (JSON: `ownershipUpdates`) und persistiert
 sie beim Apply. Die Defaults stammen dabei aus der Ziel-Template-Quelle
 (dynamischer Import ihres manifest.ts), nicht aus der laufenden — beim
-Konsumenten-Update älteren — CLI; und breitere persistierte Muster zählen als
-Override (ein `docs/**: consumer` blockiert einen neuen, spezifischeren
-Default, statt per Longest-Match ausgehebelt zu werden). Opt-out: Strategie
-auf `consumer` setzen statt die Zeile zu löschen — gelöschte Einträge werden
-wieder ergänzt.
+Konsumenten-Update älteren — CLI; quell-exklusiv verwaltete Pfade werden auch
+tatsächlich kopiert (nicht nur der Eintrag persistiert). Breitere persistierte
+Muster zählen als Override (ein `docs/**: consumer` blockiert einen neuen,
+spezifischeren Default, statt per Longest-Match ausgehebelt zu werden) —
+engere Wildcards wie `apps/*/server/*` blockieren einen breiteren Default
+`apps/*/server/**` dagegen nicht. Opt-out: Strategie auf `consumer` setzen
+statt die Zeile zu löschen — gelöschte Einträge werden wieder ergänzt.
+Bootstrap für Prä-Merge-Konsumenten: das ERSTE Update mit der CLI der Quelle
+fahren (`node --experimental-strip-types <quelle>/tooling/template/cli.ts --
+update ...`), da die kopierte Konsumenten-CLI die Merge-Logik noch nicht
+enthält; `deploy-demo-consumer.sh` macht das jetzt so.
 
 Die Scaffold-Exclusion der Template-Repo-internen GitHub-Workflows
 (`scaffold-nightly.yml`, `deploy-demo-consumer.yml` via `repositoryOnlyPaths`)

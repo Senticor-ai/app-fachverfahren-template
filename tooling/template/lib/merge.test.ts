@@ -102,4 +102,53 @@ describe("template ownership merge", () => {
       await rm(incomingRoot, { recursive: true, force: true });
     }
   });
+
+  it("plans copies for source-only ownership paths outside the candidate list", async () => {
+    // Codex-Finding PR #26 (Runde 2): ein Default, den erst die Ziel-Quelle kennt, steht
+    // nicht in der hartkodierten managedCandidateFiles-Liste der laufenden CLI — ohne
+    // extraOwnershipPaths würde der Eintrag persistiert, die Datei aber nie kopiert.
+    const root = await mkdtemp(join(tmpdir(), "template-merge-root-"));
+    const incomingRoot = await mkdtemp(
+      join(tmpdir(), "template-merge-incoming-"),
+    );
+    try {
+      await writeFile(join(incomingRoot, "EXTRA-SOURCE-ONLY.md"), "neu\n");
+      await mkdir(join(incomingRoot, "generated", "deep"), { recursive: true });
+      await writeFile(
+        join(incomingRoot, "generated", "deep", "artifact.json"),
+        "{}\n",
+      );
+
+      const ownership = {
+        paths: {
+          "EXTRA-SOURCE-ONLY.md": "replace" as const,
+          "generated/**": "replace" as const,
+        },
+      };
+
+      const plan = await planOwnershipUpdate({
+        root,
+        incomingRoot,
+        ownership,
+        extraOwnershipPaths: ["EXTRA-SOURCE-ONLY.md", "generated/**"],
+      });
+
+      expect(plan.changes).toContainEqual(
+        expect.objectContaining({
+          path: "EXTRA-SOURCE-ONLY.md",
+          action: "replace",
+        }),
+      );
+      expect(plan.changes).toContainEqual(
+        expect.objectContaining({
+          path: "generated/deep/artifact.json",
+          action: "replace",
+        }),
+      );
+      expect(plan.conflicts).toEqual([]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+      await rm(incomingRoot, { recursive: true, force: true });
+    }
+  });
 });

@@ -232,11 +232,26 @@ describe("template CLI", () => {
           );
 
           // Cross-Version-Szenario (Codex-Review PR #26): die Defaults müssen aus der
-          // ZIEL-Quelle kommen, nicht aus der laufenden CLI. Der Konsument selbst ist eine
-          // vollständige Template-Kopie — sein manifest.ts wird um einen Eintrag ergänzt,
-          // den die laufende CLI nicht kennt, und dient dann als --template-source-dir.
+          // ZIEL-Quelle kommen, nicht aus der laufenden CLI — und eine quell-exklusiv
+          // verwaltete Datei muss auch KOPIERT werden, obwohl sie nicht in der
+          // managedCandidateFiles-Liste der laufenden CLI steht. Ein zweiter Scaffold
+          // dient als "neuere" Quelle: manifest.ts erhält einen Eintrag, den die laufende
+          // CLI nicht kennt, plus die zugehörige Datei.
+          const source2 = join(root, "source2");
+          await runTemplate([
+            "scaffold",
+            "--domain",
+            "fachverfahren",
+            "--display-name",
+            "Fachverfahren",
+            "--target",
+            source2,
+            "--allow-existing-empty",
+            "--allow-dirty",
+            "--json",
+          ]);
           const sourceManifestPath = join(
-            target,
+            source2,
             "tooling",
             "template",
             "lib",
@@ -250,11 +265,16 @@ describe("template CLI", () => {
               '"EXTRA-SOURCE-ONLY.md": "replace",\n    "README.md": "merge",',
             ),
           );
+          await writeFile(
+            join(source2, "EXTRA-SOURCE-ONLY.md"),
+            "# Quell-exklusiv verwaltete Datei\n",
+          );
+
           const crossVersion = JSON.parse(
             await runTemplate([
-              "diff",
+              "update",
               "--template-source-dir",
-              target,
+              source2,
               "--json",
             ]),
           );
@@ -263,6 +283,14 @@ describe("template CLI", () => {
             path: "EXTRA-SOURCE-ONLY.md",
             strategy: "replace",
           });
+          // Die quell-exklusive Datei wurde tatsächlich in den Konsumenten kopiert …
+          expect(
+            await readFile(join(target, "EXTRA-SOURCE-ONLY.md"), "utf8"),
+          ).toContain("Quell-exklusiv");
+          // … und der Eintrag persistiert.
+          expect(await readFile(ownershipPath, "utf8")).toContain(
+            '"EXTRA-SOURCE-ONLY.md": replace',
+          );
         } finally {
           process.chdir(templateRoot);
         }

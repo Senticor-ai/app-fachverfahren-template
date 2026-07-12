@@ -1,6 +1,6 @@
-import { copyFile, mkdir, readFile, rm } from "node:fs/promises";
+import { copyFile, mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
-import { explainOwnership } from "./manifest.ts";
+import { explainOwnership, matchesOwnershipPattern } from "./manifest.ts";
 import { readJson, writeJson, type PackageJson } from "./structured-edit.ts";
 
 const managedCandidateFiles = [
@@ -38,11 +38,27 @@ const managedCandidateFiles = [
   "tooling/template/lib/structured-edit.ts",
 ];
 
-export async function planOwnershipUpdate({ root, incomingRoot, ownership }) {
+export async function planOwnershipUpdate({
+  root,
+  incomingRoot,
+  ownership,
+  extraOwnershipPaths = [],
+}) {
   const changes = [];
   const conflicts = [];
 
-  for (const path of managedCandidateFiles) {
+  // Ownership-Pfade, die erst die ZIEL-Quelle kennt (z.B. frisch gemergte Defaults), stehen
+  // nicht in der hartkodierten Kandidatenliste dieser (ggf. älteren) CLI — ohne sie würde der
+  // Eintrag zwar persistiert, die Datei aber nie kopiert (Codex-Review PR #26, Runde 2).
+  // Glob-Muster werden gegen den gerenderten Incoming-Baum expandiert.
+  const candidatePaths = [
+    ...new Set([
+      ...managedCandidateFiles,
+      ...(await expandOwnershipPaths(incomingRoot, extraOwnershipPaths)),
+    ]),
+  ];
+
+  for (const path of candidatePaths) {
     const ownershipMatch = explainOwnership(ownership, path);
     if (ownershipMatch.strategy === "consumer") {
       continue;
@@ -134,6 +150,43 @@ async function mergePackageJson(targetPath: string, incomingPath: string) {
     ...(incoming.devDependencies ?? {}),
   };
   await writeJson(targetPath, actual);
+}
+
+async function expandOwnershipPaths(
+  incomingRoot: string,
+  ownershipPaths: string[],
+): Promise<string[]> {
+  const exact = ownershipPaths.filter((path) => !path.includes("*"));
+  const patterns = ownershipPaths.filter((path) => path.includes("*"));
+  if (patterns.length === 0) {
+    return exact;
+  }
+  const incomingFiles = await listFilesRecursively(incomingRoot, incomingRoot);
+  return [
+    ...exact,
+    ...incomingFiles.filter((file) =>
+      patterns.some((pattern) => matchesOwnershipPattern(pattern, file)),
+    ),
+  ];
+}
+
+async function listFilesRecursively(
+  root: string,
+  directory: string,
+): Promise<string[]> {
+  const entries = await readdir(directory, { withFileTypes: true }).catch(
+    () => [],
+  );
+  const files: string[] = [];
+  for (const entry of entries) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await listFilesRecursively(root, path)));
+    } else {
+      files.push(relative(root, path).split("\\").join("/"));
+    }
+  }
+  return files;
 }
 
 async function readOptional(path) {

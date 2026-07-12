@@ -240,7 +240,7 @@ export function mergeOwnershipDefaults(
     .filter(
       ([path]) =>
         !persistedPatterns.some((pattern) =>
-          matchesOwnershipPattern(pattern, path),
+          ownershipPatternCovers(pattern, path),
         ),
     )
     .map(([path, strategy]) => ({ path, strategy }));
@@ -255,6 +255,41 @@ export function mergeOwnershipDefaults(
     },
     added,
   };
+}
+
+/** Deckt das persistierte Muster den (ggf. selbst wildcard-haltigen) Default-Pfad vollständig ab?
+ *  Ein naives matchesOwnershipPattern(persistiert, defaultKey) prüft den Default-Key als LITERALEN
+ *  Text: `apps/{star}/server/{star}` matchte so den Key `apps/{star}/server/{star}{star}`, deckt
+ *  verschachtelte Pfade aber nicht ab (Codex-Review PR #26, Runde 2). Stattdessen wird der
+ *  Default-Pfad zu konkreten Beispielpfaden expandiert (ein Stern → ein Segment; Doppelstern →
+ *  ein UND zwei Segmente) — nur ein Muster, das ALLE Beispiele matcht, gilt als deckend.
+ *  Das Sample-Segment `~cov~` kommt in echten Mustern nicht vor (keine False-Positives). */
+export function ownershipPatternCovers(
+  pattern: string,
+  defaultPath: string,
+): boolean {
+  if (pattern === defaultPath) {
+    return true;
+  }
+  return expandOwnershipPatternSamples(defaultPath).every((sample) =>
+    matchesOwnershipPattern(pattern, sample),
+  );
+}
+
+function expandOwnershipPatternSamples(pattern: string): string[] {
+  let variants = [pattern];
+  while (variants.some((variant) => variant.includes("**"))) {
+    variants = variants.flatMap((variant) => {
+      const index = variant.indexOf("**");
+      if (index === -1) {
+        return [variant];
+      }
+      const prefix = variant.slice(0, index);
+      const suffix = variant.slice(index + 2);
+      return [`${prefix}~cov~${suffix}`, `${prefix}~cov~/~cov~${suffix}`];
+    });
+  }
+  return variants.map((variant) => variant.replaceAll("*", "~cov~"));
 }
 
 /** Lädt die `defaultOwnership` der ZIEL-Template-Quelle (per dynamischem Import ihres manifest.ts).

@@ -119,6 +119,22 @@ describe("template manifest metadata", () => {
     ).toMatchObject({ strategy: "consumer" });
   });
 
+  it("does not treat narrower globs as covering a broader default", () => {
+    // Codex-Finding PR #26 (Runde 2): apps/*/server/* (eine Ebene) matcht den LITERALEN
+    // Default-Key apps/*/server/** als Text, deckt aber verschachtelte Pfade nicht ab —
+    // der breitere Default muss trotzdem ergänzt werden, sonst werden tiefe Dateien zu
+    // falschen merge-Konflikten.
+    const persisted = { paths: { "apps/*/server/*": "consumer" as const } };
+    const defaults = { paths: { "apps/*/server/**": "replace" as const } };
+
+    const { ownership, added } = mergeOwnershipDefaults(persisted, defaults);
+
+    expect(added).toEqual([{ path: "apps/*/server/**", strategy: "replace" }]);
+    expect(
+      explainOwnership(ownership, "apps/foo/server/routes/index.ts"),
+    ).toMatchObject({ strategy: "replace" });
+  });
+
   it("still adds broader defaults when only a more specific override exists", () => {
     const persisted = {
       paths: { "docs/reference/api.md": "consumer" as const },
