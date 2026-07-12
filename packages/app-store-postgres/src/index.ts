@@ -10,6 +10,12 @@ export {
   closePgPools,
 } from "./client.js";
 export {
+  createWakeSource,
+  InMemoryWakeSource,
+  PgWakeSource,
+  type WakeSource,
+} from "./wake-source.js";
+export {
   AutomationRuleNotFoundError,
   createAutomationStoreFromEnv,
   InMemoryAutomationStore,

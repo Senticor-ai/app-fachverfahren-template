@@ -17,6 +17,8 @@ import {
   createCaseStoreFromEnv,
   createNotificationStoreFromEnv,
   createTaskStoreFromEnv,
+  createWakeSource,
+  type WakeSource,
   InMemoryActorRoleStore,
   InMemoryAutomationStore,
   InMemoryCaseStore,
@@ -634,15 +636,30 @@ export async function startRuntime(env: NodeJS.ProcessEnv = process.env) {
   // Automations-Poller: verarbeitet fällige Outbox-Events. BEWUSST opt-in (APP_AUTOMATION_POLL_MS>0) — ein
   // Template soll nicht überraschend im Hintergrund Fälle mutieren. Multi-Replica-sicher durch `FOR UPDATE SKIP
   // LOCKED` im Store. `unref()` hält den Prozess nicht künstlich am Leben; im Shutdown wird der Timer gestoppt.
-  const automationTimer = startAutomationPoller(env, domainApi);
+  // #17: EIN Wake-Seam (LISTEN/NOTIFY bei Postgres, prozess-lokal bei In-Memory) weckt beide Poller früh bei neuen
+  // Events. Opt-in an APP_AUTOMATION_POLL_MS gekoppelt (die Poller selbst prüfen das); ohne Store kein Wecker.
+  const wakeSource = domainApi?.automationStore
+    ? createWakeSource(domainApi.automationStore, env)
+    : undefined;
+  const automationTimer = startAutomationPoller(env, domainApi, wakeSource);
   // Notification-Projektor als 2. Consumer im selben Intervall (opt-in via APP_AUTOMATION_POLL_MS, nur mit Stores).
-  const notificationTimer = startNotificationProjectorPoller(env, domainApi);
+  const notificationTimer = startNotificationProjectorPoller(
+    env,
+    domainApi,
+    wakeSource,
+  );
 
   const shutdown = async (signal: NodeJS.Signals) => {
     if (state.shuttingDown) return;
     state.shuttingDown = true;
-    if (automationTimer) clearInterval(automationTimer.timer);
-    if (notificationTimer) clearInterval(notificationTimer.timer);
+    if (automationTimer) {
+      clearInterval(automationTimer.timer);
+      automationTimer.unsubscribe?.();
+    }
+    if (notificationTimer) {
+      clearInterval(notificationTimer.timer);
+      notificationTimer.unsubscribe?.();
+    }
     logInfo("runtime.shutdown.started", { signal });
     const timeout = delay(config.shutdownTimeoutMs).then(() => "timeout");
     const closed = Promise.all([publicServer.close(), internalServer.close()])
@@ -651,6 +668,7 @@ export async function startRuntime(env: NodeJS.ProcessEnv = process.env) {
       // geclaimten Events blieben ohne angewandte Effekte hängen. ERST DANN die DB-Pools freigeben.
       .then(() => automationTimer?.drain())
       .then(() => notificationTimer?.drain())
+      .then(() => wakeSource?.close())
       .then(() => closePgPools())
       .then(() => "closed")
       .catch((error: unknown) => {
@@ -750,14 +768,28 @@ export function automationTickRunner(
 function startAutomationPoller(
   env: NodeJS.ProcessEnv,
   domainApi: DomainApiDeps | undefined,
-): { timer: NodeJS.Timeout; drain: () => Promise<void> } | undefined {
+  wakeSource?: WakeSource,
+):
+  | {
+      timer: NodeJS.Timeout;
+      drain: () => Promise<void>;
+      unsubscribe?: () => void;
+    }
+  | undefined {
   const pollMs = parseNonNegativeInt(env["APP_AUTOMATION_POLL_MS"], 0);
   if (pollMs <= 0 || !domainApi?.automationStore) return undefined;
   const runner = automationTickRunner(automationEngineDepsFrom(domainApi));
   const timer = setInterval(runner.run, pollMs);
   timer.unref();
-  logInfo("runtime.automation.poller", { pollMs });
-  return { timer, drain: runner.drain };
+  // #17: bei einem NOTIFY/Enqueue-Signal SOFORT einen (überlappungs-geschützten) Tick feuern, statt aufs Intervall zu
+  // warten. Der Poll bleibt das Sicherheitsnetz (verpasstes Signal → nächster Poll).
+  const unsubscribe = wakeSource?.subscribe(runner.run);
+  logInfo("runtime.automation.poller", { pollMs, wake: Boolean(wakeSource) });
+  return {
+    timer,
+    drain: runner.drain,
+    ...(unsubscribe ? { unsubscribe } : {}),
+  };
 }
 
 /** Überlappungs-geschützter Tick eines FAN-OUT-Consumers (#24) — analog `automationTickRunner`, aber über
@@ -801,7 +833,14 @@ export function consumerTickRunner(
 function startNotificationProjectorPoller(
   env: NodeJS.ProcessEnv,
   domainApi: DomainApiDeps | undefined,
-): { timer: NodeJS.Timeout; drain: () => Promise<void> } | undefined {
+  wakeSource?: WakeSource,
+):
+  | {
+      timer: NodeJS.Timeout;
+      drain: () => Promise<void>;
+      unsubscribe?: () => void;
+    }
+  | undefined {
   const pollMs = parseNonNegativeInt(env["APP_AUTOMATION_POLL_MS"], 0);
   if (
     pollMs <= 0 ||
@@ -817,8 +856,17 @@ function startNotificationProjectorPoller(
   );
   const timer = setInterval(runner.run, pollMs);
   timer.unref();
-  logInfo("runtime.notification.projector", { pollMs });
-  return { timer, drain: runner.drain };
+  // #17: derselbe Wake-Seam weckt auch den Projektor früh (er konsumiert dieselben neuen Events per Fan-out).
+  const unsubscribe = wakeSource?.subscribe(runner.run);
+  logInfo("runtime.notification.projector", {
+    pollMs,
+    wake: Boolean(wakeSource),
+  });
+  return {
+    timer,
+    drain: runner.drain,
+    ...(unsubscribe ? { unsubscribe } : {}),
+  };
 }
 
 /** Deutschsprachige Titel je Status (RFC-9457 `title`). Fehlt einer, greift ein generischer Fallback. */

@@ -216,9 +216,17 @@ function addMillis(iso: string, ms: number): string {
 }
 
 // ── In-Memory ─────────────────────────────────────────────────────────────────────────────────────
+/** Postgres-LISTEN/NOTIFY-Kanal (#17): der Enqueue-Pfad sendet `NOTIFY`, ein separater Worker weckt darauf sofort
+ *  (früher als das Poll-Intervall). Fester, gültiger Bezeichner (nicht parametrierbar) — eine Wahrheit für NOTIFY (hier)
+ *  und LISTEN (wake-source.ts). Der Poll bleibt IMMER das Sicherheitsnetz (ein verpasstes NOTIFY → nächster Poll). */
+export const AUTOMATION_WAKE_CHANNEL = "app_automation_wake";
+
 export class InMemoryAutomationStore implements AutomationStore {
   private readonly rules = new Map<string, AppAutomationRule>();
   private readonly events = new Map<string, AppAutomationEvent>();
+  /** OPTIONAL (#17): wird nach dem Einreihen eines NEUEN Events aufgerufen — der In-Prozess-Poller weckt daraufhin
+   *  sofort einen Tick (früher als das Poll-Intervall). Best-effort; fehlt der Callback, bleibt es beim Poll. */
+  wakeNotify?: () => void;
   private readonly runs: AppAutomationRun[] = [];
   /** Idempotenz-Riegel: gesehene (rule_id, idempotency_key). */
   private readonly seenRuns = new Set<string>();
@@ -290,6 +298,8 @@ export class InMemoryAutomationStore implements AutomationStore {
       occurredAt: event.occurredAt ?? null,
       payload: { ...event.payload },
     });
+    // Frühes Wecken (#17): NUR bei einem NEU eingereihten Event (die idempotente Wiederkehr oben weckt nicht).
+    this.wakeNotify?.();
     return { ...event };
   }
 
@@ -580,7 +590,15 @@ export class PostgresAutomationStore implements AutomationStore {
 
   async enqueueEvent(event: AppAutomationEvent): Promise<AppAutomationEvent> {
     return this.withClient(async (c) => {
-      await c.query(EVENT_INSERT_SQL, eventInsertParams(event));
+      // RETURNING event_id: bei ON-CONFLICT-Wiederkehr (Deadline-Scanner reiht dieselbe Frist erneut ein) liefert die
+      // Anweisung 0 Zeilen → dann KEIN NOTIFY (sonst weckte jeder Scan-Tick unnötig). Nur ein NEU eingereihtes Event
+      // weckt (#17). NOTIFY best-effort — ein Signalfehler darf das Enqueue NICHT kippen.
+      const r = await c.query<{ event_id: string }>(
+        `${EVENT_INSERT_SQL} RETURNING event_id`,
+        eventInsertParams(event),
+      );
+      if (r.rows.length > 0)
+        await c.query(`NOTIFY ${AUTOMATION_WAKE_CHANNEL}`).catch(() => {});
       return { ...event };
     });
   }
@@ -883,6 +901,18 @@ export async function insertAutomationEventTx(
 ): Promise<void> {
   // STRIKT (kein ON CONFLICT): eine doppelte event_id in der Domain-TX ist ein echter Fehler → Rollback.
   await client.query(EVENT_INSERT_TX_SQL, eventInsertParams(event));
+  // KEIN in-TX-NOTIFY: es würde die Zustellung ins Async-Notify-SLRU an den Domain-COMMIT koppeln — eine volle Queue
+  // liesse den COMMIT (und damit den bereits gültigen Statuswechsel) scheitern (Adversarial-Review-Fund). Der Wecker
+  // kommt best-effort NACH dem Commit über `notifyAutomationWake` (der Aufrufer), wenn das Event durabel ist.
+}
+
+/** Best-effort-Wecker (#17) für den IN-TX-Emissionspfad: der Aufrufer sendet dies NACH dem COMMIT auf derselben
+ *  Verbindung (das Event ist dann durabel). Ein NOTIFY-Fehler darf den bereits committeten Domain-Write NICHT mehr
+ *  berühren → Aufrufer schluckt ihn (`.catch`); der Poll bleibt das Sicherheitsnetz. */
+export async function notifyAutomationWake(
+  client: import("./client.js").PgClient,
+): Promise<void> {
+  await client.query(`NOTIFY ${AUTOMATION_WAKE_CHANNEL}`);
 }
 
 // ── SQL + Row-Mapping ───────────────────────────────────────────────────────────────────────────

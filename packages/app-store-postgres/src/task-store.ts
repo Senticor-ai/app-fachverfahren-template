@@ -10,7 +10,10 @@ import type {
   AppAutomationEvent,
   AutomationStore,
 } from "./automation-store.js";
-import { insertAutomationEventTx } from "./automation-store.js";
+import {
+  insertAutomationEventTx,
+  notifyAutomationWake,
+} from "./automation-store.js";
 
 export interface AppTask {
   taskId: string;
@@ -886,6 +889,9 @@ export class PostgresTaskStore implements TaskStore {
         if (input.outboxEvent)
           await insertAutomationEventTx(c, input.outboxEvent);
         await c.query("COMMIT");
+        // Frühes Wecken (#17) NACH dem Commit — best-effort, ausserhalb der Domain-TX (durabel; NOTIFY-Fehler
+        // berührt den committeten Eingang nicht mehr; der Poll bleibt das Sicherheitsnetz).
+        if (input.outboxEvent) await notifyAutomationWake(c).catch(() => {});
         return { case: { ...input.case }, task: taskFromRow(tr.rows[0]!) };
       } catch (e) {
         await c.query("ROLLBACK").catch(() => {});

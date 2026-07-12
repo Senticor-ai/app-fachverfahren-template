@@ -11,7 +11,7 @@
 // Prozess seinen eigenen, leeren Store — der Worker warnt dann und läuft ins Leere.
 import { fileURLToPath } from "node:url";
 import { createServer, type Server } from "node:http";
-import { closePgPools } from "@senticor/app-store-postgres";
+import { closePgPools, createWakeSource } from "@senticor/app-store-postgres";
 import {
   automationEngineDepsFrom,
   automationTickRunner,
@@ -62,6 +62,9 @@ export async function startWorker(
   // erkennt die Liveness einen HÄNGENDEN Tick: bleibt ein Tick stecken, veraltet dieser Wert → /livez 503 → Neustart.
   // Startwert „jetzt", damit das erste maxAlterMs-Fenster vor dem ersten Tick-Abschluss gesund ist.
   let letzterTick = Date.now();
+  // `automationStore` ist oben garantiert (früher Guard-Return, wenn es fehlt) — die Non-Null-Assertion hält das fest,
+  // da TS die Verengung nach den zwischenliegenden Aufrufen (Runner/Timer) nicht mehr trägt. Genutzt von Wecker + /metrics.
+  const automationStore = domainApi.automationStore!;
   const runner = automationTickRunner(
     automationEngineDepsFrom(domainApi),
     () => {
@@ -69,6 +72,10 @@ export async function startWorker(
     },
   );
   const timer = setInterval(runner.run, pollMs);
+  // #17: LISTEN/NOTIFY-Wecker — der WEB-Prozess NOTIFYt beim Enqueue, dieser Worker wird prozess-übergreifend SOFORT
+  // geweckt (statt bis zum nächsten Poll zu warten). Der Poll bleibt das Sicherheitsnetz.
+  const wakeSource = createWakeSource(automationStore, env);
+  const unsubEngine = wakeSource?.subscribe(runner.run);
 
   // 2. Consumer im selben Intervall: der Notification-Projektor (Fan-out) — nur wenn ein Notification-Store da ist.
   // Eigener Overlap-Guard; die Liveness bleibt an der Engine (deren Tick ist der Massstab), aber sauberer Drain im Stop.
@@ -83,12 +90,11 @@ export async function startWorker(
   const projektorTimer = projektor
     ? setInterval(projektor.run, pollMs)
     : undefined;
+  const unsubProjektor =
+    projektor && wakeSource ? wakeSource.subscribe(projektor.run) : undefined;
 
   // Minimaler HTTP-Health-Server (portabel, kein Shell/`stat` nötig). Der Worker serviert KEINEN Domain-Traffic;
   // nur `/livez` (Liveness) und `/metrics` (Rückstau-Gauge #10 für den Autoscaler — Prometheus-Text).
-  // `automationStore` ist oben garantiert (früher Guard-Return, wenn es fehlt) — die Non-Null-Assertion hält das fest,
-  // da TS die Verengung nach den zwischenliegenden Aufrufen (Runner/Timer) nicht mehr trägt.
-  const automationStore = domainApi.automationStore!;
   const jetztIso = domainApi.now ?? (() => new Date().toISOString());
   const healthPort = parseNonNegativeInt(env["APP_WORKER_HEALTH_PORT"], 0);
   let health: Server | undefined;
@@ -132,6 +138,10 @@ export async function startWorker(
   const stop = async () => {
     clearInterval(timer);
     if (projektorTimer) clearInterval(projektorTimer);
+    // Wecker abmelden + LISTEN-Verbindung schließen (vor dem Drain — keine neuen frühen Ticks mehr auslösen).
+    unsubEngine?.();
+    unsubProjektor?.();
+    await wakeSource?.close().catch(() => {});
     if (health) await new Promise<void>((r) => health!.close(() => r()));
     // Einen GERADE laufenden Tick abwarten, BEVOR der DB-Pool geschlossen wird — sonst reißt closePgPools den Pool
     // mitten in einem bereits geclaimten Event-Batch ab (die geclaimten Events blieben ohne angewandte Effekte hängen).

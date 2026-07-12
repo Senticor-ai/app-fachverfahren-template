@@ -11,7 +11,10 @@ import type {
   AppAutomationEvent,
   AutomationStore,
 } from "./automation-store.js";
-import { insertAutomationEventTx } from "./automation-store.js";
+import {
+  insertAutomationEventTx,
+  notifyAutomationWake,
+} from "./automation-store.js";
 
 export interface AppCase {
   caseId: string;
@@ -340,6 +343,10 @@ export class PostgresCaseStore implements CaseStore {
         if (input.outboxEvent)
           await insertAutomationEventTx(client, input.outboxEvent);
         await client.query("COMMIT");
+        // Frühes Wecken (#17) NACH dem Commit — best-effort, ausserhalb der Domain-TX: das Event ist durabel, ein
+        // NOTIFY-Fehler kann den Statuswechsel nicht mehr zurückrollen; der Poll bleibt das Sicherheitsnetz.
+        if (input.outboxEvent)
+          await notifyAutomationWake(client).catch(() => {});
         return caseFromRow(upd.rows[0]!);
       } catch (error) {
         await client.query("ROLLBACK").catch(() => {});
