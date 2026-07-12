@@ -9,10 +9,12 @@ import {
   type CaseStore,
   type NotificationStore,
   type TaskStore,
+  type WikiStore,
   InMemoryAutomationStore,
   InMemoryCaseStore,
   InMemoryNotificationStore,
   InMemoryTaskStore,
+  InMemoryWikiStore,
   PostgresCaseStore,
   PostgresTaskStore,
 } from "@senticor/app-store-postgres";
@@ -1495,6 +1497,144 @@ describe("/api/notifications (#18) — persistierte Meldungen, sitzungs-/mandant
         method: "GET",
         url: "/api/notifications",
         headers: SB("sb.a", "inbox.read"),
+      });
+      expect(res.statusCode).toBe(404);
+    } finally {
+      await app.close();
+    }
+  });
+});
+
+describe("/api/wiki (#20) — versionierte Wissensbasis, sitzungs-/mandanten-/behörden-scoped lesen", () => {
+  function appMitWiki(wikiStore: WikiStore): FastifyInstance {
+    const app = fastify({ logger: false });
+    registerDomainApi(app, {
+      caseStore: new InMemoryCaseStore(),
+      catalog,
+      resolveSession: headerSession,
+      now: () => "2026-06-01T00:00:00.000Z",
+      newAuditId: uid,
+      wikiStore,
+    });
+    return app;
+  }
+
+  async function seedWiki(): Promise<WikiStore> {
+    const store = new InMemoryWikiStore();
+    // Eigener Artikel (t1/b1) mit zwei Versionen → Revisionshistorie.
+    await store.upsertArticle({
+      tenantId: "t1",
+      authorityId: "b1",
+      jurisdictionId: "de",
+      articleId: "handbuch",
+      title: "Handbuch V1",
+      markdown: "eins",
+      editorActorId: "sb.a",
+      expectedVersion: 0,
+    });
+    await store.upsertArticle({
+      tenantId: "t1",
+      authorityId: "b1",
+      jurisdictionId: "de",
+      articleId: "handbuch",
+      title: "Handbuch V2",
+      markdown: "zwei",
+      editorActorId: "sb.a",
+      expectedVersion: 1,
+    });
+    // Fremder Mandant — darf NICHT erscheinen.
+    await store.upsertArticle({
+      tenantId: "fremd",
+      authorityId: "b1",
+      jurisdictionId: "de",
+      articleId: "geheim",
+      title: "Fremd",
+      markdown: "x",
+      editorActorId: "sb.z",
+      expectedVersion: 0,
+    });
+    return store;
+  }
+
+  it("GET /api/wiki listet NUR die eigene Behörde; /:id liefert den Kopf; /:id/revisions die Historie", async () => {
+    const app = appMitWiki(await seedWiki());
+    try {
+      const liste = await app.inject({
+        method: "GET",
+        url: "/api/wiki",
+        headers: SB("sb.a", "wiki.read"),
+      });
+      expect(liste.statusCode).toBe(200);
+      const body = liste.json() as { articles: { articleId: string }[] };
+      expect(body.articles.map((a) => a.articleId)).toEqual(["handbuch"]); // kein "geheim"
+
+      const einzeln = await app.inject({
+        method: "GET",
+        url: "/api/wiki/handbuch",
+        headers: SB("sb.a", "wiki.read"),
+      });
+      expect(einzeln.statusCode).toBe(200);
+      const art = (einzeln.json() as { article: { version: number } }).article;
+      expect(art.version).toBe(2); // aktueller Kopf
+
+      const revs = await app.inject({
+        method: "GET",
+        url: "/api/wiki/handbuch/revisions",
+        headers: SB("sb.a", "wiki.read"),
+      });
+      expect(revs.statusCode).toBe(200);
+      expect(
+        (revs.json() as { revisions: { version: number }[] }).revisions.map(
+          (r) => r.version,
+        ),
+      ).toEqual([2, 1]); // neueste zuerst
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("GET /api/wiki/:id → 404 für einen im Scope unbekannten Artikel", async () => {
+    const app = appMitWiki(await seedWiki());
+    try {
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/wiki/gibt-es-nicht",
+        headers: SB("sb.a", "wiki.read"),
+      });
+      expect(res.statusCode).toBe(404);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("403 ohne wiki.read-Berechtigung", async () => {
+    const app = appMitWiki(await seedWiki());
+    try {
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/wiki",
+        headers: SB("sb.a", "case.read"),
+      });
+      expect(res.statusCode).toBe(403);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("keine /api/wiki-Route ohne wikiStore (404)", async () => {
+    const app = fastify({ logger: false });
+    registerDomainApi(app, {
+      caseStore: new InMemoryCaseStore(),
+      catalog,
+      resolveSession: headerSession,
+      now: () => "2026-06-01T00:00:00.000Z",
+      newAuditId: uid,
+    });
+    try {
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/wiki",
+        headers: SB("sb.a", "wiki.read"),
       });
       expect(res.statusCode).toBe(404);
     } finally {

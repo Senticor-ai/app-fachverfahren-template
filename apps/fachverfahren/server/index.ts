@@ -18,12 +18,14 @@ import {
   createNotificationStoreFromEnv,
   createTaskStoreFromEnv,
   createWakeSource,
+  createWikiStoreFromEnv,
   type WakeSource,
   InMemoryActorRoleStore,
   InMemoryAutomationStore,
   InMemoryCaseStore,
   InMemoryNotificationStore,
   InMemoryTaskStore,
+  InMemoryWikiStore,
 } from "@senticor/app-store-postgres";
 import {
   catalogFromStatusMachines,
@@ -484,6 +486,9 @@ export async function buildDomainApiFromEnv(
   // gelesen. In-Memory-Default teilt den Prozess; PROD nutzt den geteilten Postgres-Store.
   const notificationStore =
     createNotificationStoreFromEnv(env) ?? new InMemoryNotificationStore();
+  // Wissensbasis/Wiki (#20): versionierte Handbücher/Arbeitshilfen, von /api/wiki gelesen. In-Memory-Default teilt
+  // den Prozess; PROD nutzt den geteilten Postgres-Store.
+  const wikiStore = createWikiStoreFromEnv(env) ?? new InMemoryWikiStore();
   const aiAssist = new HeuristicKiAssist();
   // Mandanten-Allowlist dieses Deployments (komma-separiert). Gesetzt ⇒ Tenant-Pinning (fail-closed, 403 bei
   // fremdem tenantId); leer/unset ⇒ keine Einschränkung (rückwärtskompatibel).
@@ -496,6 +501,7 @@ export async function buildDomainApiFromEnv(
     taskStore,
     automationStore,
     notificationStore,
+    wikiStore,
     actorRoleStore,
     aiAssist,
     catalog,

@@ -96,6 +96,16 @@ export const builtInPermissions = {
     description:
       "KI-Assistenz anfordern/übernehmen (assistiv, Mensch entscheidet)",
   },
+  // ── Wissensbasis/Wiki (#20): versionierte interne Handbücher/Arbeitshilfen. Ohne diese Grants wären die
+  //    /api/wiki-Routen in PROD tot (403). wiki.write deckt das Authoring (Phase 3, POST/PATCH) vor.
+  wikiRead: {
+    permission: "wiki.read",
+    description: "Wissensbasis/Wiki-Artikel und -Revisionen lesen",
+  },
+  wikiWrite: {
+    permission: "wiki.write",
+    description: "Wiki-Artikel anlegen/aktualisieren (versioniert)",
+  },
 } as const satisfies Record<string, RbacPermission>;
 
 export const builtInRbacRegistry = {
@@ -140,6 +150,8 @@ export const builtInRbacRegistry = {
         builtInPermissions.automationRead,
         builtInPermissions.automationWrite,
         builtInPermissions.aiAssist,
+        builtInPermissions.wikiRead,
+        builtInPermissions.wikiWrite,
       ],
       builtIn: true,
     },

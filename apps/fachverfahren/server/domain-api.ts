@@ -14,6 +14,7 @@ import type {
   CaseStore,
   NotificationStore,
   TaskStore,
+  WikiStore,
 } from "@senticor/app-store-postgres";
 import {
   bedingungUnterstuetzt,
@@ -55,6 +56,9 @@ export interface DomainApiDeps {
   /** OPTIONAL — die Benachrichtigungs-Datenschicht (persistierte Meldungen, vom Notification-Projektor #18 gespeist).
    *  Fehlt sie, gibt es keine /api/notifications-Routen (der Client fällt auf abgeleitete Meldungen zurück). */
   notificationStore?: NotificationStore;
+  /** OPTIONAL — die versionierte Wissensbasis/Wiki (#20). Fehlt sie, gibt es keine /api/wiki-Routen (der Client
+   *  fällt auf das statische Config-Wissen `WorkspaceConfig.wissen` zurück). */
+  wikiStore?: WikiStore;
   /** OPTIONAL — die KI-Assistenz-Naht. Fehlt sie, gibt es keine /api/tasks/:id/ai-Routen. */
   aiAssist?: KiAssistPort;
   /** OPTIONAL — der Zuständigkeits-Lesepfad (app_actor_roles). Für die KI-Zuweisungsprüfung. */
@@ -559,6 +563,65 @@ export function registerDomainApi(
           notificationId: request.params.id,
         });
         return reply.code(204).header("Cache-Control", NO_STORE).send();
+      },
+    );
+  }
+
+  // ── Versionierte Wissensbasis/Wiki (#20): sitzungs-/mandanten-/behörden-scoped lesen. Der Scope kommt NUR aus der
+  //    Server-Session; das Authoring (POST/PATCH mit wiki.write) folgt in Phase 3. ──
+  const wikiStore = deps.wikiStore;
+  if (wikiStore) {
+    // Alle Artikel der Behörde (der Client legt sie über das statische Config-Wissen).
+    app.get("/api/wiki", async (request, reply) => {
+      const session = requireSession(deps, request, reply);
+      if (!session) return reply;
+      if (!session.permissions.includes("wiki.read")) {
+        return forbidden(reply, "missing permission wiki.read");
+      }
+      const articles = await wikiStore.listArticles({
+        tenantId: session.tenantId,
+        authorityId: session.authorityId,
+      });
+      return reply.header("Cache-Control", NO_STORE).send({ articles });
+    });
+
+    // Ein einzelner Artikel (aktueller Kopf) — 404, wenn im Session-Scope nicht vorhanden.
+    app.get<{ Params: { id: string } }>(
+      "/api/wiki/:id",
+      async (request, reply) => {
+        const session = requireSession(deps, request, reply);
+        if (!session) return reply;
+        if (!session.permissions.includes("wiki.read")) {
+          return forbidden(reply, "missing permission wiki.read");
+        }
+        const article = await wikiStore.getArticle({
+          tenantId: session.tenantId,
+          articleId: request.params.id,
+        });
+        if (!article) {
+          return reply
+            .code(404)
+            .header("Cache-Control", NO_STORE)
+            .send({ error: "not-found" });
+        }
+        return reply.header("Cache-Control", NO_STORE).send({ article });
+      },
+    );
+
+    // Die (append-only) Revisionshistorie eines Artikels, neueste zuerst.
+    app.get<{ Params: { id: string } }>(
+      "/api/wiki/:id/revisions",
+      async (request, reply) => {
+        const session = requireSession(deps, request, reply);
+        if (!session) return reply;
+        if (!session.permissions.includes("wiki.read")) {
+          return forbidden(reply, "missing permission wiki.read");
+        }
+        const revisions = await wikiStore.listRevisions({
+          tenantId: session.tenantId,
+          articleId: request.params.id,
+        });
+        return reply.header("Cache-Control", NO_STORE).send({ revisions });
       },
     );
   }

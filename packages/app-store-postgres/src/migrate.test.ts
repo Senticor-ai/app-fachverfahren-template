@@ -124,6 +124,10 @@ describe("postgres migration runner", () => {
     );
     expect(sql).toContain("CREATE TRIGGER app_wiki_revisions_no_mutation");
     expect(sql).not.toContain("REVOKE UPDATE, DELETE ON app_wiki_articles");
+    // Wiki-RBAC-Grants: die caseworker-Rolle darf lesen/schreiben (sonst 403 in PROD trotz vorhandener Routen).
+    expect(sql).toContain("('wiki.read',");
+    expect(sql).toContain("('caseworker', 'wiki.read')");
+    expect(sql).toContain("('caseworker', 'wiki.write')");
   });
 
   it("keeps preference and mailbox semantics testable without a database", async () => {
