@@ -178,6 +178,9 @@ export async function writeTemplateMetadata(
       "- `answers.json` enthält stabile Scaffold-Eingaben.",
       "- `lock.json` enthält Template-Version, Commit und angewandte Migrationen.",
       "- `ownership.yaml` steuert, welche Pfade vom Template aktualisiert werden.",
+      "  Neue Template-Defaults werden bei `template:update` automatisch ergänzt",
+      "  (eigene Einträge gewinnen); Opt-out = Strategie `consumer` setzen statt",
+      "  die Zeile zu löschen.",
       "",
       "Diese Dateien enthalten keine Zeitstempel oder lokalen Maschinenpfade.",
       "",
@@ -212,6 +215,36 @@ export function formatOwnershipYaml(ownership: TemplateOwnership): string {
     ...entries.map(([path, strategy]) => `  "${path}": ${strategy}`),
     "",
   ].join("\n");
+}
+
+/** Ergänzt Default-Einträge, die im persistierten ownership.yaml eines Konsumenten fehlen (Set-Differenz,
+ *  neue Keys hinten angehängt → append-only-Diff). Persistierte Einträge gewinnen IMMER: Konsumenten-Overrides
+ *  werden nie zurückgesetzt, und Strategie-ÄNDERUNGEN an bestehenden Defaults propagieren bewusst nicht
+ *  (dafür gibt es Template-Migrationen — es existiert keine Provenienz, um Override von veraltetem Snapshot
+ *  zu unterscheiden). Gelöschte Einträge werden beim nächsten Update wieder ergänzt; dauerhaftes Opt-out
+ *  = Strategie auf `consumer` setzen statt die Zeile zu löschen. */
+export function mergeOwnershipDefaults(
+  persisted: TemplateOwnership,
+  defaults: TemplateOwnership = defaultOwnership,
+): {
+  ownership: TemplateOwnership;
+  added: Array<{ path: string; strategy: TemplateOwnership["paths"][string] }>;
+} {
+  const persistedPaths = persisted.paths ?? {};
+  const added = Object.entries(defaults.paths ?? {})
+    .filter(([path]) => !(path in persistedPaths))
+    .map(([path, strategy]) => ({ path, strategy }));
+  return {
+    ownership: {
+      paths: {
+        ...persistedPaths,
+        ...Object.fromEntries(
+          added.map(({ path, strategy }) => [path, strategy]),
+        ),
+      },
+    },
+    added,
+  };
 }
 
 export function validateOwnership(ownership: TemplateOwnership): string[] {

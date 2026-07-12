@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -86,11 +86,19 @@ async function runTemplate(args: string[]): Promise<string> {
   return `${lines.join("\n")}\n`;
 }
 
+const repoRoot = process.cwd();
+
 afterEach(() => {
   // Belt-and-suspenders: runTemplate always restores this itself, but a
   // thrown assertion inside a test body could otherwise leave a stale
   // exitCode bleeding into whichever test runs next in this same worker.
   process.exitCode = undefined;
+  // Ditto für cwd: das chdir-basierte Update-E2E stellt cwd selbst wieder her,
+  // aber ein per Timeout abgebrochener Testkörper läuft als Zombie weiter und
+  // ließe cwd sonst in einem (bald gelöschten) Temp-Verzeichnis zurück — jeder
+  // Folgetest mit Subprozess stürbe dann an uv_cwd/ENOENT (beobachtet unter
+  // CPU-Starvation im pre-push-Gate).
+  process.chdir(repoRoot);
 });
 
 describe("template CLI", () => {
@@ -139,6 +147,97 @@ describe("template CLI", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  // Eigenes 300s-Budget: Scaffold + zwei volle Incoming-Renders sind unter CPU-Starvation (z.B.
+  // pre-push-Gate parallel zu anderen Workern) deutlich langsamer als die default 120s — ein
+  // Timeout hier hinterließe einen Zombie-Testkörper, dessen chdir/rm Folgetests vergiftet.
+  it(
+    "merges new default ownership entries during template:update",
+    { timeout: 300_000 },
+    async () => {
+      const templateRoot = process.cwd();
+      const root = await mkdtemp(join(tmpdir(), "template-cli-update-test-"));
+      try {
+        const target = join(root, "app");
+        await runTemplate([
+          "scaffold",
+          "--domain",
+          "fachverfahren",
+          "--display-name",
+          "Fachverfahren",
+          "--target",
+          target,
+          "--allow-existing-empty",
+          "--allow-dirty",
+          "--json",
+        ]);
+
+        // Prä-#24-Konsument simulieren: dessen ownership.yaml-Snapshot kennt `ci.yml` noch nicht,
+        // und die lokale Datei ist gegenüber dem Template veraltet.
+        const ownershipPath = join(target, ".template", "ownership.yaml");
+        const persisted = await readFile(ownershipPath, "utf8");
+        expect(persisted).toContain('"ci.yml": replace');
+        await writeFile(
+          ownershipPath,
+          persisted
+            .split("\n")
+            .filter((line) => !line.includes('"ci.yml"'))
+            .join("\n"),
+        );
+        const ciPath = join(target, "ci.yml");
+        const marker = "# stale consumer marker\n";
+        await writeFile(ciPath, `${await readFile(ciPath, "utf8")}${marker}`);
+
+        process.chdir(target);
+        try {
+          const dryRun = JSON.parse(
+            await runTemplate([
+              "diff",
+              "--template-source-dir",
+              templateRoot,
+              "--json",
+            ]),
+          );
+          expect(dryRun.status).toBe("ok");
+          expect(dryRun.ownershipUpdates).toContainEqual({
+            path: "ci.yml",
+            strategy: "replace",
+          });
+          const dryRunSections = Object.fromEntries(
+            dryRun.sections.map((section) => [section.title, section.items]),
+          );
+          expect(dryRunSections["Ownership Updates"]).toContain(
+            "ci.yml: replace (new template default)",
+          );
+          expect(dryRunSections["Managed Changes"]).toContain(
+            "ci.yml: replace",
+          );
+          // Dry-Run persistiert nichts.
+          expect(await readFile(ownershipPath, "utf8")).not.toContain(
+            '"ci.yml"',
+          );
+
+          const update = JSON.parse(
+            await runTemplate([
+              "update",
+              "--template-source-dir",
+              templateRoot,
+              "--json",
+            ]),
+          );
+          expect(update.status).toBe("ok");
+          expect(await readFile(ciPath, "utf8")).not.toContain(marker);
+          expect(await readFile(ownershipPath, "utf8")).toContain(
+            '"ci.yml": replace',
+          );
+        } finally {
+          process.chdir(templateRoot);
+        }
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("discovers vendor-neutral agent workflows", async () => {
     const output = await runTemplate(["agent:discover", "--json"]);

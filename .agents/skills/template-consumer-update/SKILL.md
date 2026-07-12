@@ -28,7 +28,11 @@ pnpm run template:diff -- --to <version>
 pnpm run template:update -- --to <version>
 ```
 
-4. Resolve reported conflicts according to `.template/ownership.yaml`.
+4. Resolve reported conflicts according to `.template/ownership.yaml`. The
+   update merges new template defaults into that file automatically (listed
+   under "Ownership Updates"; existing consumer entries always win). To opt a
+   path out permanently, set its strategy to `consumer` — do not delete the
+   line, deleted entries are re-added on the next update.
 5. Run generated-app checks:
 
 ```bash

@@ -31,6 +31,7 @@ import {
   defaultOwnership,
   explainOwnership,
   hasTemplateMetadata,
+  mergeOwnershipDefaults,
   readOwnership,
   readTemplateAnswers,
   readTemplateLock,
@@ -1350,6 +1351,12 @@ async function testTemplateAdopt() {
 
 async function computeUpdatePlan({ dryRun }: { dryRun: boolean }) {
   const metadata = await readMetadataOrSourceDefaults();
+  // Neue Template-Defaults (z.B. ein nach dem Scaffold des Konsumenten ergänzter ownership-Eintrag)
+  // in die persistierte Sicht mergen, BEVOR geplant wird — sonst fiele die Datei auf den
+  // merge-Fallback zurück und ein Replace-Kandidat erschiene fälschlich als Konflikt (#24).
+  const { ownership, added: ownershipUpdates } = mergeOwnershipDefaults(
+    metadata.ownership,
+  );
   const sourceDir =
     option("--template-source-dir") ??
     process.env["TEMPLATE_SOURCE_DIR"] ??
@@ -1365,7 +1372,7 @@ async function computeUpdatePlan({ dryRun }: { dryRun: boolean }) {
   const { changes, conflicts } = await planOwnershipUpdate({
     root: process.cwd(),
     incomingRoot,
-    ownership: metadata.ownership,
+    ownership,
   });
   const report = {
     title: dryRun ? "Template Update Dry Run" : "Template Update",
@@ -1374,6 +1381,7 @@ async function computeUpdatePlan({ dryRun }: { dryRun: boolean }) {
     from: metadata.lock.templateVersion,
     to: toVersion,
     incomingRoot,
+    ownershipUpdates,
     sections: [
       {
         title: "Managed Changes",
@@ -1385,9 +1393,15 @@ async function computeUpdatePlan({ dryRun }: { dryRun: boolean }) {
           (conflict) => `${conflict.path}: ${conflict.reason}`,
         ),
       },
+      {
+        title: "Ownership Updates",
+        items: ownershipUpdates.map(
+          (entry) => `${entry.path}: ${entry.strategy} (new template default)`,
+        ),
+      },
     ],
   };
-  return { changes, conflicts, incomingRoot, report };
+  return { changes, conflicts, incomingRoot, report, ownershipUpdates };
 }
 
 async function applyComputedUpdate(updatePlan, requestedVersion?: string) {
@@ -1398,6 +1412,9 @@ async function applyComputedUpdate(updatePlan, requestedVersion?: string) {
   });
   await runPendingMigrations({ dryRun: false });
   const metadata = await readMetadataOrSourceDefaults();
+  // Bewusst RE-mergen statt die geplante Map durchzureichen: die Migrationen eine Zeile weiter oben
+  // dürfen ownership.yaml legitim editieren; der Merge ist idempotent und persistiert gewinnt.
+  metadata.ownership = mergeOwnershipDefaults(metadata.ownership).ownership;
   const toVersion = requestedVersion ?? metadata.lock.templateVersion;
   metadata.lock.templateVersion = toVersion;
   metadata.lock.generatorVersion = toVersion;

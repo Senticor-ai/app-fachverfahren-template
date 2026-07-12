@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { defaultOwnership } from "./manifest.ts";
+import { defaultOwnership, mergeOwnershipDefaults } from "./manifest.ts";
 import { planOwnershipUpdate } from "./merge.ts";
 
 describe("template ownership merge", () => {
@@ -52,6 +52,50 @@ describe("template ownership merge", () => {
           path: "schemas/app-spec.schema.json",
           action: "replace",
         }),
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+      await rm(incomingRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("treats files under newly added default ownership as managed changes", async () => {
+    const root = await mkdtemp(join(tmpdir(), "template-merge-root-"));
+    const incomingRoot = await mkdtemp(
+      join(tmpdir(), "template-merge-incoming-"),
+    );
+    try {
+      await writeFile(join(root, "ci.yml"), "schemaVersion: v0.1\n");
+      await writeFile(join(incomingRoot, "ci.yml"), "schemaVersion: v0.2\n");
+
+      // Prä-#24-Zustand: Konsument wurde gescaffoldet, bevor das Template `ci.yml` verwaltete.
+      const staleOwnership = {
+        paths: Object.fromEntries(
+          Object.entries(defaultOwnership.paths).filter(
+            ([path]) => path !== "ci.yml",
+          ),
+        ),
+      };
+
+      const stalePlan = await planOwnershipUpdate({
+        root,
+        incomingRoot,
+        ownership: staleOwnership,
+      });
+      expect(stalePlan.conflicts).toContainEqual(
+        expect.objectContaining({ path: "ci.yml" }),
+      );
+
+      const mergedPlan = await planOwnershipUpdate({
+        root,
+        incomingRoot,
+        ownership: mergeOwnershipDefaults(staleOwnership).ownership,
+      });
+      expect(mergedPlan.changes).toContainEqual(
+        expect.objectContaining({ path: "ci.yml", action: "replace" }),
+      );
+      expect(mergedPlan.conflicts).not.toContainEqual(
+        expect.objectContaining({ path: "ci.yml" }),
       );
     } finally {
       await rm(root, { recursive: true, force: true });
