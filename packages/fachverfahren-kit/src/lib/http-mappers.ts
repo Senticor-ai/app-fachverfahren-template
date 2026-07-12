@@ -207,6 +207,7 @@ export function wissenVonAppWiki(a: AppWikiArticleDTO): WissensArtikel {
     titel: a.title,
     markdown: a.markdown,
     standIso: a.updatedAt,
+    version: a.version, // fürs Optimistic-Locking beim Speichern (server-geführt)
     ...(a.category !== null ? { kategorie: a.category } : {}),
     ...(a.parentId !== null ? { parentId: a.parentId } : {}),
   };

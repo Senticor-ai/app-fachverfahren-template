@@ -1642,3 +1642,189 @@ describe("/api/wiki (#20) — versionierte Wissensbasis, sitzungs-/mandanten-/be
     }
   });
 });
+
+describe("/api/wiki Authoring (#20 Phase 3a) — POST anlegen (201) / PATCH versionieren (409 bei Konflikt)", () => {
+  function appMitWiki(wikiStore: WikiStore): FastifyInstance {
+    const app = fastify({ logger: false });
+    registerDomainApi(app, {
+      caseStore: new InMemoryCaseStore(),
+      catalog,
+      resolveSession: headerSession,
+      now: () => "2026-06-01T00:00:00.000Z",
+      newAuditId: uid,
+      wikiStore,
+    });
+    return app;
+  }
+
+  it("POST legt einen Artikel an (201, Version 1); erneutes POST derselben id → 409", async () => {
+    const app = appMitWiki(new InMemoryWikiStore());
+    try {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/wiki",
+        headers: SB("sb.a", "wiki.write"),
+        payload: { articleId: "neu", title: "Neu", markdown: "inhalt" },
+      });
+      expect(res.statusCode).toBe(201);
+      const art = (res.json() as { article: { version: number } }).article;
+      expect(art.version).toBe(1);
+
+      // Zweites POST derselben id (Neuanlage auf existierenden) → 409 (der Client muss PATCHen).
+      const dup = await app.inject({
+        method: "POST",
+        url: "/api/wiki",
+        headers: SB("sb.a", "wiki.write"),
+        payload: { articleId: "neu", title: "Nochmal", markdown: "x" },
+      });
+      expect(dup.statusCode).toBe(409);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("PATCH speichert eine neue Version (expectedVersion=1 → v2); veraltete Version → 409", async () => {
+    const store = new InMemoryWikiStore();
+    await store.upsertArticle({
+      tenantId: "t1",
+      authorityId: "b1",
+      jurisdictionId: "de",
+      articleId: "doc",
+      title: "V1",
+      markdown: "eins",
+      editorActorId: "sb.a",
+      expectedVersion: 0,
+    });
+    const app = appMitWiki(store);
+    try {
+      const ok = await app.inject({
+        method: "PATCH",
+        url: "/api/wiki/doc",
+        headers: SB("sb.a", "wiki.write"),
+        payload: { title: "V2", markdown: "zwei", expectedVersion: 1 },
+      });
+      expect(ok.statusCode).toBe(200);
+      expect(
+        (ok.json() as { article: { version: number } }).article.version,
+      ).toBe(2);
+
+      // Ein zweiter Bearbeiter mit veralteter Sicht (erwartet noch v1) → 409 mit der tatsächlichen Version.
+      const konflikt = await app.inject({
+        method: "PATCH",
+        url: "/api/wiki/doc",
+        headers: SB("sb.a", "wiki.write"),
+        payload: { title: "stale", markdown: "x", expectedVersion: 1 },
+      });
+      expect(konflikt.statusCode).toBe(409);
+      expect(konflikt.json()).toMatchObject({
+        error: "version-conflict",
+        actualVersion: 2,
+      });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("PATCH ohne expectedVersion → 400", async () => {
+    const store = new InMemoryWikiStore();
+    await store.upsertArticle({
+      tenantId: "t1",
+      authorityId: "b1",
+      jurisdictionId: "de",
+      articleId: "doc",
+      title: "V1",
+      markdown: "eins",
+      editorActorId: "sb.a",
+      expectedVersion: 0,
+    });
+    const app = appMitWiki(store);
+    try {
+      const res = await app.inject({
+        method: "PATCH",
+        url: "/api/wiki/doc",
+        headers: SB("sb.a", "wiki.write"),
+        payload: { title: "V2", markdown: "zwei" },
+      });
+      expect(res.statusCode).toBe(400);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("403 für POST/PATCH ohne wiki.write (auch mit wiki.read)", async () => {
+    const app = appMitWiki(new InMemoryWikiStore());
+    try {
+      const post = await app.inject({
+        method: "POST",
+        url: "/api/wiki",
+        headers: SB("sb.a", "wiki.read"),
+        payload: { articleId: "x", title: "X", markdown: "x" },
+      });
+      expect(post.statusCode).toBe(403);
+      const patch = await app.inject({
+        method: "PATCH",
+        url: "/api/wiki/x",
+        headers: SB("sb.a", "wiki.read"),
+        payload: { title: "X", markdown: "x", expectedVersion: 1 },
+      });
+      expect(patch.statusCode).toBe(403);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("verweigert das Überschreiben eines Artikels einer FREMDEN Behörde (404, kein Cross-Authority-Tampering)", async () => {
+    const store = new InMemoryWikiStore();
+    // Behörde b1 besitzt den Artikel (im Mandanten t1).
+    await store.upsertArticle({
+      tenantId: "t1",
+      authorityId: "b1",
+      jurisdictionId: "de",
+      articleId: "dienstanweisung",
+      title: "B1-Original",
+      markdown: "b1",
+      editorActorId: "sb.b1",
+      expectedVersion: 0,
+    });
+    const app = appMitWiki(store);
+    // Eine Sitzung der FREMDEN Behörde b2 (SELBER Mandant t1) mit wiki.write.
+    const b2 = {
+      "x-actor-id": "sb.b2",
+      "x-tenant-id": "t1",
+      "x-authority-id": "b2",
+      "x-permissions": "wiki.write",
+    };
+    try {
+      // PATCH aus b2 → 404 (nicht 409 — die Existenz/Version wird NICHT preisgegeben).
+      const patch = await app.inject({
+        method: "PATCH",
+        url: "/api/wiki/dienstanweisung",
+        headers: b2,
+        payload: { title: "forged", markdown: "x", expectedVersion: 1 },
+      });
+      expect(patch.statusCode).toBe(404);
+      // POST derselben id aus b2 → 404 (statt eines 409, das die fremde Existenz verriete).
+      const post = await app.inject({
+        method: "POST",
+        url: "/api/wiki",
+        headers: b2,
+        payload: {
+          articleId: "dienstanweisung",
+          title: "forged",
+          markdown: "x",
+        },
+      });
+      expect(post.statusCode).toBe(404);
+      // b1s Artikel ist UNVERÄNDERT geblieben (kein fremder Schreibzugriff).
+      const unveraendert = await store.getArticle({
+        tenantId: "t1",
+        articleId: "dienstanweisung",
+      });
+      expect(unveraendert?.version).toBe(1);
+      expect(unveraendert?.title).toBe("B1-Original");
+      expect(unveraendert?.authorityId).toBe("b1");
+    } finally {
+      await app.close();
+    }
+  });
+});

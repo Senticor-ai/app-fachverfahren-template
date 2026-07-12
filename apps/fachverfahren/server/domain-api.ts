@@ -16,6 +16,7 @@ import type {
   TaskStore,
   WikiStore,
 } from "@senticor/app-store-postgres";
+import { WikiVersionConflictError } from "@senticor/app-store-postgres";
 import {
   bedingungUnterstuetzt,
   evalBedingungNodeSafe,
@@ -571,6 +572,25 @@ export function registerDomainApi(
   //    Server-Session; das Authoring (POST/PATCH mit wiki.write) folgt in Phase 3. ──
   const wikiStore = deps.wikiStore;
   if (wikiStore) {
+    // Behörden-Scope für SCHREIBzugriffe: ein Artikel gehört zu genau EINER Behörde (der Store friert authority_id bei
+    // der Anlage ein und sucht nur per (tenant, id)). Ohne diese Prüfung könnte Behörde A einen Artikel der Behörde B
+    // im SELBEN Mandanten überschreiben. Existiert der Artikel unter einer FREMDEN Behörde → wie „nicht vorhanden"
+    // behandeln (404, KEIN Disclosure der Existenz/Version). Spiegelt die getX-Scope-Prüfung der Aufgaben/Automations-
+    // Schreibrouten. (Der Lesepfad ist bereits behörden-scoped via listArticles.)
+    const gehoertFremderBehoerde = async (
+      session: CaseworkerSession,
+      articleId: string,
+    ): Promise<boolean> => {
+      const vorhandener = await wikiStore.getArticle({
+        tenantId: session.tenantId,
+        articleId,
+      });
+      return (
+        vorhandener !== undefined &&
+        vorhandener.authorityId !== session.authorityId
+      );
+    };
+
     // Alle Artikel der Behörde (der Client legt sie über das statische Config-Wissen).
     app.get("/api/wiki", async (request, reply) => {
       const session = requireSession(deps, request, reply);
@@ -624,6 +644,131 @@ export function registerDomainApi(
         return reply.header("Cache-Control", NO_STORE).send({ revisions });
       },
     );
+
+    // Neuanlage eines Artikels (Version 1). editorActorId/tenant/authority/jurisdiction kommen NUR aus der Session.
+    app.post<{
+      Body: {
+        articleId?: string;
+        title?: string;
+        markdown?: string;
+        category?: string | null;
+        parentId?: string | null;
+        changeNote?: string;
+      };
+    }>("/api/wiki", async (request, reply) => {
+      const session = requireSession(deps, request, reply);
+      if (!session) return reply;
+      if (!session.permissions.includes("wiki.write")) {
+        return forbidden(reply, "missing permission wiki.write");
+      }
+      const b = request.body ?? {};
+      if (!b.articleId || !b.title || typeof b.markdown !== "string") {
+        return reply.code(400).header("Cache-Control", NO_STORE).send({
+          error: "bad-request",
+          reason: "articleId, title und markdown sind erforderlich",
+        });
+      }
+      if (await gehoertFremderBehoerde(session, b.articleId)) {
+        return reply
+          .code(404)
+          .header("Cache-Control", NO_STORE)
+          .send({ error: "not-found" });
+      }
+      try {
+        const article = await wikiStore.upsertArticle({
+          tenantId: session.tenantId,
+          authorityId: session.authorityId,
+          jurisdictionId: session.jurisdictionId,
+          articleId: b.articleId,
+          title: b.title,
+          markdown: b.markdown,
+          editorActorId: session.actorId,
+          expectedVersion: 0, // Neuanlage
+          ...(b.category !== undefined ? { category: b.category } : {}),
+          ...(b.parentId !== undefined ? { parentId: b.parentId } : {}),
+          ...(b.changeNote !== undefined ? { changeNote: b.changeNote } : {}),
+        });
+        return reply
+          .code(201)
+          .header("Cache-Control", NO_STORE)
+          .send({ article });
+      } catch (error) {
+        // Ein Artikel mit dieser id existiert bereits (Neuanlage schlägt fehl) → 409, damit der Client zum PATCH-Pfad
+        // (mit expectedVersion) wechselt statt blind zu überschreiben.
+        if (error instanceof WikiVersionConflictError) {
+          return reply.code(409).header("Cache-Control", NO_STORE).send({
+            error: "version-conflict",
+            expectedVersion: error.expectedVersion,
+            actualVersion: error.actualVersion,
+          });
+        }
+        throw error;
+      }
+    });
+
+    // Neue Version eines bestehenden Artikels — expectedVersion MUSS der aktuellen Version entsprechen (sonst 409).
+    app.patch<{
+      Params: { id: string };
+      Body: {
+        title?: string;
+        markdown?: string;
+        category?: string | null;
+        parentId?: string | null;
+        changeNote?: string;
+        expectedVersion?: number;
+      };
+    }>("/api/wiki/:id", async (request, reply) => {
+      const session = requireSession(deps, request, reply);
+      if (!session) return reply;
+      if (!session.permissions.includes("wiki.write")) {
+        return forbidden(reply, "missing permission wiki.write");
+      }
+      const b = request.body ?? {};
+      if (
+        !b.title ||
+        typeof b.markdown !== "string" ||
+        typeof b.expectedVersion !== "number" ||
+        b.expectedVersion < 1
+      ) {
+        return reply.code(400).header("Cache-Control", NO_STORE).send({
+          error: "bad-request",
+          reason: "title, markdown und expectedVersion (>=1) sind erforderlich",
+        });
+      }
+      if (await gehoertFremderBehoerde(session, request.params.id)) {
+        return reply
+          .code(404)
+          .header("Cache-Control", NO_STORE)
+          .send({ error: "not-found" });
+      }
+      try {
+        const article = await wikiStore.upsertArticle({
+          tenantId: session.tenantId,
+          authorityId: session.authorityId,
+          jurisdictionId: session.jurisdictionId,
+          articleId: request.params.id,
+          title: b.title,
+          markdown: b.markdown,
+          editorActorId: session.actorId,
+          expectedVersion: b.expectedVersion,
+          ...(b.category !== undefined ? { category: b.category } : {}),
+          ...(b.parentId !== undefined ? { parentId: b.parentId } : {}),
+          ...(b.changeNote !== undefined ? { changeNote: b.changeNote } : {}),
+        });
+        return reply.header("Cache-Control", NO_STORE).send({ article });
+      } catch (error) {
+        // Veraltete erwartete Version (ein anderer hat inzwischen gespeichert) → 409 mit der tatsächlichen Version,
+        // damit der Client nachladen + erneut versuchen kann. KEIN verlustbehaftetes Überschreiben.
+        if (error instanceof WikiVersionConflictError) {
+          return reply.code(409).header("Cache-Control", NO_STORE).send({
+            error: "version-conflict",
+            expectedVersion: error.expectedVersion,
+            actualVersion: error.actualVersion,
+          });
+        }
+        throw error;
+      }
+    });
   }
 
   // ── Management-Ebene: Aufgaben/Board + Triage-Inbox (nur wenn ein taskStore konfiguriert ist) ──

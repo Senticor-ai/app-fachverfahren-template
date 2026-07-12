@@ -162,7 +162,7 @@ function macheIntake(over: Partial<AppIntakeItem> = {}): AppIntakeItem {
 }
 
 const PERMS =
-  "task.read,task.write,case.read,case.transition,case.decide,inbox.read,inbox.triage,comment.read,comment.write,audit.read,view.read,view.write,wiki.read";
+  "task.read,task.write,case.read,case.transition,case.decide,inbox.read,inbox.triage,comment.read,comment.write,audit.read,view.read,view.write,wiki.read,wiki.write";
 
 const SB = (actor: string) => ({
   "x-actor-id": actor,
@@ -217,6 +217,19 @@ async function warteBis(pred: () => boolean, ms = 2000): Promise<void> {
   const start = Date.now();
   while (!pred()) {
     if (Date.now() - start > ms) throw new Error("warteBis: Timeout");
+    await new Promise((r) => setTimeout(r, 5));
+  }
+}
+
+// Wartet auf eine ASYNCHRONE Bedingung (z. B. den SERVER-Store direkt pollen) — nötig, weil eine optimistische
+// Client-Mutation synchron sichtbar wird, die Server-Bestätigung aber erst nach dem Round-Trip eintrifft.
+async function warteBisAsync(
+  pred: () => Promise<boolean>,
+  ms = 2000,
+): Promise<void> {
+  const start = Date.now();
+  while (!(await pred())) {
+    if (Date.now() - start > ms) throw new Error("warteBisAsync: Timeout");
     await new Promise((r) => setTimeout(r, 5));
   }
 }
@@ -611,6 +624,156 @@ describe("HttpWorkspacePort e2e — Wissensbasis/Wiki-Overlay (#20, echte /api/w
       // Ein voller refresh (inkl. des 404 auf /api/wiki) darf den Config-Seed NICHT leeren.
       await port.refresh();
       expect(port.listWissen().map((a) => a.id)).toEqual(["config-seed"]);
+    } finally {
+      await app.close();
+    }
+  });
+});
+
+describe("HttpWorkspacePort e2e — Wiki-Authoring (#20 Phase 3a, echte POST/PATCH)", () => {
+  it("speichert einen NEUEN Artikel (POST) — optimistisch sofort, nach Server-Bestätigung Version 1", async () => {
+    const wikiStore = new InMemoryWikiStore();
+    const { app, fetchShim } = baueServer({ wikiStore });
+    try {
+      const port = createHttpWorkspacePort(workspaceConfig, {
+        baseUrl: "",
+        fetch: fetchShim,
+        headers: SB("sb.a"),
+      });
+      await port.refresh(); // Server ist leer → Config-Seed wird durch [] ersetzt
+      port.speichereWissen({
+        id: "handbuch",
+        titel: "Handbuch",
+        markdown: "erste Fassung",
+      });
+      // Optimistisch SOFORT sichtbar (kein await).
+      expect(port.listWissen().some((a) => a.id === "handbuch")).toBe(true);
+      // Server-Bestätigung ABWARTEN (den Store direkt pollen — der optimistische Wert wäre schon vor dem POST da).
+      await warteBisAsync(
+        async () =>
+          (
+            await wikiStore.getArticle({
+              tenantId: "t1",
+              articleId: "handbuch",
+            })
+          )?.version === 1,
+      );
+      const persistiert = await wikiStore.getArticle({
+        tenantId: "t1",
+        articleId: "handbuch",
+      });
+      expect(persistiert?.markdown).toBe("erste Fassung");
+      expect(persistiert?.authorityId).toBe("b1"); // Scope aus der Session
+      // Der Client hat nun den bestätigten Stand (standIso vom Server → nur nach Reconcile gesetzt).
+      await warteBis(
+        () =>
+          port.listWissen().find((a) => a.id === "handbuch")?.standIso !==
+          undefined,
+      );
+      expect(port.listWissen().find((a) => a.id === "handbuch")?.version).toBe(
+        1,
+      );
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("versioniert einen bestehenden Artikel per PATCH (expectedVersion) hoch und führt die Historie", async () => {
+    const wikiStore = new InMemoryWikiStore();
+    await wikiStore.upsertArticle({
+      tenantId: "t1",
+      authorityId: "b1",
+      jurisdictionId: "de",
+      articleId: "doc",
+      title: "V1",
+      markdown: "eins",
+      editorActorId: "sb.a",
+      expectedVersion: 0,
+    });
+    const { app, fetchShim } = baueServer({ wikiStore });
+    try {
+      const port = createHttpWorkspacePort(workspaceConfig, {
+        baseUrl: "",
+        fetch: fetchShim,
+        headers: SB("sb.a"),
+      });
+      await warteBis(
+        () => port.listWissen().find((a) => a.id === "doc")?.version === 1,
+      );
+      port.speichereWissen({
+        id: "doc",
+        titel: "V2",
+        markdown: "zwei",
+        expectedVersion: 1,
+      });
+      // Server-Bestätigung (v2) ABWARTEN — den Store direkt pollen (optimistisch wäre v2 schon vor dem PATCH da).
+      await warteBisAsync(
+        async () =>
+          (await wikiStore.getArticle({ tenantId: "t1", articleId: "doc" }))
+            ?.version === 2,
+      );
+      expect(
+        (
+          await wikiStore.listRevisions({ tenantId: "t1", articleId: "doc" })
+        ).map((r) => r.version),
+      ).toEqual([2, 1]);
+      await warteBis(
+        () => port.listWissen().find((a) => a.id === "doc")?.titel === "V2",
+      );
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("Versionskonflikt: veraltete expectedVersion → optimistische Änderung wird rückgängig gemacht (Server-Stand siegt)", async () => {
+    const wikiStore = new InMemoryWikiStore();
+    await wikiStore.upsertArticle({
+      tenantId: "t1",
+      authorityId: "b1",
+      jurisdictionId: "de",
+      articleId: "doc",
+      title: "V1",
+      markdown: "eins",
+      editorActorId: "sb.a",
+      expectedVersion: 0,
+    });
+    // Ein anderer Bearbeiter hat den Artikel bereits auf v2 gehoben (Server-Stand).
+    await wikiStore.upsertArticle({
+      tenantId: "t1",
+      authorityId: "b1",
+      jurisdictionId: "de",
+      articleId: "doc",
+      title: "server-v2",
+      markdown: "server zwei",
+      editorActorId: "sb.b",
+      expectedVersion: 1,
+    });
+    const kontexte: string[] = [];
+    const { app, fetchShim } = baueServer({ wikiStore });
+    try {
+      const port = createHttpWorkspacePort(workspaceConfig, {
+        baseUrl: "",
+        fetch: fetchShim,
+        headers: SB("sb.a"),
+        onError: (_e, kontext) => kontexte.push(kontext),
+      });
+      await warteBis(
+        () => port.listWissen().find((a) => a.id === "doc")?.version === 2,
+      );
+      // Der Client speichert mit VERALTETER expectedVersion 1 → Server 409 → Revert + Reload.
+      port.speichereWissen({
+        id: "doc",
+        titel: "client-stale",
+        markdown: "client",
+        expectedVersion: 1,
+      });
+      await warteBis(() => kontexte.includes("speichereWissen"));
+      // Nach dem Reload zeigt der Client den SERVER-Stand (server-v2, v2) — nicht die verworfene Client-Fassung.
+      await warteBis(
+        () =>
+          port.listWissen().find((a) => a.id === "doc")?.titel === "server-v2",
+      );
+      expect(port.listWissen().find((a) => a.id === "doc")?.version).toBe(2);
     } finally {
       await app.close();
     }

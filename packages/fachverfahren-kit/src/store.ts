@@ -20,6 +20,7 @@ import type {
   VorgangPort,
   Transition,
   VerfahrenEintrag,
+  WissensArtikel,
   WorkspaceConfig,
   WorkspacePort,
 } from "./types.js";
@@ -337,6 +338,13 @@ export function createWorkspaceStore<T = Record<string, unknown>>(
   const detailId = (praefix: string): string =>
     `${praefix}-${(detailSeq += 1)}`;
   const nowIso = opts.now ?? (() => new Date().toISOString());
+
+  // ── Wissensbasis/Wiki (#20; in-memory, reaktiv über `bump`) — DEV hat keine API: die Artikel leben hier, aus dem
+  //    Config-Wissen geseedet (mit etwaiger `version`). In PROD über /api/wiki (versioniert). Verlustbehaftet über
+  //    Reload wie aller DEV-State; `speichereWissen` spiegelt die Optimistic-Lock-Semantik des Wiki-Stores. ──
+  const wissenListe: WissensArtikel[] = (config.wissen ?? []).map((a) => ({
+    ...a,
+  }));
 
   // Append-only Aktivitäts-Protokoll (Change-Log): JEDE Management-Mutation (Zuweisung/Priorität/Label/Move/
   // Statuswechsel) erzeugt einen Eintrag, damit der Aktivitäts-Feed ein ECHTES Änderungsprotokoll ist — nicht nur
@@ -866,9 +874,36 @@ export function createWorkspaceStore<T = Record<string, unknown>>(
         .sort((a, b) => b.eingangIso.localeCompare(a.eingangIso))
         .map((i) => ({ ...i, rohdaten: { ...i.rohdaten } })),
 
-    // Wissensbasis (#20): der DEV-Store hat keine API — er liefert schlicht das statische Config-Wissen (defensive
-    // Kopie). Der HTTP-Store lädt es aus /api/wiki nach; die Naht (synchron) ist für beide dieselbe.
-    listWissen: () => (config.wissen ?? []).map((a) => ({ ...a })),
+    // Wissensbasis (#20): der DEV-Store hält die Artikel in-memory (aus dem Config-Wissen geseedet). Defensive Kopie.
+    // Der HTTP-Store lädt/speichert sie über /api/wiki; die Naht (synchron lesen, optimistisch schreiben) ist gleich.
+    listWissen: () => wissenListe.map((a) => ({ ...a })),
+
+    speichereWissen: (input) => {
+      // Leerer Titel: no-op — der Server lehnt ihn mit 400 ab, der Artikel persistiert also nicht. DEV spiegelt den
+      // ENDzustand (DEV==PROD-Parität, #24): kein Eintrag ohne Titel.
+      if (!input.titel) return;
+      const idx = wissenListe.findIndex((a) => a.id === input.id);
+      const current = idx >= 0 ? wissenListe[idx] : undefined;
+      const currentVersion = current?.version ?? 0;
+      const expected = input.expectedVersion ?? 0;
+      // Optimistic-Lock wie im Wiki-Store (DEV==PROD-Semantik): eine veraltete erwartete Version wird abgelehnt
+      // (no-op). Im Einzel-Nutzer-DEV tritt das praktisch nicht auf; die Prüfung hält die Semantik konsistent.
+      if (expected !== currentVersion) return;
+      const next: WissensArtikel = {
+        id: input.id,
+        titel: input.titel,
+        markdown: input.markdown,
+        standIso: nowIso(),
+        version: currentVersion + 1,
+        ...(input.kategorie !== undefined
+          ? { kategorie: input.kategorie }
+          : {}),
+        ...(input.parentId !== undefined ? { parentId: input.parentId } : {}),
+      };
+      if (idx >= 0) wissenListe[idx] = next;
+      else wissenListe.push(next);
+      bump();
+    },
 
     triageInbox: (inboxId, status) => {
       const item = inbox.find((i) => i.id === inboxId);

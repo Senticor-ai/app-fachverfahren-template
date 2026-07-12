@@ -1039,6 +1039,9 @@ export interface WissensArtikel {
   /** Optionale Eltern-Artikel-Id für eine MEHRSTUFIGE Hierarchie (Baum). Fehlt sie bei allen Artikeln, bleibt es
    *  bei der flachen `kategorie`-Gruppierung (rückwärtskompatibel). */
   parentId?: string;
+  /** Optimistic-Lock-Version (#20): server-seitig geführt, vom Wiki-Store gesetzt. FEHLT bei rein statischem
+   *  Config-Wissen (noch nie gespeichert) — `speichereWissen` behandelt „fehlt/0" als Neuanlage. */
+  version?: number;
 }
 
 /** Die WORKSPACE-KONFIGURATION — die neue, N-wertige „Naht": EIN Sachbearbeiter-Workspace über MEHRERE Verfahren,
@@ -1210,4 +1213,17 @@ export interface WorkspacePort<TAntragsdaten = Record<string, unknown>> {
   // Deployment ohne wikiStore (404) bleibt beim Config-Wissen.
   /** Die Wissensbasis-Artikel im Scope (versioniert server-seitig; als flache `WissensArtikel` fürs Rendern). */
   listWissen(): WissensArtikel[];
+  /** Speichert einen Wissensartikel (Neuanlage ODER neue Version). Optimistic-Lock: `expectedVersion` MUSS der
+   *  aktuellen `version` entsprechen (fehlt/0 = Neuanlage). Der HTTP-Store wendet optimistisch an und macht bei
+   *  Server-Ablehnung (409 Versionskonflikt) rückgängig + meldet über `onError` + lädt den frischen Stand nach.
+   *  `editorActorId` setzt der Server aus der Session (der Client sendet ihn nicht). */
+  speichereWissen(input: {
+    id: string;
+    titel: string;
+    markdown: string;
+    kategorie?: string;
+    parentId?: string;
+    changeNote?: string;
+    expectedVersion?: number;
+  }): void;
 }

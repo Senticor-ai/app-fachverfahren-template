@@ -237,7 +237,15 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
         "GET",
         "/api/wiki",
       );
-      wissenCache = articles.map(wissenVonAppWiki);
+      // MONOTONIE-GUARD (wie ladeAufgaben :190-194): ein — womöglich verspäteter/stale — Voll-Reload darf einen bereits
+      // server-BESTÄTIGTEN, NEUEREN Cache-Eintrag (höhere version) NICHT überschreiben. Sonst regressiert die gecachte
+      // Version unter den Server → der nächste Edit sendet eine veraltete expectedVersion → spuriose 409 (Review-Fund).
+      const vorher = new Map(wissenCache.map((a) => [a.id, a]));
+      wissenCache = articles.map((dto) => {
+        const neu = wissenVonAppWiki(dto);
+        const alt = vorher.get(neu.id);
+        return alt && versionVon(alt) > versionVon(neu) ? alt : neu;
+      });
       bump();
     } catch (e) {
       // 404 = dieses Deployment hat KEINEN wikiStore → beim Config-Wissen bleiben (kein Fehler, kein Cache-Leeren).
@@ -673,6 +681,98 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
   // ── Wissensbasis / Wiki (#20) — synchroner Accessor über dem Cache (aus Config geseedet, per /api/wiki ersetzt) ──
   const listWissen = (): WissensArtikel[] => wissenCache.map((a) => ({ ...a }));
 
+  // Artikel per id ersetzen ODER anhängen — liefert ein FRISCHES Array (mutiert `wissenCache` nicht in place).
+  const mischeWissen = (
+    liste: WissensArtikel[],
+    a: WissensArtikel,
+  ): WissensArtikel[] => {
+    const idx = liste.findIndex((x) => x.id === a.id);
+    if (idx < 0) return [...liste, a];
+    const kopie = [...liste];
+    kopie[idx] = a;
+    return kopie;
+  };
+  // `version` ist bei rein statischem Config-Wissen undefined → als 0 behandeln (nie server-bestätigt).
+  const versionVon = (a: WissensArtikel): number => a.version ?? 0;
+
+  const speichereWissen = (input: {
+    id: string;
+    titel: string;
+    markdown: string;
+    kategorie?: string;
+    parentId?: string;
+    changeNote?: string;
+    expectedVersion?: number;
+  }): void => {
+    // Leerer Titel wird server-seitig mit 400 abgelehnt → gar nicht erst optimistisch anwenden (DEV==PROD-Parität,
+    // der DEV-Store no-opt hier ebenso). Verhindert ein optimistisches Aufblitzen mit sofortigem Revert.
+    if (!input.titel) return;
+    const expected = input.expectedVersion ?? 0;
+    // Optimistisch anwenden (sofortiges UI-Feedback), dann server-autoritativ bestätigen. Der vorherige Eintrag
+    // dieses Artikels (falls vorhanden) wird für einen CHIRURGISCHEN Revert gemerkt — kein Voll-Snapshot, damit ein
+    // Fehlschlag nebenläufige Änderungen an ANDEREN Artikeln nicht mit zurückrollt (Lehre aus dem task-store-Reconcile).
+    const vorherArtikel = wissenCache.find((x) => x.id === input.id);
+    const optimistisch: WissensArtikel = {
+      id: input.id,
+      titel: input.titel,
+      markdown: input.markdown,
+      version: expected + 1,
+      // standIso vom vorherigen Stand ÜBERNEHMEN (sonst verlöre ein Update seinen „Stand:"-Zeitstempel für die Dauer
+      // des Round-Trips — DEV setzt ihn stets; der Server-Reconcile überschreibt ihn gleich mit dem echten updatedAt).
+      ...(vorherArtikel?.standIso !== undefined
+        ? { standIso: vorherArtikel.standIso }
+        : {}),
+      ...(input.kategorie !== undefined ? { kategorie: input.kategorie } : {}),
+      ...(input.parentId !== undefined ? { parentId: input.parentId } : {}),
+    };
+    wissenCache = mischeWissen(wissenCache, optimistisch);
+    bump();
+    void (async () => {
+      const koerper = {
+        title: input.titel,
+        markdown: input.markdown,
+        category: input.kategorie ?? null,
+        parentId: input.parentId ?? null,
+        ...(input.changeNote !== undefined
+          ? { changeNote: input.changeNote }
+          : {}),
+      };
+      try {
+        const { article } =
+          expected === 0
+            ? await api<{ article: AppWikiArticleDTO }>("POST", "/api/wiki", {
+                articleId: input.id,
+                ...koerper,
+              })
+            : await api<{ article: AppWikiArticleDTO }>(
+                "PATCH",
+                `/api/wiki/${enc(input.id)}`,
+                { ...koerper, expectedVersion: expected },
+              );
+        const bestaetigt = wissenVonAppWiki(article);
+        // MONOTONIE-GUARD (wie `mutiere` :435-441): eine ältere (out-of-order eintreffende) Server-Antwort darf einen
+        // bereits neueren Cache-Stand NICHT überschreiben. Nur anwenden, wenn ≥ der gecachten Version (Review-Fund).
+        const vorhanden = wissenCache.find((x) => x.id === bestaetigt.id);
+        if (!vorhanden || versionVon(bestaetigt) >= versionVon(vorhanden)) {
+          wissenCache = mischeWissen(wissenCache, bestaetigt);
+          bump();
+        }
+      } catch (e) {
+        // Server hat abgelehnt (409 / 400 / 404 / …): den optimistischen Eintrag CHIRURGISCH zurücknehmen — ABER NUR,
+        // wenn der Cache noch UNSERE Fassung hält (Referenz-Gleichheit). Hat inzwischen ein nebenläufiger, neuerer
+        // Reconcile/Reload sie ersetzt, bleibt dieser stehen (kein Zurückrollen auf einen älteren Stand; Review-Fund).
+        if (wissenCache.find((x) => x.id === input.id) === optimistisch) {
+          wissenCache = vorherArtikel
+            ? mischeWissen(wissenCache, vorherArtikel)
+            : wissenCache.filter((x) => x.id !== input.id);
+          bump();
+        }
+        melde(e, "speichereWissen");
+        void ladeWissen().catch((f) => melde(f, "speichereWissen:reload"));
+      }
+    })();
+  };
+
   // ── Inbox / Triage ──
   const listInbox = (triageStatus: TriageStatus = "pending"): InboxItem[] =>
     // Neueste zuerst — wie der In-Memory-Store (DEV/PROD-Parität). `.filter()` liefert ein frisches Array, daher
@@ -846,6 +946,7 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
     triageInbox,
     acceptInbox,
     listWissen,
+    speichereWissen,
   };
 }
 
