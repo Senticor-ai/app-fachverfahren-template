@@ -37,7 +37,9 @@ jobs:
     if: ${{ github.repository == 'Senticor-ai/app-fachverfahren-template' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') }}
     outputs:
       pushed: ${{ steps.deploy-demo.outputs.pushed }}
-      pushed_sha: ${{ steps.deploy-demo.outputs.pushed_sha }}
+      # Soll-Stand des Demo-Konsumenten — auch OHNE neuen Commit gesetzt, damit Reruns einen
+      # früher fehlgeschlagenen Mirror-Push/Redeploy nachholen (beide Schritte sind idempotent).
+      demo_sha: ${{ steps.deploy-demo.outputs.demo_sha }}
 
     services:
       postgres:
@@ -130,8 +132,10 @@ jobs:
       # damit Teil der Wahrheit, nicht Kosmetik: ein hängender Mirror hieße, Codesphere baut
       # für immer stillschweigend alten Code. Deshalb schlägt dieser Schritt bei Push-Fehlern
       # HART fehl (anders als der redeploy-Job, der einen Codesphere-Schluckauf toleriert).
+      # Gate auf demo_sha (nicht pushed): auch ohne neuen Commit gleicht der idempotente
+      # Push einen früher fehlgeschlagenen/übersprungenen Mirror ab ("Everything up-to-date").
       - name: Mirror demo consumer to GitLab (Codesphere source of truth)
-        if: ${{ steps.deploy-demo.outputs.pushed == 'true' }}
+        if: ${{ steps.deploy-demo.outputs.demo_sha != '' }}
         env:
           DEMO_CONSUMER_GITLAB_TOKEN: ${{ secrets.DEMO_CONSUMER_GITLAB_TOKEN }}
           DEMO_CONSUMER_GITLAB_MIRROR_URL: ${{ vars.DEMO_CONSUMER_GITLAB_MIRROR_URL }}
@@ -162,7 +166,9 @@ jobs:
     # manuell nachholen (scripts/codesphere-redeploy-demo.sh). Abschaltbar per Repo-Variable
     # DEMO_CONSUMER_CS_REDEPLOY=false (z. B. falls natives Codesphere-CD doch funktioniert).
     continue-on-error: true
-    if: ${{ needs.deploy.outputs.pushed == 'true' && vars.DEMO_CONSUMER_CS_REDEPLOY != 'false' }}
+    # Gate auf demo_sha (nicht pushed): der Redeploy-Skript-No-op-Check erkennt einen bereits
+    # verifizierten Workspace-Stand selbst — Reruns holen so einen früheren Fehlschlag nach.
+    if: ${{ needs.deploy.outputs.demo_sha != '' && vars.DEMO_CONSUMER_CS_REDEPLOY != 'false' }}
 
     steps:
       - name: Checkout template (redeploy script)
@@ -202,7 +208,7 @@ jobs:
           DEMO_CONSUMER_CS_CONFIG_B64: ${{ secrets.DEMO_CONSUMER_CS_CONFIG_B64 }}
           CS_TEAM: ${{ vars.DEMO_CONSUMER_CS_TEAM || '119' }}
           CS_WORKSPACE: ${{ vars.DEMO_CONSUMER_CS_WORKSPACE }}
-          EXPECTED_SHA: ${{ needs.deploy.outputs.pushed_sha }}
+          EXPECTED_SHA: ${{ needs.deploy.outputs.demo_sha }}
         run: |
           set -euo pipefail
           umask 077

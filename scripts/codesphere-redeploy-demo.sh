@@ -39,8 +39,23 @@ CS_BIN="${CS_BIN:-$(command -v cs 2>/dev/null || true)}"
 # den Bearer-Header (401). Ohne explizites CS_API daher die DC-scoped Base verwenden.
 export CS_API="${CS_API:-https://2.vendorportal.gtplatforms.org/api}"
 
+# cs-go v1.3.0 loggt die REMOTE-stdout via Go log.Println auf STDERR (cli/cmd/exec.go; main
+# ändert nur die Log-Flags) — deshalb beide Ströme einsammeln und die 40-Hex-SHA robust
+# herausgreifen (Log-Präfixe/Zeitstempel egal). Ein 2>/dev/null würde die SHA VERWERFEN.
 ws_head() {
-  "$CS_BIN" exec -t "$CS_TEAM" -w "$CS_WORKSPACE" -- "git -C /home/user/app rev-parse HEAD" 2>/dev/null | tail -1
+  "$CS_BIN" exec -t "$CS_TEAM" -w "$CS_WORKSPACE" -- "git -C /home/user/app rev-parse HEAD" 2>&1 \
+    | grep -Eo '[0-9a-f]{40}' | tail -1
+}
+
+# Erfolgs-Marker des LETZTEN vollständig verifizierten Redeploys (liegt bewusst AUSSERHALB
+# des Repos, /home/user, damit pull/reset ihn nicht anfassen). Checkout-HEAD allein reicht
+# als No-op-Kriterium nicht: ein Vorlauf kann nach pull+reset, aber vor dem Run-Stage-Erfolg
+# abgebrochen sein — dann steht HEAD schon auf dem Ziel, der ALTE Prozess liefert weiter 200.
+WS_MARKER_FILE="/home/user/.demo-redeploy-ok"
+
+ws_marker() {
+  "$CS_BIN" exec -t "$CS_TEAM" -w "$CS_WORKSPACE" -- "cat ${WS_MARKER_FILE} 2>/dev/null || true" 2>&1 \
+    | grep -Eo '[0-9a-f]{40}' | tail -1
 }
 
 readyz_code() {
@@ -51,12 +66,14 @@ readyz_code() {
 note "wake-up (falls schlafend) …"
 "$CS_BIN" wake-up -t "$CS_TEAM" -w "$CS_WORKSPACE" --timeout 10m 2>&1 || true
 
-# No-op-/Doppel-Deploy-Check VOR dem Pull: läuft der Workspace schon gesund auf
-# dem erwarteten Stand, ist nichts zu tun.
+# No-op-/Doppel-Deploy-Check VOR dem Pull: nur wenn HEAD, Erfolgs-Marker UND /readyz
+# übereinstimmen, hat ein früherer Lauf diesen Stand nachweislich VOLLSTÄNDIG deployt —
+# HEAD+200 allein könnte auch "pull/reset durch, Pipeline abgebrochen, alter Prozess lebt" sein.
 if [ -n "$EXPECTED_SHA" ]; then
   current="$(ws_head || true)"
-  if [ "$current" = "$EXPECTED_SHA" ] && [ "$(readyz_code || true)" = "200" ]; then
-    note "Workspace läuft bereits gesund auf ${EXPECTED_SHA} — no-op."
+  marker="$(ws_marker || true)"
+  if [ "$current" = "$EXPECTED_SHA" ] && [ "$marker" = "$EXPECTED_SHA" ] && [ "$(readyz_code || true)" = "200" ]; then
+    note "Workspace läuft bereits gesund und verifiziert auf ${EXPECTED_SHA} — no-op."
     exit 0
   fi
 fi
@@ -97,6 +114,15 @@ done
 if [ -n "$EXPECTED_SHA" ]; then
   got="$(ws_head || true)"
   [ "$got" = "$EXPECTED_SHA" ] || die "läuft, aber auf falschem Stand: $got != $EXPECTED_SHA" 3
+fi
+
+# Erfolgs-Marker ERST nach vollständiger Verifikation schreiben (siehe No-op-Check oben).
+# Best effort: ein fehlender Marker führt höchstens zu einem überflüssigen Redeploy — die
+# sichere Richtung.
+final_sha="${EXPECTED_SHA:-$(ws_head || true)}"
+if [ -n "$final_sha" ]; then
+  "$CS_BIN" exec -t "$CS_TEAM" -w "$CS_WORKSPACE" -- "printf %s ${final_sha} > ${WS_MARKER_FILE}" 2>&1 \
+    || note "Warnung: Erfolgs-Marker konnte nicht geschrieben werden (nächster Lauf redeployt erneut)."
 fi
 
 note "Redeploy ok$([ -n "$EXPECTED_SHA" ] && printf ' @ %s' "$EXPECTED_SHA")."
