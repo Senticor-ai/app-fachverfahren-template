@@ -57,6 +57,7 @@ import {
   usePersistierteBenachrichtigungen,
 } from "./notifications.js";
 import { aktivesPortal } from "./portale.js";
+import { sachbearbeitungNav } from "./verfahren.registry.js";
 import { WorkspaceListe } from "./WorkspaceListe.js";
 import { VorgangBoard } from "./VorgangBoard.js";
 import {
@@ -125,25 +126,14 @@ function Shell({
  *  Einzel-Verfahren-Eingangskorb umschalten. (Die verfahrensübergreifende Nav wandert in Phase 7 in die Shell.) */
 function AmtSubNav(): React.JSX.Element {
   const { pathname } = useLocation();
-  const items: { href: string; label: string }[] = [
-    { href: "/amt/inbox", label: "Eingang" },
-    { href: "/amt/liste", label: "Alle Verfahren" },
-    { href: "/amt/board", label: "Board" },
-    { href: "/amt/dashboard", label: "Übersicht" },
-    { href: "/amt/kalender", label: "Fristen" },
-    { href: "/amt/regeln", label: "Regelwerk" },
-    { href: "/amt/verfahren", label: "Verfahren" },
-    { href: "/amt/wissen", label: "Wissen" },
-    { href: "/amt/benachrichtigungen", label: "Meldungen" },
-    { href: "/amt", label: "Eingangskorb" },
-    { href: "/amt/einstellungen", label: "Einstellungen" },
-  ];
+  // Daten-getrieben (#22): die Reiter kommen aus der Config (verfahren.registry), nicht mehr aus einer hartkodierten
+  // Liste hier — ein generierender Build passt die Nav in der Config an.
   return (
     <nav
       aria-label="Sachbearbeitung"
       className="mx-auto flex max-w-6xl gap-1 px-4 pt-4 md:px-6"
     >
-      {items.map((it) => {
+      {sachbearbeitungNav.map((it) => {
         const aktiv = pathname === it.href;
         return (
           <Link

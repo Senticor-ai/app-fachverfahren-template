@@ -51,6 +51,30 @@ export const portalMarke: KommuneTheme = {
   },
 };
 
+/** Ein Eintrag der Sachbearbeitungs-Navigation (daten-getrieben, #22): Beschriftung + Ziel-Route. Die Nav ist damit
+ *  DATEN in der Config statt einer hartkodierten Liste im Plattform-Code (App.tsx) — ein generierender Build ersetzt/
+ *  erweitert sie hier, ohne die App-Komposition anzufassen. */
+export interface SachbearbeitungNavItem {
+  label: string;
+  href: string;
+}
+
+/** Die Reiter der Sachbearbeitungs-Sub-Navigation (verfahrensübergreifender Workspace ↔ Einzel-Verfahren-Sichten).
+ *  Reihenfolge = Anzeigereihenfolge. Verfahrens-neutral (nur Workspace-Sichten). */
+export const sachbearbeitungNav: SachbearbeitungNavItem[] = [
+  { href: "/amt/inbox", label: "Eingang" },
+  { href: "/amt/liste", label: "Alle Verfahren" },
+  { href: "/amt/board", label: "Board" },
+  { href: "/amt/dashboard", label: "Übersicht" },
+  { href: "/amt/kalender", label: "Fristen" },
+  { href: "/amt/regeln", label: "Regelwerk" },
+  { href: "/amt/verfahren", label: "Verfahren" },
+  { href: "/amt/wissen", label: "Wissen" },
+  { href: "/amt/benachrichtigungen", label: "Meldungen" },
+  { href: "/amt", label: "Eingangskorb" },
+  { href: "/amt/einstellungen", label: "Einstellungen" },
+];
+
 export const workspaceConfig: WorkspaceConfig = {
   // DEV-Demo: EIN synthetischer Mandant. In PROD kommt der Mandanten-Scope IMMER aus der Server-Session,
   // NIE aus dem Client — die Kit-Komponenten exponieren keinen Mandanten-Wechsler.

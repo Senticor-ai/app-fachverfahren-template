@@ -5,11 +5,39 @@ import {
   type Aufgabe,
   type AutomationTrigger,
 } from "@senticor/fachverfahren-kit";
-import { workspaceConfig } from "./verfahren.registry.js";
+import { sachbearbeitungNav, workspaceConfig } from "./verfahren.registry.js";
 
 // Testet die VERDRAHTETEN workspace-weiten Automations-Regeln (DATEN) über die getestete reine Auswertung —
 // so ist das sichtbare Regelwerk (RegelwerkPanel) auch verhaltensseitig abgesichert, nicht nur gerendert.
 const regeln = workspaceConfig.automationenGlobal ?? [];
+
+describe("sachbearbeitungNav — daten-getriebene Nav (#22)", () => {
+  it("nicht leer, eindeutige hrefs, alle unter /amt", () => {
+    expect(sachbearbeitungNav.length).toBeGreaterThan(0);
+    const hrefs = sachbearbeitungNav.map((i) => i.href);
+    expect(new Set(hrefs).size).toBe(hrefs.length); // keine Doppel-Route
+    expect(hrefs.every((h) => h === "/amt" || h.startsWith("/amt/"))).toBe(
+      true,
+    );
+    expect(sachbearbeitungNav.every((i) => i.label.length > 0)).toBe(true);
+  });
+
+  it("trägt die erwarteten Workspace-Reiter (Regressions-Guard, byte-stabil)", () => {
+    expect(sachbearbeitungNav.map((i) => i.href)).toEqual([
+      "/amt/inbox",
+      "/amt/liste",
+      "/amt/board",
+      "/amt/dashboard",
+      "/amt/kalender",
+      "/amt/regeln",
+      "/amt/verfahren",
+      "/amt/wissen",
+      "/amt/benachrichtigungen",
+      "/amt",
+      "/amt/einstellungen",
+    ]);
+  });
+});
 
 function macheAufgabe(over: Partial<Aufgabe> = {}): Aufgabe {
   return {
