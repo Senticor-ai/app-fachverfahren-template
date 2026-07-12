@@ -1,3 +1,6 @@
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   createAnswers,
@@ -5,6 +8,7 @@ import {
   defaultOwnership,
   explainOwnership,
   formatOwnershipYaml,
+  loadSourceOwnershipDefaults,
   mergeOwnershipDefaults,
   parseOwnershipYaml,
   validateOwnership,
@@ -91,5 +95,78 @@ describe("template manifest metadata", () => {
     const { ownership, added } = mergeOwnershipDefaults({ paths: {} });
     expect(added).toHaveLength(Object.keys(defaultOwnership.paths).length);
     expect(ownership.paths).toEqual(defaultOwnership.paths);
+  });
+
+  it("skips new defaults covered by a broader persisted pattern", () => {
+    // Codex-Finding PR #26: ein breites Konsumenten-Opt-out (docs/**: consumer) darf nicht durch
+    // einen später ergänzten, SPEZIFISCHEREN Default (docs/reference/**: replace) ausgehebelt
+    // werden — explainOwnership wählt sonst das längste Pattern und das Template überschriebe
+    // Pfade, die der Konsument explizit ausgenommen hat.
+    const persisted = { paths: { "docs/**": "consumer" as const } };
+    const defaults = {
+      paths: {
+        "docs/reference/**": "replace" as const,
+        "ci.yml": "replace" as const,
+      },
+    };
+
+    const { ownership, added } = mergeOwnershipDefaults(persisted, defaults);
+
+    expect(added).toEqual([{ path: "ci.yml", strategy: "replace" }]);
+    expect(ownership.paths["docs/reference/**"]).toBeUndefined();
+    expect(
+      explainOwnership(ownership, "docs/reference/example.md"),
+    ).toMatchObject({ strategy: "consumer" });
+  });
+
+  it("still adds broader defaults when only a more specific override exists", () => {
+    const persisted = {
+      paths: { "docs/reference/api.md": "consumer" as const },
+    };
+    const defaults = { paths: { "docs/reference/**": "replace" as const } };
+
+    const { ownership, added } = mergeOwnershipDefaults(persisted, defaults);
+
+    expect(added).toEqual([{ path: "docs/reference/**", strategy: "replace" }]);
+    // Der spezifischere Konsumenten-Eintrag gewinnt weiterhin (längstes Pattern).
+    expect(explainOwnership(ownership, "docs/reference/api.md")).toMatchObject({
+      strategy: "consumer",
+    });
+    expect(
+      explainOwnership(ownership, "docs/reference/other.md"),
+    ).toMatchObject({ strategy: "replace" });
+  });
+
+  it("loads ownership defaults from the target template source", async () => {
+    const root = await mkdtemp(join(tmpdir(), "manifest-source-defaults-"));
+    try {
+      const libDir = join(root, "tooling", "template", "lib");
+      await mkdir(libDir, { recursive: true });
+      // Simuliert eine NEUERE Template-Quelle, deren defaultOwnership einen Eintrag trägt,
+      // den die laufende (ältere) CLI noch nicht kennt (Codex-Finding PR #26).
+      await writeFile(
+        join(libDir, "manifest.ts"),
+        [
+          "export const defaultOwnership = {",
+          '  paths: { "EXTRA-SOURCE-ONLY.md": "replace" },',
+          "};",
+          "",
+        ].join("\n"),
+      );
+
+      const defaults = await loadSourceOwnershipDefaults(root);
+      expect(defaults.paths["EXTRA-SOURCE-ONLY.md"]).toBe("replace");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("falls back to the running CLI defaults when the source has no manifest", async () => {
+    const root = await mkdtemp(join(tmpdir(), "manifest-source-missing-"));
+    try {
+      expect(await loadSourceOwnershipDefaults(root)).toBe(defaultOwnership);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });

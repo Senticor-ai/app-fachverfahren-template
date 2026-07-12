@@ -1,5 +1,6 @@
 import { access, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { readJson, writeFileAtomic, writeJson } from "./structured-edit.ts";
 
 export const templateDirectory = ".template";
@@ -221,8 +222,11 @@ export function formatOwnershipYaml(ownership: TemplateOwnership): string {
  *  neue Keys hinten angehängt → append-only-Diff). Persistierte Einträge gewinnen IMMER: Konsumenten-Overrides
  *  werden nie zurückgesetzt, und Strategie-ÄNDERUNGEN an bestehenden Defaults propagieren bewusst nicht
  *  (dafür gibt es Template-Migrationen — es existiert keine Provenienz, um Override von veraltetem Snapshot
- *  zu unterscheiden). Gelöschte Einträge werden beim nächsten Update wieder ergänzt; dauerhaftes Opt-out
- *  = Strategie auf `consumer` setzen statt die Zeile zu löschen. */
+ *  zu unterscheiden). Das gilt auch für BREITERE persistierte Muster: deckt z.B. `docs/**: consumer` einen
+ *  neuen, spezifischeren Default `docs/reference/**` ab, wird dieser NICHT ergänzt — sonst gewönne er als
+ *  längstes Pattern in explainOwnership und hebelte das Konsumenten-Opt-out aus (Codex-Review PR #26).
+ *  Gelöschte Einträge werden beim nächsten Update wieder ergänzt; dauerhaftes Opt-out = Strategie auf
+ *  `consumer` setzen statt die Zeile zu löschen. */
 export function mergeOwnershipDefaults(
   persisted: TemplateOwnership,
   defaults: TemplateOwnership = defaultOwnership,
@@ -231,8 +235,14 @@ export function mergeOwnershipDefaults(
   added: Array<{ path: string; strategy: TemplateOwnership["paths"][string] }>;
 } {
   const persistedPaths = persisted.paths ?? {};
+  const persistedPatterns = Object.keys(persistedPaths);
   const added = Object.entries(defaults.paths ?? {})
-    .filter(([path]) => !(path in persistedPaths))
+    .filter(
+      ([path]) =>
+        !persistedPatterns.some((pattern) =>
+          matchesOwnershipPattern(pattern, path),
+        ),
+    )
     .map(([path, strategy]) => ({ path, strategy }));
   return {
     ownership: {
@@ -245,6 +255,43 @@ export function mergeOwnershipDefaults(
     },
     added,
   };
+}
+
+/** Lädt die `defaultOwnership` der ZIEL-Template-Quelle (per dynamischem Import ihres manifest.ts).
+ *  Nötig, weil beim Update eines Konsumenten dessen INSTALLIERTE (ältere) CLI läuft: ein Default,
+ *  den erst die neuere Quelle kennt, fehlt sowohl im persistierten ownership.yaml als auch in der
+ *  kompilierten defaultOwnership der laufenden CLI — der Merge bliebe leer und die Datei fiele
+ *  weiter auf merge/Konflikt zurück (Codex-Review PR #26). Vertrauensmodell wie bei Migrationen:
+ *  template:update führt ohnehin Code aus der Quelle aus. Fallback auf die eigenen Defaults, wenn
+ *  die Quelle kein importierbares Manifest trägt. */
+export async function loadSourceOwnershipDefaults(
+  sourceRoot: string,
+): Promise<TemplateOwnership> {
+  const manifestPath = join(
+    sourceRoot,
+    "tooling",
+    "template",
+    "lib",
+    "manifest.ts",
+  );
+  try {
+    await access(manifestPath);
+    const module = await import(
+      /* @vite-ignore */ pathToFileURL(manifestPath).href
+    );
+    const sourceDefaults = module.defaultOwnership as
+      TemplateOwnership | undefined;
+    if (
+      sourceDefaults &&
+      Object.keys(sourceDefaults.paths ?? {}).length > 0 &&
+      validateOwnership(sourceDefaults).length === 0
+    ) {
+      return sourceDefaults;
+    }
+  } catch {
+    // Quelle ohne (importierbares) Manifest → Defaults der laufenden CLI.
+  }
+  return defaultOwnership;
 }
 
 export function validateOwnership(ownership: TemplateOwnership): string[] {

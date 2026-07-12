@@ -12,8 +12,13 @@ gescaffoldet wurden, dauerhaft auf ihrem Snapshot: die neue Datei fiel auf den
 Jetzt ergänzt der Update-Plan fehlende Default-Einträge vor der Planung
 (bestehende Konsumenten-Einträge gewinnen immer), meldet sie in der neuen
 Report-Sektion „Ownership Updates" (JSON: `ownershipUpdates`) und persistiert
-sie beim Apply. Opt-out: Strategie auf `consumer` setzen statt die Zeile zu
-löschen — gelöschte Einträge werden wieder ergänzt.
+sie beim Apply. Die Defaults stammen dabei aus der Ziel-Template-Quelle
+(dynamischer Import ihres manifest.ts), nicht aus der laufenden — beim
+Konsumenten-Update älteren — CLI; und breitere persistierte Muster zählen als
+Override (ein `docs/**: consumer` blockiert einen neuen, spezifischeren
+Default, statt per Longest-Match ausgehebelt zu werden). Opt-out: Strategie
+auf `consumer` setzen statt die Zeile zu löschen — gelöschte Einträge werden
+wieder ergänzt.
 
 Die Scaffold-Exclusion der Template-Repo-internen GitHub-Workflows
 (`scaffold-nightly.yml`, `deploy-demo-consumer.yml` via `repositoryOnlyPaths`)

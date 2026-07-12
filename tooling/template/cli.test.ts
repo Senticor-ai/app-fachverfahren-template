@@ -230,6 +230,39 @@ describe("template CLI", () => {
           expect(await readFile(ownershipPath, "utf8")).toContain(
             '"ci.yml": replace',
           );
+
+          // Cross-Version-Szenario (Codex-Review PR #26): die Defaults müssen aus der
+          // ZIEL-Quelle kommen, nicht aus der laufenden CLI. Der Konsument selbst ist eine
+          // vollständige Template-Kopie — sein manifest.ts wird um einen Eintrag ergänzt,
+          // den die laufende CLI nicht kennt, und dient dann als --template-source-dir.
+          const sourceManifestPath = join(
+            target,
+            "tooling",
+            "template",
+            "lib",
+            "manifest.ts",
+          );
+          const sourceManifest = await readFile(sourceManifestPath, "utf8");
+          await writeFile(
+            sourceManifestPath,
+            sourceManifest.replace(
+              '"README.md": "merge",',
+              '"EXTRA-SOURCE-ONLY.md": "replace",\n    "README.md": "merge",',
+            ),
+          );
+          const crossVersion = JSON.parse(
+            await runTemplate([
+              "diff",
+              "--template-source-dir",
+              target,
+              "--json",
+            ]),
+          );
+          expect(crossVersion.status).toBe("ok");
+          expect(crossVersion.ownershipUpdates).toContainEqual({
+            path: "EXTRA-SOURCE-ONLY.md",
+            strategy: "replace",
+          });
         } finally {
           process.chdir(templateRoot);
         }
