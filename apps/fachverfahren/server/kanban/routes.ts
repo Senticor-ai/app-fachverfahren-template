@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type {
+  AuditEventType,
+  AuditStore,
   AuthStore,
   BoardVisibility,
   CardKind,
@@ -13,14 +15,22 @@ import {
   nextPositionKey,
 } from "@senticor/app-store-postgres";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { DEFAULT_TENANT_ID } from "../auth/constants.js";
 import "../auth/principal.js";
 import { createRequirePrincipal } from "../auth/require-principal.js";
+import { hasWorkspacePermission } from "../auth/workspace-permissions.js";
 
 export interface BoardRouteDeps {
   authStore: AuthStore;
   kanbanStore: KanbanStore;
+  auditStore: AuditStore;
   generateId?: (prefix: string) => string;
 }
+
+/** Zugriffsstufen auf ein Board: `collaborate` = lesen + Spalten-/Karten-Operationen
+ *  (Team-Boards: alle Tenant-Mitglieder); `manage` = Board-Operationen
+ *  (PATCH/archive/restore; Owner oder Permission `boards.manage`). */
+type BoardAccess = "collaborate" | "manage";
 
 function defaultGenerateId(prefix: string): string {
   return `${prefix}.${randomUUID()}`;
@@ -94,10 +104,11 @@ export function registerBoardRoutes(
   const generateId = deps.generateId ?? defaultGenerateId;
   const store = deps.kanbanStore;
 
-  async function loadOwnedBoard(
+  async function loadAccessibleBoard(
     request: FastifyRequest,
     reply: FastifyReply,
     boardId: string,
+    access: BoardAccess = "collaborate",
   ) {
     const principal = request.principal;
     if (!principal) {
@@ -108,11 +119,45 @@ export function registerBoardRoutes(
       tenantId: principal.tenantId,
       boardId,
     });
-    if (!board || board.ownerActorId !== principal.actorId) {
+    const isOwner = board?.ownerActorId === principal.actorId;
+    // Nicht sichtbar (weder eigenes noch Team-Board) → 404 statt 403: die Existenz
+    // fremder persönlicher Boards wird maskiert (bestehende Semantik).
+    if (!board || (!isOwner && board.visibility !== "team")) {
       await reply.code(404).send({ error: `board "${boardId}" not found` });
       return undefined;
     }
+    if (access === "manage" && !isOwner) {
+      const user = await deps.authStore.getUserById({
+        tenantId: principal.tenantId,
+        actorId: principal.actorId,
+      });
+      if (!user || !hasWorkspacePermission(user.role, "boards.manage")) {
+        await reply.code(403).send({
+          error: "only the board owner or an admin can manage this board",
+        });
+        return undefined;
+      }
+    }
     return { principal, board };
+  }
+
+  async function audit(
+    eventType: AuditEventType,
+    actorId: string,
+    metadata: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      await deps.auditStore.appendEvent({
+        id: generateId("audit"),
+        tenantId: DEFAULT_TENANT_ID,
+        actorId,
+        eventType,
+        occurredAt: nowIso(),
+        metadata,
+      });
+    } catch (error) {
+      app.log.error({ err: error, eventType }, "audit event write failed");
+    }
   }
 
   app.get(
@@ -125,7 +170,7 @@ export function registerBoardRoutes(
       }
       const boards = await store.listBoards({
         tenantId: principal.tenantId,
-        ownerActorId: principal.actorId,
+        actorId: principal.actorId,
       });
       return reply.send(boards);
     },
@@ -161,10 +206,16 @@ export function registerBoardRoutes(
         contentLocale: "de",
         templateKey: null,
         templateVersion: null,
+        purpose: null,
+        lifecycleStage: null,
         version: 1,
         archivedAt: null,
         createdAt: timestamp,
         updatedAt: timestamp,
+      });
+      await audit("BOARD_CREATED", principal.actorId, {
+        boardId: board.boardId,
+        visibility: board.visibility,
       });
       return reply.code(201).header("etag", etagFor(board.version)).send(board);
     },
@@ -174,7 +225,7 @@ export function registerBoardRoutes(
     "/api/v1/boards/:boardId",
     { preHandler: requirePrincipal },
     async (request, reply) => {
-      const loaded = await loadOwnedBoard(
+      const loaded = await loadAccessibleBoard(
         request,
         reply,
         request.params.boardId,
@@ -205,10 +256,11 @@ export function registerBoardRoutes(
     "/api/v1/boards/:boardId",
     { preHandler: requirePrincipal },
     async (request, reply) => {
-      const loaded = await loadOwnedBoard(
+      const loaded = await loadAccessibleBoard(
         request,
         reply,
         request.params.boardId,
+        "manage",
       );
       if (!loaded) {
         return;
@@ -233,6 +285,14 @@ export function registerBoardRoutes(
               : {}),
           },
         });
+        if (updated.visibility !== loaded.board.visibility) {
+          // "BOARD_SHARED"/Entzug der Team-Sichtbarkeit — sicherheitsrelevant, weil sich
+          // der Leserkreis ändert.
+          await audit("BOARD_VISIBILITY_CHANGED", loaded.principal.actorId, {
+            boardId: updated.boardId,
+            visibility: updated.visibility,
+          });
+        }
         await reply.header("etag", etagFor(updated.version)).send(updated);
       });
     },
@@ -242,10 +302,11 @@ export function registerBoardRoutes(
     "/api/v1/boards/:boardId/archive",
     { preHandler: requirePrincipal },
     async (request, reply) => {
-      const loaded = await loadOwnedBoard(
+      const loaded = await loadAccessibleBoard(
         request,
         reply,
         request.params.boardId,
+        "manage",
       );
       if (!loaded) {
         return;
@@ -260,6 +321,9 @@ export function registerBoardRoutes(
           boardId: loaded.board.boardId,
           expectedVersion,
         });
+        await audit("BOARD_ARCHIVED", loaded.principal.actorId, {
+          boardId: archived.boardId,
+        });
         await reply.header("etag", etagFor(archived.version)).send(archived);
       });
     },
@@ -269,10 +333,11 @@ export function registerBoardRoutes(
     "/api/v1/boards/:boardId/restore",
     { preHandler: requirePrincipal },
     async (request, reply) => {
-      const loaded = await loadOwnedBoard(
+      const loaded = await loadAccessibleBoard(
         request,
         reply,
         request.params.boardId,
+        "manage",
       );
       if (!loaded) {
         return;
@@ -298,7 +363,7 @@ export function registerBoardRoutes(
     "/api/v1/boards/:boardId/columns",
     { preHandler: requirePrincipal },
     async (request, reply) => {
-      const loaded = await loadOwnedBoard(
+      const loaded = await loadAccessibleBoard(
         request,
         reply,
         request.params.boardId,
@@ -341,7 +406,7 @@ export function registerBoardRoutes(
     "/api/v1/boards/:boardId/columns/:columnId",
     { preHandler: requirePrincipal },
     async (request, reply) => {
-      const loaded = await loadOwnedBoard(
+      const loaded = await loadAccessibleBoard(
         request,
         reply,
         request.params.boardId,
@@ -373,7 +438,7 @@ export function registerBoardRoutes(
     "/api/v1/boards/:boardId/columns/:columnId/archive",
     { preHandler: requirePrincipal },
     async (request, reply) => {
-      const loaded = await loadOwnedBoard(
+      const loaded = await loadAccessibleBoard(
         request,
         reply,
         request.params.boardId,
@@ -401,7 +466,7 @@ export function registerBoardRoutes(
     "/api/v1/boards/:boardId/columns/:columnId/restore",
     { preHandler: requirePrincipal },
     async (request, reply) => {
-      const loaded = await loadOwnedBoard(
+      const loaded = await loadAccessibleBoard(
         request,
         reply,
         request.params.boardId,
@@ -450,7 +515,7 @@ export function registerBoardRoutes(
     "/api/v1/boards/:boardId/cards/archived",
     { preHandler: requirePrincipal },
     async (request, reply) => {
-      const loaded = await loadOwnedBoard(
+      const loaded = await loadAccessibleBoard(
         request,
         reply,
         request.params.boardId,
@@ -480,7 +545,7 @@ export function registerBoardRoutes(
     "/api/v1/boards/:boardId/cards",
     { preHandler: requirePrincipal },
     async (request, reply) => {
-      const loaded = await loadOwnedBoard(
+      const loaded = await loadAccessibleBoard(
         request,
         reply,
         request.params.boardId,
@@ -549,7 +614,7 @@ export function registerBoardRoutes(
     "/api/v1/boards/:boardId/cards/:cardId",
     { preHandler: requirePrincipal },
     async (request, reply) => {
-      const loaded = await loadOwnedBoard(
+      const loaded = await loadAccessibleBoard(
         request,
         reply,
         request.params.boardId,
@@ -582,7 +647,7 @@ export function registerBoardRoutes(
     "/api/v1/boards/:boardId/cards/:cardId/move",
     { preHandler: requirePrincipal },
     async (request, reply) => {
-      const loaded = await loadOwnedBoard(
+      const loaded = await loadAccessibleBoard(
         request,
         reply,
         request.params.boardId,
@@ -637,7 +702,7 @@ export function registerBoardRoutes(
     "/api/v1/boards/:boardId/cards/:cardId/archive",
     { preHandler: requirePrincipal },
     async (request, reply) => {
-      const loaded = await loadOwnedBoard(
+      const loaded = await loadAccessibleBoard(
         request,
         reply,
         request.params.boardId,
@@ -665,7 +730,7 @@ export function registerBoardRoutes(
     "/api/v1/boards/:boardId/cards/:cardId/restore",
     { preHandler: requirePrincipal },
     async (request, reply) => {
-      const loaded = await loadOwnedBoard(
+      const loaded = await loadAccessibleBoard(
         request,
         reply,
         request.params.boardId,

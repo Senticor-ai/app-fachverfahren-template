@@ -16,6 +16,7 @@ import {
   FileText,
   Home,
   Inbox,
+  LayoutGrid,
   LineChart,
   ShieldCheck,
   type LucideIcon,
@@ -96,6 +97,7 @@ function navFor<T>(
           href: "/buerger/anmelden",
         });
       }
+      items.push(boardsNavItem());
       return items;
     }
     case "sachbearbeitung": {
@@ -112,6 +114,7 @@ function navFor<T>(
           href: "/amt",
         });
       }
+      items.push(boardsNavItem());
       return items;
     }
     case "aufsicht":
@@ -124,10 +127,18 @@ function navFor<T>(
           // die Aufsicht-Persona (ihr EINZIGES Nav-Item) via *-Fallback auf /buerger (Audit D3-1, schlimmster Fall).
           href: "/aufsicht",
         },
+        boardsNavItem(),
       ];
     default:
       return [];
   }
+}
+
+/** Cross-cutting Workspace-Einstieg in JEDER Persona: /boards ist eine echte App-Route
+ *  (Audit D3-1) und session-guarded — ohne Anmeldung landet man auf /login, was für
+ *  Mitarbeitende genau der gewollte Einstieg in den Team-Workspace ist. */
+function boardsNavItem(): ShellNavItem {
+  return { key: "boards", label: "Boards", icon: LayoutGrid, href: "/boards" };
 }
 
 /** Generische, verfahrens-neutrale Rollen-Überschrift in der Sidebar. */

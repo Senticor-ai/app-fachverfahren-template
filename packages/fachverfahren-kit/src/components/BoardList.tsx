@@ -3,6 +3,7 @@
 import * as React from "react";
 import { LayoutGrid, Plus } from "lucide-react";
 import type { Board, BoardPort, CreateBoardInput } from "../board-types.js";
+import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card.js";
 import { SkeletonCard } from "../ui/skeleton.js";
@@ -104,7 +105,14 @@ export function BoardList<TCardData = Record<string, unknown>>({
                 }}
               >
                 <CardHeader>
-                  <CardTitle className="text-base">{board.title}</CardTitle>
+                  <CardTitle className="flex items-center justify-between gap-2 text-base">
+                    <span className="truncate">{board.title}</span>
+                    {/* Team-Boards sind für alle Tenant-Mitglieder sichtbar — der Hinweis
+                        unterscheidet sie vom persönlichen Board. */}
+                    {board.visibility === "team" && (
+                      <Badge tone="info">Team</Badge>
+                    )}
+                  </CardTitle>
                 </CardHeader>
                 {board.description && (
                   <CardContent className="text-sm text-muted-foreground">

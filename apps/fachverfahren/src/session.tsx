@@ -7,6 +7,10 @@ export interface SessionPrincipal {
   actorId: string;
   email: string;
   displayName?: string;
+  /** Workspace-Rolle + Permissions aus dem App-Identity-Modell (GET /auth/session).
+   *  UI-Guards prüfen Permissions, nie Rollen-Literale — wie die Server-Routen. */
+  role?: "admin" | "member";
+  permissions?: string[];
 }
 
 export type SessionStatus = "loading" | "authenticated" | "unauthenticated";

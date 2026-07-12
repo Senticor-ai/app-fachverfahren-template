@@ -69,6 +69,24 @@ describe("postgres migration runner", () => {
     expect(sql).toContain("'caseworker'");
   });
 
+  it("ships the workspace foundation migration (roles, identity links, audit, board metadata)", async () => {
+    const migrations = await loadMigrations(
+      "packages/app-store-postgres/migrations",
+    );
+    const sql = migrations.map((migration) => migration.sql).join("\n");
+
+    expect(sql).toContain("role text NOT NULL DEFAULT 'member'");
+    expect(sql).toContain("CREATE TABLE IF NOT EXISTS app_identity_links");
+    expect(sql).toContain(
+      "CREATE TABLE IF NOT EXISTS app_workspace_audit_events",
+    );
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS purpose text NULL");
+    // Backfills: frühester Benutzer je Tenant wird Admin; Discovery-Boards werden team-sichtbar.
+    expect(sql).toContain("UPDATE app_users SET role = 'admin'");
+    expect(sql).toContain("SET visibility = 'team'");
+    expect(sql).toContain("'Fachverfahren Discovery Board'");
+  });
+
   it("keeps preference and mailbox semantics testable without a database", async () => {
     const messages: MailboxMessage[] = [
       {

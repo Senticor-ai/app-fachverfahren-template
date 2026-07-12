@@ -25,11 +25,20 @@ export {
 } from "./auth-store.js";
 export type {
   AuthStore,
+  IdentityLink,
   LocalCredential,
   SessionRecord,
   UserAccount,
+  UserRole,
   UserStatus,
 } from "./auth-store.js";
+export {
+  createAuditStoreFromEnv,
+  InMemoryAuditStore,
+  PostgresAuditStore,
+  UnavailableAuditStore,
+} from "./audit-store.js";
+export type { AuditEvent, AuditEventType, AuditStore } from "./audit-store.js";
 export {
   createKanbanStoreFromEnv,
   InMemoryKanbanStore,

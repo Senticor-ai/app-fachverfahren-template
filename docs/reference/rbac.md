@@ -4,6 +4,29 @@ Der erste RBAC-Vertrag lebt in `@senticor/public-sector-sdk`.
 Code-Bezeichner bleiben Englisch; deutsche Rollenbezeichnungen sind
 Anzeige- und Dokumentationscopy.
 
+## Workspace-Rollen (`app_users.role`)
+
+Die laufende Anwendung nutzt für den Mitarbeiter-Workspace (Boards,
+Benutzerverwaltung, Audit, Export) ein schlankes, produktives Rollenmodell
+direkt am Benutzerkonto: `admin` und `member`. Routen prüfen **nie**
+Rollen-Literale, sondern immer Workspace-Permissions
+(`apps/fachverfahren/server/auth/workspace-permissions.ts`):
+
+| Permission           | admin | member |
+| -------------------- | ----- | ------ |
+| `users.manage`       | ✅    | —      |
+| `boards.manage`      | ✅    | —      |
+| `boards.collaborate` | ✅    | ✅     |
+| `audit.read`         | ✅    | —      |
+| `tenant.export`      | ✅    | —      |
+
+Feinere Rollen (Sachbearbeiter, Teamleiter, Fachadministrator, Revision)
+entstehen später ausschließlich durch Erweiterung dieses Mappings — ohne
+Routen-Refactoring. Abgrenzung: die SDK-RBAC-Registry unten (citizen/
+caseworker + `app_rbac_*`-Tabellen) ist der Vertrag für fachliche
+Domain-Permissions und bewusst noch nicht mit dem Workspace verdrahtet;
+`app_users.role` ist die heutige Wahrheit für Workspace-Zugriffe.
+
 ## Eingebaute Rollen
 
 | Code-Rolle   | Anzeige         | Zweck                                                    |

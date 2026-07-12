@@ -14,6 +14,11 @@ export interface Board {
   contentLocale: string;
   templateKey: string | null;
   templateVersion: number | null;
+  /** Wozu dient das Board (z.B. "requirements-discovery", "personal-tasks") — macht den
+   *  Board-Katalog erweiterbar (security-review/audit/betrieb), ohne neue Produkte zu bauen. */
+  purpose: string | null;
+  /** Phase im Progressive-Evolution-Modell (z.B. "design", "build", "operate"). */
+  lifecycleStage: string | null;
   version: number;
   archivedAt: string | null;
   createdAt: string;
@@ -153,8 +158,10 @@ export class KanbanValidationError extends Error {
 export interface KanbanStore {
   createBoard(board: Board): Promise<Board>;
   getBoard(input: BoardScope): Promise<Board | undefined>;
+  /** Sichtbarkeit für einen Actor: eigene Boards PLUS team-sichtbare Boards des Tenants.
+   *  (Bewusst `actorId` statt `ownerActorId` — es ist der anfragende Actor, nicht der Owner.) */
   listBoards(
-    input: TenantScope & { ownerActorId: string; includeArchived?: boolean },
+    input: TenantScope & { actorId: string; includeArchived?: boolean },
   ): Promise<Board[]>;
   updateBoard(
     input: BoardScope & VersionedMutation & { patch: BoardPatch },
@@ -242,13 +249,14 @@ export class InMemoryKanbanStore implements KanbanStore {
   }
 
   async listBoards(
-    input: TenantScope & { ownerActorId: string; includeArchived?: boolean },
+    input: TenantScope & { actorId: string; includeArchived?: boolean },
   ): Promise<Board[]> {
     return [...this.boards.values()]
       .filter(
         (board) =>
           board.tenantId === input.tenantId &&
-          board.ownerActorId === input.ownerActorId &&
+          (board.ownerActorId === input.actorId ||
+            board.visibility === "team") &&
           (input.includeArchived || board.archivedAt === null),
       )
       .map((board) => ({ ...board }))
@@ -721,6 +729,8 @@ interface BoardRow extends Record<string, unknown> {
   content_locale: string;
   template_key: string | null;
   template_version: number | null;
+  purpose: string | null;
+  lifecycle_stage: string | null;
   version: number;
   archived_at: Date | string | null;
   created_at: Date | string;
@@ -790,9 +800,10 @@ export class PostgresKanbanStore implements KanbanStore {
           INSERT INTO app_boards (
             board_id, tenant_id, authority_id, jurisdiction_id, owner_actor_id,
             title, description, visibility, content_locale, template_key,
-            template_version, version, archived_at, created_at, updated_at
+            template_version, purpose, lifecycle_stage, version, archived_at,
+            created_at, updated_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
           RETURNING *
         `,
         [
@@ -807,6 +818,8 @@ export class PostgresKanbanStore implements KanbanStore {
           board.contentLocale,
           board.templateKey,
           board.templateVersion,
+          board.purpose,
+          board.lifecycleStage,
           board.version,
           board.archivedAt,
           board.createdAt,
@@ -829,17 +842,18 @@ export class PostgresKanbanStore implements KanbanStore {
   }
 
   async listBoards(
-    input: TenantScope & { ownerActorId: string; includeArchived?: boolean },
+    input: TenantScope & { actorId: string; includeArchived?: boolean },
   ): Promise<Board[]> {
     return this.withClient(async (client) => {
       const result = await client.query<BoardRow>(
         `
           SELECT * FROM app_boards
-          WHERE tenant_id = $1 AND owner_actor_id = $2
+          WHERE tenant_id = $1
+            AND (owner_actor_id = $2 OR visibility = 'team')
             AND ($3::boolean OR archived_at IS NULL)
           ORDER BY created_at DESC
         `,
-        [input.tenantId, input.ownerActorId, Boolean(input.includeArchived)],
+        [input.tenantId, input.actorId, Boolean(input.includeArchived)],
       );
       return result.rows.map(boardFromRow);
     });
@@ -1507,6 +1521,8 @@ function boardFromRow(row: BoardRow): Board {
     contentLocale: row.content_locale,
     templateKey: row.template_key,
     templateVersion: row.template_version,
+    purpose: row.purpose,
+    lifecycleStage: row.lifecycle_stage,
     version: row.version,
     archivedAt: toIsoOrNull(row.archived_at),
     createdAt: toIsoString(row.created_at),

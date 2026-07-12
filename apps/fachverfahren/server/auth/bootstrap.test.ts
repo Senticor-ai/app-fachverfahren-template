@@ -3,59 +3,64 @@ import {
   InMemoryKanbanStore,
 } from "@senticor/app-store-postgres";
 import { describe, expect, it } from "vitest";
-import { BootstrapError, bootstrapWorkspace } from "./bootstrap.js";
+import {
+  assertBootstrapToken,
+  BootstrapError,
+  bootstrapWorkspace,
+} from "./bootstrap.js";
 
-interface MakeDepsOptions {
-  bootstrapToken: string | undefined;
-}
-
-// Deliberately no default parameter value here: `makeDeps(undefined)` must
-// mean "no token configured", not silently fall back to a default — a
-// default parameter would trigger on an explicit `undefined` argument too
-// and mask exactly the case this suite needs to exercise.
-function makeDeps(options: MakeDepsOptions) {
+function makeDeps() {
   return {
     authStore: new InMemoryAuthStore(),
     kanbanStore: new InMemoryKanbanStore(),
-    bootstrapToken: options.bootstrapToken,
   };
 }
 
 const validInput = {
-  token: "correct-token",
   email: "admin@example.org",
   password: "correct horse battery staple", // pragma: allowlist-secret
   displayName: "Admin",
 };
 
+describe("assertBootstrapToken", () => {
+  // Das Token-Gate gehört der HTTP-Route; der vertrauenswürdige Startup-Pfad
+  // (Auto-Bootstrap aus Env-Variablen) ruft bootstrapWorkspace direkt.
+  it("rejects when no bootstrap token is configured", () => {
+    expect(() => assertBootstrapToken(undefined, "anything")).toThrowError(
+      BootstrapError,
+    );
+    try {
+      assertBootstrapToken(undefined, "anything");
+    } catch (error) {
+      expect(error).toMatchObject({ code: "invalid-token" });
+    }
+  });
+
+  it("rejects an incorrect token and accepts the correct one", () => {
+    expect(() =>
+      assertBootstrapToken("correct-token", "wrong-token"),
+    ).toThrowError(BootstrapError);
+    expect(() =>
+      assertBootstrapToken("correct-token", "correct-token"),
+    ).not.toThrow();
+  });
+});
+
 describe("bootstrapWorkspace", () => {
-  it("rejects when no bootstrap token is configured", async () => {
-    const deps = makeDeps({ bootstrapToken: undefined });
-    await expect(bootstrapWorkspace(deps, validInput)).rejects.toMatchObject({
-      code: "invalid-token",
-    });
-  });
-
-  it("rejects an incorrect token", async () => {
-    const deps = makeDeps({ bootstrapToken: "correct-token" });
-    await expect(
-      bootstrapWorkspace(deps, { ...validInput, token: "wrong-token" }),
-    ).rejects.toMatchObject({ code: "invalid-token" });
-  });
-
   it("rejects a password shorter than the minimum length", async () => {
-    const deps = makeDeps({ bootstrapToken: "correct-token" });
+    const deps = makeDeps();
     await expect(
       bootstrapWorkspace(deps, { ...validInput, password: "short" }),
     ).rejects.toMatchObject({ code: "weak-password" });
   });
 
-  it("creates the first admin user, a hashed credential, and a seeded board", async () => {
-    const deps = makeDeps({ bootstrapToken: "correct-token" });
+  it("creates the first ADMIN user, a hashed credential, a local identity link, and the team discovery board", async () => {
+    const deps = makeDeps();
     const result = await bootstrapWorkspace(deps, validInput);
 
     expect(result.user.email).toBe("admin@example.org");
     expect(result.user.status).toBe("active");
+    expect(result.user.role).toBe("admin");
 
     const credential = await deps.authStore.getLocalCredential(
       result.user.actorId,
@@ -63,7 +68,20 @@ describe("bootstrapWorkspace", () => {
     expect(credential?.passwordHash).toContain("$argon2id$");
     expect(credential?.passwordHash).not.toContain(validInput.password);
 
-    expect(result.board.title).toBe("Build the Fachverfahren");
+    // Identity-Link (Authentifizierung ≠ Autorisierung): der lokale Login ist nur
+    // EIN Provider — auch er läuft über das Identity-Mapping.
+    expect(
+      await deps.authStore.findActorByIdentity({
+        tenantId: result.user.tenantId,
+        provider: "local",
+        subject: result.user.actorId,
+      }),
+    ).toBe(result.user.actorId);
+
+    expect(result.board.title).toBe("Fachverfahren Discovery Board");
+    expect(result.board.visibility).toBe("team");
+    expect(result.board.purpose).toBe("requirements-discovery");
+    expect(result.board.lifecycleStage).toBe("design");
     expect(result.board.ownerActorId).toBe(result.user.actorId);
 
     const columns = await deps.kanbanStore.listColumns({
@@ -81,8 +99,8 @@ describe("bootstrapWorkspace", () => {
     expect(cards.every((card) => card.sourceKey)).toBe(true);
   });
 
-  it("refuses to bootstrap twice — the second attempt is rejected even with a valid token", async () => {
-    const deps = makeDeps({ bootstrapToken: "correct-token" });
+  it("refuses to bootstrap twice", async () => {
+    const deps = makeDeps();
     await bootstrapWorkspace(deps, validInput);
 
     await expect(
@@ -93,18 +111,8 @@ describe("bootstrapWorkspace", () => {
     ).rejects.toMatchObject({ code: "already-bootstrapped" });
   });
 
-  it("throws a plain BootstrapError instance callers can distinguish by code", async () => {
-    const deps = makeDeps({ bootstrapToken: undefined });
-    try {
-      await bootstrapWorkspace(deps, validInput);
-      expect.unreachable("expected bootstrapWorkspace to throw");
-    } catch (error) {
-      expect(error).toBeInstanceOf(BootstrapError);
-    }
-  });
-
   it("rolls the created user back when a later step fails, so a retry succeeds", async () => {
-    const deps = makeDeps({ bootstrapToken: "correct-token" });
+    const deps = makeDeps();
     // Discovery-Board-Seed schlägt fehl (z. B. Migration fehlt) — der schon angelegte
     // Benutzer darf den Tenant NICHT dauerhaft als „bootstrapped" hinterlassen.
     const failingCreateBoard = deps.kanbanStore.createBoard.bind(
@@ -132,5 +140,13 @@ describe("bootstrapWorkspace", () => {
     expect(
       await deps.authStore.getLocalCredential(retried.user.actorId),
     ).toBeDefined();
+    // Auch der Identity-Link des Fehlversuchs darf den Retry nicht blockieren.
+    expect(
+      await deps.authStore.findActorByIdentity({
+        tenantId: retried.user.tenantId,
+        provider: "local",
+        subject: retried.user.actorId,
+      }),
+    ).toBe(retried.user.actorId);
   });
 });
