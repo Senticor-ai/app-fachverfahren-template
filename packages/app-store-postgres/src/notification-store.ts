@@ -123,6 +123,9 @@ export class PostgresNotificationStore implements NotificationStore {
     query: ListNotificationsQuery,
   ): Promise<AppNotification[]> {
     return this.withClient(async (c) => {
+      // notification_id COLLATE "C": Byte-/Code-Point-Ordnung = deckungsgleich zum JS-Tiebreak (a < b) des
+      // InMemory-Stores. Ohne COLLATE nähme PG die Locale-Kollation der DB (PROD-Default) → bei gleicher created_at
+      // abweichende Reihenfolge InMemory↔PG. Lehre #24 (Notiz ausserhalb des Template-Literals — Backticks brechen es).
       const r = await c.query<NotificationRow>(
         `SELECT notification_id, tenant_id, authority_id, recipient_actor_id, event_type, title, body,
                 case_id, task_id, read, created_at
@@ -130,7 +133,7 @@ export class PostgresNotificationStore implements NotificationStore {
          WHERE tenant_id = $1
            AND ($2::text IS NULL OR recipient_actor_id = $2)
            AND ($3::boolean IS NULL OR read = false)
-         ORDER BY created_at DESC, notification_id ASC
+         ORDER BY created_at DESC, notification_id COLLATE "C" ASC
          LIMIT $4`,
         [
           query.tenantId,

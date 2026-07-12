@@ -112,6 +112,18 @@ describe("postgres migration runner", () => {
       "CREATE OR REPLACE FUNCTION app_audit_events_immutable",
     );
     expect(sql).toContain("CREATE TRIGGER app_audit_events_no_mutation");
+
+    // Wiki-Versionierung (#20): mutabler Kopf + append-only Revisionen (belebt durch wiki-store).
+    expect(sql).toContain("CREATE TABLE IF NOT EXISTS app_wiki_articles");
+    expect(sql).toContain("CREATE TABLE IF NOT EXISTS app_wiki_revisions");
+    // Der Kopf ist je Mandant eindeutig; die Revision je (Mandant, Artikel, Version).
+    expect(sql).toContain("PRIMARY KEY (tenant_id, article_id, version)");
+    // NUR die Revisionen sind append-only verriegelt — der KOPF bleibt mutabel (Version-Bump).
+    expect(sql).toContain(
+      "REVOKE UPDATE, DELETE, TRUNCATE ON app_wiki_revisions",
+    );
+    expect(sql).toContain("CREATE TRIGGER app_wiki_revisions_no_mutation");
+    expect(sql).not.toContain("REVOKE UPDATE, DELETE ON app_wiki_articles");
   });
 
   it("keeps preference and mailbox semantics testable without a database", async () => {

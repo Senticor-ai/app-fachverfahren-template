@@ -51,6 +51,19 @@ export type {
   NotificationStore,
 } from "./notification-store.js";
 export {
+  createWikiStoreFromEnv,
+  InMemoryWikiStore,
+  PostgresWikiStore,
+  WikiVersionConflictError,
+} from "./wiki-store.js";
+export type {
+  AppWikiArticle,
+  AppWikiRevision,
+  UpsertWikiArticleInput,
+  WikiArticleStatus,
+  WikiStore,
+} from "./wiki-store.js";
+export {
   CaseNotFoundError,
   CaseVersionConflictError,
   createCaseStoreFromEnv,
