@@ -61,15 +61,29 @@ jobs:
 
       - name: Check demo-consumer configuration
         id: demo-config
+        working-directory: template
         env:
           DEMO_CONSUMER_DEPLOY_TOKEN: ${{ secrets.DEMO_CONSUMER_DEPLOY_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha || '' }}
         run: |
-          if [ -n "$DEMO_CONSUMER_DEPLOY_TOKEN" ]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          enabled=true
+          if [ -z "$DEMO_CONSUMER_DEPLOY_TOKEN" ]; then
+            enabled=false
             echo "::notice title=Demo consumer deploy skipped::Set the DEMO_CONSUMER_DEPLOY_TOKEN repository secret (and optionally the DEMO_CONSUMER_REPO repository variable, owner/repo) to enable this."
           fi
+          # Stale-Run-Guard: zwei main-Pushes können ihre CI-Läufe out-of-order beenden — der
+          # LANGSAMERE (ältere) Lauf würde den Demo-Konsumenten sonst auf einen veralteten
+          # Template-Stand zurückschieben. Deployt wird nur, wenn der validierte Commit noch
+          # die Spitze von main ist; der neuere Lauf deployt dann ohnehin.
+          if [ "$enabled" = "true" ] && [ "$EVENT_NAME" = "workflow_run" ]; then
+            tip="$(git ls-remote origin refs/heads/main | cut -f1)"
+            if [ "$tip" != "$RUN_HEAD_SHA" ]; then
+              enabled=false
+              echo "::notice title=Demo consumer deploy skipped::Stale workflow_run: validated commit ${RUN_HEAD_SHA} is no longer the tip of main (${tip}) — the newer run deploys instead."
+            fi
+          fi
+          echo "enabled=$enabled" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node
         if: ${{ steps.demo-config.outputs.enabled == 'true' }}

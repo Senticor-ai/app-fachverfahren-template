@@ -109,6 +109,17 @@ do_update() {
     return 0
   fi
 
+  # template:update kann package.json strukturell mergen (neue/angehobene Dependencies der
+  # Vorlage) — pnpm-lock.yaml ist bewusst NICHT template-managed (Konsumenten-Lockfiles
+  # divergieren legitim). Ein EINMALIGES ungefrorenes Install bringt das Lockfile in Sync;
+  # es wird mit dem Update-Commit gepusht, damit auch die Konsumenten-CI (frozen) grün bleibt.
+  # Die Gates selbst bleiben frozen und fangen echte Drift damit weiterhin ab.
+  echo "deploy-demo-consumer: lockfile-refresh nach template:update"
+  (cd "$TARGET_DIR" && pnpm install --no-frozen-lockfile) || {
+    echo "deploy-demo-consumer: lockfile refresh FAILED — kein Push" >&2
+    exit 1
+  }
+
   echo "deploy-demo-consumer: post-update migrate (gegen DIESELBE, bereits migrierte Datenbank)"
   run_migration_gate "post-update"
 }
