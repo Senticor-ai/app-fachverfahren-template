@@ -778,4 +778,49 @@ describe("HttpWorkspacePort e2e — Wiki-Authoring (#20 Phase 3a, echte POST/PAT
       await app.close();
     }
   });
+
+  it("lädt die Revisionshistorie LAZY (GET /api/wiki/:id/revisions) und invalidiert sie nach dem Speichern (#20 Phase 4)", async () => {
+    const wikiStore = new InMemoryWikiStore();
+    const { app, fetchShim } = baueServer({ wikiStore });
+    try {
+      const port = createHttpWorkspacePort(workspaceConfig, {
+        baseUrl: "",
+        fetch: fetchShim,
+        headers: SB("sb.a"),
+      });
+      await port.refresh();
+      // Artikel anlegen + Server-Bestätigung abwarten.
+      port.speichereWissen({ id: "doc", titel: "Doc", markdown: "eins" });
+      await warteBisAsync(
+        async () =>
+          (await wikiStore.getArticle({ tenantId: "t1", articleId: "doc" }))
+            ?.version === 1,
+      );
+      // Erster Zugriff ist LAZY: synchron noch leer, stößt aber den GET an.
+      expect(port.listWissenRevisionen("doc")).toEqual([]);
+      await warteBis(() => port.listWissenRevisionen("doc").length === 1);
+      expect(port.listWissenRevisionen("doc").map((r) => r.version)).toEqual([
+        1,
+      ]);
+      // Neue Version speichern → die Historie ist invalidiert → wird beim nächsten Zugriff neu geladen.
+      port.speichereWissen({
+        id: "doc",
+        titel: "Doc",
+        markdown: "zwei",
+        expectedVersion: 1,
+      });
+      await warteBisAsync(
+        async () =>
+          (await wikiStore.getArticle({ tenantId: "t1", articleId: "doc" }))
+            ?.version === 2,
+      );
+      await warteBis(() => port.listWissenRevisionen("doc").length === 2);
+      const revs = port.listWissenRevisionen("doc");
+      expect(revs.map((r) => r.version)).toEqual([2, 1]); // neueste zuerst
+      expect(revs[1]?.markdown).toBe("eins"); // alte Revision = unveränderter Snapshot
+      expect(revs[0]?.editorActorId).toBe("sb.a"); // Autor aus der Session
+    } finally {
+      await app.close();
+    }
+  });
 });

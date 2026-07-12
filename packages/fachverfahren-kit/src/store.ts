@@ -21,6 +21,7 @@ import type {
   Transition,
   VerfahrenEintrag,
   WissensArtikel,
+  WissensRevision,
   WorkspaceConfig,
   WorkspacePort,
 } from "./types.js";
@@ -345,6 +346,9 @@ export function createWorkspaceStore<T = Record<string, unknown>>(
   const wissenListe: WissensArtikel[] = (config.wissen ?? []).map((a) => ({
     ...a,
   }));
+  // Revisionshistorie je Artikel-Id (neueste zuerst). Config-Artikel starten OHNE Historie — genau wie ein noch nie
+  // server-gespeicherter Artikel in PROD (GET /revisions = leer); erst `speichereWissen` hängt Revisionen an.
+  const wissenRevisionen = new Map<string, WissensRevision[]>();
 
   // Append-only Aktivitäts-Protokoll (Change-Log): JEDE Management-Mutation (Zuweisung/Priorität/Label/Move/
   // Statuswechsel) erzeugt einen Eintrag, damit der Aktivitäts-Feed ein ECHTES Änderungsprotokoll ist — nicht nur
@@ -902,8 +906,23 @@ export function createWorkspaceStore<T = Record<string, unknown>>(
       };
       if (idx >= 0) wissenListe[idx] = next;
       else wissenListe.push(next);
+      // Revision anhängen (neueste zuerst) — spiegelt den append-only Verlauf des Wiki-Stores (DEV==PROD-Parität).
+      const rev: WissensRevision = {
+        version: next.version ?? 1,
+        titel: next.titel,
+        markdown: next.markdown,
+        standIso: next.standIso ?? nowIso(),
+        ...(next.kategorie !== undefined ? { kategorie: next.kategorie } : {}),
+      };
+      wissenRevisionen.set(input.id, [
+        rev,
+        ...(wissenRevisionen.get(input.id) ?? []),
+      ]);
       bump();
     },
+
+    listWissenRevisionen: (articleId) =>
+      (wissenRevisionen.get(articleId) ?? []).map((r) => ({ ...r })),
 
     triageInbox: (inboxId, status) => {
       const item = inbox.find((i) => i.id === inboxId);

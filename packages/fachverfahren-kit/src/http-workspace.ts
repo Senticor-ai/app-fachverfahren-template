@@ -32,6 +32,7 @@ import type {
   Vorgang,
   VorgangPort,
   WissensArtikel,
+  WissensRevision,
   WorkspaceConfig,
 } from "./types.js";
 import type { WorkspaceStore } from "./store.js";
@@ -44,6 +45,7 @@ import {
   inboxVonAppIntake,
   kommentarVonApp,
   vorgangVonAppCase,
+  wissenRevisionVonApp,
   wissenVonAppWiki,
   type AppCaseDTO,
   type AppIntakeDTO,
@@ -53,6 +55,7 @@ import {
   type AppTaskDTO,
   type AppTaskRelationDTO,
   type AppWikiArticleDTO,
+  type AppWikiRevisionDTO,
 } from "./lib/http-mappers.js";
 
 /** Fehler eines Domain-API-Aufrufs — trägt Statuscode + Kontext, damit `onError` sie einordnen kann. */
@@ -145,6 +148,10 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
   let savedViewCache: GespeicherteAnsicht[] = [];
   // Wissensbasis (#20): aus dem Config-Wissen GESEEDET (sofort da, kein Leerflackern), dann per GET /api/wiki ersetzt.
   let wissenCache: WissensArtikel[] = config.wissen ?? [];
+  // Revisionshistorie je Artikel-Id (Phase 4) — LAZY beim ersten Zugriff geladen (GET /api/wiki/:id/revisions).
+  const wissenRevisionenCache = new Map<string, WissensRevision[]>();
+  const wissenRevisionenGeladen = new Set<string>();
+  const wissenRevisionenLaedt = new Set<string>();
   const detailCache = new Map<string, DetailEintrag>();
   const detailLaedt = new Set<string>();
   // Monoton steigende Ladungs-Generation je Aufgabe: eine verspätet eintreffende ÄLTERE Detail-Ladung darf einen
@@ -253,6 +260,28 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
       if (e instanceof HttpWorkspaceError && e.status === 404) return;
       throw e;
     }
+  }
+  // Revisionshistorie eines Artikels laden (Phase 4) — neueste zuerst (der Server sortiert version DESC).
+  async function ladeWissenRevisionen(articleId: string): Promise<void> {
+    const { revisions } = await api<{ revisions: AppWikiRevisionDTO[] }>(
+      "GET",
+      `/api/wiki/${enc(articleId)}/revisions`,
+    );
+    wissenRevisionenCache.set(articleId, revisions.map(wissenRevisionVonApp));
+    wissenRevisionenGeladen.add(articleId);
+    bump();
+  }
+  // Lazy: beim ersten Zugriff (bzw. nach Invalidierung durch ein Speichern) EINMAL laden — kein Sturm paralleler GETs.
+  function ladeWissenRevisionenEinmal(articleId: string): void {
+    if (
+      wissenRevisionenGeladen.has(articleId) ||
+      wissenRevisionenLaedt.has(articleId)
+    )
+      return;
+    wissenRevisionenLaedt.add(articleId);
+    void ladeWissenRevisionen(articleId)
+      .catch((e) => melde(e, `wissenRevisionen:${articleId}`))
+      .finally(() => wissenRevisionenLaedt.delete(articleId));
   }
   // Einzel-Fall MIT Antragsdaten laden (`GET /api/cases/:id` liefert `{ case, antragsdaten }`) und den Cache-Eintrag
   // anreichern — so kann die vertiefte Prüfsicht (ReviewWorkspace) über HTTP die echten Antragsdaten zeigen.
@@ -681,6 +710,13 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
   // ── Wissensbasis / Wiki (#20) — synchroner Accessor über dem Cache (aus Config geseedet, per /api/wiki ersetzt) ──
   const listWissen = (): WissensArtikel[] => wissenCache.map((a) => ({ ...a }));
 
+  // Revisionshistorie (Phase 4) — SYNCHRON über dem Cache; stößt beim ersten Zugriff das Lazy-Laden an (danach reaktiv
+  // über den bump). Bis dahin leer (kein await im Render).
+  const listWissenRevisionen = (articleId: string): WissensRevision[] => {
+    ladeWissenRevisionenEinmal(articleId);
+    return (wissenRevisionenCache.get(articleId) ?? []).map((r) => ({ ...r }));
+  };
+
   // Artikel per id ersetzen ODER anhängen — liefert ein FRISCHES Array (mutiert `wissenCache` nicht in place).
   const mischeWissen = (
     liste: WissensArtikel[],
@@ -757,6 +793,9 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
           wissenCache = mischeWissen(wissenCache, bestaetigt);
           bump();
         }
+        // Die Revisionshistorie dieses Artikels ist nun veraltet (eine neue Revision kam hinzu) → invalidieren, damit
+        // der nächste `listWissenRevisionen`-Zugriff sie frisch nachlädt.
+        wissenRevisionenGeladen.delete(input.id);
       } catch (e) {
         // Server hat abgelehnt (409 / 400 / 404 / …): den optimistischen Eintrag CHIRURGISCH zurücknehmen — ABER NUR,
         // wenn der Cache noch UNSERE Fassung hält (Referenz-Gleichheit). Hat inzwischen ein nebenläufiger, neuerer
@@ -947,6 +986,7 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
     acceptInbox,
     listWissen,
     speichereWissen,
+    listWissenRevisionen,
   };
 }
 

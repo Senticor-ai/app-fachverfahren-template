@@ -16,6 +16,7 @@ import type {
   TriageStatus,
   Vorgang,
   WissensArtikel,
+  WissensRevision,
 } from "../types.js";
 
 /** Die Aufgaben-Repräsentation, wie die Domain-API sie liefert (`GET /api/tasks`, `PATCH /api/tasks/:id` → `{ task }`). */
@@ -197,6 +198,31 @@ export interface AppWikiArticleDTO {
   status: string;
   version: number;
   updatedAt: string;
+}
+
+/** Eine Wiki-Revision, wie die Domain-API sie liefert (`GET /api/wiki/:id/revisions` → `{ revisions }`). */
+export interface AppWikiRevisionDTO {
+  version: number;
+  title: string;
+  markdown: string;
+  category: string | null;
+  editorActorId: string;
+  changeNote: string | null;
+  createdAt: string;
+}
+
+/** Server-Wiki-Revision → Kit-`WissensRevision`. exactOptionalPropertyTypes: `kategorie`/`changeNote` bei `null`
+ *  WEGGELASSEN. */
+export function wissenRevisionVonApp(r: AppWikiRevisionDTO): WissensRevision {
+  return {
+    version: r.version,
+    titel: r.title,
+    markdown: r.markdown,
+    editorActorId: r.editorActorId,
+    standIso: r.createdAt,
+    ...(r.category !== null ? { kategorie: r.category } : {}),
+    ...(r.changeNote !== null ? { changeNote: r.changeNote } : {}),
+  };
 }
 
 /** Server-Wiki-Artikel → Kit-`WissensArtikel` (das Overlay über `WorkspaceConfig.wissen`). exactOptionalPropertyTypes:

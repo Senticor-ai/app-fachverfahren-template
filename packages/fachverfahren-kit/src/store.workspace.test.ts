@@ -736,3 +736,46 @@ describe("Unteraufgaben (Sub-Issues, DEV)", () => {
     expect(istWurzel(frei)).toBe(true);
   });
 });
+
+describe("Wissensbasis/Wiki (DEV) — speichereWissen + Revisionshistorie (#20 Phase 3/4)", () => {
+  it("legt an, versioniert hoch und führt die Revisionshistorie (neueste zuerst)", () => {
+    const store = createWorkspaceStore(macheWorkspace(), { now: NOW });
+    // Neuanlage (expectedVersion fehlt = 0).
+    store.speichereWissen({
+      id: "handbuch",
+      titel: "Handbuch",
+      markdown: "v1",
+    });
+    expect(store.listWissen().find((a) => a.id === "handbuch")?.version).toBe(
+      1,
+    );
+    // Neue Version (expectedVersion = 1).
+    store.speichereWissen({
+      id: "handbuch",
+      titel: "Handbuch",
+      markdown: "v2",
+      expectedVersion: 1,
+    });
+    const kopf = store.listWissen().find((a) => a.id === "handbuch");
+    expect(kopf?.version).toBe(2);
+    expect(kopf?.markdown).toBe("v2");
+
+    const revs = store.listWissenRevisionen("handbuch");
+    expect(revs.map((r) => r.version)).toEqual([2, 1]); // neueste zuerst
+    expect(revs[0]?.markdown).toBe("v2");
+    expect(revs[1]?.markdown).toBe("v1"); // alte Revision ist ein unveränderter Snapshot
+  });
+
+  it("lehnt eine veraltete erwartete Version ab (no-op) und hält Verlauf leer für unbekannte Artikel", () => {
+    const store = createWorkspaceStore(macheWorkspace(), { now: NOW });
+    store.speichereWissen({ id: "doc", titel: "Doc", markdown: "v1" }); // → v1
+    // Veraltete expectedVersion (0 statt 1) → keine Änderung.
+    store.speichereWissen({ id: "doc", titel: "Doc", markdown: "stale" });
+    expect(store.listWissen().find((a) => a.id === "doc")?.markdown).toBe("v1");
+    expect(store.listWissenRevisionen("doc").map((r) => r.version)).toEqual([
+      1,
+    ]);
+    // Unbekannter Artikel → leerer Verlauf (wie ein nie gespeicherter Artikel in PROD).
+    expect(store.listWissenRevisionen("gibt-es-nicht")).toEqual([]);
+  });
+});

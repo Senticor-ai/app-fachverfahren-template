@@ -1044,6 +1044,21 @@ export interface WissensArtikel {
   version?: number;
 }
 
+/** Eine unveränderliche REVISION eines Wissensartikels (#20 Phase 4) — ein Snapshot des Inhalts je gespeicherter
+ *  Version, für Verlauf + Diff. NEUESTE zuerst geliefert (version DESC). */
+export interface WissensRevision {
+  version: number;
+  titel: string;
+  markdown: string;
+  kategorie?: string;
+  /** Wer die Revision gespeichert hat (actor_id) — server-seitig gesetzt; im DEV-Store nicht belegt. */
+  editorActorId?: string;
+  /** Optionale Änderungsnotiz. */
+  changeNote?: string;
+  /** ISO-Zeitpunkt der Revision. */
+  standIso: string;
+}
+
 /** Die WORKSPACE-KONFIGURATION — die neue, N-wertige „Naht": EIN Sachbearbeiter-Workspace über MEHRERE Verfahren,
  *  mit gemeinsamem Vokabular (Prioritäten/Labels), Board, gespeicherten Views und komponierbarem Layout. Der
  *  Mandanten-Scope ist Teil der Config (DEV: synthetischer Einzeltenant; PROD: aus der Server-Session). */
@@ -1226,4 +1241,8 @@ export interface WorkspacePort<TAntragsdaten = Record<string, unknown>> {
     changeNote?: string;
     expectedVersion?: number;
   }): void;
+  /** Die Revisionshistorie eines Artikels (neueste zuerst) für Verlauf + Diff. SYNCHRON: der DEV-Store hält sie in-
+   *  memory (je `speichereWissen` eine Revision); der HTTP-Store lädt sie LAZY beim ersten Zugriff aus
+   *  `GET /api/wiki/:id/revisions` und bumpt — bis dahin leer (kein `await` im Render). */
+  listWissenRevisionen(articleId: string): WissensRevision[];
 }
