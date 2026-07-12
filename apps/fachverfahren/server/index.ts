@@ -30,6 +30,13 @@ import {
   type DomainApiDeps,
 } from "./domain-api.js";
 import { runConsumerTick, type ConsumerHandle } from "./event-consumer.js";
+import {
+  discoverModules,
+  mountModules,
+  PUBLIC_SURFACES,
+  type ModuleHostDeps,
+} from "./module-host.js";
+import type { ModuleServer } from "@senticor/public-sector-sdk";
 import { notificationProjector } from "./notification-projector.js";
 import {
   BACKLOG_SCRAPE_TIMEOUT_MS,
@@ -236,12 +243,18 @@ export function buildPublicServer({
   state = createRuntimeState(),
   metrics = new RuntimeMetrics(),
   domainApi,
+  modules,
+  moduleHostDeps,
 }: {
   config?: RuntimeConfig;
   state?: RuntimeState;
   metrics?: RuntimeMetrics;
   /** Optional: die fachliche Domain-API (/api/*). Ohne sie ist der Server reine Web-Delivery (Verhalten wie bisher). */
   domainApi?: DomainApiDeps;
+  /** Optional (ModuleHost): discoverte Domänen-Module, die NACH der Domain-API auf denselben Public-Server gemountet
+   *  werden. `moduleHostDeps` (mit den Stores) ist dann PFLICHT — sonst fail-closed. */
+  modules?: readonly ModuleServer[];
+  moduleHostDeps?: ModuleHostDeps;
 } = {}): FastifyInstance {
   const app = fastify({
     logger: false,
@@ -258,6 +271,15 @@ export function buildPublicServer({
   registerErrorHandler(app);
   // Domain-API NACH den Hooks, VOR dem SPA-Fallback (setNotFoundHandler) registrieren.
   if (domainApi) registerDomainApi(app, domainApi);
+  // ModuleHost: discoverte Module NACH der Domain-API mounten (die von Modulen übernommenen Monolith-Routen wurden
+  // vorher via stripModuleOwnedStores aus `domainApi` entfernt → genau EIN Routen-Eigentümer, kein Doppel-Mount).
+  if (modules && modules.length > 0) {
+    if (!moduleHostDeps)
+      throw new Error(
+        "buildPublicServer: `modules` gesetzt, aber `moduleHostDeps` fehlt (die Module brauchen die Datenschicht)",
+      );
+    mountModules(app, modules, moduleHostDeps);
+  }
   app.get("/livez", async (_request, reply) => {
     return reply.header("Cache-Control", NO_STORE).send({ status: "ok" });
   });
@@ -482,21 +504,89 @@ export async function buildDomainApiFromEnv(
   };
 }
 
+/** Die Monolith-Routen der Notification-Gruppe (domain-api.ts `if(notificationStore)`). Ein Modul muss ALLE bedienen,
+ *  um die Gruppe zu übernehmen. 1b explizit; ab Phase 5 aus `module.contract.yaml`. */
+const NOTIFICATION_TAKEOVER_ROUTES = [
+  { method: "GET", path: "/api/notifications" },
+  { method: "POST", path: "/api/notifications/:id/read" },
+] as const;
+
+function irgendEinModulBedient(
+  modules: readonly ModuleServer[],
+  want: { method: string; path: string },
+): boolean {
+  // Nur MOUNTBARE (public-surface) Routen zählen als Übernahme — sonst würde eine internal-surfaced Route den Store
+  // strippen, ohne dass die Route je gemountet wird (dieselbe „silent vanish"-Klasse, andere Naht; Review-Härtung).
+  return modules.some((m) =>
+    (m.routes ?? []).some(
+      (r) =>
+        r.method === want.method &&
+        r.path === want.path &&
+        PUBLIC_SURFACES.includes(r.surface),
+    ),
+  );
+}
+
+/** CUTOVER (ModuleHost): entfernt aus den Monolith-Deps die Stores, deren Routen ein discovertes Modul TATSÄCHLICH
+ *  übernimmt — der Monolith registriert die zugehörigen Inline-Routen dann NICHT (über seine `if(store)`-Schalter),
+ *  das Modul bedient sie stattdessen. So gibt es genau EINEN Routen-Eigentümer (kein Doppel-Mount).
+ *  WICHTIG (Adversarial-Review-Fund): der Strip hängt an der ROUTEN-Abdeckung, NICHT an der moduleId — sonst löschte
+ *  ein consumer-only „notification"-Modul (kein routes) den Inbox-Endpunkt lautlos. Teilabdeckung (nur eine der
+ *  Gruppen-Routen) ist eine Fehlkonfiguration → fail-closed. */
+export function stripModuleOwnedStores(
+  domainApi: DomainApiDeps,
+  modules: readonly ModuleServer[],
+): DomainApiDeps {
+  const bedient = NOTIFICATION_TAKEOVER_ROUTES.filter((w) =>
+    irgendEinModulBedient(modules, w),
+  );
+  if (
+    bedient.length > 0 &&
+    bedient.length < NOTIFICATION_TAKEOVER_ROUTES.length
+  )
+    throw new Error(
+      "module-host: ein Modul bedient nur EINEN Teil der /api/notifications-Routen — es muss ALLE übernehmen oder KEINE (sonst verschwindet ein Endpunkt oder kollidiert mit dem Monolithen)",
+    );
+  if (
+    bedient.length === NOTIFICATION_TAKEOVER_ROUTES.length &&
+    domainApi.notificationStore
+  ) {
+    const { notificationStore: _uebernommen, ...rest } = domainApi;
+    return rest;
+  }
+  return domainApi;
+}
+
 export async function startRuntime(env: NodeJS.ProcessEnv = process.env) {
   const config = readRuntimeConfig(env);
   await assertStaticDir(config);
   const state = createRuntimeState();
   const metrics = new RuntimeMetrics();
+  // Die VOLLE Datenschicht — Worker/Projektor/Backlog + die Modul-Ports (moduleHostDeps) nutzen sie unverändert.
   const domainApi = await buildDomainApiFromEnv(env);
-  // Die Domain-API wird gleich ÜBER HTTP aktiv → JETZT die Header-Auth-Sperre prüfen (schließt den Header-Voll-Bypass
-  // in PRODUCTION). Bewusst hier auf dem HTTP-Pfad, nicht in `buildDomainApiFromEnv` (der Worker teilt die Deps, aber
-  // nicht diese HTTP-Policy).
-  if (domainApi) assertHeaderAuthAllowed(env);
+  // ModuleHost: gelistete Domänen-Module discovern (Default leer ⇒ [] ⇒ Monolith unverändert). Fail-closed lädt.
+  const modules = await discoverModules(env);
+  // FIX-FIRST #2: Die Header-Auth-Sperre MUSS auch feuern, wenn (nur) Module gemountet werden — sonst umginge ein
+  // Modul-Deployment ohne Monolith-Domain-API den PROD-Header-Bypass-Schutz. Daher `domainApi ODER modules`.
+  if (domainApi || modules.length > 0) assertHeaderAuthAllowed(env);
+  // Module brauchen die Datenschicht (ihre Ports) — ohne Domain-API fail-closed statt stiller Nicht-Mount.
+  if (modules.length > 0 && !domainApi)
+    throw new Error(
+      "startRuntime: APP_MODULES gesetzt, aber keine Datenschicht (APP_LEISTUNG_CONTRACT) — die Module brauchen die Stores",
+    );
+  // CUTOVER nur fürs ROUTING: von Modulen übernommene Stores aus den Route-Deps entfernen (kein Doppel-Eigentümer);
+  // die Module erhalten die VOLLEN Deps als moduleHostDeps.
+  const domainApiForRoutes = domainApi
+    ? stripModuleOwnedStores(domainApi, modules)
+    : domainApi;
   const publicServer = buildPublicServer({
     config,
     state,
     metrics,
-    ...(domainApi ? { domainApi } : {}),
+    ...(domainApiForRoutes ? { domainApi: domainApiForRoutes } : {}),
+    ...(modules.length > 0 && domainApi
+      ? { modules, moduleHostDeps: domainApi }
+      : {}),
   });
   // Rückstau-Gauge (#10) am /internal/metrics, sobald ein Automations-Store da ist (der In-Process-Poller ist der
   // Default, wenn KEIN separater Worker läuft) — dann ist die Skalierungs-Kennzahl auch ohne Worker-Deployment sichtbar.

@@ -2,14 +2,24 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { InMemoryCaseStore } from "@senticor/app-store-postgres";
+import {
+  InMemoryCaseStore,
+  InMemoryNotificationStore,
+} from "@senticor/app-store-postgres";
+import type {
+  CaseworkerSession,
+  ModuleServer,
+  NotificationPort,
+} from "@senticor/public-sector-sdk";
 import {
   assertHeaderAuthAllowed,
   buildDomainApiFromEnv,
   buildInternalServer,
   buildPublicServer,
   readRuntimeConfig,
+  stripModuleOwnedStores,
 } from "./index.js";
+import type { DomainApiDeps } from "./domain-api.js";
 
 /** Minimal-Vertrag (id + StatusMachine) für die Auth-Bootstrap-Tests. */
 async function writeContract(): Promise<{ path: string; dir: string }> {
@@ -424,6 +434,190 @@ describe("fachverfahren runtime", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("ModuleHost-Cutover (Phase 1b)", () => {
+  const SESSION: CaseworkerSession = {
+    actorId: "sb.1",
+    tenantId: "t1",
+    authorityId: "b1",
+    jurisdictionId: "de",
+    permissions: ["inbox.read"],
+  };
+  const notifModule: ModuleServer = {
+    moduleId: "notification",
+    requiredPorts: ["notification"],
+    routes: [
+      {
+        method: "GET",
+        path: "/api/notifications",
+        surface: "caseworker",
+        operationId: "list",
+        requiredPermissions: ["inbox.read"],
+        handle: async (ctx) => ({
+          ok: true,
+          body: {
+            notifications: await (
+              ctx.ports as { notification: NotificationPort }
+            ).notification.list({ unreadOnly: ctx.query["unread"] === "true" }),
+          },
+        }),
+      },
+      {
+        method: "POST",
+        path: "/api/notifications/:id/read",
+        surface: "caseworker",
+        operationId: "read",
+        requiredPermissions: ["inbox.read"],
+        handle: async (ctx) => {
+          await (
+            ctx.ports as { notification: NotificationPort }
+          ).notification.markRead({ notificationId: ctx.params["id"] ?? "" });
+          return { ok: true, status: 204 };
+        },
+      },
+    ],
+  };
+
+  function minimalDeps(over: Partial<DomainApiDeps> = {}): DomainApiDeps {
+    return {
+      caseStore: new InMemoryCaseStore(),
+      catalog: { transitionsFor: () => [] },
+      resolveSession: () => undefined,
+      ...over,
+    };
+  }
+
+  it("stripModuleOwnedStores entfernt notificationStore, wenn ein Modul die Gruppe VOLL bedient", () => {
+    const store = new InMemoryNotificationStore();
+    const deps = minimalDeps({ notificationStore: store });
+    expect(
+      stripModuleOwnedStores(deps, [notifModule]).notificationStore,
+    ).toBeUndefined();
+    expect(stripModuleOwnedStores(deps, []).notificationStore).toBe(store); // ohne Modul unverändert
+  });
+
+  it("strippt NICHT für ein consumer-only notification-Modul (kein lautloses Löschen des Endpunkts) — Review-Fix", () => {
+    const store = new InMemoryNotificationStore();
+    const deps = minimalDeps({ notificationStore: store });
+    const consumerOnly: ModuleServer = {
+      moduleId: "notification",
+      requiredPorts: ["notification"],
+      consumers: [{ id: "proj", handle: () => {} }],
+    };
+    expect(stripModuleOwnedStores(deps, [consumerOnly]).notificationStore).toBe(
+      store,
+    );
+  });
+
+  it("strippt NICHT für internal-surfaced Übernahme-Routen (nicht mountbar ⇒ kein silent vanish) — Review-Härtung", () => {
+    const store = new InMemoryNotificationStore();
+    const deps = minimalDeps({ notificationStore: store });
+    const internalTakeover: ModuleServer = {
+      moduleId: "notification",
+      requiredPorts: ["notification"],
+      routes: [
+        {
+          method: "GET",
+          path: "/api/notifications",
+          surface: "internal",
+          operationId: "g",
+          requiredPermissions: ["inbox.read"],
+          handle: () => ({ ok: true }),
+        },
+        {
+          method: "POST",
+          path: "/api/notifications/:id/read",
+          surface: "internal",
+          operationId: "p",
+          requiredPermissions: ["inbox.read"],
+          handle: () => ({ ok: true, status: 204 }),
+        },
+      ],
+    };
+    // Beide internal ⇒ nicht mountbar ⇒ zählen nicht als Übernahme ⇒ Monolith behält den Store (kein Verlust).
+    expect(
+      stripModuleOwnedStores(deps, [internalTakeover]).notificationStore,
+    ).toBe(store);
+  });
+
+  it("wirft fail-closed bei TEIL-Abdeckung der notification-Routen — Review-Fix", () => {
+    const store = new InMemoryNotificationStore();
+    const deps = minimalDeps({ notificationStore: store });
+    const partial: ModuleServer = {
+      moduleId: "notification",
+      requiredPorts: ["notification"],
+      routes: [
+        {
+          method: "GET",
+          path: "/api/notifications",
+          surface: "caseworker",
+          operationId: "listOnly",
+          requiredPermissions: ["inbox.read"],
+          handle: () => ({ ok: true }),
+        },
+      ],
+    };
+    expect(() => stripModuleOwnedStores(deps, [partial])).toThrow(
+      /Teil der \/api\/notifications/,
+    );
+  });
+
+  it("das notification-Modul bedient /api/notifications byte-kompatibel (Cutover)", async () => {
+    const staticDir = await createStaticDir();
+    const config = readRuntimeConfig({ STATIC_DIR: staticDir });
+    const store = new InMemoryNotificationStore();
+    await store.insertNotification({
+      notificationId: "n1",
+      tenantId: "t1",
+      authorityId: "b1",
+      recipientActorId: null,
+      eventType: "case.eingegangen",
+      title: "T",
+      body: "B",
+      caseId: "c1",
+      taskId: null,
+      read: false,
+      createdAt: "2026-07-10T00:00:00.000Z",
+    });
+    const app = buildPublicServer({
+      config,
+      modules: [notifModule],
+      moduleHostDeps: {
+        resolveSession: () => SESSION,
+        notificationStore: store,
+      },
+    });
+    try {
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/notifications",
+      });
+      expect(res.statusCode).toBe(200);
+      expect(
+        (
+          res.json() as { notifications: { notificationId: string }[] }
+        ).notifications.map((n) => n.notificationId),
+      ).toEqual(["n1"]);
+      const read = await app.inject({
+        method: "POST",
+        url: "/api/notifications/n1/read",
+      });
+      expect(read.statusCode).toBe(204);
+    } finally {
+      await app.close();
+      await rm(staticDir, { recursive: true, force: true });
+    }
+  });
+
+  it("buildPublicServer wirft fail-closed, wenn `modules` ohne `moduleHostDeps` kommt", async () => {
+    const staticDir = await createStaticDir();
+    const config = readRuntimeConfig({ STATIC_DIR: staticDir });
+    expect(() => buildPublicServer({ config, modules: [notifModule] })).toThrow(
+      /moduleHostDeps/,
+    );
+    await rm(staticDir, { recursive: true, force: true });
   });
 });
 

@@ -94,8 +94,9 @@ function sendResult(reply: FastifyReply, result: ModuleResult): FastifyReply {
 }
 
 /** Zonen, die auf den PUBLIC-Server gehören. `internal` ist bewusst ausgeschlossen (gehört auf den internen Server —
- *  `/internal/*` darf nie über den Public-Ingress erreichbar sein). */
-const PUBLIC_SURFACES: readonly ModuleSurface[] = [
+ *  `/internal/*` darf nie über den Public-Ingress erreichbar sein). Exportiert, damit der Cutover (stripModuleOwnedStores)
+ *  eine Übernahme nur zählt, wenn die Route auch WIRKLICH (public) gemountet wird. */
+export const PUBLIC_SURFACES: readonly ModuleSurface[] = [
   "citizen",
   "caseworker",
   "audit",
@@ -161,4 +162,88 @@ export function mountModules(
   opts: { surfaces?: readonly ModuleSurface[] } = {},
 ): void {
   for (const m of modules) mountModule(app, m, deps, opts);
+}
+
+// ── Discovery (Phase 1b): APP_MODULES-Allowlist → geladene, validierte Modul-Server. Default leer ⇒ [] ⇒ Monolith
+//    unverändert (additive Naht). ──
+
+/** Grobe Laufzeit-Validierung eines dynamisch geladenen Objekts (fail-closed-Discovery). */
+function istModuleServer(x: unknown): x is ModuleServer {
+  if (typeof x !== "object" || x === null) return false;
+  const m = x as Partial<ModuleServer>;
+  return (
+    typeof m.moduleId === "string" &&
+    Array.isArray(m.requiredPorts) &&
+    (m.routes !== undefined || m.consumers !== undefined)
+  );
+}
+
+/** Default-Loader: dynamischer `import(...)` des GEBAUTEN Modul-Servers. Bewusst `import(spezifizierer)` (NICHT
+ *  `import … from`), sonst triggert die module-boundaries-Regex auf „modules/". Der ECHTE Build-Ausgabepfad wird in
+ *  Phase 1b-ii verdrahtet (Output-Dir OHNE „modules"-Substring); bis dahin wird der Default nur erreicht, wenn
+ *  APP_MODULES gesetzt UND das Modul gebaut ist. */
+async function defaultModuleLoad(id: string): Promise<unknown> {
+  const spezifizierer = new URL(
+    `../../dist-domain-servers/${id}/server/index.js`,
+    import.meta.url,
+  ).href;
+  const mod = (await import(spezifizierer)) as {
+    server?: unknown;
+    default?: unknown;
+  };
+  return mod.server ?? mod.default;
+}
+
+/** Discovert die in `APP_MODULES` (komma-separierte Allowlist) gelisteten Modul-Server. Leer/unset ⇒ [] ⇒ Monolith
+ *  unverändert. FAIL-CLOSED: ein gelistetes, nicht ladbares/ungültiges Modul WIRFT (kein stiller Skip — ein „Backend"
+ *  darf nicht lautlos verschwinden). `load` ist für Tests injizierbar. */
+export async function discoverModules(
+  env: NodeJS.ProcessEnv,
+  opts: { load?: (id: string) => Promise<unknown> } = {},
+): Promise<ModuleServer[]> {
+  const ids = (env["APP_MODULES"] ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const load = opts.load ?? defaultModuleLoad;
+  const modules: ModuleServer[] = [];
+  for (const id of ids) {
+    let geladen: unknown;
+    try {
+      geladen = await load(id);
+    } catch (error) {
+      throw new Error(
+        `module-host: Modul "${id}" (APP_MODULES) nicht ladbar: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
+      );
+    }
+    if (!istModuleServer(geladen))
+      throw new Error(
+        `module-host: Modul "${id}" exportiert keinen gültigen ModuleServer`,
+      );
+    if (geladen.moduleId !== id)
+      throw new Error(
+        `module-host: Modul "${id}" hat abweichende moduleId "${geladen.moduleId}"`,
+      );
+    modules.push(geladen);
+  }
+  assertModuleRoutesUnique(modules);
+  return modules;
+}
+
+/** Wirft, wenn zwei Module dieselbe method+path deklarieren (sonst doppelte Fastify-Registrierung → Boot-Crash). */
+export function assertModuleRoutesUnique(
+  modules: readonly ModuleServer[],
+): void {
+  const gesehen = new Set<string>();
+  for (const m of modules) {
+    for (const r of m.routes ?? []) {
+      const key = `${r.method} ${r.path}`;
+      if (gesehen.has(key))
+        throw new Error(
+          `module-host: doppelte Route ${key} (Modul "${m.moduleId}")`,
+        );
+      gesehen.add(key);
+    }
+  }
 }

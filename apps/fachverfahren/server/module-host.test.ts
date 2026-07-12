@@ -11,7 +11,9 @@ import type {
   NotificationPort,
 } from "@senticor/public-sector-sdk";
 import {
+  assertModuleRoutesUnique,
   buildModulePorts,
+  discoverModules,
   mountModule,
   type ModuleHostDeps,
 } from "./module-host.js";
@@ -271,6 +273,75 @@ describe("Scope-Härtung (Adversarial-Review)", () => {
     // Angreifer/Bug mutiert den Scope NACH dem Bau — der Port bleibt an t1 gebunden.
     (scope as { tenantId: string }).tenantId = "t2";
     expect((await ports.notification.list({})).length).toBe(1); // weiterhin t1
+  });
+});
+
+describe("discoverModules — APP_MODULES-Allowlist, fail-closed (Phase 1b)", () => {
+  // Je Modul eine EIGENE Route (unique path) — sonst greift zu Recht assertModuleRoutesUnique.
+  const ladeFixture = async (id: string): Promise<unknown> => ({
+    moduleId: id,
+    requiredPorts: [],
+    routes: [
+      {
+        method: "GET",
+        path: `/api/${id}`,
+        surface: "caseworker",
+        operationId: `op-${id}`,
+        requiredPermissions: [],
+        handle: () => ({ ok: true }),
+      },
+    ],
+  });
+
+  it("ohne APP_MODULES ⇒ [] (Monolith unverändert)", async () => {
+    expect(await discoverModules({}, { load: ladeFixture })).toEqual([]);
+    expect(
+      await discoverModules({ APP_MODULES: "  " }, { load: ladeFixture }),
+    ).toEqual([]);
+  });
+
+  it("lädt die gelisteten Module (Allowlist, getrimmt)", async () => {
+    const mods = await discoverModules(
+      { APP_MODULES: "notification, andere" },
+      { load: ladeFixture },
+    );
+    expect(mods.map((m) => m.moduleId)).toEqual(["notification", "andere"]);
+  });
+
+  it("FAIL-CLOSED: nicht ladbares Modul ⇒ wirft (kein stiller Skip)", async () => {
+    await expect(
+      discoverModules(
+        { APP_MODULES: "kaputt" },
+        {
+          load: async () => {
+            throw new Error("boom");
+          },
+        },
+      ),
+    ).rejects.toThrow(/nicht ladbar/);
+  });
+
+  it("FAIL-CLOSED: ungültige Form ⇒ wirft", async () => {
+    await expect(
+      discoverModules({ APP_MODULES: "x" }, { load: async () => ({ foo: 1 }) }),
+    ).rejects.toThrow(/gültigen ModuleServer/);
+  });
+
+  it("FAIL-CLOSED: abweichende moduleId ⇒ wirft", async () => {
+    await expect(
+      discoverModules(
+        { APP_MODULES: "notification" },
+        { load: async () => fixtureModule }, // moduleId = "test-notif"
+      ),
+    ).rejects.toThrow(/abweichende moduleId/);
+  });
+});
+
+describe("assertModuleRoutesUnique", () => {
+  it("wirft bei doppelter method+path über Module", () => {
+    const a: ModuleServer = { ...fixtureModule, moduleId: "a" };
+    const b: ModuleServer = { ...fixtureModule, moduleId: "b" };
+    expect(() => assertModuleRoutesUnique([a, b])).toThrow(/doppelte Route/);
   });
 });
 
