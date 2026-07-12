@@ -143,13 +143,26 @@ echo "deploy-demo-consumer: build + runtime smoke"
   exit 1
 }
 
+# Maschinenlesbares Push-Signal für nachgelagerte Workflow-Schritte (GitLab-Mirror-Push,
+# Codesphere-Redeploy): ohne Push darf downstream nichts passieren.
+emit_pushed() {
+  if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    echo "pushed=$1" >>"$GITHUB_OUTPUT"
+    if [ -n "${2:-}" ]; then
+      echo "pushed_sha=$2" >>"$GITHUB_OUTPUT"
+    fi
+  fi
+}
+
 if [ "$PUSH" != "1" ]; then
   echo "deploy-demo-consumer: PUSH!=1 — Trockenlauf, kein Commit/Push"
+  emit_pushed false
   exit 0
 fi
 
 if [ -z "$(git -C "$TARGET_DIR" status --porcelain)" ]; then
   echo "deploy-demo-consumer: keine Änderungen — nichts zu pushen"
+  emit_pushed false
   exit 0
 fi
 
@@ -164,4 +177,8 @@ git -C "$TARGET_DIR" \
   -c user.email="app-fachverfahren-template-demo-deploy@users.noreply.github.com" \
   commit -q --no-verify -m "chore: sync from app-fachverfahren-template@${TEMPLATE_SHA} (${MODE})"
 git -C "$TARGET_DIR" push --no-verify origin HEAD:main
-echo "deploy-demo-consumer: pushed — Codesphere Continuous Deployment übernimmt den Rest"
+emit_pushed true "$(git -C "$TARGET_DIR" rev-parse HEAD)"
+# Codesphere auf dem vendorportal beobachtet KEINEN Git-Push von selbst (Git-Integration ist
+# GitLab-only, natives CD ungetestet) — den Redeploy stößt der Workflow explizit an:
+# Mirror-Push nach gitlab.opencode.de + redeploy-codesphere-Job (scripts/codesphere-redeploy-demo.sh).
+echo "deploy-demo-consumer: pushed — Mirror-Push + Codesphere-Redeploy übernehmen die Folge-Jobs"
