@@ -35,6 +35,11 @@ jobs:
     # nach jedem Konsumenten-CI mit — und würde, falls dort je DEMO_CONSUMER_DEPLOY_TOKEN
     # gesetzt wird, ein "Enkel"-Scaffold erzeugen.
     if: ${{ github.repository == 'Senticor-ai/app-fachverfahren-template' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') }}
+    outputs:
+      pushed: ${{ steps.deploy-demo.outputs.pushed }}
+      # Soll-Stand des Demo-Konsumenten — auch OHNE neuen Commit gesetzt, damit Reruns einen
+      # früher fehlgeschlagenen Mirror-Push/Redeploy nachholen (beide Schritte sind idempotent).
+      demo_sha: ${{ steps.deploy-demo.outputs.demo_sha }}
 
     services:
       postgres:
@@ -111,6 +116,7 @@ jobs:
           fetch-depth: 0
 
       - name: Deploy demo consumer
+        id: deploy-demo
         if: ${{ steps.demo-config.outputs.enabled == 'true' }}
         env:
           TARGET_DIR: ${{ github.workspace }}/demo-consumer
@@ -121,3 +127,96 @@ jobs:
           APP_PG_DIRECT_URL: postgres://app:app@localhost:5432/app
           APP_PG_URL: postgres://app:app@localhost:5432/app
         run: template/scripts/deploy-demo-consumer.sh
+
+      # Codesphere (vendorportal) kann NUR von gitlab.opencode.de bauen — der Mirror-Push ist
+      # damit Teil der Wahrheit, nicht Kosmetik: ein hängender Mirror hieße, Codesphere baut
+      # für immer stillschweigend alten Code. Deshalb schlägt dieser Schritt bei Push-Fehlern
+      # HART fehl (anders als der redeploy-Job, der einen Codesphere-Schluckauf toleriert).
+      # Gate auf demo_sha (nicht pushed): auch ohne neuen Commit gleicht der idempotente
+      # Push einen früher fehlgeschlagenen/übersprungenen Mirror ab ("Everything up-to-date").
+      - name: Mirror demo consumer to GitLab (Codesphere source of truth)
+        if: ${{ steps.deploy-demo.outputs.demo_sha != '' }}
+        env:
+          DEMO_CONSUMER_GITLAB_TOKEN: ${{ secrets.DEMO_CONSUMER_GITLAB_TOKEN }}
+          DEMO_CONSUMER_GITLAB_MIRROR_URL: ${{ vars.DEMO_CONSUMER_GITLAB_MIRROR_URL }}
+        run: |
+          if [ -z "$DEMO_CONSUMER_GITLAB_TOKEN" ] || [ -z "$DEMO_CONSUMER_GITLAB_MIRROR_URL" ]; then
+            echo "::notice title=GitLab mirror skipped::Set the DEMO_CONSUMER_GITLAB_TOKEN repository secret and the DEMO_CONSUMER_GITLAB_MIRROR_URL repository variable to mirror the demo consumer for Codesphere."
+            exit 0
+          fi
+          case "$DEMO_CONSUMER_GITLAB_MIRROR_URL" in
+            https://*)
+              mirror_url="${DEMO_CONSUMER_GITLAB_MIRROR_URL/https:\/\//https:\/\/oauth2:${DEMO_CONSUMER_GITLAB_TOKEN}@}"
+              ;;
+            *)
+              echo "DEMO_CONSUMER_GITLAB_MIRROR_URL must be an HTTPS GitLab repository URL." >&2
+              exit 1
+              ;;
+          esac
+          git -C demo-consumer push --no-verify "$mirror_url" HEAD:refs/heads/main
+          echo "Mirrored $(git -C demo-consumer rev-parse HEAD) to GitLab."
+
+  redeploy-codesphere:
+    name: Redeploy Codesphere demo workspace
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: deploy
+    # continue-on-error: ein Codesphere-Schluckauf darf einen Lauf, dessen Pushes (GitHub +
+    # GitLab-Mirror) sauber durch sind, nicht rot färben — der Redeploy lässt sich jederzeit
+    # manuell nachholen (scripts/codesphere-redeploy-demo.sh). Abschaltbar per Repo-Variable
+    # DEMO_CONSUMER_CS_REDEPLOY=false (z. B. falls natives Codesphere-CD doch funktioniert).
+    continue-on-error: true
+    # Gate auf demo_sha (nicht pushed): der Redeploy-Skript-No-op-Check erkennt einen bereits
+    # verifizierten Workspace-Stand selbst — Reruns holen so einen früheren Fehlschlag nach.
+    if: ${{ needs.deploy.outputs.demo_sha != '' && vars.DEMO_CONSUMER_CS_REDEPLOY != 'false' }}
+
+    steps:
+      - name: Checkout template (redeploy script)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Check Codesphere configuration
+        id: cs-config
+        env:
+          DEMO_CONSUMER_CS_CONFIG_B64: ${{ secrets.DEMO_CONSUMER_CS_CONFIG_B64 }}
+          DEMO_CONSUMER_CS_WORKSPACE: ${{ vars.DEMO_CONSUMER_CS_WORKSPACE }}
+        run: |
+          if [ -n "$DEMO_CONSUMER_CS_CONFIG_B64" ] && [ -n "$DEMO_CONSUMER_CS_WORKSPACE" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Codesphere redeploy skipped::Set the DEMO_CONSUMER_CS_CONFIG_B64 secret and the DEMO_CONSUMER_CS_WORKSPACE variable to redeploy the demo workspace."
+          fi
+
+      - name: Install cs CLI (pinned)
+        if: ${{ steps.cs-config.outputs.enabled == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CS_GO_VERSION: v1.3.0 # gepinnt — ein ungepinntes "latest" liefe in diesem Job
+          # mit Zugriff auf DEMO_CONSUMER_CS_CONFIG_B64. Bewusst bumpen.
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.local/bin"
+          gh release download "$CS_GO_VERSION" -R codesphere-cloud/cs-go -O "$HOME/.local/bin/cs" -p '*linux_amd64'
+          chmod +x "$HOME/.local/bin/cs"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Redeploy workspace in place
+        if: ${{ steps.cs-config.outputs.enabled == 'true' }}
+        env:
+          DEMO_CONSUMER_CS_CONFIG_B64: ${{ secrets.DEMO_CONSUMER_CS_CONFIG_B64 }}
+          CS_TEAM: ${{ vars.DEMO_CONSUMER_CS_TEAM || '119' }}
+          CS_WORKSPACE: ${{ vars.DEMO_CONSUMER_CS_WORKSPACE }}
+          EXPECTED_SHA: ${{ needs.deploy.outputs.demo_sha }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$DEMO_CONSUMER_CS_CONFIG_B64" | base64 -d > /tmp/codesphere.cfg
+          # shellcheck disable=SC1091
+          . /tmp/codesphere.cfg
+          export CS_TOKEN
+          if ! scripts/codesphere-redeploy-demo.sh; then
+            echo "::warning title=Codesphere redeploy failed::Pushes to GitHub + GitLab mirror succeeded; only the workspace redeploy failed. Re-run manually: CS_WORKSPACE=$CS_WORKSPACE scripts/codesphere-redeploy-demo.sh (see Senticor-ai/infrastructure codesphere-vendorportal/fachverfahren-demo/README.md for recovery)."
+            exit 1
+          fi
