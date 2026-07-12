@@ -1,8 +1,14 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
-import { basename, extname, join } from "node:path";
+import { basename, dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createPgClient } from "./client.js";
+
+// Paketwurzel relativ zu DIESER Datei (src/ ODER dist/, beide liegen eine Ebene über der Wurzel) —
+// NICHT relativ zu process.cwd(). `db:migrate` läuft normalerweise über
+// `pnpm --filter @senticor/app-store-postgres db:migrate`, das cwd auf DIESES Paket setzt, nicht auf
+// die Repo-Wurzel — ein cwd-relativer Default hängt sonst vom Aufrufkontext ab und zeigt ins Leere.
+const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
 export interface MigrationFile {
   id: string;
@@ -52,9 +58,7 @@ export function defaultMigrationOptionsFromEnv(
   const resolved = resolveDatabaseUrl(env);
   return {
     databaseUrl: resolved.url,
-    migrationsDir:
-      env["APP_MIGRATIONS_DIR"] ??
-      join(process.cwd(), "packages/app-store-postgres/migrations"),
+    migrationsDir: env["APP_MIGRATIONS_DIR"] ?? join(packageRoot, "migrations"),
     migrationTable: env["APP_MIGRATION_TABLE"] ?? "app_schema_migrations",
     advisoryLockId: BigInt(env["APP_MIGRATION_LOCK_ID"] ?? "5311101"),
   };

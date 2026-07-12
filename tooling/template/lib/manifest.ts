@@ -39,6 +39,7 @@ export const defaultOwnership: TemplateOwnership = {
     "CODE_OF_CONDUCT.md": "replace",
     "ADOPTERS.md": "consumer",
     ".gitlab-ci.yml": "replace",
+    "ci.yml": "replace",
     ".gitlab/CODEOWNERS": "consumer",
     ".gitlab/issue_templates/**": "replace",
     ".gitlab/merge_request_templates/**": "replace",
