@@ -1,0 +1,16 @@
+{
+  // Typecheck-Naht (noEmit) fuer die ModuleHost-Domaenen-BACKENDS unter modules/_backends/ (framework-agnostische
+  // ModuleServer). Der Haupt-`tsc -b` erfasst modules/ NICHT (nur tsconfig.storybook deckt modules/**/ui ab), sodass
+  // diese Server-Module bisher nur zur vitest-Laufzeit (esbuild, ohne Typecheck) geprueft wurden. Dieser Lauf schliesst
+  // die Luecke; er laeuft im Gate NACH `tsc -b` (das @senticor/*-Pakete baut → dist-Typen aufloesbar via node_modules).
+  "extends": "./tsconfig.strict.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": true,
+    "types": ["node"],
+    "baseUrl": "."
+  },
+  "include": ["modules/_backends/**/*.ts"]
+}

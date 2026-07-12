@@ -398,3 +398,100 @@ describe("buildModulePorts — fail-closed", () => {
     expect((await fremd.notification.list({})).length).toBe(0);
   });
 });
+
+describe("discoverModules + mountModule — das ECHTE notification-Modul e2e (1b-ii)", () => {
+  // Lädt die MODUL-QUELLE per DYNAMISCHEM import (exakt wie defaultModuleLoad; ein `import(...)` — KEIN `from`-Import —
+  // triggert die module-boundaries-Regex NICHT). Der einzige Unterschied zur PROD-Laufzeit: dort lädt der Default-Loader
+  // das GEBAUTE dist-domain-servers/<id>/…; hier die .ts-Quelle (identischer Code, via vitest transpiliert).
+  const ladeEchtesModul = async (id: string): Promise<unknown> => {
+    const url = new URL(
+      `../../../modules/_backends/${id}/server/index.ts`,
+      import.meta.url,
+    ).href;
+    const mod = (await import(/* @vite-ignore */ url)) as {
+      server?: unknown;
+      default?: unknown;
+    };
+    return mod.server ?? mod.default;
+  };
+
+  async function baueEchtModulApp(
+    store: InMemoryNotificationStore,
+    session: CaseworkerSession | undefined,
+  ): Promise<FastifyInstance> {
+    const modules = await discoverModules(
+      { APP_MODULES: "notification" },
+      { load: ladeEchtesModul },
+    );
+    expect(modules.map((m) => m.moduleId)).toEqual(["notification"]);
+    const app = fastify({ logger: false });
+    const deps: ModuleHostDeps = {
+      resolveSession: () => session,
+      notificationStore: store,
+    };
+    for (const m of modules) mountModule(app, m, deps);
+    await app.ready();
+    return app;
+  }
+
+  it("serviert GET /api/notifications mandanten-scoped über den vor-gescopten Port", async () => {
+    const store = new InMemoryNotificationStore();
+    await store.insertNotification(macheNotification({ notificationId: "n1" }));
+    await store.insertNotification(
+      macheNotification({ notificationId: "n2", tenantId: "fremd" }),
+    );
+    const app = await baueEchtModulApp(store, macheSession());
+    try {
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/notifications",
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as {
+        notifications: { notificationId: string }[];
+      };
+      // NUR der eigene Mandant (der Port ist an die Session gebunden — kein fremder Mandant erreichbar).
+      expect(body.notifications.map((n) => n.notificationId)).toEqual(["n1"]);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("403 ohne inbox.read — das Host-RBAC greift auch für das echte Modul", async () => {
+    const app = await baueEchtModulApp(
+      new InMemoryNotificationStore(),
+      macheSession({ permissions: [] }),
+    );
+    try {
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/notifications",
+      });
+      expect(res.statusCode).toBe(403);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("POST /api/notifications/:id/read markiert gelesen → 204", async () => {
+    const store = new InMemoryNotificationStore();
+    await store.insertNotification(
+      macheNotification({ notificationId: "n1", read: false }),
+    );
+    const app = await baueEchtModulApp(store, macheSession());
+    try {
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/notifications/n1/read",
+      });
+      expect(res.statusCode).toBe(204);
+      const ungelesen = await store.listNotifications({
+        tenantId: "t1",
+        unreadOnly: true,
+      });
+      expect(ungelesen.map((n) => n.notificationId)).not.toContain("n1");
+    } finally {
+      await app.close();
+    }
+  });
+});
