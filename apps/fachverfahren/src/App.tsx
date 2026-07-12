@@ -16,13 +16,94 @@ import {
   AntragStepper,
   Arbeitsvorrat,
   AufsichtDashboard,
+  BoardList,
+  Button,
   FachverfahrenShell,
+  KanbanBoard,
   ReviewWorkspace,
   formatBetragStatus,
   type Persona,
   type ShellNavItem,
 } from "@senticor/fachverfahren-kit";
 import { store } from "./store.js";
+import { createBoardClient } from "./board-client.js";
+import { LoginPage } from "./LoginPage.js";
+import { useSession } from "./session.js";
+
+const boardPort = createBoardClient();
+
+/** Guards `/boards*`: redirects to `/login` until a session exists (kanban plan Gate P0-A). */
+function RequireSession({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.JSX.Element | null {
+  const { status } = useSession();
+  if (status === "loading") return null;
+  if (status === "unauthenticated") return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+/** Minimal shell for the workspace/boards area — deliberately outside the 3-persona FachverfahrenShell,
+ *  since Kanban boards are cross-cutting platform tooling, not tied to a Leistung's personas. */
+function BoardsShell({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.JSX.Element {
+  const { logout, principal } = useSession();
+  const navigate = useNavigate();
+  return (
+    <div className="flex min-h-screen flex-col">
+      <header className="flex items-center justify-between border-b border-border px-4 py-2">
+        <button
+          type="button"
+          className="text-sm font-semibold text-foreground"
+          onClick={() => navigate("/boards")}
+        >
+          Boards
+        </button>
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          {principal?.email}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => void logout()}
+          >
+            Abmelden
+          </Button>
+        </div>
+      </header>
+      <div className="min-h-0 flex-1">{children}</div>
+    </div>
+  );
+}
+
+function BoardsList(): React.JSX.Element {
+  const navigate = useNavigate();
+  return (
+    <RequireSession>
+      <BoardsShell>
+        <BoardList
+          port={boardPort}
+          onOpen={(id) => navigate(`/boards/${id}`)}
+        />
+      </BoardsShell>
+    </RequireSession>
+  );
+}
+
+function BoardDetail(): React.JSX.Element {
+  const { boardId = "" } = useParams();
+  return (
+    <RequireSession>
+      <BoardsShell>
+        <KanbanBoard boardId={boardId} port={boardPort} />
+      </BoardsShell>
+    </RequireSession>
+  );
+}
 
 // ── Reaktivität: die Bausteine lesen `port.list()` synchron. Über diesen Hook re-rendert der Routen-Baum,
 //    sobald sich der Store ändert (neuer Antrag, Status-Übergang) — der Store bleibt die EINE Quelle. ──
@@ -221,6 +302,9 @@ export function App(): React.JSX.Element {
       <Route path="/amt" element={<AmtEingang />} />
       <Route path="/amt/vorgang/:id" element={<AmtVorgang />} />
       <Route path="/aufsicht" element={<Aufsicht />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/boards" element={<BoardsList />} />
+      <Route path="/boards/:boardId" element={<BoardDetail />} />
       <Route path="*" element={<Navigate to="/buerger" replace />} />
     </Routes>
   );

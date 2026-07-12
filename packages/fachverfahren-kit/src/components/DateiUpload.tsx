@@ -56,10 +56,7 @@ import { useStatusRegion } from "./StatusRegion.js";
  * - `rejected` — serverseitig abgelehnt; `grund` (Format/Größe/Virus/…) als Klartext für Anzeige + Ansage.
  */
 export type NachweisUploadPhase =
-  | "idle"
-  | "uploading"
-  | "scanning"
-  | "rejected";
+  "idle" | "uploading" | "scanning" | "rejected";
 
 // Die Ablehnungs-Kategorie `NachweisAblehnungsGrund` ist kanonisch in `../lib/nachweis-pruefung.js` definiert
 // (EINE Wahrheit für die server-autoritative Statusanzeige HIER und die reine Fail-Fast-Vorprüfung dort) und wird
@@ -485,6 +482,7 @@ function NachweisZeile({
         type="file"
         className="sr-only"
         accept={accept}
+        aria-label={`Datei auswählen: ${nachweis.label}`}
         aria-describedby={cn(
           anforderungId,
           einschraenkungenText ? einschraenkungId : undefined,

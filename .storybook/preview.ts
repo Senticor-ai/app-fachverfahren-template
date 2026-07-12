@@ -67,7 +67,9 @@ const preview: Preview = {
       ],
     },
     a11y: {
-      test: "todo",
+      // "error": Axe-Verstöße lassen Story-Tests fehlschlagen (test:storybook + Test-Widget).
+      // Bewusste Ausnahmen einzelner Stories per parameters.a11y.test = "todo" — sparsam, mit Begründung.
+      test: "error",
     },
   },
   tags: ["autodocs"],

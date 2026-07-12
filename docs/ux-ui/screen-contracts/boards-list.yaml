@@ -1,0 +1,57 @@
+id: boards-list
+route: /boards
+owner: packages/fachverfahren-kit (BoardList)
+persona: caseworker
+inputs:
+  - runtimeConfig
+  - activeSession
+outputs:
+  - board.opened
+  - board.created
+states:
+  - loading
+  - empty
+  - error
+  - ready
+ia:
+  pattern: dashboard-drilldown
+  navigation:
+    - role-gated navigation is visible before screen actions
+  profile:
+    - profile and settings remain reachable from the persistent shell
+  scroll:
+    - screen uses independent content scroll, not body scroll for work panels
+content:
+  language:
+    - German UI text fits the caseworker persona
+  architectureTerms:
+    - no basis-service, port or adapter wording in primary user navigation
+hcai:
+  mode: none
+  controls: []
+a11y:
+  landmarks:
+    - main
+  labels:
+    - all controls have visible labels
+  keyboard:
+    - Tab reaches every interactive element
+    - Enter or Space activates a focused board card
+  focusOrder:
+    - page heading
+    - '"Neues Board" primary action'
+    - board card grid
+  zoom:
+    - 400 percent zoom reflows without function loss
+  statusSemantics:
+    - status uses text or icon plus color
+tests:
+  unit:
+    - renders only boards owned by the active actor
+  integration:
+    - handles a failed board list fetch with a recovery action
+  storybook:
+    - default
+    - loading
+    - empty
+    - error

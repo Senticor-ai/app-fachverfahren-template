@@ -181,7 +181,7 @@ export function KiAssistPanel({
 
       {/* Wert: der eigentliche Vorschlag */}
       <div className="mt-3">
-        <span className="block text-xs font-bold uppercase tracking-wide text-muted-foreground/80">
+        <span className="block text-xs font-bold uppercase tracking-wide text-muted-foreground">
           Vorschlag
         </span>
         <div className="mt-0.5 text-sm font-medium text-foreground">
@@ -192,7 +192,7 @@ export function KiAssistPanel({
       {/* Source + Confidence */}
       <dl className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <dt className="text-xs font-bold uppercase tracking-wide text-muted-foreground/80">
+          <dt className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
             Quelle
           </dt>
           <dd className="mt-0.5 text-xs text-foreground">{vorschlag.quelle}</dd>
@@ -200,7 +200,7 @@ export function KiAssistPanel({
         <div>
           <dt
             id={konfidenzLabelId}
-            className="text-xs font-bold uppercase tracking-wide text-muted-foreground/80"
+            className="text-xs font-bold uppercase tracking-wide text-muted-foreground"
           >
             Konfidenz
           </dt>
@@ -215,7 +215,7 @@ export function KiAssistPanel({
 
       {/* Why: Begründung je Vorschlag */}
       <div className="mt-3">
-        <span className="block text-xs font-bold uppercase tracking-wide text-muted-foreground/80">
+        <span className="block text-xs font-bold uppercase tracking-wide text-muted-foreground">
           Begründung
         </span>
         <p

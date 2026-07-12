@@ -3,11 +3,20 @@ import { constants } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
+import fastifyCookie from "@fastify/cookie";
+import {
+  createAuthStoreFromEnv,
+  createKanbanStoreFromEnv,
+  type AuthStore,
+  type KanbanStore,
+} from "@senticor/app-store-postgres";
 import fastify, {
   type FastifyInstance,
   type FastifyReply,
   type FastifyRequest,
 } from "fastify";
+import { registerAuthRoutes } from "./auth/routes.js";
+import { registerBoardRoutes } from "./kanban/routes.js";
 
 const NO_STORE = "no-store";
 const IMMUTABLE = "public, max-age=31536000, immutable";
@@ -185,10 +194,16 @@ export function buildPublicServer({
   config = readRuntimeConfig(),
   state = createRuntimeState(),
   metrics = new RuntimeMetrics(),
+  authStore = createAuthStoreFromEnv(),
+  kanbanStore = createKanbanStoreFromEnv(),
+  bootstrapToken = process.env["BOOTSTRAP_TOKEN"],
 }: {
   config?: RuntimeConfig;
   state?: RuntimeState;
   metrics?: RuntimeMetrics;
+  authStore?: AuthStore;
+  kanbanStore?: KanbanStore;
+  bootstrapToken?: string | undefined;
 } = {}): FastifyInstance {
   const app = fastify({
     logger: false,
@@ -198,6 +213,9 @@ export function buildPublicServer({
   });
   app.server.headersTimeout = DEFAULT_HEADER_TIMEOUT_MS;
   registerPublicHooks(app, config, metrics);
+  app.register(fastifyCookie);
+  registerAuthRoutes(app, { authStore, kanbanStore, bootstrapToken });
+  registerBoardRoutes(app, { authStore, kanbanStore });
   app.get("/livez", async (_request, reply) => {
     return reply.header("Cache-Control", NO_STORE).send({ status: "ok" });
   });

@@ -1,0 +1,192 @@
+// LoginPage — zeigt je nach `/auth/status` entweder das Einmal-Setup (Bootstrap, token-gated) oder
+// den normalen Login. Kein Fachliches: nur die App-Komposition der Kit-Primitive.
+import * as React from "react";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Input,
+} from "@senticor/fachverfahren-kit";
+import { useSession } from "./session.js";
+
+export function LoginPage(): React.ReactElement {
+  const { bootstrapped, refresh } = useSession();
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-secondary/20 px-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle>
+            {bootstrapped ? "Anmelden" : "Workspace einrichten"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {bootstrapped ? (
+            <LoginForm onSuccess={refresh} />
+          ) : (
+            <BootstrapForm onSuccess={refresh} />
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function LoginForm({
+  onSuccess,
+}: {
+  onSuccess: () => Promise<void>;
+}): React.ReactElement {
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [error, setError] = React.useState<string | null>(null);
+  const [submitting, setSubmitting] = React.useState(false);
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      const response = await fetch("/auth/login", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!response.ok) {
+        setError(
+          response.status === 423
+            ? "Konto vorübergehend gesperrt. Bitte später erneut versuchen."
+            : "E-Mail-Adresse oder Passwort ist falsch.",
+        );
+        return;
+      }
+      await onSuccess();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <label className="block space-y-1.5">
+        <span className="text-sm font-medium">E-Mail</span>
+        <Input
+          type="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          required
+          autoFocus
+        />
+      </label>
+      <label className="block space-y-1.5">
+        <span className="text-sm font-medium">Passwort</span>
+        <Input
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          required
+        />
+      </label>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      <Button type="submit" className="w-full" disabled={submitting}>
+        Anmelden
+      </Button>
+    </form>
+  );
+}
+
+function BootstrapForm({
+  onSuccess,
+}: {
+  onSuccess: () => Promise<void>;
+}): React.ReactElement {
+  const [token, setToken] = React.useState("");
+  const [email, setEmail] = React.useState("");
+  const [displayName, setDisplayName] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [error, setError] = React.useState<string | null>(null);
+  const [submitting, setSubmitting] = React.useState(false);
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      const response = await fetch("/auth/bootstrap", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token, email, password, displayName }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        setError(body.error ?? "Einrichtung fehlgeschlagen.");
+        return;
+      }
+      await onSuccess();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Erstes Setup: das vom Betreiber ausgegebene Einrichtungs-Token eingeben,
+        um den ersten Administrationszugang anzulegen.
+      </p>
+      <label className="block space-y-1.5">
+        <span className="text-sm font-medium">Einrichtungs-Token</span>
+        <Input
+          value={token}
+          onChange={(event) => setToken(event.target.value)}
+          required
+          autoFocus
+        />
+      </label>
+      <label className="block space-y-1.5">
+        <span className="text-sm font-medium">Name</span>
+        <Input
+          value={displayName}
+          onChange={(event) => setDisplayName(event.target.value)}
+          required
+        />
+      </label>
+      <label className="block space-y-1.5">
+        <span className="text-sm font-medium">E-Mail</span>
+        <Input
+          type="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          required
+        />
+      </label>
+      <label className="block space-y-1.5">
+        <span className="text-sm font-medium">Passwort (mind. 12 Zeichen)</span>
+        <Input
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          minLength={12}
+          required
+        />
+      </label>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      <Button type="submit" className="w-full" disabled={submitting}>
+        Workspace einrichten
+      </Button>
+    </form>
+  );
+}

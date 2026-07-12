@@ -13,10 +13,7 @@ import { formatDateiGroesse } from "../format.js";
  *  definiert, damit die reine Vorprüfung UND die server-autoritative Statusanzeige (DateiUpload) dieselbe
  *  Kategorien-Wahrheit teilen. */
 export type NachweisAblehnungsGrund =
-  | "format"
-  | "groesse"
-  | "virus"
-  | "sonstiges";
+  "format" | "groesse" | "virus" | "sonstiges";
 
 /** Die Metadaten einer zu prüfenden Datei — nur was die reine Prüfung braucht (kein DOM-`File`). Der MIME-`typ`
  *  ist optional, weil manche Browser ihn leer lassen; dann greift die Endungs-Prüfung. */
