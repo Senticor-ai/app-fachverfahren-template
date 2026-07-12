@@ -314,6 +314,49 @@ for (const impl of impls) {
       expect(feed).toHaveLength(1);
       expect(feed[0]?.activityType).toBe("task.assigned");
       expect(feed[0]?.payload).toEqual({ to: "sb.b" });
+      // authority_id ist optional/nullable — ohne Angabe null (Symmetrie zu Kommentaren; Lehre #24: InMemory==PG).
+      expect(feed[0]?.authorityId ?? null).toBeNull();
+    });
+
+    it("insertCommentWithActivity schreibt Vermerk + Aktivität ATOMAR (beide lesbar, authority_id gesetzt)", async () => {
+      const task = macheTask();
+      await store.insertTask(task);
+      const commentId = `c-${uid()}`;
+      const res = await store.insertCommentWithActivity({
+        comment: {
+          commentId,
+          taskId: task.taskId,
+          tenantId: "t1",
+          authorityId: "b1",
+          authorActorId: "sb.a",
+          body: "Atomarer Vermerk",
+          createdAt: "2026-06-02T12:00:00.000Z",
+        },
+        activity: {
+          activityId: `a-${uid()}`,
+          taskId: task.taskId,
+          tenantId: "t1",
+          authorityId: "b1",
+          actorId: "sb.a",
+          activityType: "task.commented",
+          payload: { commentId },
+          occurredAt: "2026-06-02T12:00:00.000Z",
+        },
+      });
+      expect(res.comment.commentId).toBe(commentId);
+      // BEIDE sind persistiert.
+      const comments = await store.listTaskComments({
+        tenantId: "t1",
+        taskId: task.taskId,
+      });
+      expect(comments.map((c) => c.body)).toContain("Atomarer Vermerk");
+      const feed = await store.listTaskActivity({
+        tenantId: "t1",
+        taskId: task.taskId,
+      });
+      const commented = feed.find((a) => a.activityType === "task.commented");
+      expect(commented?.payload).toEqual({ commentId });
+      expect(commented?.authorityId).toBe("b1"); // Behörde mitgeführt
     });
 
     // Tie-Stabilität: bei GLEICHEM Zeitstempel MUSS die id-Sekundärsortierung greifen — sonst

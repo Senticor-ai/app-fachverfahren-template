@@ -128,6 +128,23 @@ describe("postgres migration runner", () => {
     expect(sql).toContain("('wiki.read',");
     expect(sql).toContain("('caseworker', 'wiki.read')");
     expect(sql).toContain("('caseworker', 'wiki.write')");
+
+    // Collab-Härtung (Phase 0): app_task_activity += authority_id (Symmetrie zu app_task_comments) mit Backfill.
+    expect(sql).toContain(
+      "ALTER TABLE app_task_activity ADD COLUMN IF NOT EXISTS authority_id",
+    );
+    expect(sql).toContain("UPDATE app_task_activity a");
+    // append-only-Riegel auf BEIDEN Collab-Tabellen (Spiegel des Audit-Riegels).
+    expect(sql).toContain(
+      "REVOKE UPDATE, DELETE, TRUNCATE ON app_task_comments",
+    );
+    expect(sql).toContain(
+      "REVOKE UPDATE, DELETE, TRUNCATE ON app_task_activity",
+    );
+    expect(sql).toContain("CREATE TRIGGER app_task_comments_no_mutation");
+    expect(sql).toContain("CREATE TRIGGER app_task_activity_no_mutation");
+    expect(sql).toContain("CREATE TRIGGER app_task_comments_no_truncate");
+    expect(sql).toContain("CREATE TRIGGER app_task_activity_no_truncate");
   });
 
   it("keeps preference and mailbox semantics testable without a database", async () => {

@@ -104,6 +104,9 @@ export interface AppTaskActivity {
   activityId: string;
   taskId: string;
   tenantId: string;
+  /** Behörde der Aufgabe (Phase-0-Härtung: Symmetrie zu AppTaskComment). Optional/`null` für Altbestand ohne
+   *  Rückschluss auf den Task; neue Schreibvorgänge setzen sie aus der Server-Session. */
+  authorityId?: string | null;
   actorId: string;
   activityType: string;
   payload: Record<string, unknown>;
@@ -211,6 +214,12 @@ export interface TaskStore {
   }): Promise<AppTaskComment[]>;
   /** Append-only: protokolliert eine Aktivität. */
   insertTaskActivity(activity: AppTaskActivity): Promise<AppTaskActivity>;
+  /** ATOMAR (append-only): ein Vermerk + die zugehörige „task.commented"-Aktivität in EINER Transaktion — kein
+   *  Vermerk ohne sein Aktivitätsprotokoll und umgekehrt (die getrennten Einzel-Inserts waren nicht atomar). */
+  insertCommentWithActivity(input: {
+    comment: AppTaskComment;
+    activity: AppTaskActivity;
+  }): Promise<{ comment: AppTaskComment; activity: AppTaskActivity }>;
   listTaskActivity(query: {
     tenantId: string;
     taskId: string;
@@ -534,8 +543,27 @@ export class InMemoryTaskStore implements TaskStore {
   async insertTaskActivity(
     activity: AppTaskActivity,
   ): Promise<AppTaskActivity> {
-    this.activity.push({ ...activity, payload: { ...activity.payload } });
+    // authorityId auf null normalisieren (fehlend↔null), damit InMemory und PG identisch zurückliefern (Lehre #24).
+    this.activity.push({
+      ...activity,
+      authorityId: activity.authorityId ?? null,
+      payload: { ...activity.payload },
+    });
     return { ...activity };
+  }
+
+  async insertCommentWithActivity(input: {
+    comment: AppTaskComment;
+    activity: AppTaskActivity;
+  }): Promise<{ comment: AppTaskComment; activity: AppTaskActivity }> {
+    // In-Memory ist ohnehin synchron-atomar; dieselbe Signatur wie PG (kein Vermerk ohne sein Protokoll).
+    this.comments.push({ ...input.comment });
+    this.activity.push({
+      ...input.activity,
+      authorityId: input.activity.authorityId ?? null,
+      payload: { ...input.activity.payload },
+    });
+    return { comment: { ...input.comment }, activity: { ...input.activity } };
   }
 
   async listTaskActivity(query: {
@@ -961,16 +989,42 @@ export class PostgresTaskStore implements TaskStore {
     activity: AppTaskActivity,
   ): Promise<AppTaskActivity> {
     return this.withClient(async (c) => {
-      await c.query(ACTIVITY_INSERT_SQL, [
-        activity.activityId,
-        activity.taskId,
-        activity.tenantId,
-        activity.actorId,
-        activity.activityType,
-        JSON.stringify(activity.payload),
-        activity.occurredAt,
-      ]);
+      await c.query(ACTIVITY_INSERT_SQL, activityInsertParams(activity));
       return { ...activity };
+    });
+  }
+
+  async insertCommentWithActivity(input: {
+    comment: AppTaskComment;
+    activity: AppTaskActivity;
+  }): Promise<{ comment: AppTaskComment; activity: AppTaskActivity }> {
+    return this.withClient(async (c) => {
+      try {
+        // ATOMAR: Vermerk + zugehörige Aktivität teilen EINE Transaktion — kein Vermerk ohne sein Protokoll (und
+        // umgekehrt). Schlägt der zweite Insert fehl, rollt der erste mit zurück (Muster wie case-store transitionCase).
+        await c.query("BEGIN");
+        await c.query(COMMENT_INSERT_SQL, [
+          input.comment.commentId,
+          input.comment.taskId,
+          input.comment.tenantId,
+          input.comment.authorityId,
+          input.comment.authorActorId,
+          input.comment.body,
+          input.comment.createdAt,
+        ]);
+        await c.query(
+          ACTIVITY_INSERT_SQL,
+          activityInsertParams(input.activity),
+        );
+        await c.query("COMMIT");
+        return {
+          comment: { ...input.comment },
+          activity: { ...input.activity },
+        };
+      } catch (e) {
+        await c.query("ROLLBACK").catch(() => {});
+        throw e;
+      }
     });
   }
 
@@ -1283,15 +1337,30 @@ function commentFromRow(r: CommentRow): AppTaskComment {
 }
 
 // ── Aktivität (append-only) ──
-const ACTIVITY_COLS = `activity_id, task_id, tenant_id, actor_id, activity_type, payload, occurred_at`;
+const ACTIVITY_COLS = `activity_id, task_id, tenant_id, authority_id, actor_id, activity_type, payload, occurred_at`;
 const ACTIVITY_SELECT = `SELECT ${ACTIVITY_COLS} FROM app_task_activity`;
 const ACTIVITY_INSERT_SQL = `INSERT INTO app_task_activity (${ACTIVITY_COLS})
-  VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7)`;
+  VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8)`;
+
+/** EINE Wahrheit der Aktivitäts-Insert-Parameter (für insertTaskActivity UND insertCommentWithActivity). */
+function activityInsertParams(a: AppTaskActivity): unknown[] {
+  return [
+    a.activityId,
+    a.taskId,
+    a.tenantId,
+    a.authorityId ?? null,
+    a.actorId,
+    a.activityType,
+    JSON.stringify(a.payload),
+    a.occurredAt,
+  ];
+}
 
 interface ActivityRow extends Record<string, unknown> {
   activity_id: string;
   task_id: string;
   tenant_id: string;
+  authority_id: string | null;
   actor_id: string;
   activity_type: string;
   payload: unknown;
@@ -1303,6 +1372,7 @@ function activityFromRow(r: ActivityRow): AppTaskActivity {
     activityId: r.activity_id,
     taskId: r.task_id,
     tenantId: r.tenant_id,
+    authorityId: r.authority_id,
     actorId: r.actor_id,
     activityType: r.activity_type,
     payload:

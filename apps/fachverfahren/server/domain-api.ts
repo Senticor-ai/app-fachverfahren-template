@@ -870,6 +870,7 @@ export function registerDomainApi(
             activityId: `activity.${newId()}`,
             taskId: request.params.id,
             tenantId: session.tenantId,
+            authorityId: session.authorityId,
             actorId: session.actorId,
             activityType,
             payload,
@@ -1218,23 +1219,29 @@ export function registerDomainApi(
           .header("Cache-Control", NO_STORE)
           .send({ error: "not-found" });
       const ts = now();
-      const comment = await taskStore.insertTaskComment({
-        commentId: `comment.${newId()}`,
-        taskId: request.params.id,
-        tenantId: session.tenantId,
-        authorityId: session.authorityId,
-        authorActorId: session.actorId,
-        body: request.body.body,
-        createdAt: ts,
-      });
-      await taskStore.insertTaskActivity({
-        activityId: `activity.${newId()}`,
-        taskId: request.params.id,
-        tenantId: session.tenantId,
-        actorId: session.actorId,
-        activityType: "task.commented",
-        payload: { commentId: comment.commentId },
-        occurredAt: ts,
+      const commentId = `comment.${newId()}`;
+      // ATOMAR: Vermerk + „task.commented"-Aktivität in EINER Transaktion — kein Vermerk ohne sein Protokoll (die
+      // beiden getrennten Inserts waren nicht atomar: ein Crash dazwischen hinterließe einen Zustand ohne das andere).
+      const { comment } = await taskStore.insertCommentWithActivity({
+        comment: {
+          commentId,
+          taskId: request.params.id,
+          tenantId: session.tenantId,
+          authorityId: session.authorityId,
+          authorActorId: session.actorId,
+          body: request.body.body,
+          createdAt: ts,
+        },
+        activity: {
+          activityId: `activity.${newId()}`,
+          taskId: request.params.id,
+          tenantId: session.tenantId,
+          authorityId: session.authorityId,
+          actorId: session.actorId,
+          activityType: "task.commented",
+          payload: { commentId },
+          occurredAt: ts,
+        },
       });
       return reply
         .code(201)
@@ -1604,6 +1611,7 @@ export function registerDomainApi(
           activityId: `activity.${newId()}`,
           taskId: request.params.id,
           tenantId: session.tenantId,
+          authorityId: session.authorityId,
           actorId: session.actorId,
           activityType: "task.ki-uebernommen",
           payload: {
