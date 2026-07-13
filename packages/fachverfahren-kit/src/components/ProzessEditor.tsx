@@ -230,7 +230,7 @@ export function ProzessEditor({
                 <Label htmlFor={`${uid}-${k.id}-typ`}>Typ ({k.id})</Label>
                 <select
                   id={`${uid}-${k.id}-typ`}
-                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                   value={k.typ}
                   disabled={nurLesen}
                   onChange={(e) =>
@@ -280,7 +280,7 @@ export function ProzessEditor({
                     <input
                       id={`${uid}-${k.id}-va`}
                       type="checkbox"
-                      className="size-4 rounded border-input"
+                      className="size-4 rounded border-input outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                       checked={Boolean(k.vierAugen)}
                       disabled={nurLesen}
                       onChange={(e) =>
@@ -338,7 +338,7 @@ export function ProzessEditor({
                 <Label htmlFor={`${uid}-${e.id}-von`}>Von ({e.id})</Label>
                 <select
                   id={`${uid}-${e.id}-von`}
-                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                   value={e.von}
                   disabled={nurLesen}
                   onChange={(ev) => setzeKante(e.id, { von: ev.target.value })}
@@ -354,7 +354,7 @@ export function ProzessEditor({
                 <Label htmlFor={`${uid}-${e.id}-nach`}>Nach</Label>
                 <select
                   id={`${uid}-${e.id}-nach`}
-                  className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                   value={e.nach}
                   disabled={nurLesen}
                   onChange={(ev) => setzeKante(e.id, { nach: ev.target.value })}
@@ -371,7 +371,7 @@ export function ProzessEditor({
                   <input
                     id={`${uid}-${e.id}-default`}
                     type="checkbox"
-                    className="size-4 rounded border-input"
+                    className="size-4 rounded border-input outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                     checked={Boolean(e.default)}
                     disabled={nurLesen}
                     onChange={(ev) =>
