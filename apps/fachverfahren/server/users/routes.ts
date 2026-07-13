@@ -8,11 +8,7 @@ import type {
 } from "@senticor/app-store-postgres";
 import { hashPassword } from "@senticor/provider-local-auth";
 import type { FastifyInstance } from "fastify";
-import {
-  DEFAULT_AUTHORITY_ID,
-  DEFAULT_JURISDICTION_ID,
-  MINIMUM_PASSWORD_LENGTH,
-} from "../auth/bootstrap.js";
+import { MINIMUM_PASSWORD_LENGTH } from "../auth/bootstrap.js";
 import "../auth/principal.js";
 import { createRequirePrincipal } from "../auth/require-principal.js";
 import { seedPersonalStarterBoard } from "../auth/starter-board.js";
@@ -155,8 +151,10 @@ export function registerUserRoutes(
         user = await deps.authStore.createUser({
           actorId,
           tenantId: principal.tenantId,
-          authorityId: DEFAULT_AUTHORITY_ID,
-          jurisdictionId: DEFAULT_JURISDICTION_ID,
+          // Kontext der handelnden Session vererben: ein Admin einer Nicht-Default-
+          // Behörde legt Konten SEINER Behörde an (Codex-Review PR #27, Runde 5).
+          authorityId: principal.authorityId,
+          jurisdictionId: principal.jurisdictionId,
           email,
           displayName,
           status: "active",
@@ -201,8 +199,8 @@ export function registerUserRoutes(
           deps.kanbanStore,
           {
             tenantId: principal.tenantId,
-            authorityId: DEFAULT_AUTHORITY_ID,
-            jurisdictionId: DEFAULT_JURISDICTION_ID,
+            authorityId: principal.authorityId,
+            jurisdictionId: principal.jurisdictionId,
             ownerActorId: actorId,
             contentLocale: "de",
             now: nowValue,

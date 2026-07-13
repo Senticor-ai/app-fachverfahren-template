@@ -370,6 +370,14 @@ export function registerBoardRoutes(
           boardId: loaded.board.boardId,
           expectedVersion,
         });
+        // Restore öffnet ein eingefrorenes (Team-)Board wieder für alle Mitglieder —
+        // genauso sicherheitsrelevant wie das Archivieren (Codex-Review PR #27, Runde 5).
+        await audit(
+          "BOARD_RESTORED",
+          loaded.principal.tenantId,
+          loaded.principal.actorId,
+          { boardId: restored.boardId },
+        );
         await reply.header("etag", etagFor(restored.version)).send(restored);
       });
     },

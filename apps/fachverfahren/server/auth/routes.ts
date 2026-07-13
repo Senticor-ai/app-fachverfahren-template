@@ -67,15 +67,19 @@ export function registerAuthRoutes(
   // Audit-Schreiben darf einen Login nie verhindern: das Event ist Pflicht der
   // Baseline, aber ein kaputter Audit-Store soll den Auth-Pfad nicht mitreißen —
   // der Fehler wird geloggt (Fastify-Logger), die Anfrage läuft weiter.
+  // tenantId explizit: Login/Bootstrap sind an den Default-Tenant der Route gebunden,
+  // principal-basierte Aktionen (Passwortwechsel) gehören in den Tenant der Session
+  // (Codex-Review PR #27, Runde 5).
   async function audit(
     eventType: AuditEventType,
+    tenantId: string,
     actorId: string | null,
     metadata: Record<string, unknown> = {},
   ): Promise<void> {
     try {
       await deps.auditStore.appendEvent({
         id: generateId("audit"),
-        tenantId: DEFAULT_TENANT_ID,
+        tenantId,
         actorId,
         eventType,
         occurredAt: now().toISOString(),
@@ -137,7 +141,7 @@ export function registerAuthRoutes(
               },
             ),
         );
-        await audit("USER_CREATED", result.user.actorId, {
+        await audit("USER_CREATED", result.user.tenantId, result.user.actorId, {
           email: result.user.email,
           role: result.user.role,
           via: "bootstrap",
@@ -171,7 +175,7 @@ export function registerAuthRoutes(
         email: body.email,
       });
       if (!user || user.status !== "active") {
-        await audit("LOGIN_FAILED", user?.actorId ?? null, {
+        await audit("LOGIN_FAILED", DEFAULT_TENANT_ID, user?.actorId ?? null, {
           reason: user ? "account-disabled" : "unknown-account",
         });
         return reply.code(401).send({ error: "invalid credentials" });
@@ -179,7 +183,7 @@ export function registerAuthRoutes(
 
       const credential = await deps.authStore.getLocalCredential(user.actorId);
       if (!credential) {
-        await audit("LOGIN_FAILED", user.actorId, {
+        await audit("LOGIN_FAILED", user.tenantId, user.actorId, {
           reason: "missing-credential",
         });
         return reply.code(401).send({ error: "invalid credentials" });
@@ -193,7 +197,7 @@ export function registerAuthRoutes(
         now: nowValue,
       });
       if (!gate.allowed) {
-        await audit("LOGIN_LOCKED", user.actorId, {});
+        await audit("LOGIN_LOCKED", user.tenantId, user.actorId, {});
         return reply.code(423).send({ error: "account temporarily locked" });
       }
 
@@ -209,11 +213,11 @@ export function registerAuthRoutes(
             user.actorId,
             lockedUntil.toISOString(),
           );
-          await audit("LOGIN_LOCKED", user.actorId, {
+          await audit("LOGIN_LOCKED", user.tenantId, user.actorId, {
             failedAttempts: updated.failedAttempts,
           });
         } else {
-          await audit("LOGIN_FAILED", user.actorId, {
+          await audit("LOGIN_FAILED", user.tenantId, user.actorId, {
             reason: "wrong-password",
             failedAttempts: updated.failedAttempts,
           });
@@ -222,7 +226,7 @@ export function registerAuthRoutes(
       }
 
       await deps.authStore.resetLoginFailures(user.actorId);
-      await audit("LOGIN_SUCCESS", user.actorId, {});
+      await audit("LOGIN_SUCCESS", user.tenantId, user.actorId, {});
       await issueSession(deps.authStore, reply, user, nowValue);
       return reply.send({ actorId: user.actorId, email: user.email });
     },
@@ -306,7 +310,7 @@ export function registerAuthRoutes(
         now: nowValue,
       });
       if (!gate.allowed) {
-        await audit("LOGIN_LOCKED", principal.actorId, {
+        await audit("LOGIN_LOCKED", principal.tenantId, principal.actorId, {
           via: "password-change",
         });
         return reply.code(423).send({ error: "account temporarily locked" });
@@ -326,12 +330,12 @@ export function registerAuthRoutes(
             principal.actorId,
             lockedUntil.toISOString(),
           );
-          await audit("LOGIN_LOCKED", principal.actorId, {
+          await audit("LOGIN_LOCKED", principal.tenantId, principal.actorId, {
             via: "password-change",
             failedAttempts: updated.failedAttempts,
           });
         } else {
-          await audit("LOGIN_FAILED", principal.actorId, {
+          await audit("LOGIN_FAILED", principal.tenantId, principal.actorId, {
             reason: "wrong-current-password",
             via: "password-change",
             failedAttempts: updated.failedAttempts,
@@ -348,7 +352,12 @@ export function registerAuthRoutes(
         hashAlgo: "argon2id",
         passwordChangedAt: nowValue.toISOString(),
       });
-      await audit("PASSWORD_CHANGED", principal.actorId, {});
+      await audit(
+        "PASSWORD_CHANGED",
+        principal.tenantId,
+        principal.actorId,
+        {},
+      );
       return reply.code(204).send();
     },
   );
