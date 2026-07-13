@@ -19,7 +19,23 @@ import fastify, {
 } from "fastify";
 import { registerAuditRoutes } from "./audit/routes.js";
 import { autoBootstrapAdminFromEnv } from "./auth/auto-bootstrap.js";
-import { registerAuthRoutes } from "./auth/routes.js";
+import { registerAuthPolicyGuard } from "./auth/authorization.js";
+import { registerAuthRoutes, type RegistrationMode } from "./auth/routes.js";
+
+/** Self-Signup-Politik aus der Env: default AUS; `open_unverified` heißt ehrlich so,
+ *  bis E-Mail-Verifikation existiert. Unbekannte Werte fallen GESCHLOSSEN zurück. */
+function parseRegistrationMode(value: string | undefined): RegistrationMode {
+  if (value === "open_unverified") {
+    // Der Default-Rate-Limiter zählt im Prozess: bei mehreren App-Instanzen drosselt
+    // jede für sich — für Multi-Instanz-Deployments einen verteilten RateLimiter
+    // konfigurieren (auth/rate-limit.ts).
+    console.warn(
+      "[auth] AUTH_REGISTRATION_MODE=open_unverified: Registrierung ist OFFEN (ohne E-Mail-Verifikation); In-Memory-Rate-Limiter trägt nur Single-Process-Deployments.",
+    );
+    return "open_unverified";
+  }
+  return "disabled";
+}
 import { registerBoardRoutes } from "./kanban/routes.js";
 import { registerUserRoutes } from "./users/routes.js";
 
@@ -203,6 +219,9 @@ export function buildPublicServer({
   kanbanStore = createKanbanStoreFromEnv(),
   auditStore = createAuditStoreFromEnv(),
   bootstrapToken = process.env["BOOTSTRAP_TOKEN"],
+  registrationMode = parseRegistrationMode(
+    process.env["AUTH_REGISTRATION_MODE"],
+  ),
 }: {
   config?: RuntimeConfig;
   state?: RuntimeState;
@@ -211,6 +230,7 @@ export function buildPublicServer({
   kanbanStore?: KanbanStore;
   auditStore?: AuditStore;
   bootstrapToken?: string | undefined;
+  registrationMode?: RegistrationMode;
 } = {}): FastifyInstance {
   const app = fastify({
     logger: false,
@@ -220,12 +240,15 @@ export function buildPublicServer({
   });
   app.server.headersTimeout = DEFAULT_HEADER_TIMEOUT_MS;
   registerPublicHooks(app, config, metrics);
+  // K2: /auth-/api-Route ohne Autorisierungs-Policy = Boot-Fehler, nicht erst Test-Rot.
+  registerAuthPolicyGuard(app);
   app.register(fastifyCookie);
   registerAuthRoutes(app, {
     authStore,
     kanbanStore,
     auditStore,
     bootstrapToken,
+    registrationMode,
   });
   registerBoardRoutes(app, { authStore, kanbanStore, auditStore });
   registerUserRoutes(app, { authStore, kanbanStore, auditStore });

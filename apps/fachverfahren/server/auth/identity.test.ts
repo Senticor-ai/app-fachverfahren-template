@@ -13,6 +13,10 @@ function makeUser(actorId: string, tenantId = "default") {
     displayName: actorId,
     status: "active" as const,
     role: "member" as const,
+    localPersonas: [],
+    oidcPersonas: [],
+    personaManagementMode: "local" as const,
+    principalVersion: 1,
     createdAt: now,
     updatedAt: now,
   };

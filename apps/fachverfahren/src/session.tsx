@@ -5,11 +5,17 @@ import * as React from "react";
 import { apiPath } from "./board-client.js";
 import {
   fetchSessionState,
+  type RegistrationMode,
+  type SessionCapabilities,
   type SessionPrincipal,
   type SessionStatus,
 } from "./session-state.js";
 
-export type { SessionPrincipal, SessionStatus } from "./session-state.js";
+export type {
+  SessionCapabilities,
+  SessionPrincipal,
+  SessionStatus,
+} from "./session-state.js";
 
 interface SessionState {
   status: SessionStatus;
@@ -17,6 +23,8 @@ interface SessionState {
   bootstrapped: boolean;
   /** false = API-Server antwortet nicht mit JSON (down/kein Dev-Proxy) — siehe session-state. */
   apiAvailable: boolean;
+  registration: RegistrationMode;
+  capabilities: SessionCapabilities;
 }
 
 interface SessionContextValue extends SessionState {
@@ -36,6 +44,8 @@ export function SessionProvider({
     principal: null,
     bootstrapped: false,
     apiAvailable: true,
+    registration: "disabled",
+    capabilities: {},
   });
 
   const refresh = React.useCallback(async () => {

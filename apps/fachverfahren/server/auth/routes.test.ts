@@ -62,7 +62,7 @@ describe("auth routes", () => {
   it("reports not-bootstrapped status before setup", async () => {
     const response = await app.inject({ method: "GET", url: "/auth/status" });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ bootstrapped: false });
+    expect(response.json()).toMatchObject({ bootstrapped: false });
   });
 
   it("rejects bootstrap with a wrong token", async () => {
@@ -85,7 +85,7 @@ describe("auth routes", () => {
     expect(String(response.headers["set-cookie"])).toContain("HttpOnly");
 
     const status = await app.inject({ method: "GET", url: "/auth/status" });
-    expect(status.json()).toEqual({ bootstrapped: true });
+    expect(status.json()).toMatchObject({ bootstrapped: true });
   });
 
   it("refuses a second bootstrap attempt", async () => {
@@ -207,10 +207,43 @@ describe("auth routes", () => {
       headers: { cookie },
     });
     expect(session.statusCode).toBe(200);
-    expect(session.json().email).toBe(bootstrapBody.email);
-    // Frontend-Guards brauchen Rolle + Permissions aus dem App-Identity-Modell.
-    expect(session.json().role).toBe("admin");
-    expect(session.json().permissions).toContain("users.manage");
+    const principal = session.json();
+    expect(principal.email).toBe(bootstrapBody.email);
+    // Frontend-Guards autorisieren NUR über Permissions; workspaceRole ist Anzeige
+    // (`role` bleibt EIN Release als deprecated Alias erhalten).
+    expect(principal.workspaceRole).toBe("admin");
+    expect(principal.role).toBe("admin");
+    expect(principal.permissions).toContain("users.manage");
+    // Personas = Arbeitsbereiche (Erlebnis): der Bootstrap-Admin bekommt explizit alle drei.
+    expect(principal.personas).toEqual([
+      "buerger",
+      "sachbearbeitung",
+      "aufsicht",
+    ]);
+    expect(principal.personaManagementMode).toBe("local");
+    expect(principal.principalVersion).toBe(1);
+    expect(principal.tenantId).toBe("default");
+    expect(principal.identity).toEqual({
+      provider: "local",
+      subject: principal.actorId,
+    });
+    expect(principal.account).toMatchObject({
+      email: bootstrapBody.email,
+      status: "active",
+    });
+  });
+
+  it("advertises schema capabilities and the registration mode on GET /auth/status", async () => {
+    const status = await app.inject({ method: "GET", url: "/auth/status" });
+    expect(status.statusCode).toBe(200);
+    const body = status.json();
+    // Capability-Anzeige statt Client-Konstante: meldet der Server userPersonas und das
+    // personas-Feld fehlt trotzdem, fällt der Client auf LEER zurück (fail closed) —
+    // nur ein ALTER Server ohne Capability bekommt den Alle-drei-Fallback.
+    expect(body.sessionSchemaVersion).toBe(2);
+    expect(body.capabilities).toEqual({ userPersonas: true });
+    // Registrierung ist ohne explizite Konfiguration AUS.
+    expect(body.registration).toBe("disabled");
   });
 });
 
@@ -408,7 +441,7 @@ describe("auth routes — auth store unavailable (no APP_PG_URL)", () => {
     await app.ready();
     const response = await app.inject({ method: "GET", url: "/auth/status" });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({
+    expect(response.json()).toMatchObject({
       bootstrapped: false,
       storeAvailable: false,
     });
@@ -424,3 +457,149 @@ function extractCookie(response: { headers: Record<string, unknown> }): string {
   }
   return value.split(";")[0] ?? "";
 }
+
+// Self-Signup (Phase D): default AUS; `open_unverified` heißt ehrlich so, bis
+// E-Mail-Verifikation existiert. Anti-Enumeration: identische neutrale Antwort für
+// neue UND vergebene Adressen, KEIN Auto-Login (kein Cookie) — Existenz von Konten
+// ist von außen nicht ablesbar. Tenant kommt NIE aus dem Request-Body.
+describe("auth routes — POST /auth/register", () => {
+  const registerBody = {
+    email: "neu@example.org",
+    displayName: "Neue Bürger:in",
+    password: "citizen register pw", // pragma: allowlist-secret
+  };
+
+  async function setUpOpen() {
+    const { app, authStore, kanbanStore, auditStore } = buildTestApp(
+      "test-bootstrap-token",
+    );
+    await app.register(fastifyCookie);
+    registerAuthRoutes(app, {
+      authStore,
+      kanbanStore,
+      auditStore,
+      bootstrapToken: "test-bootstrap-token",
+      registrationMode: "open_unverified",
+    });
+    await app.ready();
+    return { app, authStore, auditStore };
+  }
+
+  it("ist ohne Konfiguration deaktiviert (403) und auditierbar", async () => {
+    const { app } = await setUp("test-bootstrap-token");
+    const response = await app.inject({
+      method: "POST",
+      url: "/auth/register",
+      payload: registerBody,
+    });
+    expect(response.statusCode).toBe(403);
+  });
+
+  it("legt im open_unverified-Modus ein citizen-Konto mit Arbeitsbereich buerger an — neutral, ohne Auto-Login", async () => {
+    const { app, authStore, auditStore } = await setUpOpen();
+    const response = await app.inject({
+      method: "POST",
+      url: "/auth/register",
+      payload: registerBody,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["set-cookie"]).toBeUndefined();
+    const message = response.json().message as string;
+    expect(message).toContain("Anmeldung");
+
+    const user = await authStore.getUserByEmail({
+      tenantId: "default",
+      email: registerBody.email,
+    });
+    expect(user?.role).toBe("citizen");
+    expect(user?.localPersonas).toEqual(["buerger"]);
+    expect(user?.personaManagementMode).toBe("local");
+    // Danach normaler Login mit den registrierten Zugangsdaten.
+    const login = await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: registerBody.email, password: registerBody.password },
+    });
+    expect(login.statusCode).toBe(200);
+
+    const events = await auditStore.listEvents({ tenantId: "default" });
+    const created = events.find((event) => event.eventType === "USER_CREATED");
+    expect(created?.metadata).toMatchObject({ selfSignup: true });
+  });
+
+  it("antwortet für eine bereits vergebene E-Mail IDENTISCH neutral (Anti-Enumeration)", async () => {
+    const { app } = await setUpOpen();
+    const first = await app.inject({
+      method: "POST",
+      url: "/auth/register",
+      payload: registerBody,
+    });
+    const second = await app.inject({
+      method: "POST",
+      url: "/auth/register",
+      payload: { ...registerBody, displayName: "Doppelt" },
+    });
+    expect(second.statusCode).toBe(first.statusCode);
+    expect(second.body).toBe(first.body);
+    expect(second.headers["set-cookie"]).toBeUndefined();
+  });
+
+  it("weist zu kurze Passwörter und überlange Eingaben ab (Caps vor argon2)", async () => {
+    const { app } = await setUpOpen();
+    const short = await app.inject({
+      method: "POST",
+      url: "/auth/register",
+      payload: { ...registerBody, password: "kurz" },
+    });
+    expect(short.statusCode).toBe(400);
+
+    const oversized = await app.inject({
+      method: "POST",
+      url: "/auth/register",
+      payload: { ...registerBody, password: "x".repeat(300) },
+    });
+    expect(oversized.statusCode).toBe(400);
+
+    const longEmail = await app.inject({
+      method: "POST",
+      url: "/auth/register",
+      payload: { ...registerBody, email: `${"a".repeat(255)}@example.org` },
+    });
+    expect(longEmail.statusCode).toBe(400);
+  });
+
+  it("ignoriert einen tenantId-Versuch im Body (Tenant kommt aus dem Deployment-Kontext)", async () => {
+    const { app, authStore } = await setUpOpen();
+    await app.inject({
+      method: "POST",
+      url: "/auth/register",
+      payload: { ...registerBody, tenantId: "tenant.evil" },
+    });
+    expect(
+      await authStore.getUserByEmail({
+        tenantId: "default",
+        email: registerBody.email,
+      }),
+    ).toBeDefined();
+    expect(
+      await authStore.getUserByEmail({
+        tenantId: "tenant.evil",
+        email: registerBody.email,
+      }),
+    ).toBeUndefined();
+  });
+
+  it("drosselt wiederholte Registrierungsversuche derselben Quelle (429)", async () => {
+    const { app } = await setUpOpen();
+    let limited = 0;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const response = await app.inject({
+        method: "POST",
+        url: "/auth/register",
+        payload: { ...registerBody, email: `probe-${attempt}@example.org` },
+      });
+      if (response.statusCode === 429) limited += 1;
+    }
+    expect(limited).toBeGreaterThan(0);
+  });
+});

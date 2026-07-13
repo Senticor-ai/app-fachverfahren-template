@@ -1,5 +1,4 @@
-import type { AuthStore, UserRole } from "@senticor/app-store-postgres";
-import type { FastifyReply, FastifyRequest } from "fastify";
+import type { UserRole } from "@senticor/app-store-postgres";
 
 /** Workspace-Permissions statt Rollen-ifs in Routen: Routen prüfen IMMER eine Permission,
  *  nie `role === "admin"`. Damit lassen sich später feinere Rollen (Sachbearbeiter,
@@ -21,9 +20,14 @@ const ALL_PERMISSIONS: WorkspacePermission[] = [
   "tenant.export",
 ];
 
+// citizen = selbstregistrierte Bürger:innen: KEINE Workspace-Permissions. Ihre
+// Persona-Sichten sind heute rein clientseitige Demo-Daten; sobald echte Fach-APIs
+// entstehen (z.B. application.read), brauchen diese RESOURCE-Autorisierung
+// (Ownership/Zuweisung) über den AuthorizationService — nie Persona-Checks.
 const ROLE_PERMISSIONS: Record<UserRole, WorkspacePermission[]> = {
   admin: ALL_PERMISSIONS,
   member: ["boards.collaborate"],
+  citizen: [],
 };
 
 export function permissionsForRole(role: UserRole): WorkspacePermission[] {
@@ -37,34 +41,6 @@ export function hasWorkspacePermission(
   return ROLE_PERMISSIONS[role].includes(permission);
 }
 
-/** Fastify-preHandler NACH requirePrincipal: lädt die Rolle live (kein Session-Schema-
- *  Change — Demotion/Deaktivierung wirkt sofort auf geschützte APIs) und prüft die
- *  geforderte Permission gegen das App-Identity-Modell, nie gegen den Auth-Provider. */
-export function createRequirePermission(
-  authStore: AuthStore,
-  permission: WorkspacePermission,
-) {
-  return async function requirePermission(
-    request: FastifyRequest,
-    reply: FastifyReply,
-  ): Promise<void> {
-    const principal = request.principal;
-    if (!principal) {
-      await reply.code(401).send({ error: "authentication required" });
-      return;
-    }
-    const user = await authStore.getUserById({
-      tenantId: principal.tenantId,
-      actorId: principal.actorId,
-    });
-    if (
-      !user ||
-      user.status !== "active" ||
-      !hasWorkspacePermission(user.role, permission)
-    ) {
-      await reply
-        .code(403)
-        .send({ error: `permission "${permission}" required` });
-    }
-  };
-}
+// Die Durchsetzung lebt in auth/authorization.ts (routeAuth/requireAuthorization):
+// Routen deklarieren ihre Policy als Route-Config, die preHandler werden daraus
+// abgeleitet — dieses Modul liefert nur noch das Rolle→Permission-Mapping.

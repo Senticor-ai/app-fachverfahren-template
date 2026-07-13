@@ -56,8 +56,10 @@ export const DEFAULT_PERSONAS: readonly PersonaDescriptor[] = [
 ];
 
 export interface PersonaSwitcherProps {
-  /** Aktiv gewählte Rolle (kontrolliert). */
-  persona: Persona;
+  /** Aktiv gewählter Arbeitsbereich (kontrolliert). OPTIONAL: der Team-Workspace (Boards)
+   *  ist Workspace-Navigation ohne aktive Persona — der Trigger zeigt dann neutral
+   *  „Arbeitsbereich wählen" statt eine Rolle vorzutäuschen. */
+  persona?: Persona | undefined;
   /** Wechsel-Callback — die App entscheidet über Folgewirkung (z.B. Routing). */
   onPersonaChange: (persona: Persona) => void;
   /** Rollen-Beschreibungen (Reihenfolge = Menü-Reihenfolge). Default: DEFAULT_PERSONAS. */
@@ -67,15 +69,17 @@ export interface PersonaSwitcherProps {
   className?: string;
 }
 
-/** Rollen-Wechsler mit Popup-Menü (Radix-frei, aber Radix-konform in a11y: menu / menuitemradio). */
+/** Rollen-Wechsler mit Popup-Menü (Radix-frei, aber Radix-konform in a11y: menu / menuitemradio).
+ *  Ohne Einträge (Konto ohne Arbeitsbereiche) rendert er NICHTS — der Aufrufer muss keinen
+ *  eigenen Leer-Guard führen. */
 export function PersonaSwitcher({
   persona,
   onPersonaChange,
   personas = DEFAULT_PERSONAS,
   compact = false,
   className,
-}: PersonaSwitcherProps): React.JSX.Element {
-  const current = personas.find((p) => p.key === persona) ?? personas[0]!;
+}: PersonaSwitcherProps): React.JSX.Element | null {
+  const current = persona ? personas.find((p) => p.key === persona) : undefined;
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
 
@@ -97,6 +101,8 @@ export function PersonaSwitcher({
     };
   }, [open]);
 
+  if (personas.length === 0) return null;
+
   return (
     <div className={cn("relative", className)} ref={ref}>
       <button
@@ -104,8 +110,18 @@ export function PersonaSwitcher({
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`Rolle wechseln — aktuell ${current.label}`}
-        title={compact ? `${current.label} · Rolle wechseln` : undefined}
+        aria-label={
+          current
+            ? `Arbeitsbereich wechseln — aktuell ${current.label}`
+            : "Arbeitsbereich wählen"
+        }
+        title={
+          compact
+            ? current
+              ? `${current.label} · Arbeitsbereich wechseln`
+              : "Arbeitsbereich wählen"
+            : undefined
+        }
         className={cn(
           // Kanonisches Fokus-Rezept (Spec 3.2): weicher 3px-Ring, EIN Rezept kit-weit.
           "flex w-full items-center gap-2.5 rounded-md text-left hover:bg-white/5",
@@ -116,16 +132,16 @@ export function PersonaSwitcher({
         )}
       >
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar-accent/25 text-xs font-bold text-sidebar-foreground">
-          {current.initials}
+          {current?.initials ?? "AB"}
         </span>
         {!compact && (
           <>
             <span className="min-w-0 flex-1 leading-tight">
               <span className="block truncate text-sm font-medium text-sidebar-foreground">
-                {current.label}
+                {current?.label ?? "Arbeitsbereich wählen"}
               </span>
               <span className="block truncate text-xs text-sidebar-muted">
-                {current.sub}
+                {current?.sub ?? "Zugewiesene Sichten"}
               </span>
             </span>
             <ChevronsUpDown
@@ -139,17 +155,19 @@ export function PersonaSwitcher({
       {open && (
         <div
           role="menu"
-          aria-label="Rolle wählen"
+          aria-label="Arbeitsbereich wählen"
           className="absolute bottom-full left-0 z-50 mb-2 w-64 overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-md"
         >
           <div className="border-b border-border bg-muted/40 px-3 py-2 text-xs uppercase tracking-wide text-muted-foreground">
-            Rolle wechseln
+            Arbeitsbereich wechseln
           </div>
-          <ul className="p-1">
+          {/* a11y (axe aria-required-children): role="menu" darf nur menuitem*-Kinder
+              besitzen — die Listen-Container sind rein präsentational. */}
+          <ul role="presentation" className="p-1">
             {personas.map((p) => {
               const isActive = p.key === persona;
               return (
-                <li key={p.key}>
+                <li role="presentation" key={p.key}>
                   <button
                     type="button"
                     role="menuitemradio"

@@ -4,6 +4,7 @@ import {
   InMemoryAuthStore,
   InMemoryKanbanStore,
 } from "@senticor/app-store-postgres";
+import { hashPassword } from "@senticor/provider-local-auth";
 import fastify, { type FastifyInstance } from "fastify";
 import { beforeEach, describe, expect, it } from "vitest";
 import { registerAuthRoutes } from "../auth/routes.js";
@@ -21,6 +22,7 @@ const memberBody = {
   email: "member@example.org",
   displayName: "Mitglied",
   initialPassword: "initial member password", // pragma: allowlist-secret
+  personas: ["sachbearbeitung"],
 };
 
 async function setUp() {
@@ -542,5 +544,68 @@ describe("team board access", () => {
     expect(types).toContain("BOARD_ARCHIVED");
     // Wer ein eingefrorenes Board wieder öffnet, muss im Trail sichtbar sein.
     expect(types).toContain("BOARD_RESTORED");
+  });
+});
+
+// Härtung (K2): die Boards-API verlangt boards.collaborate — „eingeloggt" reicht NICHT.
+// citizen-Konten (Self-Signup) haben KEINE Workspace-Permissions und werden abgewiesen,
+// obwohl ihre Session gültig ist.
+describe("boards API — citizen ohne boards.collaborate", () => {
+  it("verweigert Lesen und Schreiben mit 403", async () => {
+    const { app, authStore } = await setUp();
+    const now = new Date().toISOString();
+    await authStore.createLocalUserWithCredential({
+      user: {
+        actorId: "actor.citizen",
+        tenantId: "default",
+        authorityId: "default",
+        jurisdictionId: "de",
+        email: "buerger@example.org",
+        displayName: "Bürger:in",
+        status: "active",
+        role: "citizen",
+        localPersonas: ["buerger"],
+        oidcPersonas: [],
+        personaManagementMode: "local",
+        principalVersion: 1,
+        createdAt: now,
+        updatedAt: now,
+      },
+      credential: {
+        actorId: "actor.citizen",
+        passwordHash: await hashPassword("citizen test password"), // pragma: allowlist-secret
+        hashAlgo: "argon2id",
+        passwordChangedAt: now,
+        failedAttempts: 0,
+        lockedUntil: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+    const login = await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: "buerger@example.org",
+        password: "citizen test password", // pragma: allowlist-secret
+      },
+    });
+    expect(login.statusCode).toBe(200);
+    const citizenCookie = extractCookie(login);
+
+    const list = await app.inject({
+      method: "GET",
+      url: "/api/v1/boards",
+      headers: { cookie: citizenCookie },
+    });
+    expect(list.statusCode).toBe(403);
+
+    const create = await app.inject({
+      method: "POST",
+      url: "/api/v1/boards",
+      headers: { cookie: citizenCookie },
+      payload: { title: "Privat" },
+    });
+    expect(create.statusCode).toBe(403);
   });
 });

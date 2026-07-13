@@ -20,6 +20,7 @@ const memberBody = {
   email: "member@example.org",
   displayName: "Mitglied",
   initialPassword: "initial member password", // pragma: allowlist-secret
+  personas: ["sachbearbeitung"],
 };
 
 async function setUp() {
@@ -340,3 +341,157 @@ function extractCookie(response: { headers: Record<string, unknown> }): string {
   }
   return value.split(";")[0] ?? "";
 }
+
+// Arbeitsbereiche (Personas) in der Benutzerverwaltung: PFLICHT bei der Anlage
+// (fail-closed, keine stillen Defaults), atomarer PATCH über updateUserAccess mit
+// optimistischer Nebenläufigkeit (If-Match) und Audit mit before/after.
+describe("user management routes — Arbeitsbereiche", () => {
+  let ctx: Awaited<ReturnType<typeof setUp>>;
+
+  beforeEach(async () => {
+    ctx = await setUp();
+  });
+
+  it("verlangt personas bei der Anlage (400 ohne / bei ungültigen Werten)", async () => {
+    const { personas: _omit, ...withoutPersonas } = memberBody;
+    const missing = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: { cookie: ctx.adminCookie },
+      payload: withoutPersonas,
+    });
+    expect(missing.statusCode).toBe(400);
+
+    const invalid = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: { cookie: ctx.adminCookie },
+      payload: { ...memberBody, personas: ["hausmeister"] },
+    });
+    expect(invalid.statusCode).toBe(400);
+
+    // Leeres Array ist GÜLTIG (Null-Arbeitsbereiche-Konto, z.B. Boards-only später).
+    const empty = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: { cookie: ctx.adminCookie },
+      payload: { ...memberBody, personas: [] },
+    });
+    expect(empty.statusCode).toBe(201);
+    expect(empty.json().personas).toEqual([]);
+  });
+
+  it("liefert Arbeitsbereichs-Felder in Antworten und ändert sie atomar per PATCH", async () => {
+    const created = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: { cookie: ctx.adminCookie },
+      payload: memberBody,
+    });
+    expect(created.statusCode).toBe(201);
+    const actorId = created.json().actorId as string;
+    expect(created.json()).toMatchObject({
+      workspaceRole: "member",
+      personas: ["sachbearbeitung"],
+      localPersonas: ["sachbearbeitung"],
+      oidcPersonas: [],
+      personaManagementMode: "local",
+      principalVersion: 1,
+    });
+
+    // Status UND Personas in EINEM Patch → GENAU ein Version-Bump.
+    const patched = await ctx.app.inject({
+      method: "PATCH",
+      url: `/api/v1/users/${actorId}`,
+      headers: { cookie: ctx.adminCookie },
+      payload: { personas: ["buerger", "aufsicht"], status: "active" },
+    });
+    expect(patched.statusCode).toBe(200);
+    expect(patched.json().personas).toEqual(["buerger", "aufsicht"]);
+    expect(patched.json().principalVersion).toBe(2);
+
+    const events = await ctx.auditStore.listEvents({ tenantId: "default" });
+    const personasChanged = events.find(
+      (event) => event.eventType === "USER_PERSONAS_CHANGED",
+    );
+    expect(personasChanged?.metadata).toMatchObject({
+      before: ["sachbearbeitung"],
+      after: ["buerger", "aufsicht"],
+      source: "local_admin",
+    });
+  });
+
+  it("If-Match mit veralteter principalVersion → 409, keine Änderung", async () => {
+    const created = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: { cookie: ctx.adminCookie },
+      payload: memberBody,
+    });
+    const actorId = created.json().actorId as string;
+
+    const stale = await ctx.app.inject({
+      method: "PATCH",
+      url: `/api/v1/users/${actorId}`,
+      headers: { cookie: ctx.adminCookie, "if-match": '"99"' },
+      payload: { personas: [] },
+    });
+    expect(stale.statusCode).toBe(409);
+
+    const fresh = await ctx.app.inject({
+      method: "PATCH",
+      url: `/api/v1/users/${actorId}`,
+      headers: { cookie: ctx.adminCookie, "if-match": '"1"' },
+      payload: { personas: [] },
+    });
+    expect(fresh.statusCode).toBe(200);
+    expect(fresh.json().personas).toEqual([]);
+  });
+
+  it("verweigert lokale Persona-Pflege bei oidc_authoritative (409)", async () => {
+    const created = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: { cookie: ctx.adminCookie },
+      payload: memberBody,
+    });
+    const actorId = created.json().actorId as string;
+    await ctx.authStore.updateUserAccess({
+      tenantId: "default",
+      actorId,
+      patch: { personaManagementMode: "oidc_authoritative" },
+    });
+
+    const denied = await ctx.app.inject({
+      method: "PATCH",
+      url: `/api/v1/users/${actorId}`,
+      headers: { cookie: ctx.adminCookie },
+      payload: { personas: ["buerger"] },
+    });
+    expect(denied.statusCode).toBe(409);
+  });
+
+  it("identischer Persona-PATCH ist ein No-op: keine Version, kein Audit-Event", async () => {
+    const created = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: { cookie: ctx.adminCookie },
+      payload: memberBody,
+    });
+    const actorId = created.json().actorId as string;
+
+    const noop = await ctx.app.inject({
+      method: "PATCH",
+      url: `/api/v1/users/${actorId}`,
+      headers: { cookie: ctx.adminCookie },
+      payload: { personas: ["sachbearbeitung"] },
+    });
+    expect(noop.statusCode).toBe(200);
+    expect(noop.json().principalVersion).toBe(1);
+
+    const events = await ctx.auditStore.listEvents({ tenantId: "default" });
+    expect(
+      events.filter((event) => event.eventType === "USER_PERSONAS_CHANGED"),
+    ).toHaveLength(0);
+  });
+});

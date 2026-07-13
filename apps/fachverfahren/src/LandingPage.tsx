@@ -1,9 +1,11 @@
 // LandingPage — die EINE unauthentifizierte Route ("/"). Alle Rollen melden sich HIER an:
-// Branding aus der LeistungConfig, die Auth-Karte (Login / Einmal-Setup / API-Hinweis, Logik
-// in landing-state.ts) und die Einstiege in die Bereiche. Alle anderen Routen sind session-
-// gepflichtig und bouncen unangemeldet mit `state.from` hierher; nach dem Login geht es auf
-// den ursprünglichen Deep-Link zurück (postLoginRedirect — nur bei Client-Navigation, der
-// History-State überlebt keinen Full-Reload).
+// Branding aus der LeistungConfig, die Auth-Karte (Login / Registrieren / Einmal-Setup /
+// API-Hinweis, Logik in landing-state.ts) und die Einstiege in die Bereiche. Angemeldet
+// filtern sich die Bereiche auf die ZUGEWIESENEN Arbeitsbereiche (personas.ts) — ohne
+// Arbeitsbereich und ohne Boards-Permission bleibt der Freischalt-Hinweis. Alle anderen
+// Routen sind session-pflichtig und bouncen unangemeldet mit `state.from` hierher; nach
+// dem Login geht es auf den ursprünglichen Deep-Link zurück (postLoginRedirect — nur bei
+// Client-Navigation, der History-State überlebt keinen Full-Reload).
 import * as React from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import {
@@ -11,45 +13,60 @@ import {
   Card,
   CardContent,
   CardHeader,
+  type Persona,
 } from "@senticor/fachverfahren-kit";
 import {
   ApiUnavailableNotice,
   BootstrapForm,
   LoginForm,
+  RegisterForm,
 } from "./auth-forms.js";
 import { landingView, postLoginRedirect } from "./landing-state.js";
+import { allowedPersonas } from "./personas.js";
 import { useSession } from "./session.js";
 import { store } from "./store.js";
 
-/** Die Bereichs-Einstiege: Persona-Sichten (Demo-Daten) + der Boards-Workspace (echte Daten).
- *  Immer sichtbar — unangemeldet führt jeder Klick über das Session-Gate zurück zur Anmeldung. */
-const BEREICHE = [
+/** Die Bereichs-Einstiege: Arbeitsbereiche (Demo-Daten) + der Boards-Workspace (echte
+ *  Daten, permission-gated). Unangemeldet sind alle sichtbar — jeder Klick bounct durchs
+ *  Session-Gate; angemeldet filtert `sichtbareBereiche` auf das eigene Konto. */
+const BEREICHE: ReadonlyArray<{
+  href: string;
+  label: string;
+  beschreibung: string;
+  persona?: Persona;
+  permission?: string;
+}> = [
   {
     href: "/buerger",
     label: "Bürger:in",
     beschreibung: "Antrag stellen und Eingangsbestätigung (Demo-Daten)",
+    persona: "buerger",
   },
   {
     href: "/amt",
     label: "Sachbearbeitung",
     beschreibung: "Arbeitsvorrat und Vorgangsprüfung (Demo-Daten)",
+    persona: "sachbearbeitung",
   },
   {
     href: "/aufsicht",
     label: "Aufsicht",
     beschreibung: "Kennzahlen und Audit (Demo-Daten)",
+    persona: "aufsicht",
   },
   {
     href: "/boards",
     label: "Boards",
     beschreibung: "Team-Arbeitsbereich mit echten Arbeitsdaten",
+    permission: "boards.collaborate",
   },
-] as const;
+];
 
 export function LandingPage(): React.ReactElement | null {
   const session = useSession();
   const location = useLocation();
   const view = landingView(session);
+  const [authMode, setAuthMode] = React.useState<"login" | "register">("login");
 
   // Kein Formular-Flackern, solange der Session-Zustand lädt.
   if (view === "loading") return null;
@@ -61,6 +78,10 @@ export function LandingPage(): React.ReactElement | null {
     if (from) return <Navigate to={from} replace />;
   }
 
+  const registerOffen =
+    view === "login" && session.registration === "open_unverified";
+  const showRegister = registerOffen && authMode === "register";
+
   const authTitle =
     view === "api-unavailable"
       ? "Server nicht erreichbar"
@@ -68,7 +89,27 @@ export function LandingPage(): React.ReactElement | null {
         ? "Workspace einrichten"
         : view === "authenticated"
           ? "Angemeldet"
-          : "Anmelden";
+          : showRegister
+            ? "Registrieren"
+            : "Anmelden";
+
+  // Angemeldet: nur die eigenen Arbeitsbereiche + Boards nur mit Permission.
+  // Unangemeldet: alle Einstiege (der Klick bounct durchs Session-Gate).
+  const sichtbareBereiche =
+    view === "authenticated"
+      ? BEREICHE.filter((bereich) => {
+          if (bereich.persona) {
+            return allowedPersonas(
+              session.principal,
+              session.capabilities,
+            ).includes(bereich.persona);
+          }
+          if (bereich.permission) {
+            return session.principal?.permissions?.includes(bereich.permission);
+          }
+          return true;
+        })
+      : BEREICHE;
 
   return (
     <main className="min-h-screen bg-secondary/20 px-4 py-10 md:py-16">
@@ -89,7 +130,12 @@ export function LandingPage(): React.ReactElement | null {
               </h2>
             </CardHeader>
             <CardContent>
-              <AuthCardBody view={view} />
+              <AuthCardBody
+                view={view}
+                showRegister={showRegister}
+                registerOffen={registerOffen}
+                onAuthModeChange={setAuthMode}
+              />
             </CardContent>
           </Card>
           <section aria-labelledby="bereiche-heading" className="space-y-3">
@@ -99,23 +145,35 @@ export function LandingPage(): React.ReactElement | null {
             >
               Bereiche
             </h2>
-            <ul className="space-y-3">
-              {BEREICHE.map((bereich) => (
-                <li key={bereich.href}>
-                  <Link
-                    to={bereich.href}
-                    className="block rounded-lg border border-border bg-card p-4 transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <span className="block text-sm font-medium text-foreground">
-                      {bereich.label}
-                    </span>
-                    <span className="mt-0.5 block text-sm text-muted-foreground">
-                      {bereich.beschreibung}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            {sichtbareBereiche.length > 0 ? (
+              <ul className="space-y-3">
+                {sichtbareBereiche.map((bereich) => (
+                  <li key={bereich.href}>
+                    <Link
+                      to={bereich.href}
+                      className="block rounded-lg border border-border bg-card p-4 transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <span className="block text-sm font-medium text-foreground">
+                        {bereich.label}
+                      </span>
+                      <span className="mt-0.5 block text-sm text-muted-foreground">
+                        {bereich.beschreibung}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              // Null-Arbeitsbereiche-Zustand: gültig — Konto existiert, aber es wurde
+              // (noch) kein Arbeitsbereich freigeschaltet bzw. wieder entzogen.
+              <p
+                role="status"
+                className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground"
+              >
+                Für Ihr Konto ist noch kein Arbeitsbereich freigeschaltet. Bitte
+                wenden Sie sich an Ihre Administration.
+              </p>
+            )}
           </section>
         </div>
       </div>
@@ -123,11 +181,18 @@ export function LandingPage(): React.ReactElement | null {
   );
 }
 
-/** Der Inhalt der Auth-Karte je Sicht — angemeldet wird sie zur Konto-Karte. */
+/** Der Inhalt der Auth-Karte je Sicht — angemeldet wird sie zur Konto-Karte; bei
+ *  geöffneter Registrierung (open_unverified) gibt es den Umschalter zum Bürger-Signup. */
 function AuthCardBody({
   view,
+  showRegister,
+  registerOffen,
+  onAuthModeChange,
 }: {
   view: "api-unavailable" | "bootstrap" | "login" | "authenticated";
+  showRegister: boolean;
+  registerOffen: boolean;
+  onAuthModeChange: (mode: "login" | "register") => void;
 }): React.ReactElement {
   const { principal, refresh, logout } = useSession();
   if (view === "api-unavailable") {
@@ -137,7 +202,23 @@ function AuthCardBody({
     return <BootstrapForm onSuccess={refresh} />;
   }
   if (view === "login") {
-    return <LoginForm onSuccess={refresh} />;
+    if (showRegister) {
+      return <RegisterForm onBackToLogin={() => onAuthModeChange("login")} />;
+    }
+    return (
+      <div className="space-y-4">
+        <LoginForm onSuccess={refresh} />
+        {registerOffen && (
+          <button
+            type="button"
+            className="w-full text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            onClick={() => onAuthModeChange("register")}
+          >
+            Neu hier? Als Bürger:in registrieren
+          </button>
+        )}
+      </div>
+    );
   }
   return (
     <div className="space-y-4">

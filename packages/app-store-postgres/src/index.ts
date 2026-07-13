@@ -19,16 +19,25 @@ export type {
 export type { PgClient } from "./client.js";
 export {
   createAuthStoreFromEnv,
+  effectivePersonas,
   InMemoryAuthStore,
+  isDuplicateUserError,
+  normalizePersonas,
   PostgresAuthStore,
+  StalePrincipalVersionError,
   UnavailableAuthStore,
+  USER_PERSONAS,
 } from "./auth-store.js";
 export type {
   AuthStore,
   IdentityLink,
   LocalCredential,
+  PersonaManagementMode,
   SessionRecord,
+  UserAccessPatch,
+  UserAccessResult,
   UserAccount,
+  UserPersona,
   UserRole,
   UserStatus,
 } from "./auth-store.js";
