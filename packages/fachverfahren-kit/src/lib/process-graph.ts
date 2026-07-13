@@ -6,8 +6,27 @@ import type {
   ProzessDefinition,
   ProzessKante,
   ProzessKnoten,
+  ServiceTaskKnoten,
+  UserTaskKnoten,
 } from "./process-ir.js";
-import { UNTERSTUETZTE_KNOTEN_TYPEN, istStatusaendernd } from "./process-ir.js";
+
+// V1-ausfuehrbare Knotentypen + Status-Guard leben HIER (nicht im reinen Typ-Modul process-ir), damit process-graph
+// OHNE Laufzeit-Sibling-Wert-Import ladbar bleibt: check:leistung-contract laeuft via `node --experimental-strip-types`,
+// das `.js`->`.ts` fuer WERT-Importe nicht aufloest (nur-Typ-Importe werden erased). So bleibt EINE Wahrheit + die
+// Validierung im Gate-Pfad nutzbar.
+const UNTERSTUETZTE_KNOTEN_TYPEN = new Set<string>([
+  "start",
+  "ende",
+  "userTask",
+  "serviceTask",
+  "exclusiveGateway",
+]);
+/** Traegt der Knotentyp eine `catalogAction` (loest also eine Status-Transition aus)? */
+function istStatusaendernd(
+  k: ProzessKnoten,
+): k is UserTaskKnoten | ServiceTaskKnoten {
+  return k.typ === "userTask" || k.typ === "serviceTask";
+}
 
 export interface ProzessValidierungsFehler {
   code: string;
@@ -92,9 +111,8 @@ export function validateProzessGraph(
   }
 
   // ── [G5] nur unterstuetzte Knotentypen ──
-  const unterstuetzt = new Set<string>(UNTERSTUETZTE_KNOTEN_TYPEN);
   for (const k of def.knoten)
-    if (!unterstuetzt.has(k.typ))
+    if (!UNTERSTUETZTE_KNOTEN_TYPEN.has(k.typ))
       push(
         "knoten-typ-nicht-unterstuetzt",
         `Knotentyp „${k.typ}" ist in V1 nicht ausfuehrbar`,

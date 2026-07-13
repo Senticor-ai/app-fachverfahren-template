@@ -22,17 +22,6 @@ export type ProzessKnotenTyp =
   | "boundaryEvent"
   | "subprozess";
 
-/** In V1 ausfuehrbare Knotentypen (Laufzeit-Kern). Alles andere -> Deploy-Reject. */
-export const UNTERSTUETZTE_KNOTEN_TYPEN = [
-  "start",
-  "ende",
-  "userTask",
-  "serviceTask",
-  "exclusiveGateway",
-] as const;
-export type UnterstuetzterKnotenTyp =
-  (typeof UNTERSTUETZTE_KNOTEN_TYPEN)[number];
-
 interface KnotenBasis {
   id: string;
   label?: string;
@@ -104,11 +93,4 @@ export interface ProzessDefinition {
   label?: string;
   knoten: ProzessKnoten[];
   kanten: ProzessKante[];
-}
-
-/** Traegt der Knotentyp eine `catalogAction` (loest also eine Status-Transition aus)? */
-export function istStatusaendernd(
-  k: ProzessKnoten,
-): k is UserTaskKnoten | ServiceTaskKnoten {
-  return k.typ === "userTask" || k.typ === "serviceTask";
 }

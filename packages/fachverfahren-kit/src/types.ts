@@ -9,6 +9,10 @@
 // Architektur: DEV-Datenschicht = Zustand-Store im Browser (end-to-end klickbar). PROD = dieselbe
 // `VorgangPort`-Schnittstelle gegen das SDK/Fastify-Backend. EINE Schnittstelle, zwei Laufzeiten.
 
+// WORKFLOW-IR: die Prozess-Definition lebt in `lib/process-ir` (co-located mit Graph-Gate + Planer). Nur-Typ-Import
+// (voll erased unter verbatimModuleSyntax → der Typ-Zyklus process-ir<->types ist unschädlich).
+import type { ProzessDefinition } from "./lib/process-ir.js";
+
 /** Audit-/Historien-Eintrag eines Vorgangs (revisionssicher, append-only). */
 export interface VorgangHistorie {
   ts: string;
@@ -727,6 +731,11 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   /** PM-UPGRADE (additiv) — verfahrensspezifische PRIORITÄTS-Stufen. Fehlt das Feld ⇒ der Workspace nutzt seine
    *  gemeinsamen `WorkspaceConfig.prioritaeten`. */
   prioritaeten?: PriorityDef[] | undefined;
+  /** WORKFLOW (additiv) — BPMN-inspirierte Prozess-Definitionen dieses Verfahrens als DATEN (IR). Deploy-validiert
+   *  vom fail-closed `validateProzessGraph` (check:leistung-contract) gegen `statusMachine`. Fehlt das Feld ⇒ kein
+   *  Prozess (Verhalten wie bisher). Die zustandsändernden Schritte laufen server-autoritativ durch dieselbe
+   *  Governance-Kette wie fachliche Übergänge (procedure-gebunden). Siehe `lib/process-ir`/`process-graph`. */
+  prozesse?: ProzessDefinition[] | undefined;
   /** Seed-Fälle (Demo-Arbeitsvorrat), damit die SB-Sicht sofort echte Vorgänge zeigt. */
   seed?: (helpers: {
     vorgangsnummer: () => string;

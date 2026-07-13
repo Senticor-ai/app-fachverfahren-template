@@ -33,6 +33,9 @@ export interface LeistungContractSnapshot {
   board?: LeistungConfig["board"];
   /** PM-UPGRADE — verfahrensspezifische PRIORITÄTS-Stufen. */
   prioritaeten?: LeistungConfig["prioritaeten"];
+  /** WORKFLOW — BPMN-inspirierte Prozess-Definitionen (IR) als echte Zeilen. Deploy-validiert (fail-closed) gegen
+   *  `statusMachine`; gehört wie `automationen` in den auditierbaren Vertrag, nicht als un-projiziertes Feld daran vorbei. */
+  prozesse?: LeistungConfig["prozesse"];
   statusMachine: LeistungConfig["statusMachine"];
   register: LeistungConfig["register"];
   detailSektionen: LeistungConfig["detailSektionen"];
@@ -78,6 +81,7 @@ export function toContractSnapshot<T = Record<string, unknown>>(
     ...(config.automationen ? { automationen: config.automationen } : {}),
     ...(config.board ? { board: config.board } : {}),
     ...(config.prioritaeten ? { prioritaeten: config.prioritaeten } : {}),
+    ...(config.prozesse ? { prozesse: config.prozesse } : {}),
     statusMachine: config.statusMachine,
     register: config.register,
     detailSektionen: config.detailSektionen,
