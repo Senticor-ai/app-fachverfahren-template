@@ -131,10 +131,15 @@ export function registerUserRoutes(
           error: `password must be at least ${MINIMUM_PASSWORD_LENGTH} characters`,
         });
       }
+      // Normalisieren: " user@example.org " und "user@example.org" sind DASSELBE Konto —
+      // ungetrimmte Eingaben erzeugten sonst visuelle Duplikate, mit denen sich niemand
+      // regulär anmelden kann (Codex-Review PR #27).
+      const email = body.email.trim();
+      const displayName = body.displayName.trim();
 
       const existing = await deps.authStore.getUserByEmail({
         tenantId: principal.tenantId,
-        email: body.email,
+        email,
       });
       if (existing) {
         return reply
@@ -152,8 +157,8 @@ export function registerUserRoutes(
           tenantId: principal.tenantId,
           authorityId: DEFAULT_AUTHORITY_ID,
           jurisdictionId: DEFAULT_JURISDICTION_ID,
-          email: body.email,
-          displayName: body.displayName,
+          email,
+          displayName,
           status: "active",
           role: "member",
           createdAt: nowIso,

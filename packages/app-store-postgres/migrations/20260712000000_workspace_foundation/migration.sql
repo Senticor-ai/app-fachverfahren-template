@@ -103,7 +103,12 @@ ALTER TABLE app_boards
 -- nur, was das neue listBoards zusätzlich anzeigt; version bleibt unangetastet (ETags intakt).
 UPDATE app_boards
 SET visibility = 'team',
-    title = 'Fachverfahren Discovery Board',
     purpose = 'requirements-discovery',
-    lifecycle_stage = 'design'
+    lifecycle_stage = 'design',
+    -- Nur den unveränderten Default-Titel umbenennen: hat ein Konsument sein Board
+    -- bereits via PATCH umbenannt, bleibt SEIN Titel erhalten (Codex-Review PR #27).
+    title = CASE
+      WHEN title = 'Build the Fachverfahren' THEN 'Fachverfahren Discovery Board'
+      ELSE title
+    END
 WHERE template_key = 'fachverfahren-discovery-v1';

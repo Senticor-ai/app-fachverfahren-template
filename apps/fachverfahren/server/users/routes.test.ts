@@ -256,6 +256,28 @@ describe("user management routes", () => {
     expect(reLogin.statusCode).toBe(200);
   });
 
+  it("normalizes emails: padded input creates the trimmed account, padded duplicate is a 409", async () => {
+    const padded = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: { cookie: ctx.adminCookie },
+      payload: { ...memberBody, email: "  member@example.org  " },
+    });
+    expect(padded.statusCode).toBe(201);
+    expect(padded.json().email).toBe("member@example.org");
+
+    // Login mit der normalen (getrimmten) Adresse funktioniert.
+    await loginCookie(ctx.app, memberBody.email, memberBody.initialPassword);
+
+    const duplicate = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: { cookie: ctx.adminCookie },
+      payload: { ...memberBody, email: " member@example.org " },
+    });
+    expect(duplicate.statusCode).toBe(409);
+  });
+
   it("maps only duplicate-email races to 409 — other persistence failures stay 5xx", async () => {
     const originalCreateUser = ctx.authStore.createUser.bind(ctx.authStore);
     ctx.authStore.createUser = async () => {
