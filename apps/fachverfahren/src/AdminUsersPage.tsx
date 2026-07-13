@@ -1,6 +1,6 @@
 // AdminUsersPage — Benutzerverwaltung für Admins (Permission users.manage): Konten anlegen,
 // aktivieren/deaktivieren. Kein Fachliches: nur App-Komposition der Kit-Primitive gegen
-// /api/v1/users. Muster (Zustände, role="alert", Copy) wie LoginPage/BoardList.
+// /api/v1/users. Muster (Zustände, role="alert", Copy) wie auth-forms/BoardList.
 import * as React from "react";
 import {
   Badge,

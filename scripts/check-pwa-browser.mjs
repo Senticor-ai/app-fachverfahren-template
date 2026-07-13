@@ -16,7 +16,11 @@ const failures = [];
 const observations = [];
 const auditResults = [];
 
-const routes = ["/buerger", "/buerger/anmelden", "/amt", "/aufsicht"];
+// Nur die Landing ("/") ist unauthentifiziert erreichbar — die Persona-Sichten sind
+// session-gepflichtig und würden hier ohne Login nur als Redirect auf die Landing erscheinen.
+// Ihre visuelle/A11y-Abdeckung läuft über die Storybook-/Browser-Tests des Kits
+// (pnpm run test:storybook).
+const routes = ["/"];
 const visualModes = [
   {
     name: "standard",
@@ -275,7 +279,7 @@ async function runBrowserAudit(browser, baseUrl) {
 async function assertPwaBrowserRuntime(browser, baseUrl, runtimeErrors) {
   const label = "pwa-browser-runtime";
   runtimeErrors.length = 0;
-  await navigate(browser, `${baseUrl}/buerger`);
+  await navigate(browser, `${baseUrl}/`);
   await waitForHydration(browser, label);
 
   const registration = await browser.evaluate(async () => {

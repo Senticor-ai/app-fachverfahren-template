@@ -6,8 +6,8 @@
 // Ablauf: Store-Paket bauen (die Runtime lädt @senticor/app-store-postgres aus dist/) →
 // Migrationen fahren → Server-Bundle bauen → Runtime starten. Voraussetzung ist NUR ein
 // erreichbares Postgres samt existierender Datenbank (Default: dev/postgres.yaml, app/app/app;
-// eigene Instanz via APP_PG_URL). Beim ersten Start richtet man den Admin im Browser unter
-// /login mit dem Bootstrap-Token ein (Default „dev-setup", NUR für lokale Entwicklung) —
+// eigene Instanz via APP_PG_URL). Beim ersten Start richtet man den Admin im Browser auf der
+// Landing ("/") mit dem Bootstrap-Token ein (Default „dev-setup", NUR für lokale Entwicklung) —
 // alternativ legt AUTH_BOOTSTRAP_ADMIN_EMAIL/-PASSWORD den Admin beim Start automatisch an.
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -73,7 +73,7 @@ function main() {
   console.log(
     `[dev-api] Runtime startet auf http://${env.HOST}:${env.PORT}` +
       (env.BOOTSTRAP_TOKEN
-        ? ` — Einmal-Setup unter /login mit Bootstrap-Token "${env.BOOTSTRAP_TOKEN}"`
+        ? ` — Einmal-Setup auf der Landing ("/") mit Bootstrap-Token "${env.BOOTSTRAP_TOKEN}"`
         : ""),
   );
   const server = spawn("node", ["apps/fachverfahren/dist-server/index.js"], {

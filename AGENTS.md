@@ -22,12 +22,18 @@ Plattformpakete:
   `app-store-postgres`, `jurisdictions/*`) sind die wiederverwendbare
   Plattformbasis.
 
-Das Template baut und läuft ohne jedes externe Werkzeug:
+Das Template baut ohne jedes externe Werkzeug; die klickbaren Sichten sind
+seit dem Session-Gate anmeldepflichtig:
 
 ```bash
 pnpm install
 pnpm run dev
 ```
+
+`pnpm run dev` allein zeigt die Landing mit „Server nicht erreichbar" — für
+die klickbaren Personas braucht es zusätzlich `pnpm run dev:api` (Postgres
+vorausgesetzt) und eine Anmeldung. Die login-freie Demo der Bausteine ist
+`pnpm run storybook`.
 
 Ein neues Fachverfahren entsteht, indem GENAU EINE Datei mit Fachdaten gefüllt
 wird — die Austausch-Naht (nächster Abschnitt). Es wird nichts neu gebaut, was
@@ -47,8 +53,9 @@ Aktuell gilt insbesondere:
   weiterhin Ausbauschritte; Zielarchitektur:
   `docs/reference/backend-fastify.md`.
 - Es existiert KEIN MSW-Mocking: `docs/reference/mock-data-msw.md` (PLAN).
-- Es existieren KEINE E2E-Suiten und keine Scripts `test:e2e`,
-  `test:e2e:postgres`, `dev:postgres`, `dev:all`.
+- Es existiert ein hermetischer E2E-Rauchtest (`pnpm run test:e2e`,
+  `tests/e2e/`); KEINE Scripts `test:e2e:postgres`, `dev:postgres`,
+  `dev:all`.
 - `modules/` enthält KEINE Instanz (nur Dokumentation). Der Generator-Pfad
   `app:new` kann dort ein Modul-Gerüst erzeugen, aber die laufende App bindet
   Module NICHT ein (kein Modul-Mount). Details: `modules/README.md`.
@@ -97,12 +104,17 @@ pnpm --filter @senticor/fachverfahren emit:contract
 Der Snapshot `apps/fachverfahren/leistung.contract.json` ist GENERIERT und
 wird nie von Hand editiert.
 
-Die realen Routen der App (`apps/fachverfahren/src/App.tsx`):
+Die realen Routen der App (`apps/fachverfahren/src/App.tsx`). `/` ist die
+Landing mit der Anmeldung für alle Rollen und die EINZIGE unauthentifizierte
+Route (`/login` bleibt nur als Alias auf `/`); alle Persona- und
+Workspace-Routen sind session-pflichtig:
 
 ```text
+/  (Landing/Anmeldung)
 /buerger · /buerger/anmelden · /buerger/bestaetigung/:id
 /amt · /amt/vorgang/:id
 /aufsicht
+/boards · /boards/:boardId · /admin/users · /konto/passwort
 ```
 
 ## Was Agenten NIE anfassen

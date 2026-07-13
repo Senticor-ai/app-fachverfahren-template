@@ -91,10 +91,20 @@ export function registerAuthRoutes(
   }
 
   app.get("/auth/status", async () => {
-    const count = await deps.authStore.countUsers({
-      tenantId: DEFAULT_TENANT_ID,
-    });
-    return { bootstrapped: count > 0 };
+    // Ohne erreichbaren Auth-Store (kein APP_PG_URL, DB down) bewusst degradiert
+    // antworten statt 500: Web-Tier oben, Datenbank unten. Der Client behandelt
+    // storeAvailable=false wie „API nicht erreichbar" (session-state.ts), und der
+    // Browser loggt keinen Ressourcen-Fehler — der hermetische PWA-Browser-Audit
+    // läuft genau in diesem Zustand gegen die Landing.
+    try {
+      const count = await deps.authStore.countUsers({
+        tenantId: DEFAULT_TENANT_ID,
+      });
+      return { bootstrapped: count > 0 };
+    } catch (error) {
+      app.log.warn({ err: error }, "auth store unavailable for /auth/status");
+      return { bootstrapped: false, storeAvailable: false };
+    }
   });
 
   app.post<{ Body: BootstrapRequestBody }>(

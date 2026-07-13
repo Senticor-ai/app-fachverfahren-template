@@ -99,7 +99,7 @@ bleiben separat zu validieren.
   Euro, `provisional`/`final`) und ist gegen die Beispielwerte getestet.
 - `pnpm --filter @senticor/fachverfahren emit:contract` wurde ausgeführt;
   `pnpm run typecheck` und `pnpm run test` sind grün; die drei Personas sind
-  unter `/buerger`, `/amt` und `/aufsicht` klickbar.
+  nach Anmeldung unter `/buerger`, `/amt` und `/aufsicht` klickbar.
 - KI bleibt assistiv (`ki.schwelleAutonom`, optional transparenter
   `vorschlag`); Entscheidungen bleiben menschlich bestätigt.
 - Kein Hundesteuer-Code landet außerhalb der Naht oder dieses

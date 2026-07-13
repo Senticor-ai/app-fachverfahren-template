@@ -51,7 +51,7 @@ Der Sammel-Lauf `pnpm run check:precommit` bündelt die schnellen Gates;
 ## 4. Persona-Routen (Web-Delivery)
 
 Der Fastify-Server (`apps/fachverfahren/server/`) liefert das SPA auf allen
-client-seitigen Persona-Routen aus — `/` (Bürger), `/buerger`, `/amt`,
+client-seitigen Routen aus — `/` (Landing/Anmeldung), `/buerger`, `/amt`,
 `/aufsicht` — plus Health (`/livez`/`/readyz`/`/startupz`). Siehe die Skill
 [`backend-fastify`](../../.agents/skills/backend-fastify/SKILL.md).
 

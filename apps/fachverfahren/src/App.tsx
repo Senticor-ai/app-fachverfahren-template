@@ -2,12 +2,16 @@
 //   1. Routing (react-router): URL → Persona → Kit-Baustein.
 //   2. Die EINE Store-Instanz aus ./store (Kit-Store + LeistungConfig) als `port` an jeden Baustein.
 //   3. Persona-Wechsel über die Kit-Shell (Bürger/Sachbearbeitung/Aufsicht), URL-getrieben.
+//   4. Das Session-Gate: die Landing ("/") ist die EINZIGE unauthentifizierte Route — ALLE
+//      Persona- und Workspace-Routen liegen hinter RequireSessionOutlet (Storybook bleibt die
+//      login-freie Demo; Vertrag in tests/route-gating.guard.test.ts).
 // Alles Fachliche (Antrag-Schritte, Subsumtion, Status-Machine, Arbeitsvorrat-Spalten, Aufsichts-Kennzahlen)
 // kommt aus den Kit-Bausteinen + der Config. Tausche die Config (./leistung.config) → dieselbe App, anderes Verfahren.
 import { useSyncExternalStore } from "react";
 import { Users } from "lucide-react";
 import {
   Navigate,
+  Outlet,
   Route,
   Routes,
   useLocation,
@@ -31,23 +35,30 @@ import {
 import { store } from "./store.js";
 import { AdminUsersPage } from "./AdminUsersPage.js";
 import { createBoardClient } from "./board-client.js";
-import { LoginPage } from "./LoginPage.js";
+import { LandingPage } from "./LandingPage.js";
 import { PasswordChangePage } from "./PasswordChangePage.js";
 import { useSession } from "./session.js";
 import { needsFirstRunSetup } from "./session-state.js";
 
 const boardPort = createBoardClient();
 
-/** Guards `/boards*`: redirects to `/login` until a session exists (kanban plan Gate P0-A). */
-function RequireSession({
-  children,
-}: {
-  children: React.ReactNode;
-}): React.JSX.Element | null {
+/** Das EINE Session-Gate (Layout-Route): jede Route außer der Landing braucht eine Session.
+ *  Unangemeldet geht es mit `state.from` zur Landing — nach dem Login kehrt die Landing auf
+ *  den angeforderten Deep-Link zurück (postLoginRedirect in landing-state.ts). */
+function RequireSessionOutlet(): React.JSX.Element | null {
   const { status } = useSession();
+  const location = useLocation();
   if (status === "loading") return null;
-  if (status === "unauthenticated") return <Navigate to="/login" replace />;
-  return <>{children}</>;
+  if (status === "unauthenticated") {
+    return (
+      <Navigate
+        to="/"
+        state={{ from: location.pathname + location.search + location.hash }}
+        replace
+      />
+    );
+  }
+  return <Outlet />;
 }
 
 /** Guards `/admin/*`: prüft eine Workspace-Permission (wie die Server-Routen — nie
@@ -61,7 +72,7 @@ function RequirePermission({
 }): React.JSX.Element | null {
   const { status, principal } = useSession();
   if (status === "loading") return null;
-  if (status === "unauthenticated") return <Navigate to="/login" replace />;
+  if (status === "unauthenticated") return <Navigate to="/" replace />;
   if (!principal?.permissions?.includes(permission)) {
     return <Navigate to="/boards" replace />;
   }
@@ -135,51 +146,42 @@ function BoardsShell({
   );
 }
 
+// Die Session-Pflicht liegt zentral auf der RequireSessionOutlet-Layout-Route — die einzelnen
+// Sichten prüfen nur noch ihre Permissions.
 function BoardsList(): React.JSX.Element {
   const navigate = useNavigate();
   return (
-    <RequireSession>
-      <BoardsShell activeNavKey="boards">
-        <BoardList
-          port={boardPort}
-          onOpen={(id) => navigate(`/boards/${id}`)}
-        />
-      </BoardsShell>
-    </RequireSession>
+    <BoardsShell activeNavKey="boards">
+      <BoardList port={boardPort} onOpen={(id) => navigate(`/boards/${id}`)} />
+    </BoardsShell>
   );
 }
 
 function BoardDetail(): React.JSX.Element {
   const { boardId = "" } = useParams();
   return (
-    <RequireSession>
-      <BoardsShell activeNavKey="boards">
-        <KanbanBoard boardId={boardId} port={boardPort} />
-      </BoardsShell>
-    </RequireSession>
+    <BoardsShell activeNavKey="boards">
+      <KanbanBoard boardId={boardId} port={boardPort} />
+    </BoardsShell>
   );
 }
 
 function KontoPasswort(): React.JSX.Element {
+  // Kein Sidebar-Eintrag „Konto" — bewusst kein aktiver Nav-Schlüssel.
   return (
-    <RequireSession>
-      {/* Kein Sidebar-Eintrag „Konto" — bewusst kein aktiver Nav-Schlüssel. */}
-      <BoardsShell activeNavKey="konto">
-        <PasswordChangePage />
-      </BoardsShell>
-    </RequireSession>
+    <BoardsShell activeNavKey="konto">
+      <PasswordChangePage />
+    </BoardsShell>
   );
 }
 
 function AdminUsers(): React.JSX.Element {
   return (
-    <RequireSession>
-      <RequirePermission permission="users.manage">
-        <BoardsShell activeNavKey="admin-users">
-          <AdminUsersPage />
-        </BoardsShell>
-      </RequirePermission>
-    </RequireSession>
+    <RequirePermission permission="users.manage">
+      <BoardsShell activeNavKey="admin-users">
+        <AdminUsersPage />
+      </BoardsShell>
+    </RequirePermission>
   );
 }
 
@@ -368,8 +370,8 @@ function Aufsicht(): React.JSX.Element {
 }
 
 /** First-Run-Gate: solange der Workspace nicht eingerichtet ist (kein Admin existiert), führt
- *  JEDER Pfad zuerst zum Einmal-Setup — nicht nur /boards. Die Prädikat-Logik (inkl. Preview-
- *  Ausnahme ohne API) lebt testbar in session-state.ts. */
+ *  JEDER Pfad zuerst zum Einmal-Setup auf der Landing — die zeigt dann das Bootstrap-Formular.
+ *  Die Prädikat-Logik (inkl. Preview-Ausnahme ohne API) lebt testbar in session-state.ts. */
 function FirstRunGate({
   children,
 }: {
@@ -377,8 +379,8 @@ function FirstRunGate({
 }): React.JSX.Element {
   const session = useSession();
   const location = useLocation();
-  if (needsFirstRunSetup(session) && location.pathname !== "/login") {
-    return <Navigate to="/login" replace />;
+  if (needsFirstRunSetup(session) && location.pathname !== "/") {
+    return <Navigate to="/" replace />;
   }
   return <>{children}</>;
 }
@@ -387,22 +389,26 @@ export function App(): React.JSX.Element {
   return (
     <FirstRunGate>
       <Routes>
-        <Route path="/" element={<Navigate to="/buerger" replace />} />
-        <Route path="/buerger" element={<BuergerStart />} />
-        <Route path="/buerger/anmelden" element={<BuergerAnmelden />} />
-        <Route
-          path="/buerger/bestaetigung/:id"
-          element={<BuergerBestaetigung />}
-        />
-        <Route path="/amt" element={<AmtEingang />} />
-        <Route path="/amt/vorgang/:id" element={<AmtVorgang />} />
-        <Route path="/aufsicht" element={<Aufsicht />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/boards" element={<BoardsList />} />
-        <Route path="/boards/:boardId" element={<BoardDetail />} />
-        <Route path="/admin/users" element={<AdminUsers />} />
-        <Route path="/konto/passwort" element={<KontoPasswort />} />
-        <Route path="*" element={<Navigate to="/buerger" replace />} />
+        {/* Die Landing ist die EINZIGE unauthentifizierte Route; /login bleibt nur als Alias
+            für Bookmarks und Doku bestehen. */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<Navigate to="/" replace />} />
+        <Route element={<RequireSessionOutlet />}>
+          <Route path="/buerger" element={<BuergerStart />} />
+          <Route path="/buerger/anmelden" element={<BuergerAnmelden />} />
+          <Route
+            path="/buerger/bestaetigung/:id"
+            element={<BuergerBestaetigung />}
+          />
+          <Route path="/amt" element={<AmtEingang />} />
+          <Route path="/amt/vorgang/:id" element={<AmtVorgang />} />
+          <Route path="/aufsicht" element={<Aufsicht />} />
+          <Route path="/boards" element={<BoardsList />} />
+          <Route path="/boards/:boardId" element={<BoardDetail />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
+          <Route path="/konto/passwort" element={<KontoPasswort />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </FirstRunGate>
   );

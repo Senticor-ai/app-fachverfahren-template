@@ -66,20 +66,23 @@ Komponenten-Bibliothek gebaut — die neutrale Fastify-Web-Runtime existiert in
    pnpm run dev
    ```
 
-   Die drei Personas laufen rein clientseitig. Der Workspace (`/boards`,
-   Login, Benutzerverwaltung) braucht zusätzlich die lokale App-Runtime —
-   der Vite-Dev-Server proxied `/auth` + `/api` an sie
+   Die Landing (`/`) ist die einzige Route ohne Anmeldung; alle Persona-
+   und Workspace-Sichten (`/buerger*`, `/amt*`, `/aufsicht`, `/boards`,
+   Benutzerverwaltung) liegen hinter dem Session-Gate und brauchen die
+   lokale App-Runtime — der Vite-Dev-Server proxied `/auth` + `/api` an sie
    (`apps/fachverfahren/dev-proxy.ts`, Default `http://127.0.0.1:8080`):
 
    ```bash
-   pnpm run dev:api   # baut Store + Server, fährt Migrationen, startet die Runtime
+   pnpm run dev:api
    ```
 
-   Voraussetzung ist ein erreichbares Postgres samt Datenbank (Default
+   `dev:api` baut Store und Server, fährt die Migrationen und startet die
+   Runtime. Voraussetzung ist ein erreichbares Postgres samt Datenbank (Default
    `postgres://app:app@127.0.0.1:5432/app`, übersteuerbar via `APP_PG_URL`;
    abweichendes Proxy-Ziel via `VITE_DEV_API_PROXY_TARGET`). Beim ersten
-   Start den Admin unter `/login` mit dem Bootstrap-Token einrichten
-   (Default `dev-setup`, nur lokal).
+   Start den Admin auf der Landing (`/`) mit dem Bootstrap-Token einrichten
+   (Default `dev-setup`, nur lokal). Die login-freie Sichtprüfung der
+   Bausteine läuft über `pnpm run storybook`.
 
 ## Bürger-Sprache: Leichte Sprache und Fachbegriffe
 
