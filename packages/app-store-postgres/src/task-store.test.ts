@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import type { AppCase } from "./case-store.js";
-import { CaseVersionConflictError } from "./case-store.js";
+import type { AppCase, CaseStore } from "./case-store.js";
+import {
+  CaseVersionConflictError,
+  InMemoryCaseStore,
+  PostgresCaseStore,
+} from "./case-store.js";
 import {
   type AppIntakeItem,
   type AppSavedView,
@@ -277,6 +281,13 @@ for (const impl of impls) {
         taskKind: "ziel",
         sortRank: "3",
       });
+      // Die Faelle MUESSEN existieren: app_tasks.case_id ist ein FK auf app_cases (ON DELETE SET NULL). InMemory
+      // erzwingt das nicht, Postgres schon — ohne die Cases scheitert der Insert nur auf PG (echte Paritaets-Luecke).
+      const caseStore: CaseStore = pgUrl
+        ? new PostgresCaseStore(pgUrl)
+        : new InMemoryCaseStore();
+      await caseStore.insertCase(macheCase(caseA));
+      await caseStore.insertCase(macheCase(caseB));
       await store.insertTask(zielA);
       await store.insertTask(itemA);
       await store.insertTask(zielB);
