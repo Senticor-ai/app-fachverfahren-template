@@ -670,6 +670,15 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
    *  Subjekt-/Fallmanagement (interne Sachbearbeitung, Sub-Sammlungen an EINER Akte). Treibt später UI-Komposition
    *  + `case_kind`; fehlt das Feld, verhält sich alles unverändert wie `"vorgang"` (Byte-identischer Vertrag). */
   kind?: "vorgang" | "dossier";
+  /** GOVERNANCE-OPT-IN (Dual-Mode Phase 2, additiv, STRIKT MONOTON): Governance darf ueber die in
+   *  `statusMachine.transitions` deklarierte Vier-Augen-Menge hinaus nur ANgeschaltet werden, nie ab.
+   *  `zusaetzlicheVierAugen` nennt Transitionen (from→to), die ZUSAETZLICH Vier-Augen erfordern; die EFFEKTIVE Menge
+   *  liefert `abgeleiteteTransitions()` (Obermenge), `governanceMonotonieVerletzungen()` erzwingt die Monotonie.
+   *  Fehlt das Feld, ist die effektive gleich der deklarierten Menge — Byte-identisches Verhalten. store.ts bleibt
+   *  autoritativ ueber die EINE abgeleitete Wahrheit; es entsteht KEINE zweite praezedenzlose Governance-Quelle. */
+  governance?: {
+    zusaetzlicheVierAugen?: { from: string; to: string }[];
+  };
   /** M3 — `konditionierendesFeld`: der P0-Feldpfad der Vorgangsart, der den Rest des Antrags konditioniert; MUSS
    *  in `steps[0]` (dem `rolle: "kontext"`-Schritt) liegen. Downstream-Schritte/-Felder blenden über `sichtbarWenn`
    *  darauf ein. OPTIONAL/additiv — fehlt es, gibt es keine progressive Disclosure (Verhalten wie bisher). */
