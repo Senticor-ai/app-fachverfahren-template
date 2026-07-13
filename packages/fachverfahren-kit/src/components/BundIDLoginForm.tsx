@@ -95,7 +95,8 @@ export function BundIDLoginForm({
   const demoWarOffen = useRef(false);
   useEffect(() => {
     if (demoOffen && !demoWarOffen.current) vornameRef.current?.focus();
-    else if (!demoOffen && demoWarOffen.current) demoTriggerRef.current?.focus();
+    else if (!demoOffen && demoWarOffen.current)
+      demoTriggerRef.current?.focus();
     demoWarOffen.current = demoOffen;
   }, [demoOffen]);
 

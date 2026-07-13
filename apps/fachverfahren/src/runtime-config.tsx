@@ -127,19 +127,29 @@ export function RuntimeConfigProvider({
         // import.meta.env.BASE_URL, z. B. /flow/preview/<sid>/ oder ein Deploy-Sub-Pfad). Ein ABSOLUTER Pfad
         // "/runtime-config.json" umgeht die Base → landet am Origin-ROOT → 404/SPA-Fallback. Relativ zur Base laden, damit
         // public/runtime-config.json (dort ausgeliefert) gefunden wird. BASE_URL endet per Vite-Konvention mit "/".
-        const antwort = await fetch(`${import.meta.env.BASE_URL}runtime-config.json`, {
-          cache: "no-store",
-          credentials: "same-origin",
-        });
+        const antwort = await fetch(
+          `${import.meta.env.BASE_URL}runtime-config.json`,
+          {
+            cache: "no-store",
+            credentials: "same-origin",
+          },
+        );
         if (!antwort.ok || abgebrochen) return;
         // Ein FEHLENDES runtime-config.json kann unter einem SPA-Fallback als index.html mit Status 200 zurückkommen —
         // dann bräche `.json()` mit „Unexpected token '<' … is not valid JSON". Nur parsen, wenn es wirklich JSON ist.
-        if (!(antwort.headers.get("content-type") || "").toLowerCase().includes("application/json")) return;
+        if (
+          !(antwort.headers.get("content-type") || "")
+            .toLowerCase()
+            .includes("application/json")
+        )
+          return;
         const geladen = (await antwort.json()) as RuntimeConfig;
         if (abgebrochen) return;
         setConfig(geladen);
         if (geladen.delivery?.serviceWorkerEnabled === true) {
-          await registerServiceWorker(`${import.meta.env.BASE_URL}service-worker.js`);
+          await registerServiceWorker(
+            `${import.meta.env.BASE_URL}service-worker.js`,
+          );
         }
       } catch {
         // Die Runtime-Konfiguration ist eine Verbesserung fuer Deployments; die App startet auch ohne sie.

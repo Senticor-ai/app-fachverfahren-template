@@ -976,9 +976,14 @@ function FeldRenderer({
                     warn ? "text-status-warn" : "text-status-info",
                   )}
                 >
-                  <TonIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  <TonIcon
+                    className="mt-0.5 h-4 w-4 shrink-0"
+                    aria-hidden="true"
+                  />
                   <span>
-                    <span className="sr-only">{warn ? "Warnung: " : "Hinweis: "}</span>
+                    <span className="sr-only">
+                      {warn ? "Warnung: " : "Hinweis: "}
+                    </span>
                     {h.text}
                   </span>
                 </li>

@@ -25,12 +25,7 @@ import * as React from "react";
 import type { LeistungConfig } from "../types.js";
 import { cn } from "../lib/utils.js";
 import { Badge } from "../ui/badge.js";
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-  SheetTitle,
-} from "../ui/sheet.js";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "../ui/sheet.js";
 import { useKommuneTheme, KommuneLogo } from "./KommuneTheme.js";
 import {
   DEFAULT_PERSONAS,
@@ -230,15 +225,11 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
       </a>
 
       {/* ── Marken-Sidebar (banner-/navigation-Landmark) ─────────────────────── */}
-      <aside
-        className="sticky top-0 z-30 hidden h-dvh w-[232px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex"
-      >
+      <aside className="sticky top-0 z-30 hidden h-dvh w-[232px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
         {/* Marke — Branding ausschließlich aus config. Bewusst KEIN role="banner": der EINE Seiten-Banner ist der
             <header> unten (1.3.1 — genau ein banner je Seite, nicht in ein complementary/aside verschachtelt). Die
             Navigation trägt ihr eigenes aria-label am inneren <nav>. */}
-        <div
-          className="flex h-14 shrink-0 items-center gap-2.5 border-b border-sidebar-border px-3"
-        >
+        <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-sidebar-border px-3">
           {wappen ? (
             <KommuneLogo logo={wappen} height={28} className="shrink-0" />
           ) : (

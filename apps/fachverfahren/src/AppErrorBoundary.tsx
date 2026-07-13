@@ -57,8 +57,22 @@ export class AppErrorBoundary extends Component<
           typeof window !== "undefined" &&
           !!window.matchMedia?.("(prefers-color-scheme: dark)").matches));
     const c = dark
-      ? { fg: "#e2e8f0", bg: "#0f172a", muted: "#94a3b8", codeBg: "#334155", preBg: "#020617", preBorder: "#1e293b" }
-      : { fg: "#1e293b", bg: "#f8fafc", muted: "#475569", codeBg: "#e2e8f0", preBg: "#0f172a", preBorder: "#0f172a" };
+      ? {
+          fg: "#e2e8f0",
+          bg: "#0f172a",
+          muted: "#94a3b8",
+          codeBg: "#334155",
+          preBg: "#020617",
+          preBorder: "#1e293b",
+        }
+      : {
+          fg: "#1e293b",
+          bg: "#f8fafc",
+          muted: "#475569",
+          codeBg: "#e2e8f0",
+          preBg: "#0f172a",
+          preBorder: "#0f172a",
+        };
     const codeStyle = {
       background: c.codeBg,
       padding: "0 0.25rem",

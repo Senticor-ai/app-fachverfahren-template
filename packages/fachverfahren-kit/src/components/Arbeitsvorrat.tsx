@@ -1075,7 +1075,11 @@ function Th({
       : "descending"
     : "none";
   return (
-    <TableHead scope="col" aria-sort={ariaSort} className="px-4 py-2 font-medium">
+    <TableHead
+      scope="col"
+      aria-sort={ariaSort}
+      className="px-4 py-2 font-medium"
+    >
       <button
         type="button"
         onClick={() => onSort(cKey)}
