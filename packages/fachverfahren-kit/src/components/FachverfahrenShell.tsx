@@ -58,6 +58,21 @@ export interface FachverfahrenShellProps<T = Record<string, unknown>> {
   onNavigate?: (item: ShellNavItem) => void;
   /** Rollen-Beschreibungen für den Switcher (Default: generische DEFAULT_PERSONAS). */
   personas?: readonly PersonaDescriptor[];
+  /** ZUSÄTZLICHE Sidebar-Sektionen unter der Persona-Nav — z.B. „Verwaltung" (role-gated) im
+   *  Team-Workspace. Additiv: ohne Prop ändert sich nichts (Personas, Previews, Bestands-Apps). */
+  extraNavSections?: readonly ShellNavSection[];
+  /** Konto-Bereich rechts im Header (E-Mail, Passwort ändern, Abmelden) — Screen-Contract
+   *  boards-list: „profile and settings remain reachable from the persistent shell". */
+  accountSlot?: React.ReactNode;
+  /** „Demo · synthetische Daten"-Badge (Default true, die Persona-Sichten sind Demos). Der
+   *  Team-Workspace zeigt ECHTE Arbeitsdaten — dort wäre das Badge irreführend → false. */
+  showDemoBadge?: boolean;
+}
+
+/** Eine zusätzliche, benannte Nav-Sektion der Sidebar (siehe extraNavSections). */
+export interface ShellNavSection {
+  label: string;
+  items: readonly ShellNavItem[];
 }
 
 /** Kurz-Marke (Initialen) aus dem Leistungs-Label ableiten — z.B. „Gewerbeanmeldung"→„GE". */
@@ -159,6 +174,9 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
   activeNavKey,
   onNavigate,
   personas,
+  extraNavSections,
+  accountSlot,
+  showDemoBadge = true,
 }: FachverfahrenShellProps<T>): React.JSX.Element {
   // DATA-DRIVEN Rollen: explizite Prop > verfahrensspezifische Rollen aus dem Vertrag (config.personas, aus dem
   // Fachkonzept) > generische DEFAULT_PERSONAS. So spiegeln die 3 Sichten das jeweilige Verfahren, ohne Hardcode.
@@ -185,6 +203,33 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
       e.preventDefault();
       onNavigate(item);
     }
+  };
+
+  // EIN Rezept für Sidebar-Einträge — Persona-Nav und extraNavSections rendern identisch.
+  const renderNavItem = (item: ShellNavItem) => {
+    const Icon = item.icon;
+    const isActive = item.key === activeKey;
+    return (
+      <li key={item.key}>
+        <a
+          href={item.href ?? "#"}
+          aria-current={isActive ? "page" : undefined}
+          onClick={handleNav(item)}
+          className={cn(
+            "flex min-h-11 items-center gap-2.5 rounded-md px-2.5 text-sm",
+            // Kanonisches Fokus-Rezept (Spec 3.2): weicher 3px-Ring, EIN Rezept kit-weit.
+            "transition-colors ease-out motion-reduce:transition-none",
+            "outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+            isActive
+              ? "bg-sidebar-accent/20 font-medium text-sidebar-foreground"
+              : "text-sidebar-muted hover:bg-white/5 hover:text-sidebar-foreground",
+          )}
+        >
+          <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className="truncate">{item.label}</span>
+        </a>
+      </li>
+    );
   };
 
   return (
@@ -239,34 +284,18 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
             <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-sidebar-muted">
               {ROLLEN_LABEL[persona]}
             </div>
-            <ul className="flex flex-col gap-0.5">
-              {nav.map((item) => {
-                const Icon = item.icon;
-                const isActive = item.key === activeKey;
-                return (
-                  <li key={item.key}>
-                    <a
-                      href={item.href ?? "#"}
-                      aria-current={isActive ? "page" : undefined}
-                      onClick={handleNav(item)}
-                      className={cn(
-                        "flex min-h-11 items-center gap-2.5 rounded-md px-2.5 text-sm",
-                        // Kanonisches Fokus-Rezept (Spec 3.2): weicher 3px-Ring, EIN Rezept kit-weit.
-                        "transition-colors ease-out motion-reduce:transition-none",
-                        "outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-                        isActive
-                          ? "bg-sidebar-accent/20 font-medium text-sidebar-foreground"
-                          : "text-sidebar-muted hover:bg-white/5 hover:text-sidebar-foreground",
-                      )}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                      <span className="truncate">{item.label}</span>
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
+            <ul className="flex flex-col gap-0.5">{nav.map(renderNavItem)}</ul>
           </div>
+          {extraNavSections?.map((section) => (
+            <div key={section.label} className="mb-4">
+              <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-sidebar-muted">
+                {section.label}
+              </div>
+              <ul className="flex flex-col gap-0.5">
+                {section.items.map(renderNavItem)}
+              </ul>
+            </div>
+          ))}
         </nav>
 
         {/* Rollen-Wechsler (umschaltbar). */}
@@ -306,8 +335,13 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
               <ShieldCheck className="h-3 w-3" aria-hidden="true" />
               {ROLLEN_LABEL[persona]}
             </Badge>
-            {/* Demo-/Datenschutz-Transparenz (synthetische Daten — keine Echtdaten). */}
-            <Badge tone="neu">Demo · synthetische Daten</Badge>
+            {/* Demo-/Datenschutz-Transparenz (synthetische Daten — keine Echtdaten).
+                Im Team-Workspace (echte Arbeitsdaten) via showDemoBadge=false abgeschaltet. */}
+            {showDemoBadge && (
+              <Badge tone="neu">Demo · synthetische Daten</Badge>
+            )}
+            {/* Konto-Bereich (persistent shell: Profil/Einstellungen erreichbar). */}
+            {accountSlot}
           </div>
         </header>
 

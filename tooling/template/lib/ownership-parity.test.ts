@@ -68,6 +68,7 @@ const updateUnmanagedPaths: string[] = [
   // App-Hülle außerhalb der verwalteten server/public/deploy-Bäume: Frontend/Config, die
   // Konsumenten an ihre Domäne anpassen. Achtung: Vorlagen-PRs, die Frontend UND Server ändern,
   // erreichen Konsumenten hier NICHT über template:update — bekannte Lücke, Produktentscheidung.
+  "apps/*/dev-proxy.ts",
   "apps/*/index.html",
   "apps/*/leistung.contract.json",
   "apps/*/package.json",
@@ -115,6 +116,10 @@ const updateUnmanagedPaths: string[] = [
   "scripts/ci-validate.sh",
   "scripts/codesphere-redeploy-demo.sh",
   "scripts/deploy-demo-consumer.sh",
+  // Lokaler Dev-Runtime-Starter (pnpm dev:api): wie dev/** Konsumenten-Hoheit — Ports,
+  // Postgres-URL und Bootstrap-Weg sind Umgebungsentscheidungen des Konsumenten.
+  "scripts/dev-api.mjs",
+  "scripts/dev-api.test.mjs",
   "scripts/evidence-build.mjs",
   "scripts/motion-baseline.json",
   "scripts/smoke-generated-app.sh",

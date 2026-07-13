@@ -1,24 +1,22 @@
 // session — Client-seitiger Session-Zustand: wer ist angemeldet, ist das Board-Workspace schon
 // eingerichtet (bootstrapped)? EIN Hook, den LoginPage und die geschützten Routen gemeinsam nutzen.
+// Das eigentliche Laden (inkl. „API nicht erreichbar"-Fällen) lebt testbar in ./session-state.
 import * as React from "react";
 import { apiPath } from "./board-client.js";
+import {
+  fetchSessionState,
+  type SessionPrincipal,
+  type SessionStatus,
+} from "./session-state.js";
 
-export interface SessionPrincipal {
-  actorId: string;
-  email: string;
-  displayName?: string;
-  /** Workspace-Rolle + Permissions aus dem App-Identity-Modell (GET /auth/session).
-   *  UI-Guards prüfen Permissions, nie Rollen-Literale — wie die Server-Routen. */
-  role?: "admin" | "member";
-  permissions?: string[];
-}
-
-export type SessionStatus = "loading" | "authenticated" | "unauthenticated";
+export type { SessionPrincipal, SessionStatus } from "./session-state.js";
 
 interface SessionState {
   status: SessionStatus;
   principal: SessionPrincipal | null;
   bootstrapped: boolean;
+  /** false = API-Server antwortet nicht mit JSON (down/kein Dev-Proxy) — siehe session-state. */
+  apiAvailable: boolean;
 }
 
 interface SessionContextValue extends SessionState {
@@ -37,32 +35,22 @@ export function SessionProvider({
     status: "loading",
     principal: null,
     bootstrapped: false,
+    apiAvailable: true,
   });
 
   const refresh = React.useCallback(async () => {
-    const statusResponse = await fetch(apiPath("/auth/status"), {
-      credentials: "include",
-    });
-    const { bootstrapped } = (await statusResponse.json()) as {
-      bootstrapped: boolean;
-    };
-
-    const sessionResponse = await fetch(apiPath("/auth/session"), {
-      credentials: "include",
-    });
-    if (sessionResponse.ok) {
-      const principal = (await sessionResponse.json()) as SessionPrincipal;
-      setState({ status: "authenticated", principal, bootstrapped });
-    } else {
-      setState({ status: "unauthenticated", principal: null, bootstrapped });
-    }
+    setState(await fetchSessionState());
   }, []);
 
   const logout = React.useCallback(async () => {
-    await fetch(apiPath("/auth/logout"), {
-      method: "POST",
-      credentials: "include",
-    });
+    try {
+      await fetch(apiPath("/auth/logout"), {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
+      // API weg (Netzfehler): refresh() unten stellt den Zustand ehrlich dar.
+    }
     await refresh();
   }, [refresh]);
 

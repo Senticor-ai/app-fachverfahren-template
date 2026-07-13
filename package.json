@@ -11,6 +11,7 @@
   "scripts": {
     "predev": "node scripts/check-dev-dependencies.mjs vite",
     "dev": "pnpm --filter @senticor/fachverfahren dev",
+    "dev:api": "node scripts/dev-api.mjs",
     "build": "pnpm -r --if-present build",
     "build:packages": "pnpm --filter \"./packages/**\" run --if-present build && pnpm --filter \"./jurisdictions/**\" run --if-present build",
     "build:app": "pnpm --filter @senticor/fachverfahren build",
