@@ -449,6 +449,14 @@ function shouldCopy(path: string, sourceRoot: string) {
   if (relativePath === "") {
     return true;
   }
+  return isRenderedRepoPath(relativePath);
+}
+
+/** Landet dieser repo-relative Pfad beim Scaffold im Konsumenten? Exportiert, damit der
+ *  Ownership-Paritäts-Test (manifest.test.ts) exakt dieselben Skip-Regeln nutzt wie der
+ *  Scaffold selbst — eine zweite, driftende Kopie der Regeln wäre genau die Lücke,
+ *  die der Test verhindern soll. */
+export function isRenderedRepoPath(relativePath: string): boolean {
   if (repositoryOnlyPaths.has(relativePath)) {
     return false;
   }

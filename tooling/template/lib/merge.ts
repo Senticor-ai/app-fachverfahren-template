@@ -3,7 +3,7 @@ import { dirname, join, relative } from "node:path";
 import { explainOwnership, matchesOwnershipPattern } from "./manifest.ts";
 import { readJson, writeJson, type PackageJson } from "./structured-edit.ts";
 
-const managedCandidateFiles = [
+export const managedCandidateFiles = [
   ".gitlab-ci.yml",
   "ci.yml",
   "scripts/codesphere-toolchain.sh",
