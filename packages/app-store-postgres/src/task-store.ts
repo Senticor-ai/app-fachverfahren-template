@@ -191,6 +191,18 @@ export interface TaskStore {
     at: string;
   }): Promise<void>;
   patchTask(patch: TaskPatch): Promise<AppTask>;
+  /** DOSSIERPORT (Dual-Mode Phase 1.5) — die EINZIGE auditierte Naht für Dossier-`data`-Mutationen. Patcht die
+   *  `data`-Nutzlast (flacher Merge auf oberster Ebene, NICHT ersetzen) UND emittiert in DERSELBEN Transaktion eine
+   *  append-only-Aktivität. Kern-Invariante des Dossier-Modus: KEINE data-Mutation ohne Protokoll. Guard vor jeder
+   *  Mutation (`assertDossierActivityShape` + Behörden-Gleichheit) → wirft `DossierActivityInvalidError`, ohne zu
+   *  schreiben (Rollback-Parität). `expectedVersion` erzwingt Optimistic-Locking; die Version steigt bei jedem Patch. */
+  patchTaskDataWithActivity(input: {
+    tenantId: string;
+    taskId: string;
+    expectedVersion?: number;
+    dataPatch: Record<string, unknown>;
+    activity: AppTaskActivity;
+  }): Promise<{ task: AppTask; activity: AppTaskActivity }>;
   insertIntake(item: AppIntakeItem): Promise<AppIntakeItem>;
   listIntake(query: {
     tenantId: string;
@@ -283,6 +295,38 @@ export class IntakeNotFoundError extends Error {
     super(`intake ${intakeId} not found`);
     this.name = "IntakeNotFoundError";
   }
+}
+
+/** Dual-Mode Phase 1.5: die Aktivität, die eine Dossier-`data`-Mutation begleitet, ist NICHT revisionssicher.
+ *  `missing-authority`: keine authorityId (die DB erzwingt das NICHT — app_task_activity.authority_id ist nullable,
+ *  deshalb der App-Guard); `task-mismatch`: Aktivität gehört zu anderem Mandant/Task als die Mutation;
+ *  `authority-mismatch`: Aktivitäts-Behörde ≠ Behörde der Aufgabe (fremdbehördliches Protokoll). → HTTP 422. */
+export class DossierActivityInvalidError extends Error {
+  constructor(
+    readonly grund:
+      | "missing-authority"
+      | "task-mismatch"
+      | "authority-mismatch",
+  ) {
+    super(`invalid dossier activity: ${grund}`);
+    this.name = "DossierActivityInvalidError";
+  }
+}
+
+/** Vor-Lade-Guard des DossierPorts: die begleitende Aktivität MUSS eine Behörde tragen und exakt zu der zu
+ *  mutierenden Aufgabe (Mandant + taskId) gehören. Läuft VOR jeder Mutation — schlägt er an, ist nichts
+ *  geschrieben (Rollback-Parität InMemory==Postgres). Die Behörden-Gleichheit gegen die Aufgabe wird erst nach
+ *  dem Laden geprüft (dort steht die Behörde der Aufgabe fest). */
+function assertDossierActivityShape(input: {
+  tenantId: string;
+  taskId: string;
+  activity: AppTaskActivity;
+}): void {
+  const a = input.activity;
+  if (!a.authorityId)
+    throw new DossierActivityInvalidError("missing-authority");
+  if (a.tenantId !== input.tenantId || a.taskId !== input.taskId)
+    throw new DossierActivityInvalidError("task-mismatch");
 }
 
 // ── In-Memory ─────────────────────────────────────────────────────────────────────────────────────
@@ -447,6 +491,51 @@ export class InMemoryTaskStore implements TaskStore {
       ...next,
       labels: [...next.labels],
       data: { ...(next.data ?? {}) },
+    };
+  }
+
+  async patchTaskDataWithActivity(input: {
+    tenantId: string;
+    taskId: string;
+    expectedVersion?: number;
+    dataPatch: Record<string, unknown>;
+    activity: AppTaskActivity;
+  }): Promise<{ task: AppTask; activity: AppTaskActivity }> {
+    // STAGING/ROLLBACK-Shim (Parität zu PG BEGIN..ROLLBACK): ALLE Prüfungen (Guard, Not-Found, Behörden-Gleichheit,
+    // Version) laufen VOR der ersten Mutation; die beiden Schreibvorgänge (task.data + Aktivität) erfolgen danach
+    // synchron-unteilbar OHNE dazwischenliegendes await. Wirft die Emission (ungültige Aktivität), ist nichts geschrieben.
+    assertDossierActivityShape(input);
+    const key = this.tk(input.tenantId, input.taskId);
+    const cur = this.tasks.get(key);
+    if (!cur) throw new TaskNotFoundError(input.taskId);
+    if (input.activity.authorityId !== cur.authorityId)
+      throw new DossierActivityInvalidError("authority-mismatch");
+    if (
+      input.expectedVersion !== undefined &&
+      cur.version !== input.expectedVersion
+    )
+      throw new CaseVersionConflictError(
+        input.taskId,
+        input.expectedVersion,
+        cur.version,
+      );
+    const next: AppTask = {
+      ...cur,
+      // flacher Merge auf oberster Ebene — ein Key im Patch ersetzt den gleichnamigen Key im Bestand (wie jsonb `||`).
+      data: { ...(cur.data ?? {}), ...input.dataPatch },
+      version: cur.version + 1,
+      updatedAt: this.now(),
+    };
+    const staged: AppTaskActivity = {
+      ...input.activity,
+      payload: { ...input.activity.payload },
+    };
+    // commit (synchron-unteilbar):
+    this.tasks.set(key, next);
+    this.activity.push(staged);
+    return {
+      task: { ...next, labels: [...next.labels], data: { ...next.data } },
+      activity: { ...staged, payload: { ...staged.payload } },
     };
   }
 
@@ -843,6 +932,63 @@ export class PostgresTaskStore implements TaskStore {
         );
         await c.query("COMMIT");
         return taskFromRow(upd.rows[0]!);
+      } catch (e) {
+        await c.query("ROLLBACK").catch(() => {});
+        throw e;
+      }
+    });
+  }
+
+  async patchTaskDataWithActivity(input: {
+    tenantId: string;
+    taskId: string;
+    expectedVersion?: number;
+    dataPatch: Record<string, unknown>;
+    activity: AppTaskActivity;
+  }): Promise<{ task: AppTask; activity: AppTaskActivity }> {
+    // Guard VOR der Transaktion (kein Verbindungsleihen für eine ohnehin ungültige Aktivität).
+    assertDossierActivityShape(input);
+    return this.withClient(async (c) => {
+      try {
+        // ATOMAR: data-Patch + Aktivität teilen EINE Transaktion (Muster wie insertCommentWithActivity). Schlägt der
+        // Aktivitäts-Insert fehl, rollt der data-Patch mit zurück — keine Dossier-Mutation ohne ihr Protokoll.
+        await c.query("BEGIN");
+        const cur = await c.query<TaskRow>(
+          `${TASK_SELECT} WHERE tenant_id = $1 AND task_id = $2 FOR UPDATE`,
+          [input.tenantId, input.taskId],
+        );
+        const row = cur.rows[0];
+        if (!row) throw new TaskNotFoundError(input.taskId);
+        if (input.activity.authorityId !== row.authority_id)
+          throw new DossierActivityInvalidError("authority-mismatch");
+        if (
+          input.expectedVersion !== undefined &&
+          row.version !== input.expectedVersion
+        )
+          throw new CaseVersionConflictError(
+            input.taskId,
+            input.expectedVersion,
+            row.version,
+          );
+        const upd = await c.query<TaskRow>(
+          // jsonb `||` = flacher Merge auf oberster Ebene (Patch-Key ersetzt gleichnamigen Bestand) — Parität zu InMemory.
+          `UPDATE app_tasks SET data = data || $3::jsonb, version = version + 1, updated_at = now()
+           WHERE tenant_id = $1 AND task_id = $2
+           RETURNING ${TASK_COLS}`,
+          [input.tenantId, input.taskId, JSON.stringify(input.dataPatch)],
+        );
+        await c.query(
+          ACTIVITY_INSERT_SQL,
+          activityInsertParams(input.activity),
+        );
+        await c.query("COMMIT");
+        return {
+          task: taskFromRow(upd.rows[0]!),
+          activity: {
+            ...input.activity,
+            payload: { ...input.activity.payload },
+          },
+        };
       } catch (e) {
         await c.query("ROLLBACK").catch(() => {});
         throw e;

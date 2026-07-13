@@ -5,7 +5,9 @@ import {
   type AppIntakeItem,
   type AppSavedView,
   type AppTask,
+  type AppTaskActivity,
   type TaskStore,
+  DossierActivityInvalidError,
   InMemoryTaskStore,
   IntakeNotFoundError,
   PostgresTaskStore,
@@ -132,6 +134,91 @@ for (const impl of impls) {
       });
       expect(p.taskKind).toBe("ziel");
       expect(p.data).toEqual({ kategorie: "Wohnen", zieltermin: "2026-09-01" });
+    });
+
+    it("DOSSIERPORT (Phase 1.5): patchTaskDataWithActivity merged data + emittiert Aktivitaet atomar; Guards rollen zurueck — InMemory==Postgres", async () => {
+      const t = macheTask({ taskKind: "ziel", data: { kategorie: "Wohnen" } });
+      await store.insertTask(t);
+      const mkAkt = (over: Partial<AppTaskActivity> = {}): AppTaskActivity => ({
+        activityId: `a-${uid()}`,
+        taskId: t.taskId,
+        tenantId: "t1",
+        authorityId: "b1",
+        actorId: "sb.a",
+        activityType: "dossier.data.updated",
+        payload: {},
+        occurredAt: "2026-06-03T00:00:00.000Z",
+        ...over,
+      });
+
+      // Happy path: FLACHER Merge (bestehender Key bleibt, neuer kommt hinzu, gleichnamiger wird ersetzt) + Version+1;
+      // die Aktivitaet erscheint im append-only-Protokoll.
+      const r1 = await store.patchTaskDataWithActivity({
+        tenantId: "t1",
+        taskId: t.taskId,
+        dataPatch: { zieltermin: "2026-09-01", kategorie: "Arbeit" },
+        activity: mkAkt({ payload: { feld: "zieltermin" } }),
+      });
+      expect(r1.task.data).toEqual({
+        kategorie: "Arbeit",
+        zieltermin: "2026-09-01",
+      });
+      expect(r1.task.version).toBe(2);
+      expect(
+        (
+          await store.listTaskActivity({ tenantId: "t1", taskId: t.taskId })
+        ).some((a) => a.activityType === "dossier.data.updated"),
+      ).toBe(true);
+
+      // GUARD missing-authority: die DB erzwingt authority_id NICHT — der Port tut es. Wirft, data UNVERAENDERT, KEINE
+      // zweite Aktivitaet (Rollback-Paritaet: in PG rollt der data-Patch mit zurueck, in InMemory wird nie geschrieben).
+      await expect(
+        store.patchTaskDataWithActivity({
+          tenantId: "t1",
+          taskId: t.taskId,
+          dataPatch: { geheim: true },
+          activity: mkAkt({ authorityId: null }),
+        }),
+      ).rejects.toBeInstanceOf(DossierActivityInvalidError);
+      const nach = await store.getTask({ tenantId: "t1", taskId: t.taskId });
+      expect(nach?.data).toEqual({
+        kategorie: "Arbeit",
+        zieltermin: "2026-09-01",
+      });
+      expect(nach?.version).toBe(2);
+      expect(
+        (await store.listTaskActivity({ tenantId: "t1", taskId: t.taskId }))
+          .length,
+      ).toBe(1);
+
+      // GUARD task-mismatch: Aktivitaet zeigt auf eine andere Aufgabe -> wirft (kein fremdes Protokoll).
+      await expect(
+        store.patchTaskDataWithActivity({
+          tenantId: "t1",
+          taskId: t.taskId,
+          dataPatch: { x: 1 },
+          activity: mkAkt({ taskId: "andere-aufgabe" }),
+        }),
+      ).rejects.toBeInstanceOf(DossierActivityInvalidError);
+
+      // Optimistic-Locking: falsche expectedVersion -> Konflikt, keine Mutation.
+      await expect(
+        store.patchTaskDataWithActivity({
+          tenantId: "t1",
+          taskId: t.taskId,
+          expectedVersion: 99,
+          dataPatch: { x: 1 },
+          activity: mkAkt(),
+        }),
+      ).rejects.toBeInstanceOf(CaseVersionConflictError);
+      // nach allen Guards immer noch genau 1 Aktivitaet + Version 2 (nichts durchgesickert).
+      expect(
+        (await store.getTask({ tenantId: "t1", taskId: t.taskId }))?.version,
+      ).toBe(2);
+      expect(
+        (await store.listTaskActivity({ tenantId: "t1", taskId: t.taskId }))
+          .length,
+      ).toBe(1);
     });
 
     it("patcht Zuweisung/Priorität/Labels und erhöht die Version", async () => {
