@@ -36,6 +36,7 @@ Rein additiv: keine Migration, keine Signatur-Änderung bestehender Methoden. `p
 ausschließlich über den DossierPort.
 
 Härtungen (`DossierActivityInvalidError`, HTTP 422):
+
 - **Guard `missing-authority`** — die begleitende Aktivität MUSS eine `authorityId`
   tragen. Die DB erzwingt das NICHT (`app_task_activity.authority_id` ist nullable für
   Altbestand), daher der App-Guard. Läuft VOR jeder Mutation.

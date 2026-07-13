@@ -11,12 +11,15 @@ Verfahren, über die in `statusMachine.transitions` deklarierte Vier-Augen-Menge
 Governance zu VERSCHÄRFEN — strikt monoton (nur ANschalten, nie ab).
 
 Neu in `LeistungConfig`:
+
 ```ts
 governance?: { zusaetzlicheVierAugen?: { from: string; to: string }[] };
 ```
+
 Optional/additiv — fehlt es, verhält sich alles byte-identisch wie bisher.
 
 Neue reine Interpreter-Funktionen (aus `@senticor/fachverfahren-kit`):
+
 - `abgeleiteteTransitions(config)` — die EFFEKTIVEN Transitionen: jede in `zusaetzlicheVierAugen`
   genannte (from→to) trägt zusätzlich `vierAugen: true`; alle anderen unverändert. Ohne
   `governance` wird die deklarierte Liste UNVERÄNDERT (per Referenz) zurückgegeben. Rein,

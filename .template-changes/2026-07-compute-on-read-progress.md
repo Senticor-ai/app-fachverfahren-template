@@ -17,7 +17,7 @@ Motivation (aus dem integrai-Modellierungs-Beweis, Phase 1.5c): der Ziele-Fortsc
 die dedizierte, **LIMIT-FREIE** Aggregation:
 
 - Postgres: `COUNT(*)` + `COUNT(*) FILTER (WHERE data->>$flagKey = 'true')` `GROUP BY
-  parent_task_id` — kein Cap, keine geladenen Kind-Zeilen, der Flag-Key ist parametrisiert.
+parent_task_id` — kein Cap, keine geladenen Kind-Zeilen, der Flag-Key ist parametrisiert.
 - InMemory: iteriert über ALLE Kinder (kein Cap), gruppiert nach `parentTaskId`.
 
 Wertneutral: der Flag-Key ist ein Parameter (die Domäne übergibt `flagKey='erledigt'`,
