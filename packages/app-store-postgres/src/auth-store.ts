@@ -64,6 +64,10 @@ export interface AuthStore {
   }): Promise<UserAccount | undefined>;
   countUsers(input: { tenantId: string }): Promise<number>;
   listUsers(input: { tenantId: string }): Promise<UserAccount[]>;
+  /** Statuswechsel ATOMAR mit der Session-Konsequenz: `disabled` widerruft in derselben
+   *  Transaktion alle aktiven Sessions des Actors — getrennte Schritte könnten nach einem
+   *  Teilfehler ein deaktiviertes Konto mit lebender 12h-Session zurücklassen
+   *  (requirePrincipal prüft user.status nicht pro Request). */
   updateUserStatus(input: {
     tenantId: string;
     actorId: string;
@@ -100,9 +104,6 @@ export interface AuthStore {
     sessionIdHash: string,
   ): Promise<SessionRecord | undefined>;
   revokeSession(sessionIdHash: string): Promise<void>;
-  /** Deaktivierung ohne Session-Revocation wäre 12h wirkungslos (Session-TTL):
-   *  widerruft ALLE aktiven Sessions eines Actors. */
-  revokeSessionsForActor(actorId: string): Promise<void>;
 
   linkIdentity(link: IdentityLink): Promise<IdentityLink>;
   findActorByIdentity(input: {
@@ -193,6 +194,13 @@ export class InMemoryAuthStore implements AuthStore {
       updatedAt: nowIso(),
     };
     this.users.set(key, next);
+    if (input.status === "disabled") {
+      for (const [hash, session] of this.sessions) {
+        if (session.actorId === input.actorId && !session.revokedAt) {
+          this.sessions.set(hash, { ...session, revokedAt: nowIso() });
+        }
+      }
+    }
     return { ...next };
   }
 
@@ -325,14 +333,6 @@ export class InMemoryAuthStore implements AuthStore {
     }
   }
 
-  async revokeSessionsForActor(actorId: string): Promise<void> {
-    for (const [hash, session] of this.sessions) {
-      if (session.actorId === actorId && !session.revokedAt) {
-        this.sessions.set(hash, { ...session, revokedAt: nowIso() });
-      }
-    }
-  }
-
   async linkIdentity(link: IdentityLink): Promise<IdentityLink> {
     const key = identityKey(link.tenantId, link.provider, link.subject);
     if (this.identityLinks.has(key)) {
@@ -437,9 +437,6 @@ export class UnavailableAuthStore implements AuthStore {
     this.fail();
   }
   async revokeSession(): Promise<void> {
-    this.fail();
-  }
-  async revokeSessionsForActor(): Promise<void> {
     this.fail();
   }
   async linkIdentity(): Promise<IdentityLink> {
@@ -552,16 +549,32 @@ export class PostgresAuthStore implements AuthStore {
     status: UserStatus;
   }): Promise<UserAccount> {
     return this.withClient(async (client) => {
-      const result = await client.query<UserRow>(
-        `
-          UPDATE app_users
-          SET status = $3, updated_at = now()
-          WHERE tenant_id = $1 AND actor_id = $2
-          RETURNING *
-        `,
-        [input.tenantId, input.actorId, input.status],
-      );
-      return userFromRow(requireRow(result.rows, "user", input.actorId));
+      // Eine Transaktion für Status + Session-Revocation: sonst könnte ein Fehler nach
+      // dem Status-Update ein deaktiviertes Konto mit lebenden Sessions hinterlassen.
+      await client.query("BEGIN");
+      try {
+        const result = await client.query<UserRow>(
+          `
+            UPDATE app_users
+            SET status = $3, updated_at = now()
+            WHERE tenant_id = $1 AND actor_id = $2
+            RETURNING *
+          `,
+          [input.tenantId, input.actorId, input.status],
+        );
+        const row = requireRow(result.rows, "user", input.actorId);
+        if (input.status === "disabled") {
+          await client.query(
+            `UPDATE app_sessions SET revoked_at = now() WHERE actor_id = $1 AND revoked_at IS NULL`,
+            [input.actorId],
+          );
+        }
+        await client.query("COMMIT");
+        return userFromRow(row);
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => {});
+        throw error;
+      }
     });
   }
 
@@ -759,15 +772,6 @@ export class PostgresAuthStore implements AuthStore {
       );
       return credentialFromRow(
         requireRow(result.rows, "local credential", input.actorId),
-      );
-    });
-  }
-
-  async revokeSessionsForActor(actorId: string): Promise<void> {
-    await this.withClient(async (client) => {
-      await client.query(
-        `UPDATE app_sessions SET revoked_at = now() WHERE actor_id = $1 AND revoked_at IS NULL`,
-        [actorId],
       );
     });
   }

@@ -192,7 +192,7 @@ describe("InMemoryAuthStore — administration", () => {
     expect(updated.passwordChangedAt).toBe("2026-07-12T11:00:00.000Z");
   });
 
-  it("revokes every active session of an actor (disable must not leave 12h zombie sessions)", async () => {
+  it("disabling a user revokes every active session ATOMICALLY with the status change", async () => {
     const store = new InMemoryAuthStore();
     await store.createUser(makeUser());
     const future = new Date(Date.now() + 60_000).toISOString();
@@ -209,9 +209,21 @@ describe("InMemoryAuthStore — administration", () => {
       });
     }
 
-    await store.revokeSessionsForActor("actor.1");
+    await store.updateUserStatus({
+      tenantId: "tenant.local",
+      actorId: "actor.1",
+      status: "disabled",
+    });
     expect(await store.getActiveSessionByHash("hash.a")).toBeUndefined();
     expect(await store.getActiveSessionByHash("hash.b")).toBeUndefined();
+
+    // Re-Aktivierung lässt widerrufene Sessions widerrufen (kein Wiederaufleben).
+    await store.updateUserStatus({
+      tenantId: "tenant.local",
+      actorId: "actor.1",
+      status: "active",
+    });
+    expect(await store.getActiveSessionByHash("hash.a")).toBeUndefined();
   });
 });
 

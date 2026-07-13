@@ -256,6 +256,21 @@ describe("user management routes", () => {
     expect(reLogin.statusCode).toBe(200);
   });
 
+  it("maps only duplicate-email races to 409 — other persistence failures stay 5xx", async () => {
+    const originalCreateUser = ctx.authStore.createUser.bind(ctx.authStore);
+    ctx.authStore.createUser = async () => {
+      throw new Error("relation app_users does not exist");
+    };
+    const brokenStore = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: { cookie: ctx.adminCookie },
+      payload: { ...memberBody, email: "other@example.org" },
+    });
+    expect(brokenStore.statusCode).toBe(500);
+    ctx.authStore.createUser = originalCreateUser;
+  });
+
   it("refuses self-disable and unknown actors", async () => {
     const self = await ctx.app.inject({
       method: "PATCH",

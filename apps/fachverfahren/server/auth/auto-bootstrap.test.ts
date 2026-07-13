@@ -1,6 +1,8 @@
 import {
+  InMemoryAuditStore,
   InMemoryAuthStore,
   InMemoryKanbanStore,
+  UnavailableAuditStore,
   UnavailableAuthStore,
   UnavailableKanbanStore,
 } from "@senticor/app-store-postgres";
@@ -17,6 +19,7 @@ function makeDeps(env: NodeJS.ProcessEnv) {
   return {
     authStore: new InMemoryAuthStore(),
     kanbanStore: new InMemoryKanbanStore(),
+    auditStore: new InMemoryAuditStore(),
     env,
     log: (level: "info" | "error", event: string, fields: unknown) => {
       logs.push({ level, event, fields });
@@ -41,6 +44,9 @@ describe("autoBootstrapAdminFromEnv", () => {
       actorId: user?.actorId ?? "",
     });
     expect(boards[0]?.visibility).toBe("team");
+    // Auch der Env-Bootstrap hinterlässt Audit-Evidenz für das erste privilegierte Konto.
+    const events = await deps.auditStore.listEvents({ tenantId: "default" });
+    expect(events.map((event) => event.eventType)).toContain("USER_CREATED");
     // Das Passwort taucht in KEINEM Logfeld auf.
     expect(JSON.stringify(deps.logs)).not.toContain(
       configuredEnv["AUTH_BOOTSTRAP_ADMIN_PASSWORD"],
@@ -81,6 +87,7 @@ describe("autoBootstrapAdminFromEnv", () => {
     const outcome = await autoBootstrapAdminFromEnv({
       authStore: new UnavailableAuthStore("db down"),
       kanbanStore: new UnavailableKanbanStore("db down"),
+      auditStore: new UnavailableAuditStore("db down"),
       env: configuredEnv,
     });
     expect(outcome).toBe("failed");

@@ -11,7 +11,6 @@ import type { FastifyInstance } from "fastify";
 import {
   DEFAULT_AUTHORITY_ID,
   DEFAULT_JURISDICTION_ID,
-  DEFAULT_TENANT_ID,
   MINIMUM_PASSWORD_LENGTH,
 } from "../auth/bootstrap.js";
 import "../auth/principal.js";
@@ -49,6 +48,16 @@ function toUserResponse(user: UserAccount) {
   };
 }
 
+/** Duplikat-Erkennung über beide Store-Implementierungen: Postgres meldet die
+ *  Unique-Violation als SQLSTATE 23505, der InMemory-Store wirft "... already exists". */
+function isDuplicateUserError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const code = (error as { code?: unknown }).code;
+  return code === "23505" || /already exists/i.test(error.message);
+}
+
 /** Admin-Benutzerverwaltung (Feature-Entscheid: Admin legt Konten an, keine
  *  Selbst-Registrierung). Alle Routen verlangen die Permission `users.manage`. */
 export function registerUserRoutes(
@@ -65,15 +74,19 @@ export function registerUserRoutes(
   );
   const guards = [requirePrincipal, requireUsersManage];
 
+  // Audit-Events gehören in den Tenant des HANDELNDEN Principals — nicht pauschal in
+  // den Default-Tenant, sonst verschwänden sie aus dem Trail des betroffenen Tenants
+  // (Codex-Review PR #27).
   async function audit(
     eventType: AuditEventType,
+    tenantId: string,
     actorId: string | null,
     metadata: Record<string, unknown>,
   ): Promise<void> {
     try {
       await deps.auditStore.appendEvent({
         id: generateId("audit"),
-        tenantId: DEFAULT_TENANT_ID,
+        tenantId,
         actorId,
         eventType,
         occurredAt: now().toISOString(),
@@ -146,12 +159,16 @@ export function registerUserRoutes(
           createdAt: nowIso,
           updatedAt: nowIso,
         });
-      } catch {
-        // Race auf den Unique-Index (tenant_id, lower(email)) zwischen Pre-Check und
-        // INSERT: derselbe 409 wie beim Pre-Check, kein 500.
-        return reply
-          .code(409)
-          .send({ error: "a user with this email already exists" });
+      } catch (error) {
+        // NUR das Duplikat (Race auf den Unique-Index (tenant_id, lower(email)) zwischen
+        // Pre-Check und INSERT) wird zum 409 — alle anderen Persistenzfehler (fehlende
+        // Migration, Verbindungsabbruch) müssen als 5xx sichtbar bleiben (Codex-Review PR #27).
+        if (isDuplicateUserError(error)) {
+          return reply
+            .code(409)
+            .send({ error: "a user with this email already exists" });
+        }
+        throw error;
       }
 
       // Gleiche Rollback-Grenze wie bootstrapWorkspace: scheitert Credential, Identity-Link
@@ -187,7 +204,7 @@ export function registerUserRoutes(
           },
           { generateId },
         );
-        await audit("USER_CREATED", principal.actorId, {
+        await audit("USER_CREATED", principal.tenantId, principal.actorId, {
           createdActorId: actorId,
           email: user.email,
           role: user.role,
@@ -233,19 +250,22 @@ export function registerUserRoutes(
         return reply.code(404).send({ error: "user not found" });
       }
 
+      // updateUserStatus widerruft bei `disabled` ATOMAR alle aktiven Sessions
+      // (eine Store-Transaktion) — kein Fenster für „deaktiviert, aber Session lebt".
       const updated = await deps.authStore.updateUserStatus({
         tenantId: principal.tenantId,
         actorId: target.actorId,
         status,
       });
-      if (status === "disabled") {
-        // Deaktivierung ohne Session-Revocation wäre bis zu 12h wirkungslos.
-        await deps.authStore.revokeSessionsForActor(target.actorId);
-      }
-      await audit("USER_STATUS_CHANGED", principal.actorId, {
-        targetActorId: target.actorId,
-        status,
-      });
+      await audit(
+        "USER_STATUS_CHANGED",
+        principal.tenantId,
+        principal.actorId,
+        {
+          targetActorId: target.actorId,
+          status,
+        },
+      );
       return reply.send(toUserResponse(updated));
     },
   );

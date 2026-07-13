@@ -163,6 +163,10 @@ export async function bootstrapWorkspace(
 
     return { user, board };
   } catch (error) {
+    // deleteUser räumt in Postgres per ON DELETE CASCADE auch Credential, Sessions,
+    // Identity-Links UND den bereits geseedeten Board-Graph ab (owner_actor_id-FK,
+    // Migration workspace_foundation) — sonst bliebe nach einem Seed-Teilfehler ein
+    // Zombie-Konto mit gültigem Initialpasswort zurück (Codex-Review PR #27).
     await deps.authStore.deleteUser({ tenantId, actorId }).catch(() => {
       // Best effort: schlägt auch die Kompensation fehl (z. B. DB weg), gewinnt der
       // ursprüngliche Fehler — er beschreibt die eigentliche Ursache.

@@ -15,7 +15,6 @@ import {
   nextPositionKey,
 } from "@senticor/app-store-postgres";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { DEFAULT_TENANT_ID } from "../auth/constants.js";
 import "../auth/principal.js";
 import { createRequirePrincipal } from "../auth/require-principal.js";
 import { hasWorkspacePermission } from "../auth/workspace-permissions.js";
@@ -141,15 +140,17 @@ export function registerBoardRoutes(
     return { principal, board };
   }
 
+  // Audit-Events gehören in den Tenant des handelnden Principals (Codex-Review PR #27).
   async function audit(
     eventType: AuditEventType,
+    tenantId: string,
     actorId: string,
     metadata: Record<string, unknown>,
   ): Promise<void> {
     try {
       await deps.auditStore.appendEvent({
         id: generateId("audit"),
-        tenantId: DEFAULT_TENANT_ID,
+        tenantId,
         actorId,
         eventType,
         occurredAt: nowIso(),
@@ -213,7 +214,7 @@ export function registerBoardRoutes(
         createdAt: timestamp,
         updatedAt: timestamp,
       });
-      await audit("BOARD_CREATED", principal.actorId, {
+      await audit("BOARD_CREATED", principal.tenantId, principal.actorId, {
         boardId: board.boardId,
         visibility: board.visibility,
       });
@@ -288,10 +289,15 @@ export function registerBoardRoutes(
         if (updated.visibility !== loaded.board.visibility) {
           // "BOARD_SHARED"/Entzug der Team-Sichtbarkeit — sicherheitsrelevant, weil sich
           // der Leserkreis ändert.
-          await audit("BOARD_VISIBILITY_CHANGED", loaded.principal.actorId, {
-            boardId: updated.boardId,
-            visibility: updated.visibility,
-          });
+          await audit(
+            "BOARD_VISIBILITY_CHANGED",
+            loaded.principal.tenantId,
+            loaded.principal.actorId,
+            {
+              boardId: updated.boardId,
+              visibility: updated.visibility,
+            },
+          );
         }
         await reply.header("etag", etagFor(updated.version)).send(updated);
       });
@@ -321,9 +327,12 @@ export function registerBoardRoutes(
           boardId: loaded.board.boardId,
           expectedVersion,
         });
-        await audit("BOARD_ARCHIVED", loaded.principal.actorId, {
-          boardId: archived.boardId,
-        });
+        await audit(
+          "BOARD_ARCHIVED",
+          loaded.principal.tenantId,
+          loaded.principal.actorId,
+          { boardId: archived.boardId },
+        );
         await reply.header("etag", etagFor(archived.version)).send(archived);
       });
     },

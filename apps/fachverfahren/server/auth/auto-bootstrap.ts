@@ -1,4 +1,9 @@
-import type { AuthStore, KanbanStore } from "@senticor/app-store-postgres";
+import { randomUUID } from "node:crypto";
+import type {
+  AuditStore,
+  AuthStore,
+  KanbanStore,
+} from "@senticor/app-store-postgres";
 import { bootstrapWorkspace, DEFAULT_TENANT_ID } from "./bootstrap.js";
 
 export type AutoBootstrapOutcome =
@@ -7,6 +12,7 @@ export type AutoBootstrapOutcome =
 export interface AutoBootstrapDeps {
   authStore: AuthStore;
   kanbanStore: KanbanStore;
+  auditStore: AuditStore;
   env?: NodeJS.ProcessEnv;
   now?: () => Date;
   generateId?: (prefix: string) => string;
@@ -26,6 +32,10 @@ export interface AutoBootstrapDeps {
  *  Wirft NIE: Fehlkonfiguration oder DB-Ausfall werden laut geloggt, der Server
  *  startet trotzdem (die Personas-Demo und /login funktionieren weiterhin).
  *  Das Passwort erscheint in keinem Logfeld. */
+function defaultGenerateId(prefix: string): string {
+  return `${prefix}.${randomUUID()}`;
+}
+
 export async function autoBootstrapAdminFromEnv(
   deps: AutoBootstrapDeps,
 ): Promise<AutoBootstrapOutcome> {
@@ -72,6 +82,27 @@ export async function autoBootstrapAdminFromEnv(
           },
           { email, password, displayName },
         );
+        // Auch der Env-Bootstrap ist eine sicherheitsrelevante Konto-Anlage — ohne
+        // dieses Event hätte ausgerechnet das erste privilegierte Konto keine
+        // Audit-Evidenz (Codex-Review PR #27). Fehler loggen, aber nicht werfen.
+        try {
+          await deps.auditStore.appendEvent({
+            id: (deps.generateId ?? defaultGenerateId)("audit"),
+            tenantId: DEFAULT_TENANT_ID,
+            actorId: result.user.actorId,
+            eventType: "USER_CREATED",
+            occurredAt: (deps.now ?? (() => new Date()))().toISOString(),
+            metadata: {
+              email: result.user.email,
+              role: result.user.role,
+              via: "startup-env",
+            },
+          });
+        } catch (error) {
+          log("error", "runtime.auth.bootstrap.audit-failed", {
+            reason: error instanceof Error ? error.message : String(error),
+          });
+        }
         log("info", "runtime.auth.bootstrap.created", {
           actorId: result.user.actorId,
           boardId: result.board.boardId,

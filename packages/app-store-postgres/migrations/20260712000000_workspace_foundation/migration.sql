@@ -52,6 +52,36 @@ CREATE TABLE IF NOT EXISTS app_workspace_audit_events (
 CREATE INDEX IF NOT EXISTS app_workspace_audit_events_tenant_time_idx
   ON app_workspace_audit_events (tenant_id, occurred_at DESC);
 
+-- Kompensations-Löschung reparieren (Codex-Review PR #27): bootstrapWorkspace und die
+-- Benutzer-API löschen bei Teil-Fehlschlag den frisch angelegten Benutzer — das scheiterte
+-- in Postgres am FK app_boards.owner_actor_id OHNE cascade, sobald das Seed-Board schon
+-- existierte (User+Credential+Identity-Link blieben als Zombie zurück). deleteUser wird
+-- ausschließlich als Kompensation FRISCH angelegter Konten aufgerufen; deren Boards/Karten
+-- gehören ihnen selbst, der Cascade räumt den gesamten Board-Graph mit ab
+-- (columns/cards cascaden bereits über board_id).
+ALTER TABLE app_boards
+  DROP CONSTRAINT IF EXISTS app_boards_owner_actor_id_fkey;
+ALTER TABLE app_boards
+  ADD CONSTRAINT app_boards_owner_actor_id_fkey
+  FOREIGN KEY (owner_actor_id) REFERENCES app_users (actor_id) ON DELETE CASCADE;
+
+-- Karten-Referenzen auf Actors dürfen die Konto-Löschung NICHT blockieren (empirisch:
+-- der NO-ACTION-FK created_by_actor_id verhinderte das Kompensations-DELETE trotz
+-- Board-Cascade). Karten auf FREMDEN Boards überleben den Ersteller — die Urheberschaft
+-- wird anonymisiert (SET NULL, auch DSGVO-freundlich); Zuweisungen werden gelöst.
+ALTER TABLE app_board_cards
+  ALTER COLUMN created_by_actor_id DROP NOT NULL;
+ALTER TABLE app_board_cards
+  DROP CONSTRAINT IF EXISTS app_board_cards_created_by_actor_id_fkey;
+ALTER TABLE app_board_cards
+  ADD CONSTRAINT app_board_cards_created_by_actor_id_fkey
+  FOREIGN KEY (created_by_actor_id) REFERENCES app_users (actor_id) ON DELETE SET NULL;
+ALTER TABLE app_board_cards
+  DROP CONSTRAINT IF EXISTS app_board_cards_assignee_actor_id_fkey;
+ALTER TABLE app_board_cards
+  ADD CONSTRAINT app_board_cards_assignee_actor_id_fkey
+  FOREIGN KEY (assignee_actor_id) REFERENCES app_users (actor_id) ON DELETE SET NULL;
+
 -- Board-Metadaten (zukunftsfest ohne neue Produkte): purpose + lifecycle_stage neben
 -- dem bestehenden template_key ermöglichen später security-review-/audit-/betrieb-Boards.
 ALTER TABLE app_boards

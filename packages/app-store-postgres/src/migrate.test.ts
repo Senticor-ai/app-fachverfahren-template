@@ -81,6 +81,11 @@ describe("postgres migration runner", () => {
       "CREATE TABLE IF NOT EXISTS app_workspace_audit_events",
     );
     expect(sql).toContain("ADD COLUMN IF NOT EXISTS purpose text NULL");
+    // Kompensations-Löschung: owner-FK muss cascaden, sonst bleibt bei Seed-Teilfehlern
+    // ein Zombie-Konto mit gültigem Initialpasswort zurück (Codex-Review PR #27).
+    expect(sql).toContain(
+      "FOREIGN KEY (owner_actor_id) REFERENCES app_users (actor_id) ON DELETE CASCADE",
+    );
     // Backfills: frühester Benutzer je Tenant wird Admin; Discovery-Boards werden team-sichtbar.
     expect(sql).toContain("UPDATE app_users SET role = 'admin'");
     expect(sql).toContain("SET visibility = 'team'");

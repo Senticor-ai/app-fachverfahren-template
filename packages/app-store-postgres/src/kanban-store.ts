@@ -73,7 +73,9 @@ export interface BoardCard {
   positionKey: string;
   labels: string[];
   sourceKey: string | null;
-  createdByActorId: string;
+  /** NULL nach Konto-Löschung des Erstellers (FK ON DELETE SET NULL) — die Karte
+   *  überlebt anonymisiert. */
+  createdByActorId: string | null;
   version: number;
   archivedAt: string | null;
   createdAt: string;
@@ -762,7 +764,7 @@ interface CardRow extends Record<string, unknown> {
   position_key: string;
   labels: string[];
   source_key: string | null;
-  created_by_actor_id: string;
+  created_by_actor_id: string | null;
   version: number;
   archived_at: Date | string | null;
   created_at: Date | string;

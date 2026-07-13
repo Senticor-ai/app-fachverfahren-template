@@ -333,6 +333,7 @@ export async function startRuntime(env: NodeJS.ProcessEnv = process.env) {
   await autoBootstrapAdminFromEnv({
     authStore,
     kanbanStore,
+    auditStore,
     env,
     log: (level, event, fields) =>
       level === "error" ? logError(event, fields) : logInfo(event, fields),
