@@ -14,6 +14,7 @@ export type AuditEventType =
   | "BOARD_CREATED"
   | "BOARD_VISIBILITY_CHANGED"
   | "BOARD_ARCHIVED"
+  | "BOARD_RESTORED"
   | "EXPORT_CREATED";
 
 export interface AuditEvent {

@@ -529,11 +529,18 @@ describe("team board access", () => {
       url: `/api/v1/boards/${boardId}/archive`,
       headers: { cookie: member.cookie, "if-match": '"2"' },
     });
+    await ctx.app.inject({
+      method: "POST",
+      url: `/api/v1/boards/${boardId}/restore`,
+      headers: { cookie: member.cookie, "if-match": '"3"' },
+    });
 
     const events = await ctx.auditStore.listEvents({ tenantId: "default" });
     const types = events.map((event) => event.eventType);
     expect(types).toContain("BOARD_CREATED");
     expect(types).toContain("BOARD_VISIBILITY_CHANGED");
     expect(types).toContain("BOARD_ARCHIVED");
+    // Wer ein eingefrorenes Board wieder öffnet, muss im Trail sichtbar sein.
+    expect(types).toContain("BOARD_RESTORED");
   });
 });
