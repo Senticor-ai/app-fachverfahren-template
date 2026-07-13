@@ -295,21 +295,60 @@ export function registerAuthRoutes(
       if (!credential) {
         return reply.code(401).send({ error: "authentication required" });
       }
+
+      // Gleicher Failure-/Lockout-Pfad wie der Login: eine gestohlene Session darf
+      // currentPassword nicht unbegrenzt raten (Codex-Review PR #27, Runde 2).
+      const nowValue = now();
+      const gate = evaluateLoginAttempt({
+        lockedUntil: credential.lockedUntil
+          ? new Date(credential.lockedUntil)
+          : null,
+        now: nowValue,
+      });
+      if (!gate.allowed) {
+        await audit("LOGIN_LOCKED", principal.actorId, {
+          via: "password-change",
+        });
+        return reply.code(423).send({ error: "account temporarily locked" });
+      }
+
       const currentOk = await verifyPassword(
         body.currentPassword,
         credential.passwordHash,
       );
       if (!currentOk) {
+        const updated = await deps.authStore.recordLoginFailure(
+          principal.actorId,
+        );
+        const lockedUntil = lockAfterFailure(updated.failedAttempts, nowValue);
+        if (lockedUntil) {
+          await deps.authStore.setAccountLock(
+            principal.actorId,
+            lockedUntil.toISOString(),
+          );
+          await audit("LOGIN_LOCKED", principal.actorId, {
+            via: "password-change",
+            failedAttempts: updated.failedAttempts,
+          });
+        } else {
+          await audit("LOGIN_FAILED", principal.actorId, {
+            reason: "wrong-current-password",
+            via: "password-change",
+            failedAttempts: updated.failedAttempts,
+          });
+        }
         return reply.code(403).send({ error: "current password is incorrect" });
       }
 
       const passwordHash = await hashPassword(body.newPassword);
+      // updateLocalCredentialPassword resettet die Lockout-Zähler mit.
       await deps.authStore.updateLocalCredentialPassword({
         actorId: principal.actorId,
         passwordHash,
         hashAlgo: "argon2id",
-        passwordChangedAt: now().toISOString(),
+        passwordChangedAt: nowValue.toISOString(),
       });
+      await audit("PASSWORD_CHANGED", principal.actorId, {});
       return reply.code(204).send();
     },
   );

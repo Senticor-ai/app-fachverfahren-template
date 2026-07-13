@@ -463,6 +463,52 @@ describe("team board access", () => {
     expect(detail.statusCode).toBe(404);
   });
 
+  it("freezes archived boards: reading stays possible, collaboration is rejected until restore", async () => {
+    // Archivierte Team-Boards dürfen mit gespeicherter URL nicht weiter mutierbar sein
+    // (Codex-Review PR #27, Runde 2); Lesen bleibt möglich (Restore-UI braucht die Version).
+    const detailBefore = await ctx.app.inject({
+      method: "GET",
+      url: `/api/v1/boards/${ctx.boardIdFromBootstrap}`,
+      headers: { cookie: member.cookie },
+    });
+    const firstColumnId = detailBefore.json().columns[0].columnId as string;
+
+    await ctx.app.inject({
+      method: "POST",
+      url: `/api/v1/boards/${ctx.boardIdFromBootstrap}/archive`,
+      headers: { cookie: ctx.ownerCookie, "if-match": '"1"' },
+    });
+
+    const read = await ctx.app.inject({
+      method: "GET",
+      url: `/api/v1/boards/${ctx.boardIdFromBootstrap}`,
+      headers: { cookie: member.cookie },
+    });
+    expect(read.statusCode).toBe(200);
+
+    const card = await ctx.app.inject({
+      method: "POST",
+      url: `/api/v1/boards/${ctx.boardIdFromBootstrap}/cards`,
+      headers: { cookie: member.cookie },
+      payload: { columnId: firstColumnId, title: "Nachzügler" },
+    });
+    expect(card.statusCode).toBe(409);
+
+    // Owner darf nach dem Restore wieder kollaborieren.
+    await ctx.app.inject({
+      method: "POST",
+      url: `/api/v1/boards/${ctx.boardIdFromBootstrap}/restore`,
+      headers: { cookie: ctx.ownerCookie, "if-match": '"2"' },
+    });
+    const afterRestore = await ctx.app.inject({
+      method: "POST",
+      url: `/api/v1/boards/${ctx.boardIdFromBootstrap}/cards`,
+      headers: { cookie: member.cookie },
+      payload: { columnId: firstColumnId, title: "Wieder offen" },
+    });
+    expect(afterRestore.statusCode).toBe(201);
+  });
+
   it("audits board creation, visibility changes, and archiving", async () => {
     const created = await ctx.app.inject({
       method: "POST",

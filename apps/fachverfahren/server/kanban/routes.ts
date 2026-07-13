@@ -26,10 +26,11 @@ export interface BoardRouteDeps {
   generateId?: (prefix: string) => string;
 }
 
-/** Zugriffsstufen auf ein Board: `collaborate` = lesen + Spalten-/Karten-Operationen
- *  (Team-Boards: alle Tenant-Mitglieder); `manage` = Board-Operationen
- *  (PATCH/archive/restore; Owner oder Permission `boards.manage`). */
-type BoardAccess = "collaborate" | "manage";
+/** Zugriffsstufen auf ein Board: `read` = lesend (auch archiviert — das Restore-UI
+ *  braucht Version/Inhalt); `collaborate` = mutierende Spalten-/Karten-Operationen
+ *  (Team-Boards: alle Tenant-Mitglieder; archivierte Boards → 409, eingefroren);
+ *  `manage` = Board-Operationen (PATCH/archive/restore; Owner oder `boards.manage`). */
+type BoardAccess = "read" | "collaborate" | "manage";
 
 function defaultGenerateId(prefix: string): string {
   return `${prefix}.${randomUUID()}`;
@@ -137,6 +138,13 @@ export function registerBoardRoutes(
         return undefined;
       }
     }
+    // Archivierte Boards sind eingefroren: mutierende Kollaboration wird abgelehnt,
+    // bis ein Restore erfolgt (Codex-Review PR #27, Runde 2). Lesen (`read`) und
+    // Board-Verwaltung (`manage`, insb. restore) bleiben möglich.
+    if (access === "collaborate" && board.archivedAt !== null) {
+      await reply.code(409).send({ error: `board "${boardId}" is archived` });
+      return undefined;
+    }
     return { principal, board };
   }
 
@@ -230,6 +238,7 @@ export function registerBoardRoutes(
         request,
         reply,
         request.params.boardId,
+        "read",
       );
       if (!loaded) {
         return;
@@ -528,6 +537,7 @@ export function registerBoardRoutes(
         request,
         reply,
         request.params.boardId,
+        "read",
       );
       if (!loaded) {
         return;

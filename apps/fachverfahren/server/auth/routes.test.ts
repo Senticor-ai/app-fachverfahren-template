@@ -257,6 +257,45 @@ describe("auth routes — password change", () => {
     expect(wrongCurrent.statusCode).toBe(403);
   });
 
+  it("locks the account after repeated wrong current passwords (stolen-session guessing)", async () => {
+    // Eine gestohlene Session darf currentPassword nicht unbegrenzt raten:
+    // derselbe Failure-/Lockout-Pfad wie beim Login (Codex-Review PR #27, Runde 2).
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const response = await app.inject({
+        method: "POST",
+        url: "/auth/password",
+        headers: { cookie },
+        payload: {
+          currentPassword: `wrong-guess-${attempt}`,
+          newPassword: "another correct horse battery", // pragma: allowlist-secret
+        },
+      });
+      expect(response.statusCode).toBe(403);
+    }
+
+    const locked = await app.inject({
+      method: "POST",
+      url: "/auth/password",
+      headers: { cookie },
+      payload: {
+        currentPassword: bootstrapBody.password,
+        newPassword: "another correct horse battery", // pragma: allowlist-secret
+      },
+    });
+    expect(locked.statusCode).toBe(423);
+
+    // Auch der Login ist jetzt gesperrt — ein gemeinsamer Zähler, kein Nebeneingang.
+    const login = await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: bootstrapBody.email,
+        password: bootstrapBody.password,
+      },
+    });
+    expect(login.statusCode).toBe(423);
+  });
+
   it("changes the password: old stops working, new works", async () => {
     const newPassword = "another correct horse battery"; // pragma: allowlist-secret
     const change = await app.inject({
@@ -313,6 +352,29 @@ describe("auth routes — audit trail", () => {
     expect(types).toContain("USER_CREATED");
     expect(types).toContain("LOGIN_FAILED");
     expect(types).toContain("LOGIN_SUCCESS");
+  });
+
+  it("audits successful password changes", async () => {
+    const { app, auditStore } = await setUp("test-bootstrap-token");
+    const bootstrapResponse = await app.inject({
+      method: "POST",
+      url: "/auth/bootstrap",
+      payload: bootstrapBody,
+    });
+    const cookie = extractCookie(bootstrapResponse);
+    await app.inject({
+      method: "POST",
+      url: "/auth/password",
+      headers: { cookie },
+      payload: {
+        currentPassword: bootstrapBody.password,
+        newPassword: "another correct horse battery", // pragma: allowlist-secret
+      },
+    });
+    const events = await auditStore.listEvents({ tenantId: "default" });
+    expect(events.map((event) => event.eventType)).toContain(
+      "PASSWORD_CHANGED",
+    );
   });
 });
 
