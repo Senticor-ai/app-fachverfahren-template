@@ -199,8 +199,20 @@ Reimplementierungen stehen in `platform/capabilities.json`.
 
 - Sicherheitsmeldungen: `SECURITY.md`
 - Verhaltenskodex: `CODE_OF_CONDUCT.md`
+- Beitragen: `CONTRIBUTING.md`
 - Änderungen und Release-Hinweise: `CHANGELOG.md`
 - Öffentliche Adopter und Evaluierungen: `ADOPTERS.md`
+
+## Lizenz und Owner
+
+Dieses Repository ist Open Source unter der **European Union Public Licence v. 1.2 (EUPL-1.2)** —
+siehe [`LICENSE`](LICENSE). Copyright © 2024–2026 **Senticor GmbH** (Produkt: **Senticor AI**), die
+das Projekt betreut. Beiträge werden unter derselben Lizenz (EUPL-1.2) eingebracht.
+
+Mitgelieferte Open-Source-Komponenten und ihre Lizenzen sind in
+[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) aufgeführt (Attribution nach EUPL-1.2 Art. 5).
+Alle Produktions-Abhängigkeiten sind permissiv bzw. datei-/modulweise reziprok lizenziert; es gibt
+kein starkes Copyleft und damit keinen Lizenzkonflikt mit der EUPL-1.2.
 
 ## Wichtige Regeln
 
