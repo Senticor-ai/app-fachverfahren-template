@@ -963,18 +963,27 @@ function FeldRenderer({
             className="space-y-1"
             aria-live="polite"
           >
-            {plausiHinweise.map((h, i) => (
-              <li
-                key={i}
-                className={cn(
-                  "flex items-start gap-1.5 text-sm",
-                  h.ton === "warn" ? "text-status-warn" : "text-status-info",
-                )}
-              >
-                <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>{h.text}</span>
-              </li>
-            ))}
+            {plausiHinweise.map((h, i) => {
+              // 1.4.1 — Ton (warn/info) NICHT nur über Farbe: eigenes Icon je Ton + sr-only-Textpräfix, damit die
+              // Schwere auch ohne Farbwahrnehmung (und für Screenreader) ankommt.
+              const warn = h.ton === "warn";
+              const TonIcon = warn ? AlertTriangle : Info;
+              return (
+                <li
+                  key={i}
+                  className={cn(
+                    "flex items-start gap-1.5 text-sm",
+                    warn ? "text-status-warn" : "text-status-info",
+                  )}
+                >
+                  <TonIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>
+                    <span className="sr-only">{warn ? "Warnung: " : "Hinweis: "}</span>
+                    {h.text}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         ) : undefined
       }
@@ -1079,12 +1088,14 @@ function FeldRenderer({
 
       case "ja-nein":
         // Tatbestand als Ja/Nein-Radio (Wert = boolean). „Nein" ist eine gültige, den Antrag NICHT sperrende Antwort —
-        // im Gegensatz zu einer Pflicht-Checkbox. Die Gruppe trägt das Feld-Label (aria-label) + die Fehler-/Hinweis-Kopplung.
+        // im Gegensatz zu einer Pflicht-Checkbox. 1.3.1: die Gruppe übernimmt das VOLLE sichtbare Feld-Label per
+        // aria-labelledby (statt eines abweichenden aria-label) und meldet ihren Pflicht-Status via aria-required.
         return (
           <RadioGroup
             id={id}
             className="flex flex-row flex-wrap gap-x-6 gap-y-2 pt-1"
-            aria-label={label}
+            aria-labelledby={`${id}-label`}
+            aria-required={feld.required || undefined}
             aria-invalid={invalidAttr}
             aria-describedby={describedBy}
             value={wert === true ? "ja" : wert === false ? "nein" : ""}
@@ -1485,9 +1496,12 @@ function Field({
 }) {
   return (
     <div className={cn("flex flex-col gap-2", wide ? "sm:col-span-2" : "")}>
-      {/* Feld-Label = primäre Information: volle Tinte, 14px (Spec 2). Bei Fehler destructive statt muted. */}
+      {/* Feld-Label = primäre Information: volle Tinte, 14px (Spec 2). Bei Fehler destructive statt muted.
+          Eigene id (`${htmlFor}-label`), damit NICHT-labelbare Gruppen (role=radiogroup) das VOLLE sichtbare Label
+          — inkl. Pflicht-/Fachbegriff-Zusatz — per aria-labelledby als zugänglichen Namen übernehmen (1.3.1). */}
       <Label
         htmlFor={htmlFor}
+        id={htmlFor ? `${htmlFor}-label` : undefined}
         className={cn(invalid ? "text-destructive" : "text-foreground")}
       >
         {label}
@@ -1526,7 +1540,11 @@ function Field({
             {error}
           </span>
         </p>
-      ) : hint ? (
+      ) : null}
+      {/* 3.3.2/3.3.3 — der Hinweis (oft die Format-Anweisung) bleibt AUCH bei Fehler sichtbar: er hilft beim
+          Korrigieren, und das per aria-describedby referenzierte `hintId`-Ziel muss stets im DOM existieren
+          (sonst zeigt describedby ins Leere). Darum unabhängig vom Fehler rendern, nicht im else-Zweig. */}
+      {hint ? (
         <p id={hintId} className="text-sm text-muted-foreground">
           {hint}
         </p>

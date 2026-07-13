@@ -452,6 +452,9 @@ function MehrdeutigAuswahl({
   onUebernehmen: (t: AdressTreffer) => void;
 }) {
   const groupLabelId = React.useId();
+  // Roving-Tabindex (WAI-ARIA radio): der DOM-Fokus MUSS der Pfeiltasten-Auswahl folgen (2.4.3/4.1.2) — sonst
+  // bleibt der Fokus auf dem alten (jetzt tabIndex=-1) Radio, während aria-checked wandert und die AT nichts ansagt.
+  const radioRefs = React.useRef<Array<HTMLDivElement | null>>([]);
 
   const onKeyDown = (
     event: React.KeyboardEvent<HTMLDivElement>,
@@ -465,6 +468,7 @@ function MehrdeutigAuswahl({
     else return;
     event.preventDefault();
     onAuswahl(next);
+    radioRefs.current[next]?.focus(); // der Zielknoten ist bereits gerendert — Fokus folgt der Auswahl
   };
 
   return (
@@ -495,6 +499,9 @@ function MehrdeutigAuswahl({
           return (
             <div
               key={`${t.strasse}-${t.plz}-${t.ort}-${index}`}
+              ref={(el) => {
+                radioRefs.current[index] = el;
+              }}
               role="radio"
               aria-checked={selected}
               tabIndex={selected ? 0 : -1}

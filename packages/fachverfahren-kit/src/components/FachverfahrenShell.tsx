@@ -193,12 +193,12 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
       {/* ── Marken-Sidebar (banner-/navigation-Landmark) ─────────────────────── */}
       <aside
         className="sticky top-0 z-30 hidden h-dvh w-[232px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex"
-        aria-label="Hauptnavigation"
       >
-        {/* Marke — Branding ausschließlich aus config. */}
+        {/* Marke — Branding ausschließlich aus config. Bewusst KEIN role="banner": der EINE Seiten-Banner ist der
+            <header> unten (1.3.1 — genau ein banner je Seite, nicht in ein complementary/aside verschachtelt). Die
+            Navigation trägt ihr eigenes aria-label am inneren <nav>. */}
         <div
           className="flex h-14 shrink-0 items-center gap-2.5 border-b border-sidebar-border px-3"
-          role="banner"
         >
           {wappen ? (
             <KommuneLogo logo={wappen} height={28} className="shrink-0" />
