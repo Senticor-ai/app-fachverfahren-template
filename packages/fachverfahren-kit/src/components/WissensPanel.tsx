@@ -202,6 +202,12 @@ function VerlaufDiff({
                 >
                   {z.typ === "hinzu" ? "+" : z.typ === "weg" ? "-" : " "}
                 </span>
+                {/* 1.4.1 — Diff-Art nicht nur über Farbe + (aria-hidden) Glyph: sr-only-Textpräfix je Zeile. */}
+                {z.typ !== "gleich" ? (
+                  <span className="sr-only">
+                    {z.typ === "hinzu" ? "Hinzugefügt: " : "Entfernt: "}
+                  </span>
+                ) : null}
                 <span>{z.zeile || " "}</span>
               </div>
             ))}
