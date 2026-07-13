@@ -17,6 +17,8 @@ import {
   type LeistungContractSnapshot,
 } from "../packages/fachverfahren-kit/src/contract-snapshot.ts";
 import { validateProzessGraph } from "../packages/fachverfahren-kit/src/lib/process-graph.ts";
+// EFFEKTIVE Config (governance-monoton abgeleitete Vier-Augen im Contract) — self-contained, strip-types-tauglich.
+import { effektiveLeistungConfig } from "../packages/fachverfahren-kit/src/lib/governance.ts";
 import { leistungConfig } from "../apps/fachverfahren/src/leistung.config.ts";
 
 const CONTRACT_URL = new URL(
@@ -28,7 +30,9 @@ const fehler: string[] = [];
 const fail = (m: string) => fehler.push(m);
 
 // ── 1) FRISCHE ──────────────────────────────────────────────────────────────
-const snap = toContractSnapshot(leistungConfig as never);
+const snap = toContractSnapshot(
+  effektiveLeistungConfig(leistungConfig) as never,
+);
 const frisch = JSON.stringify(snap, null, 2) + "\n";
 let committed = "";
 try {

@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import type { StatusMachine } from "../types.js";
+import type { LeistungConfig, StatusMachine } from "../types.js";
 import {
   abgeleiteteTransitions,
+  effektiveLeistungConfig,
   governanceMonotonieVerletzungen,
 } from "./interpreter.js";
 
@@ -105,5 +106,38 @@ describe("abgeleiteteTransitions — MONOTONE Governance-Opt-in-Derivation", () 
         },
       }),
     ).toEqual([]);
+  });
+});
+
+describe("effektiveLeistungConfig — Contract-Projektion der abgeleiteten Governance (PROD liest den Contract)", () => {
+  it("ohne governance: gibt DIESELBE config-Referenz zurueck (byte-identischer Contract)", () => {
+    const config = { statusMachine: sm } as unknown as LeistungConfig;
+    expect(effektiveLeistungConfig(config)).toBe(config);
+  });
+
+  it("mit governance: statusMachine.transitions traegt die abgeleitete Vier-Augen-Menge", () => {
+    const config = {
+      statusMachine: sm,
+      governance: {
+        zusaetzlicheVierAugen: [{ from: "pruefung", to: "abgelehnt" }],
+      },
+    } as unknown as LeistungConfig;
+    const eff = effektiveLeistungConfig(config);
+    expect(eff).not.toBe(config); // neue, projizierte Gestalt
+    // Der Opt-in-Uebergang traegt jetzt Vier-Augen — so sieht ihn auch der committete Contract + die PROD-Policy.
+    expect(
+      eff.statusMachine.transitions.find((t) => t.to === "abgelehnt")
+        ?.vierAugen,
+    ).toBe(true);
+    // Deklarierte Vier-Augen bleibt, uebrige Machine-Felder unveraendert.
+    expect(
+      eff.statusMachine.transitions.find((t) => t.to === "festgesetzt")
+        ?.vierAugen,
+    ).toBe(true);
+    expect(eff.statusMachine.initial).toBe(sm.initial);
+    // Original NICHT mutiert.
+    expect(sm.transitions.find((t) => t.to === "abgelehnt")?.vierAugen).toBe(
+      undefined,
+    );
   });
 });

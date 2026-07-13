@@ -34,9 +34,19 @@ Test: ein normal ungatterter Übergang verlangt mit Opt-in zwei verschiedene Akt
 identisch — keine Config nutzt `governance`, `abgeleiteteTransitions` liefert die deklarierte Liste
 per Referenz, der Contract bleibt frisch.
 
-**Noch offen** (folgt, mit voller Verifikation): (1) die PROD-Policy (`DefaultDenyPolicyEngine`)
-ebenfalls auf `abgeleiteteTransitions` beziehen — sie löst Vier-Augen heute über einen anderen Pfad
-auf (nicht direkt aus `statusMachine.transitions`); vor produktiver Nutzung eines `governance`-Opt-ins
-schließen. (2) Die effektive Vier-Augen-Menge in den `leistung.contract.json`-Snapshot aufnehmen
-(auditierbar). Die Opt-in-Fähigkeiten `buergerPortal`/`bescheid`/`gebuehr` kommen erst, wenn ihre
-Capabilities verdrahtet werden (YAGNI).
+**Phase 2c/2d (jetzt enthalten): PROD-Pfad + Contract.** Die PROD-Policy löst ihre Vier-Augen-Pflicht
+NICHT direkt aus der Config, sondern aus dem committeten `leistung.contract.json` (der Server baut
+seinen `ProcedureCatalog` via `catalogFromStatusMachines` aus `contract.statusMachine.transitions`).
+Daher genügt EINE Naht: der Contract-Snapshot wird jetzt aus der EFFEKTIVEN Config gebildet
+(`toContractSnapshot(effektiveLeistungConfig(config))` in `emit-contract` UND `check-leistung-contract`).
+So trägt der Contract die governance-monoton abgeleitete Vier-Augen-Menge → DEV-Store und PROD-Policy
+sehen dieselbe eine Wahrheit. HEUTE byte-identisch (musterantrag ohne `governance`).
+
+Damit die strip-types-Contract-Gates das laden können, liegt die Derivation SELF-CONTAINED (nur
+type-only Imports) in `lib/governance.ts` (aus `interpreter` weiterhin re-exportiert; öffentliche API
+unverändert). Neu: `effektiveLeistungConfig(config)` — projiziert die Config auf ihre effektive Gestalt
+(gibt bei fehlendem `governance` DIESELBE Referenz zurück → byte-identisch).
+
+**Noch offen:** die Opt-in-Fähigkeiten `buergerPortal`/`bescheid`/`gebuehr` kommen erst, wenn ihre
+Capabilities verdrahtet werden (YAGNI). Automations-Engine-Vier-Augen (`fordertVierAugen`) liest aus
+demselben Katalog — bei Bedarf gegenprüfen.
