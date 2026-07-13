@@ -107,6 +107,10 @@ function LoginForm({
         <span className="text-sm font-medium">E-Mail</span>
         <Input
           type="email"
+          name="email"
+          // Passwort-Manager (1Password & Co.) erkennen das Anmelde-Paar über
+          // username/current-password — type="email" allein reicht ihnen nicht.
+          autoComplete="username"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           required
@@ -117,6 +121,8 @@ function LoginForm({
         <span className="text-sm font-medium">Passwort</span>
         <Input
           type="password"
+          name="password"
+          autoComplete="current-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           required
@@ -179,6 +185,10 @@ function BootstrapForm({
       <label className="block space-y-1.5">
         <span className="text-sm font-medium">Einrichtungs-Token</span>
         <Input
+          name="token"
+          // one-time-code: verhindert, dass Passwort-Manager das Betreiber-Token
+          // als Zugangsdaten interpretieren und hier Passwörter einfüllen.
+          autoComplete="one-time-code"
           value={token}
           onChange={(event) => setToken(event.target.value)}
           required
@@ -188,6 +198,8 @@ function BootstrapForm({
       <label className="block space-y-1.5">
         <span className="text-sm font-medium">Name</span>
         <Input
+          name="displayName"
+          autoComplete="name"
           value={displayName}
           onChange={(event) => setDisplayName(event.target.value)}
           required
@@ -197,6 +209,8 @@ function BootstrapForm({
         <span className="text-sm font-medium">E-Mail</span>
         <Input
           type="email"
+          name="email"
+          autoComplete="username"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           required
@@ -206,6 +220,9 @@ function BootstrapForm({
         <span className="text-sm font-medium">Passwort (mind. 12 Zeichen)</span>
         <Input
           type="password"
+          name="password"
+          // new-password: Passwort-Manager bieten hier Generieren + Speichern an.
+          autoComplete="new-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           minLength={12}

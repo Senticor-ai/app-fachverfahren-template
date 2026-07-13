@@ -5,10 +5,12 @@
 // Alles Fachliche (Antrag-Schritte, Subsumtion, Status-Machine, Arbeitsvorrat-Spalten, Aufsichts-Kennzahlen)
 // kommt aus den Kit-Bausteinen + der Config. Tausche die Config (./leistung.config) → dieselbe App, anderes Verfahren.
 import { useSyncExternalStore } from "react";
+import { Users } from "lucide-react";
 import {
   Navigate,
   Route,
   Routes,
+  useLocation,
   useNavigate,
   useParams,
 } from "react-router-dom";
@@ -24,6 +26,7 @@ import {
   formatBetragStatus,
   type Persona,
   type ShellNavItem,
+  type ShellNavSection,
 } from "@senticor/fachverfahren-kit";
 import { store } from "./store.js";
 import { AdminUsersPage } from "./AdminUsersPage.js";
@@ -31,6 +34,7 @@ import { createBoardClient } from "./board-client.js";
 import { LoginPage } from "./LoginPage.js";
 import { PasswordChangePage } from "./PasswordChangePage.js";
 import { useSession } from "./session.js";
+import { needsFirstRunSetup } from "./session-state.js";
 
 const boardPort = createBoardClient();
 
@@ -64,38 +68,50 @@ function RequirePermission({
   return <>{children}</>;
 }
 
-/** Minimal shell for the workspace/boards area — deliberately outside the 3-persona FachverfahrenShell,
- *  since Kanban boards are cross-cutting platform tooling, not tied to a Leistung's personas. */
+/** Workspace-Hülle = DIESELBE Persona-Sidebar wie die Fach-Sichten (FachverfahrenShell), mit
+ *  aktivem „Boards"-Eintrag, role-gated „Verwaltung"-Sektion und Konto im Header (Screen-Contract
+ *  boards-list: „profile and settings remain reachable from the persistent shell"). Die Boards
+ *  zeigen ECHTE Arbeitsdaten — deshalb showDemoBadge=false. */
 function BoardsShell({
+  activeNavKey,
   children,
 }: {
+  activeNavKey: string;
   children: React.ReactNode;
 }): React.JSX.Element {
   const { logout, principal } = useSession();
   const navigate = useNavigate();
+  const verwaltung: ShellNavSection[] = principal?.permissions?.includes(
+    "users.manage",
+  )
+    ? [
+        {
+          label: "Verwaltung",
+          items: [
+            {
+              key: "admin-users",
+              label: "Benutzer",
+              icon: Users,
+              href: "/admin/users",
+            },
+          ],
+        },
+      ]
+    : [];
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="flex items-center justify-between border-b border-border px-4 py-2">
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            className="text-sm font-semibold text-foreground"
-            onClick={() => navigate("/boards")}
-          >
-            Boards
-          </button>
-          {principal?.permissions?.includes("users.manage") && (
-            <button
-              type="button"
-              className="text-sm text-muted-foreground hover:text-foreground"
-              onClick={() => navigate("/admin/users")}
-            >
-              Benutzer
-            </button>
-          )}
-        </div>
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          {principal?.email}
+    <FachverfahrenShell
+      config={store.config}
+      persona="sachbearbeitung"
+      onPersonaChange={(next) => navigate(PERSONA_HOME[next])}
+      activeNavKey={activeNavKey}
+      onNavigate={(item: ShellNavItem) => {
+        if (item.href) navigate(item.href);
+      }}
+      extraNavSections={verwaltung}
+      showDemoBadge={false}
+      accountSlot={
+        <span className="flex items-center gap-3 text-sm text-muted-foreground">
+          <span className="hidden md:inline">{principal?.email}</span>
           <button
             type="button"
             className="text-sm text-muted-foreground hover:text-foreground"
@@ -111,12 +127,11 @@ function BoardsShell({
           >
             Abmelden
           </Button>
-        </div>
-      </header>
-      {/* main-Landmark (Screen-Contract der Board-Routen): Landmark-Navigation von
-          Screenreadern springt damit direkt zum Workspace-Inhalt. */}
-      <main className="min-h-0 flex-1">{children}</main>
-    </div>
+        </span>
+      }
+    >
+      {children}
+    </FachverfahrenShell>
   );
 }
 
@@ -124,7 +139,7 @@ function BoardsList(): React.JSX.Element {
   const navigate = useNavigate();
   return (
     <RequireSession>
-      <BoardsShell>
+      <BoardsShell activeNavKey="boards">
         <BoardList
           port={boardPort}
           onOpen={(id) => navigate(`/boards/${id}`)}
@@ -138,7 +153,7 @@ function BoardDetail(): React.JSX.Element {
   const { boardId = "" } = useParams();
   return (
     <RequireSession>
-      <BoardsShell>
+      <BoardsShell activeNavKey="boards">
         <KanbanBoard boardId={boardId} port={boardPort} />
       </BoardsShell>
     </RequireSession>
@@ -148,7 +163,8 @@ function BoardDetail(): React.JSX.Element {
 function KontoPasswort(): React.JSX.Element {
   return (
     <RequireSession>
-      <BoardsShell>
+      {/* Kein Sidebar-Eintrag „Konto" — bewusst kein aktiver Nav-Schlüssel. */}
+      <BoardsShell activeNavKey="konto">
         <PasswordChangePage />
       </BoardsShell>
     </RequireSession>
@@ -159,7 +175,7 @@ function AdminUsers(): React.JSX.Element {
   return (
     <RequireSession>
       <RequirePermission permission="users.manage">
-        <BoardsShell>
+        <BoardsShell activeNavKey="admin-users">
           <AdminUsersPage />
         </BoardsShell>
       </RequirePermission>
@@ -351,26 +367,44 @@ function Aufsicht(): React.JSX.Element {
   );
 }
 
+/** First-Run-Gate: solange der Workspace nicht eingerichtet ist (kein Admin existiert), führt
+ *  JEDER Pfad zuerst zum Einmal-Setup — nicht nur /boards. Die Prädikat-Logik (inkl. Preview-
+ *  Ausnahme ohne API) lebt testbar in session-state.ts. */
+function FirstRunGate({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.JSX.Element {
+  const session = useSession();
+  const location = useLocation();
+  if (needsFirstRunSetup(session) && location.pathname !== "/login") {
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+}
+
 export function App(): React.JSX.Element {
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/buerger" replace />} />
-      <Route path="/buerger" element={<BuergerStart />} />
-      <Route path="/buerger/anmelden" element={<BuergerAnmelden />} />
-      <Route
-        path="/buerger/bestaetigung/:id"
-        element={<BuergerBestaetigung />}
-      />
-      <Route path="/amt" element={<AmtEingang />} />
-      <Route path="/amt/vorgang/:id" element={<AmtVorgang />} />
-      <Route path="/aufsicht" element={<Aufsicht />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/boards" element={<BoardsList />} />
-      <Route path="/boards/:boardId" element={<BoardDetail />} />
-      <Route path="/admin/users" element={<AdminUsers />} />
-      <Route path="/konto/passwort" element={<KontoPasswort />} />
-      <Route path="*" element={<Navigate to="/buerger" replace />} />
-    </Routes>
+    <FirstRunGate>
+      <Routes>
+        <Route path="/" element={<Navigate to="/buerger" replace />} />
+        <Route path="/buerger" element={<BuergerStart />} />
+        <Route path="/buerger/anmelden" element={<BuergerAnmelden />} />
+        <Route
+          path="/buerger/bestaetigung/:id"
+          element={<BuergerBestaetigung />}
+        />
+        <Route path="/amt" element={<AmtEingang />} />
+        <Route path="/amt/vorgang/:id" element={<AmtVorgang />} />
+        <Route path="/aufsicht" element={<Aufsicht />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/boards" element={<BoardsList />} />
+        <Route path="/boards/:boardId" element={<BoardDetail />} />
+        <Route path="/admin/users" element={<AdminUsers />} />
+        <Route path="/konto/passwort" element={<KontoPasswort />} />
+        <Route path="*" element={<Navigate to="/buerger" replace />} />
+      </Routes>
+    </FirstRunGate>
   );
 }
 

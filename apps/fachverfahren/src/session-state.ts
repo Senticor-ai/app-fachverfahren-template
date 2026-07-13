@@ -42,6 +42,19 @@ function isJsonResponse(response: Response): boolean {
   return contentType.toLowerCase().includes("application/json");
 }
 
+/** First-Run-Gate: erzwingt das Einmal-Setup auf JEDEM Pfad, solange kein Admin existiert.
+ *  Nur mit erreichbarer API (sonst würde eine reine Frontend-Vorschau ausgesperrt) und nie
+ *  während des Ladens (kein Redirect-Flackern beim App-Start). */
+export function needsFirstRunSetup(state: {
+  status: SessionStatus;
+  bootstrapped: boolean;
+  apiAvailable: boolean;
+}): boolean {
+  return (
+    state.status !== "loading" && state.apiAvailable && !state.bootstrapped
+  );
+}
+
 export async function fetchSessionState(
   fetchImpl: typeof fetch = fetch,
 ): Promise<SessionSnapshot> {

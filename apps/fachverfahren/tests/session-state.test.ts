@@ -6,7 +6,7 @@
 // bedeuten deshalb „API nicht erreichbar" (apiAvailable=false) — niemals ein Throw.
 import { describe, expect, it } from "vitest";
 
-import { fetchSessionState } from "../src/session-state.js";
+import { fetchSessionState, needsFirstRunSetup } from "../src/session-state.js";
 
 const SPA_FALLBACK_HTML = "<!doctype html>\n<html><body>app</body></html>";
 
@@ -108,5 +108,32 @@ describe("fetchSessionState", () => {
     );
     expect(snapshot.apiAvailable).toBe(false);
     expect(snapshot.status).toBe("unauthenticated");
+  });
+});
+
+// First-Run-Gate: solange der Workspace NICHT eingerichtet ist (kein Admin existiert), soll
+// JEDER Pfad zuerst das Setup erzwingen — nicht nur /boards. Ohne erreichbare API (reine
+// Frontend-Vorschau, CHOS-Preview) darf das Gate NIE greifen, sonst weißt es die Personas aus.
+describe("needsFirstRunSetup", () => {
+  const base = {
+    status: "unauthenticated",
+    bootstrapped: false,
+    apiAvailable: true,
+  } as const;
+
+  it("greift, wenn API da ist und noch kein Admin existiert", () => {
+    expect(needsFirstRunSetup(base)).toBe(true);
+  });
+
+  it("greift NICHT während des Ladens (kein Redirect-Flackern)", () => {
+    expect(needsFirstRunSetup({ ...base, status: "loading" })).toBe(false);
+  });
+
+  it("greift NICHT, wenn der Workspace eingerichtet ist", () => {
+    expect(needsFirstRunSetup({ ...base, bootstrapped: true })).toBe(false);
+  });
+
+  it("greift NICHT ohne erreichbare API (Preview/Standalone-Frontend)", () => {
+    expect(needsFirstRunSetup({ ...base, apiAvailable: false })).toBe(false);
   });
 });
