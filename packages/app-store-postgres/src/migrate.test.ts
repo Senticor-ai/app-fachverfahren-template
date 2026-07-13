@@ -77,6 +77,13 @@ describe("postgres migration runner", () => {
 
     expect(sql).toContain("role text NOT NULL DEFAULT 'member'");
     expect(sql).toContain("CREATE TABLE IF NOT EXISTS app_identity_links");
+    // Bestands-Konten bekommen ihren lokalen Identity-Link per Backfill (idempotent).
+    expect(sql).toContain(
+      "INSERT INTO app_identity_links (tenant_id, provider, subject, actor_id)",
+    );
+    expect(sql).toContain(
+      "ON CONFLICT (tenant_id, provider, subject) DO NOTHING",
+    );
     expect(sql).toContain(
       "CREATE TABLE IF NOT EXISTS app_workspace_audit_events",
     );

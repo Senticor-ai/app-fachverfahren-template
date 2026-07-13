@@ -35,6 +35,15 @@ CREATE TABLE IF NOT EXISTS app_identity_links (
 CREATE INDEX IF NOT EXISTS app_identity_links_actor_idx
   ON app_identity_links (actor_id);
 
+-- Backfill für Bestands-Konten: vor dieser Migration angelegte lokale Benutzer haben
+-- Credentials, aber keinen Identity-Link — resolveActorForIdentity könnte sie sonst nie
+-- auflösen, während neue Konten es können. Idempotent via ON CONFLICT DO NOTHING.
+INSERT INTO app_identity_links (tenant_id, provider, subject, actor_id)
+SELECT u.tenant_id, 'local', u.actor_id, u.actor_id
+FROM app_users u
+JOIN app_local_credentials c ON c.actor_id = u.actor_id
+ON CONFLICT (tenant_id, provider, subject) DO NOTHING;
+
 -- Workspace-Audit-Events (Compliance-by-Design, MVP): jede sicherheitsrelevante
 -- administrative Aktion erzeugt ein Event. actor_id ist NULL-bar (fehlgeschlagene
 -- Logins unbekannter Konten); metadata trägt Kontext ohne PII-Zwang. Ereignis-Katalog:

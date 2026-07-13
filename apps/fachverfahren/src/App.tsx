@@ -29,6 +29,7 @@ import { store } from "./store.js";
 import { AdminUsersPage } from "./AdminUsersPage.js";
 import { createBoardClient } from "./board-client.js";
 import { LoginPage } from "./LoginPage.js";
+import { PasswordChangePage } from "./PasswordChangePage.js";
 import { useSession } from "./session.js";
 
 const boardPort = createBoardClient();
@@ -95,6 +96,13 @@ function BoardsShell({
         </div>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           {principal?.email}
+          <button
+            type="button"
+            className="text-sm text-muted-foreground hover:text-foreground"
+            onClick={() => navigate("/konto/passwort")}
+          >
+            Passwort ändern
+          </button>
           <Button
             type="button"
             variant="ghost"
@@ -132,6 +140,16 @@ function BoardDetail(): React.JSX.Element {
     <RequireSession>
       <BoardsShell>
         <KanbanBoard boardId={boardId} port={boardPort} />
+      </BoardsShell>
+    </RequireSession>
+  );
+}
+
+function KontoPasswort(): React.JSX.Element {
+  return (
+    <RequireSession>
+      <BoardsShell>
+        <PasswordChangePage />
       </BoardsShell>
     </RequireSession>
   );
@@ -350,6 +368,7 @@ export function App(): React.JSX.Element {
       <Route path="/boards" element={<BoardsList />} />
       <Route path="/boards/:boardId" element={<BoardDetail />} />
       <Route path="/admin/users" element={<AdminUsers />} />
+      <Route path="/konto/passwort" element={<KontoPasswort />} />
       <Route path="*" element={<Navigate to="/buerger" replace />} />
     </Routes>
   );

@@ -13,7 +13,8 @@ Benutzer-API `/api/v1/users` (Anlegen mit Initialpasswort + persönlichem
 Starter-Board „Mein Board", Aktivieren/Deaktivieren mit sofortiger
 Session-Revocation) samt UI `/admin/users`, Passwort-Änderung
 `/auth/password`, Audit-Events für alle sicherheitsrelevanten Aktionen
-(`app_audit_events` + `GET /api/v1/audit-events`), Identity-Links
+(`app_workspace_audit_events` — bewusst getrennt vom Domain-Audit-Vertrag
+`app_audit_events` — + `GET /api/v1/audit-events`), Identity-Links
 (`app_identity_links`, Authentifizierung ≠ Autorisierung — OIDC-Naht
 dokumentiert in docs/capabilities/identity-and-trust.md), Auto-Bootstrap
 beim Serverstart über `AUTH_BOOTSTRAP_ADMIN_EMAIL`/`_PASSWORD` (idempotent).

@@ -204,7 +204,7 @@ function CreateUserCard({
         return;
       }
       setSuccess(
-        "Konto angelegt. Teilen Sie das initiale Passwort auf sicherem Weg — die Person kann es unter /auth/password ändern.",
+        "Konto angelegt. Teilen Sie das initiale Passwort auf sicherem Weg — die Person kann es nach der Anmeldung über „Passwort ändern“ ersetzen.",
       );
       setDisplayName("");
       setEmail("");
