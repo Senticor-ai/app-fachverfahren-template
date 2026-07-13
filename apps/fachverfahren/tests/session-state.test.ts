@@ -47,6 +47,8 @@ describe("fetchSessionState", () => {
       principal: null,
       bootstrapped: false,
       apiAvailable: false,
+      registration: "disabled",
+      capabilities: {},
     });
   });
 
@@ -83,6 +85,8 @@ describe("fetchSessionState", () => {
       principal: null,
       bootstrapped: false,
       apiAvailable: false,
+      registration: "disabled",
+      capabilities: {},
     });
   });
 
@@ -98,7 +102,26 @@ describe("fetchSessionState", () => {
       principal: null,
       bootstrapped: true,
       apiAvailable: true,
+      // Alt-Server ohne Envelope: Registrierung geschlossen, keine Capabilities.
+      registration: "disabled",
+      capabilities: {},
     });
+  });
+
+  it("reicht registration-Modus und capabilities aus /auth/status durch", async () => {
+    const snapshot = await fetchSessionState(
+      fetchStub({
+        "/auth/status": () =>
+          jsonResponse({
+            bootstrapped: true,
+            registration: "open_unverified",
+            capabilities: { userPersonas: true },
+          }),
+        "/auth/session": () => jsonResponse({ error: "unauthorized" }, 401),
+      }),
+    );
+    expect(snapshot.registration).toBe("open_unverified");
+    expect(snapshot.capabilities).toEqual({ userPersonas: true });
   });
 
   it("gültige Session → authenticated mit Principal", async () => {

@@ -1,8 +1,7 @@
 import type { AuditStore, AuthStore } from "@senticor/app-store-postgres";
 import type { FastifyInstance } from "fastify";
 import "../auth/principal.js";
-import { createRequirePrincipal } from "../auth/require-principal.js";
-import { createRequirePermission } from "../auth/workspace-permissions.js";
+import { routeAuth } from "../auth/authorization.js";
 
 export interface AuditRouteDeps {
   authStore: AuthStore;
@@ -17,15 +16,9 @@ export function registerAuditRoutes(
   app: FastifyInstance,
   deps: AuditRouteDeps,
 ): void {
-  const requirePrincipal = createRequirePrincipal(deps.authStore);
-  const requireAuditRead = createRequirePermission(
-    deps.authStore,
-    "audit.read",
-  );
-
   app.get<{ Querystring: { limit?: string } }>(
     "/api/v1/audit-events",
-    { preHandler: [requirePrincipal, requireAuditRead] },
+    routeAuth({ kind: "permission", action: "audit.read" }, deps),
     async (request, reply) => {
       const principal = request.principal;
       if (!principal) {

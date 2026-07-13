@@ -16,7 +16,7 @@ import {
 } from "@senticor/app-store-postgres";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import "../auth/principal.js";
-import { createRequirePrincipal } from "../auth/require-principal.js";
+import { routeAuth } from "../auth/authorization.js";
 import { hasWorkspacePermission } from "../auth/workspace-permissions.js";
 
 export interface BoardRouteDeps {
@@ -100,7 +100,13 @@ export function registerBoardRoutes(
   app: FastifyInstance,
   deps: BoardRouteDeps,
 ): void {
-  const requirePrincipal = createRequirePrincipal(deps.authStore);
+  // Härtung (K2): die Boards-API ist Team-Arbeitsfläche — JEDE Route verlangt
+  // boards.collaborate, „eingeloggt" reicht nicht (citizen-Konten haben keine
+  // Workspace-Permissions). Policy + Durchsetzung aus EINER Quelle (routeAuth).
+  const boardsCollaborate = routeAuth(
+    { kind: "permission", action: "boards.collaborate" },
+    deps,
+  );
   const generateId = deps.generateId ?? defaultGenerateId;
   const store = deps.kanbanStore;
 
@@ -169,70 +175,62 @@ export function registerBoardRoutes(
     }
   }
 
-  app.get(
-    "/api/v1/boards",
-    { preHandler: requirePrincipal },
-    async (request, reply) => {
-      const principal = request.principal;
-      if (!principal) {
-        return reply.code(401).send({ error: "authentication required" });
-      }
-      const boards = await store.listBoards({
-        tenantId: principal.tenantId,
-        actorId: principal.actorId,
-      });
-      return reply.send(boards);
-    },
-  );
+  app.get("/api/v1/boards", boardsCollaborate, async (request, reply) => {
+    const principal = request.principal;
+    if (!principal) {
+      return reply.code(401).send({ error: "authentication required" });
+    }
+    const boards = await store.listBoards({
+      tenantId: principal.tenantId,
+      actorId: principal.actorId,
+    });
+    return reply.send(boards);
+  });
 
   app.post<{
     Body: { title?: unknown; description?: unknown; visibility?: unknown };
-  }>(
-    "/api/v1/boards",
-    { preHandler: requirePrincipal },
-    async (request, reply) => {
-      const principal = request.principal;
-      if (!principal) {
-        return reply.code(401).send({ error: "authentication required" });
-      }
-      const body = request.body ?? {};
-      if (typeof body.title !== "string" || body.title.trim() === "") {
-        return reply.code(400).send({ error: "title is required" });
-      }
-      const visibility: BoardVisibility =
-        body.visibility === "team" ? "team" : "personal";
-      const timestamp = nowIso();
-      const board = await store.createBoard({
-        boardId: generateId("board"),
-        tenantId: principal.tenantId,
-        authorityId: principal.authorityId,
-        jurisdictionId: principal.jurisdictionId,
-        ownerActorId: principal.actorId,
-        title: body.title,
-        description:
-          typeof body.description === "string" ? body.description : null,
-        visibility,
-        contentLocale: "de",
-        templateKey: null,
-        templateVersion: null,
-        purpose: null,
-        lifecycleStage: null,
-        version: 1,
-        archivedAt: null,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      });
-      await audit("BOARD_CREATED", principal.tenantId, principal.actorId, {
-        boardId: board.boardId,
-        visibility: board.visibility,
-      });
-      return reply.code(201).header("etag", etagFor(board.version)).send(board);
-    },
-  );
+  }>("/api/v1/boards", boardsCollaborate, async (request, reply) => {
+    const principal = request.principal;
+    if (!principal) {
+      return reply.code(401).send({ error: "authentication required" });
+    }
+    const body = request.body ?? {};
+    if (typeof body.title !== "string" || body.title.trim() === "") {
+      return reply.code(400).send({ error: "title is required" });
+    }
+    const visibility: BoardVisibility =
+      body.visibility === "team" ? "team" : "personal";
+    const timestamp = nowIso();
+    const board = await store.createBoard({
+      boardId: generateId("board"),
+      tenantId: principal.tenantId,
+      authorityId: principal.authorityId,
+      jurisdictionId: principal.jurisdictionId,
+      ownerActorId: principal.actorId,
+      title: body.title,
+      description:
+        typeof body.description === "string" ? body.description : null,
+      visibility,
+      contentLocale: "de",
+      templateKey: null,
+      templateVersion: null,
+      purpose: null,
+      lifecycleStage: null,
+      version: 1,
+      archivedAt: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+    await audit("BOARD_CREATED", principal.tenantId, principal.actorId, {
+      boardId: board.boardId,
+      visibility: board.visibility,
+    });
+    return reply.code(201).header("etag", etagFor(board.version)).send(board);
+  });
 
   app.get<{ Params: { boardId: string } }>(
     "/api/v1/boards/:boardId",
-    { preHandler: requirePrincipal },
+    boardsCollaborate,
     async (request, reply) => {
       const loaded = await loadAccessibleBoard(
         request,
@@ -262,60 +260,56 @@ export function registerBoardRoutes(
   app.patch<{
     Params: { boardId: string };
     Body: { title?: unknown; description?: unknown; visibility?: unknown };
-  }>(
-    "/api/v1/boards/:boardId",
-    { preHandler: requirePrincipal },
-    async (request, reply) => {
-      const loaded = await loadAccessibleBoard(
-        request,
-        reply,
-        request.params.boardId,
-        "manage",
-      );
-      if (!loaded) {
-        return;
-      }
-      const expectedVersion = requireIfMatch(request, reply);
-      if (expectedVersion === undefined) {
-        return;
-      }
-      const body = request.body ?? {};
-      await handleStoreErrors(reply, async () => {
-        const updated = await store.updateBoard({
-          tenantId: loaded.principal.tenantId,
-          boardId: loaded.board.boardId,
-          expectedVersion,
-          patch: {
-            ...(typeof body.title === "string" ? { title: body.title } : {}),
-            ...(typeof body.description === "string"
-              ? { description: body.description }
-              : {}),
-            ...(body.visibility === "team" || body.visibility === "personal"
-              ? { visibility: body.visibility }
-              : {}),
-          },
-        });
-        if (updated.visibility !== loaded.board.visibility) {
-          // "BOARD_SHARED"/Entzug der Team-Sichtbarkeit — sicherheitsrelevant, weil sich
-          // der Leserkreis ändert.
-          await audit(
-            "BOARD_VISIBILITY_CHANGED",
-            loaded.principal.tenantId,
-            loaded.principal.actorId,
-            {
-              boardId: updated.boardId,
-              visibility: updated.visibility,
-            },
-          );
-        }
-        await reply.header("etag", etagFor(updated.version)).send(updated);
+  }>("/api/v1/boards/:boardId", boardsCollaborate, async (request, reply) => {
+    const loaded = await loadAccessibleBoard(
+      request,
+      reply,
+      request.params.boardId,
+      "manage",
+    );
+    if (!loaded) {
+      return;
+    }
+    const expectedVersion = requireIfMatch(request, reply);
+    if (expectedVersion === undefined) {
+      return;
+    }
+    const body = request.body ?? {};
+    await handleStoreErrors(reply, async () => {
+      const updated = await store.updateBoard({
+        tenantId: loaded.principal.tenantId,
+        boardId: loaded.board.boardId,
+        expectedVersion,
+        patch: {
+          ...(typeof body.title === "string" ? { title: body.title } : {}),
+          ...(typeof body.description === "string"
+            ? { description: body.description }
+            : {}),
+          ...(body.visibility === "team" || body.visibility === "personal"
+            ? { visibility: body.visibility }
+            : {}),
+        },
       });
-    },
-  );
+      if (updated.visibility !== loaded.board.visibility) {
+        // "BOARD_SHARED"/Entzug der Team-Sichtbarkeit — sicherheitsrelevant, weil sich
+        // der Leserkreis ändert.
+        await audit(
+          "BOARD_VISIBILITY_CHANGED",
+          loaded.principal.tenantId,
+          loaded.principal.actorId,
+          {
+            boardId: updated.boardId,
+            visibility: updated.visibility,
+          },
+        );
+      }
+      await reply.header("etag", etagFor(updated.version)).send(updated);
+    });
+  });
 
   app.post<{ Params: { boardId: string } }>(
     "/api/v1/boards/:boardId/archive",
-    { preHandler: requirePrincipal },
+    boardsCollaborate,
     async (request, reply) => {
       const loaded = await loadAccessibleBoard(
         request,
@@ -349,7 +343,7 @@ export function registerBoardRoutes(
 
   app.post<{ Params: { boardId: string } }>(
     "/api/v1/boards/:boardId/restore",
-    { preHandler: requirePrincipal },
+    boardsCollaborate,
     async (request, reply) => {
       const loaded = await loadAccessibleBoard(
         request,
@@ -387,7 +381,7 @@ export function registerBoardRoutes(
 
   app.post<{ Params: { boardId: string }; Body: { title?: unknown } }>(
     "/api/v1/boards/:boardId/columns",
-    { preHandler: requirePrincipal },
+    boardsCollaborate,
     async (request, reply) => {
       const loaded = await loadAccessibleBoard(
         request,
@@ -430,7 +424,7 @@ export function registerBoardRoutes(
     Body: { title?: unknown };
   }>(
     "/api/v1/boards/:boardId/columns/:columnId",
-    { preHandler: requirePrincipal },
+    boardsCollaborate,
     async (request, reply) => {
       const loaded = await loadAccessibleBoard(
         request,
@@ -462,7 +456,7 @@ export function registerBoardRoutes(
 
   app.post<{ Params: { boardId: string; columnId: string } }>(
     "/api/v1/boards/:boardId/columns/:columnId/archive",
-    { preHandler: requirePrincipal },
+    boardsCollaborate,
     async (request, reply) => {
       const loaded = await loadAccessibleBoard(
         request,
@@ -490,7 +484,7 @@ export function registerBoardRoutes(
 
   app.post<{ Params: { boardId: string; columnId: string } }>(
     "/api/v1/boards/:boardId/columns/:columnId/restore",
-    { preHandler: requirePrincipal },
+    boardsCollaborate,
     async (request, reply) => {
       const loaded = await loadAccessibleBoard(
         request,
@@ -539,7 +533,7 @@ export function registerBoardRoutes(
 
   app.get<{ Params: { boardId: string } }>(
     "/api/v1/boards/:boardId/cards/archived",
-    { preHandler: requirePrincipal },
+    boardsCollaborate,
     async (request, reply) => {
       const loaded = await loadAccessibleBoard(
         request,
@@ -570,7 +564,7 @@ export function registerBoardRoutes(
     };
   }>(
     "/api/v1/boards/:boardId/cards",
-    { preHandler: requirePrincipal },
+    boardsCollaborate,
     async (request, reply) => {
       const loaded = await loadAccessibleBoard(
         request,
@@ -639,7 +633,7 @@ export function registerBoardRoutes(
     Body: Record<string, unknown>;
   }>(
     "/api/v1/boards/:boardId/cards/:cardId",
-    { preHandler: requirePrincipal },
+    boardsCollaborate,
     async (request, reply) => {
       const loaded = await loadAccessibleBoard(
         request,
@@ -672,7 +666,7 @@ export function registerBoardRoutes(
     Body: { toColumnId?: unknown; toPositionKey?: unknown };
   }>(
     "/api/v1/boards/:boardId/cards/:cardId/move",
-    { preHandler: requirePrincipal },
+    boardsCollaborate,
     async (request, reply) => {
       const loaded = await loadAccessibleBoard(
         request,
@@ -727,7 +721,7 @@ export function registerBoardRoutes(
 
   app.post<{ Params: { boardId: string; cardId: string } }>(
     "/api/v1/boards/:boardId/cards/:cardId/archive",
-    { preHandler: requirePrincipal },
+    boardsCollaborate,
     async (request, reply) => {
       const loaded = await loadAccessibleBoard(
         request,
@@ -755,7 +749,7 @@ export function registerBoardRoutes(
 
   app.post<{ Params: { boardId: string; cardId: string } }>(
     "/api/v1/boards/:boardId/cards/:cardId/restore",
-    { preHandler: requirePrincipal },
+    boardsCollaborate,
     async (request, reply) => {
       const loaded = await loadAccessibleBoard(
         request,

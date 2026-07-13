@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   InMemoryAuthStore,
+  StalePrincipalVersionError,
+  effectivePersonas,
+  normalizePersonas,
   type LocalCredential,
   type UserAccount,
 } from "./auth-store.js";
@@ -16,6 +19,10 @@ function makeUser(overrides: Partial<UserAccount> = {}): UserAccount {
     displayName: "Admin",
     status: "active",
     role: "admin",
+    localPersonas: ["buerger", "sachbearbeitung", "aufsicht"],
+    oidcPersonas: [],
+    personaManagementMode: "local",
+    principalVersion: 1,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -292,6 +299,218 @@ describe("InMemoryAuthStore — identity links", () => {
         tenantId: "tenant.local",
         provider: "local",
         subject: "actor.1",
+      }),
+    ).toBeUndefined();
+  });
+});
+
+// Personas sind Konto-DATEN (Arbeitsbereiche/Erlebnis), keine Autorisierung. Die puren
+// Helfer sind deterministisch: USER_PERSONAS-Reihenfolge, dupe-frei — Gleichheitsprüfungen
+// (No-op-Erkennung) und UI-Sortierung hängen daran.
+describe("Persona-Helfer (pure)", () => {
+  it("normalizePersonas dedupliziert und sortiert in kanonischer Reihenfolge", () => {
+    expect(
+      normalizePersonas(["aufsicht", "buerger", "aufsicht", "buerger"]),
+    ).toEqual(["buerger", "aufsicht"]);
+  });
+
+  it("effectivePersonas: local-Modus nutzt NUR lokale Zuweisungen", () => {
+    const user = makeUser({
+      localPersonas: ["aufsicht"],
+      oidcPersonas: ["buerger"],
+      personaManagementMode: "local",
+    });
+    expect(effectivePersonas(user)).toEqual(["aufsicht"]);
+  });
+
+  it("effectivePersonas: oidc_authoritative nutzt NUR externe Zuweisungen", () => {
+    const user = makeUser({
+      localPersonas: ["aufsicht"],
+      oidcPersonas: ["buerger"],
+      personaManagementMode: "oidc_authoritative",
+    });
+    expect(effectivePersonas(user)).toEqual(["buerger"]);
+  });
+
+  it("effectivePersonas: oidc_additive ist die dupe-freie Union in kanonischer Reihenfolge", () => {
+    const user = makeUser({
+      localPersonas: ["aufsicht", "buerger"],
+      oidcPersonas: ["sachbearbeitung", "buerger"],
+      personaManagementMode: "oidc_additive",
+    });
+    expect(effectivePersonas(user)).toEqual([
+      "buerger",
+      "sachbearbeitung",
+      "aufsicht",
+    ]);
+  });
+});
+
+// updateUserAccess = DIE atomare Principal-Mutation: validiert den ganzen Patch, erkennt
+// No-ops nach Normalisierung (kein Version-Bump, kein Audit-Anlass), bumpt sonst GENAU
+// einmal und trägt optimistische Nebenläufigkeit (expectedPrincipalVersion → Konflikt).
+describe("InMemoryAuthStore — updateUserAccess", () => {
+  it("kombinierter Patch (Status + Personas) bumpt principalVersion genau einmal", async () => {
+    const store = new InMemoryAuthStore();
+    await store.createUser(makeUser({ localPersonas: ["buerger"] }));
+
+    const result = await store.updateUserAccess({
+      tenantId: "tenant.local",
+      actorId: "actor.1",
+      patch: { status: "disabled", localPersonas: ["sachbearbeitung"] },
+    });
+    expect(result.changed).toBe(true);
+    expect(result.before.principalVersion).toBe(1);
+    expect(result.after.principalVersion).toBe(2);
+    expect(result.after.status).toBe("disabled");
+    expect(result.after.localPersonas).toEqual(["sachbearbeitung"]);
+  });
+
+  it("No-op bumpt NICHT: gleiche Persona-Menge in anderer Reihenfolge", async () => {
+    const store = new InMemoryAuthStore();
+    await store.createUser(
+      makeUser({ localPersonas: ["buerger", "aufsicht"] }),
+    );
+
+    const result = await store.updateUserAccess({
+      tenantId: "tenant.local",
+      actorId: "actor.1",
+      patch: { localPersonas: ["aufsicht", "buerger", "aufsicht"] },
+    });
+    expect(result.changed).toBe(false);
+    expect(result.after.principalVersion).toBe(1);
+  });
+
+  it("stale expectedPrincipalVersion → StalePrincipalVersionError, keine Änderung", async () => {
+    const store = new InMemoryAuthStore();
+    await store.createUser(makeUser());
+
+    await expect(
+      store.updateUserAccess({
+        tenantId: "tenant.local",
+        actorId: "actor.1",
+        expectedPrincipalVersion: 99,
+        patch: { localPersonas: [] },
+      }),
+    ).rejects.toBeInstanceOf(StalePrincipalVersionError);
+    const unchanged = await store.getUserById({
+      tenantId: "tenant.local",
+      actorId: "actor.1",
+    });
+    expect(unchanged?.principalVersion).toBe(1);
+    expect(unchanged?.localPersonas).toEqual([
+      "buerger",
+      "sachbearbeitung",
+      "aufsicht",
+    ]);
+  });
+
+  it("unbekannter Actor → not found", async () => {
+    const store = new InMemoryAuthStore();
+    await expect(
+      store.updateUserAccess({
+        tenantId: "tenant.local",
+        actorId: "actor.unknown",
+        patch: { status: "active" },
+      }),
+    ).rejects.toThrow(/not found/);
+  });
+
+  it("status→disabled widerruft Sessions ATOMAR mit dem Patch", async () => {
+    const store = new InMemoryAuthStore();
+    await store.createUser(makeUser());
+    await store.createSession({
+      sessionIdHash: "hash.a",
+      actorId: "actor.1",
+      tenantId: "tenant.local",
+      authorityId: "authority.local",
+      jurisdictionId: "de",
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      revokedAt: null,
+    });
+
+    await store.updateUserAccess({
+      tenantId: "tenant.local",
+      actorId: "actor.1",
+      patch: { status: "disabled" },
+    });
+    expect(await store.getActiveSessionByHash("hash.a")).toBeUndefined();
+  });
+
+  it("Modus-Wechsel ist principal-relevant und bumpt die Version", async () => {
+    const store = new InMemoryAuthStore();
+    await store.createUser(makeUser());
+
+    const result = await store.updateUserAccess({
+      tenantId: "tenant.local",
+      actorId: "actor.1",
+      patch: { personaManagementMode: "oidc_additive" },
+    });
+    expect(result.changed).toBe(true);
+    expect(result.after.principalVersion).toBe(2);
+    // Identischer Sync danach = No-op (unveränderte OIDC-Claims bumpen NICHTS).
+    const noop = await store.updateUserAccess({
+      tenantId: "tenant.local",
+      actorId: "actor.1",
+      patch: { personaManagementMode: "oidc_additive", oidcPersonas: [] },
+    });
+    expect(noop.changed).toBe(false);
+    expect(noop.after.principalVersion).toBe(2);
+  });
+
+  it("updateUserStatus (Wrapper) bumpt die Version weiterhin", async () => {
+    const store = new InMemoryAuthStore();
+    await store.createUser(makeUser());
+    const disabled = await store.updateUserStatus({
+      tenantId: "tenant.local",
+      actorId: "actor.1",
+      status: "disabled",
+    });
+    expect(disabled.principalVersion).toBe(2);
+  });
+});
+
+// Lokale Konto-Anlage ist ATOMAR: User + Credential + „local"-Identity-Link entstehen
+// zusammen oder gar nicht — sonst bliebe ein aktives Konto ohne Login-Möglichkeit zurück,
+// dessen E-Mail jede erneute Registrierung blockiert.
+describe("InMemoryAuthStore — createLocalUserWithCredential", () => {
+  it("legt User, Credential und local-Identity-Link zusammen an", async () => {
+    const store = new InMemoryAuthStore();
+    const user = await store.createLocalUserWithCredential({
+      user: makeUser({ localPersonas: ["buerger"], role: "citizen" }),
+      credential: makeCredential(),
+    });
+    expect(user.role).toBe("citizen");
+    expect(await store.getLocalCredential("actor.1")).toBeDefined();
+    expect(
+      await store.findActorByIdentity({
+        tenantId: "tenant.local",
+        provider: "local",
+        subject: "actor.1",
+      }),
+    ).toBe("actor.1");
+  });
+
+  it("Duplikat-E-Mail → nichts wird angelegt (kein Zombie-Credential/-Link)", async () => {
+    const store = new InMemoryAuthStore();
+    await store.createLocalUserWithCredential({
+      user: makeUser(),
+      credential: makeCredential(),
+    });
+
+    await expect(
+      store.createLocalUserWithCredential({
+        user: makeUser({ actorId: "actor.2", email: "ADMIN@example.org" }),
+        credential: makeCredential({ actorId: "actor.2" }),
+      }),
+    ).rejects.toThrow(/already exists/);
+    expect(await store.getLocalCredential("actor.2")).toBeUndefined();
+    expect(
+      await store.findActorByIdentity({
+        tenantId: "tenant.local",
+        provider: "local",
+        subject: "actor.2",
       }),
     ).toBeUndefined();
   });

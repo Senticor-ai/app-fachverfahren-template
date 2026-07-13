@@ -8,15 +8,35 @@
 // und Netzfehler bedeuten „API nicht erreichbar" (apiAvailable=false) — niemals ein Throw.
 import { apiPath } from "./board-client.js";
 
+export type SessionPersona = "buerger" | "sachbearbeitung" | "aufsicht";
+export type SessionWorkspaceRole = "admin" | "member" | "citizen";
+
 export interface SessionPrincipal {
   actorId: string;
+  tenantId?: string;
   email: string;
   displayName?: string;
   /** Workspace-Rolle + Permissions aus dem App-Identity-Modell (GET /auth/session).
-   *  UI-Guards prüfen Permissions, nie Rollen-Literale — wie die Server-Routen. */
-  role?: "admin" | "member";
+   *  UI-Guards prüfen Permissions, nie Rollen-Literale — wie die Server-Routen.
+   *  `role` ist der deprecated Alias von `workspaceRole` (ein Release). */
+  workspaceRole?: SessionWorkspaceRole;
+  role?: SessionWorkspaceRole;
   permissions?: string[];
+  /** Wirksame ARBEITSBEREICHE (Personas) — Produkt-Erlebnis, keine Autorisierung.
+   *  Fallback-Regeln in personas.ts (capability-gesteuert). */
+  personas?: SessionPersona[];
+  personaManagementMode?: "local" | "oidc_authoritative" | "oidc_additive";
+  /** Versioniert jede principal-relevante Mutation (If-Match für Admin-PATCHes). */
+  principalVersion?: number;
 }
+
+/** Vom Server gemeldete Schema-Fähigkeiten (GET /auth/status) — Grundlage des
+ *  Legacy-Fallbacks in personas.ts. */
+export interface SessionCapabilities {
+  userPersonas?: boolean;
+}
+
+export type RegistrationMode = "disabled" | "open_unverified";
 
 export type SessionStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -28,6 +48,9 @@ export interface SessionSnapshot {
   /** false = der API-Server hat nicht mit JSON geantwortet (down/kein Proxy/Fehlkonfiguration).
    *  Die Landing zeigt dann einen Hinweis statt der Formulare — Anmelden wäre zwecklos. */
   apiAvailable: boolean;
+  /** Self-Signup-Politik des Servers — steuert den Registrieren-Umschalter der Landing. */
+  registration: RegistrationMode;
+  capabilities: SessionCapabilities;
 }
 
 const API_UNAVAILABLE: SessionSnapshot = {
@@ -35,6 +58,8 @@ const API_UNAVAILABLE: SessionSnapshot = {
   principal: null,
   bootstrapped: false,
   apiAvailable: false,
+  registration: "disabled",
+  capabilities: {},
 };
 
 function isJsonResponse(response: Response): boolean {
@@ -65,16 +90,24 @@ export async function fetchSessionState(
     if (!statusResponse.ok || !isJsonResponse(statusResponse)) {
       return API_UNAVAILABLE;
     }
-    const { bootstrapped, storeAvailable } = (await statusResponse.json()) as {
-      bootstrapped: boolean;
-      storeAvailable?: boolean;
-    };
+    const { bootstrapped, storeAvailable, registration, capabilities } =
+      (await statusResponse.json()) as {
+        bootstrapped: boolean;
+        storeAvailable?: boolean;
+        registration?: RegistrationMode;
+        capabilities?: SessionCapabilities;
+      };
     // Degradierte Server-Antwort (Web-Tier oben, Datenbank unten): der Server meldet
     // storeAvailable=false mit 200 statt 500, damit der Browser keinen Ressourcen-
     // Fehler loggt — für die UI ist das „API nicht erreichbar" (Anmelden zwecklos).
     if (storeAvailable === false) {
       return API_UNAVAILABLE;
     }
+    const envelope = {
+      registration:
+        registration === "open_unverified" ? registration : "disabled",
+      capabilities: capabilities ?? {},
+    } as const;
 
     const sessionResponse = await fetchImpl(apiPath("/auth/session"), {
       credentials: "include",
@@ -87,6 +120,7 @@ export async function fetchSessionState(
         principal,
         bootstrapped,
         apiAvailable: true,
+        ...envelope,
       };
     }
     return {
@@ -94,6 +128,7 @@ export async function fetchSessionState(
       principal: null,
       bootstrapped,
       apiAvailable: true,
+      ...envelope,
     };
   } catch {
     return API_UNAVAILABLE;

@@ -17,22 +17,54 @@ import {
   bootstrapWorkspace,
   MINIMUM_PASSWORD_LENGTH,
 } from "./bootstrap.js";
-import { DEFAULT_TENANT_ID, SESSION_COOKIE_NAME } from "./constants.js";
+import {
+  DEFAULT_AUTHORITY_ID,
+  DEFAULT_JURISDICTION_ID,
+  DEFAULT_TENANT_ID,
+  SESSION_COOKIE_NAME,
+} from "./constants.js";
 import "./principal.js";
-import { createRequirePrincipal } from "./require-principal.js";
+import { routeAuth } from "./authorization.js";
+import { createInMemoryRateLimiter, type RateLimiter } from "./rate-limit.js";
 import {
   DEFAULT_SESSION_TTL_MS,
   generateSessionToken,
   hashSessionToken,
   sessionExpiryIso,
 } from "./session-token.js";
+import {
+  effectivePersonas,
+  isDuplicateUserError,
+} from "@senticor/app-store-postgres";
 import { permissionsForRole } from "./workspace-permissions.js";
+
+export type RegistrationMode = "disabled" | "open_unverified";
+
+export interface RegistrationContext {
+  tenantId: string;
+  registrationMode: RegistrationMode;
+}
+
+/** Tenant + Registrierungs-Modus kommen aus dem VERTRAUENSWÜRDIGEN Deployment-Kontext
+ *  (konfigurierter Tenant, später Subdomain-/Invite-/OIDC-Mapping) — NIE aus dem
+ *  Request-Body. Die Standalone-Implementierung nutzt den konfigurierten Default-Tenant. */
+export interface RegistrationContextResolver {
+  resolve(request: {
+    ip: string;
+  }): RegistrationContext | Promise<RegistrationContext>;
+}
 
 export interface AuthRouteDeps {
   authStore: AuthStore;
   kanbanStore: KanbanStore;
   auditStore: AuditStore;
   bootstrapToken: string | undefined;
+  /** Self-Signup-Politik: Default AUS. `open_unverified` heißt ehrlich so, bis
+   *  E-Mail-Verifikation existiert (capability:notification, PLAN in rbac.md). */
+  registrationMode?: RegistrationMode;
+  registrationContextResolver?: RegistrationContextResolver;
+  /** Drossel für Registrierung/Login/Passwort — Default: In-Memory (Single-Process). */
+  rateLimiter?: RateLimiter;
   now?: () => Date;
   generateId?: (prefix: string) => string;
 }
@@ -62,7 +94,25 @@ export function registerAuthRoutes(
   const now = deps.now ?? (() => new Date());
   const generateId =
     deps.generateId ?? ((prefix: string) => `${prefix}.${randomUUID()}`);
-  const requirePrincipal = createRequirePrincipal(deps.authStore);
+  const publicRoute = routeAuth({ kind: "public" }, deps);
+  const authenticated = routeAuth({ kind: "authenticated" }, deps);
+  // Zwei Drossel-Profile: Registrierung streng (Konto-Anlage), Credential-Pfade
+  // großzügiger (ein Büro hinter NAT teilt sich eine IP). Ein injizierter
+  // RateLimiter (deps) übernimmt BEIDE Schlüsselräume — verteilte Implementierungen
+  // konfigurieren ihre Limits pro Schlüssel-Präfix selbst.
+  const registerLimiter =
+    deps.rateLimiter ??
+    createInMemoryRateLimiter({ limit: 10, windowMs: 15 * 60 * 1000 });
+  const credentialLimiter =
+    deps.rateLimiter ??
+    createInMemoryRateLimiter({ limit: 30, windowMs: 15 * 60 * 1000 });
+  const registrationResolver: RegistrationContextResolver =
+    deps.registrationContextResolver ?? {
+      resolve: () => ({
+        tenantId: DEFAULT_TENANT_ID,
+        registrationMode: deps.registrationMode ?? "disabled",
+      }),
+    };
 
   // Audit-Schreiben darf einen Login nie verhindern: das Event ist Pflicht der
   // Baseline, aber ein kaputter Audit-Store soll den Auth-Pfad nicht mitreißen —
@@ -90,7 +140,16 @@ export function registerAuthRoutes(
     }
   }
 
-  app.get("/auth/status", async () => {
+  // Statische Status-Anteile: Schema-/Capability-Anzeige (der Client fällt NUR bei
+  // Servern OHNE userPersonas-Capability auf den Alle-drei-Legacy-Fallback zurück;
+  // fehlt personas trotz Capability, gilt fail closed LEER) + Registration-Modus.
+  const statusEnvelope = {
+    sessionSchemaVersion: 2,
+    capabilities: { userPersonas: true },
+    registration: deps.registrationMode ?? "disabled",
+  };
+
+  app.get("/auth/status", publicRoute, async () => {
     // Ohne erreichbaren Auth-Store (kein APP_PG_URL, DB down) bewusst degradiert
     // antworten statt 500: Web-Tier oben, Datenbank unten. Der Client behandelt
     // storeAvailable=false wie „API nicht erreichbar" (session-state.ts), und der
@@ -100,15 +159,17 @@ export function registerAuthRoutes(
       const count = await deps.authStore.countUsers({
         tenantId: DEFAULT_TENANT_ID,
       });
-      return { bootstrapped: count > 0 };
+      return { ...statusEnvelope, bootstrapped: count > 0 };
     } catch (error) {
       app.log.warn({ err: error }, "auth store unavailable for /auth/status");
-      return { bootstrapped: false, storeAvailable: false };
+      return { ...statusEnvelope, bootstrapped: false, storeAvailable: false };
     }
   });
 
   app.post<{ Body: BootstrapRequestBody }>(
     "/auth/bootstrap",
+    // Gate = Einrichtungs-Token im Body (assertBootstrapToken im Handler).
+    routeAuth({ kind: "bootstrap-token" }, deps),
     async (request, reply) => {
       const body = request.body ?? {};
       if (
@@ -172,9 +233,134 @@ export function registerAuthRoutes(
     },
   );
 
+  interface RegisterRequestBody {
+    email?: unknown;
+    displayName?: unknown;
+    password?: unknown;
+  }
+
+  // Neutrale Antwort für NEU und BEREITS VERGEBEN (Anti-Enumeration): kein Auto-Login,
+  // kein Cookie — Konto-Existenz ist von außen nicht ablesbar. Wortlaut identisch.
+  const NEUTRAL_REGISTER_RESPONSE = {
+    message:
+      "Falls die E-Mail-Adresse noch nicht registriert war, wurde Ihr Konto angelegt. Sie können sich jetzt mit Ihren Zugangsdaten über die Anmeldung anmelden.",
+  };
+  const MAX_EMAIL_LENGTH = 254;
+  const MAX_DISPLAY_NAME_LENGTH = 120;
+  const MAX_PASSWORD_LENGTH = 256;
+  const MAX_PASSWORD_BYTES = 1024;
+
+  // Self-Signup (default AUS): legt ein citizen-Konto mit Arbeitsbereich „buerger" an.
+  // citizen hat KEINE Workspace-Permissions (workspace-permissions.ts) — die Boards-API
+  // bleibt zu. Offene Punkte bis zum ehrlichen "open": E-Mail-Verifikation, Passwort-
+  // Reset, Invites (PLAN in docs/reference/rbac.md).
+  app.post<{ Body: RegisterRequestBody }>(
+    "/auth/register",
+    routeAuth({ kind: "registration-policy" }, deps),
+    async (request, reply) => {
+      const context = await registrationResolver.resolve(request);
+      if (context.registrationMode !== "open_unverified") {
+        await audit("REGISTRATION_REJECTED", context.tenantId, null, {
+          reason: "registration_disabled",
+        });
+        return reply.code(403).send({ error: "registration is disabled" });
+      }
+      // Quelle drosseln, BEVOR gehasht wird (argon2 ist teuer). request.ip ist nur
+      // hinter explizit konfiguriertem trustProxy die Client-IP (rate-limit.ts).
+      if (!registerLimiter.allow(`register:${request.ip}`)) {
+        await audit("REGISTRATION_REJECTED", context.tenantId, null, {
+          reason: "rate_limited",
+        });
+        return reply
+          .code(429)
+          .send({ error: "too many registration attempts" });
+      }
+      const body = request.body ?? {};
+      if (
+        typeof body.email !== "string" ||
+        typeof body.displayName !== "string" ||
+        typeof body.password !== "string"
+      ) {
+        return reply.code(400).send({ error: "invalid registration request" });
+      }
+      // Längen-Caps VOR dem Hashing (Hashing-DoS) — E-Mail normalisiert (trim/lowercase,
+      // der Unique-Index ist ohnehin lower(email)).
+      const email = body.email.trim().toLowerCase();
+      const displayName = body.displayName.trim();
+      if (
+        email.length === 0 ||
+        email.length > MAX_EMAIL_LENGTH ||
+        !email.includes("@") ||
+        displayName.length === 0 ||
+        displayName.length > MAX_DISPLAY_NAME_LENGTH ||
+        body.password.length < MINIMUM_PASSWORD_LENGTH ||
+        body.password.length > MAX_PASSWORD_LENGTH ||
+        Buffer.byteLength(body.password, "utf8") > MAX_PASSWORD_BYTES
+      ) {
+        return reply.code(400).send({ error: "invalid registration request" });
+      }
+
+      // Hash IMMER berechnen (auch für vergebene Adressen): uniforme Antwortzeit,
+      // kein Timing-Orakel über Konto-Existenz.
+      const passwordHash = await hashPassword(body.password);
+      const nowIso = now().toISOString();
+      const actorId = generateId("actor");
+      try {
+        await deps.authStore.createLocalUserWithCredential({
+          user: {
+            actorId,
+            tenantId: context.tenantId,
+            authorityId: DEFAULT_AUTHORITY_ID,
+            jurisdictionId: DEFAULT_JURISDICTION_ID,
+            email,
+            displayName,
+            status: "active",
+            role: "citizen",
+            localPersonas: ["buerger"],
+            oidcPersonas: [],
+            personaManagementMode: "local",
+            principalVersion: 1,
+            createdAt: nowIso,
+            updatedAt: nowIso,
+          },
+          credential: {
+            actorId,
+            passwordHash,
+            hashAlgo: "argon2id",
+            passwordChangedAt: nowIso,
+            failedAttempts: 0,
+            lockedUntil: null,
+            createdAt: nowIso,
+            updatedAt: nowIso,
+          },
+        });
+      } catch (error) {
+        if (isDuplicateUserError(error)) {
+          await audit("REGISTRATION_REJECTED", context.tenantId, null, {
+            reason: "email_taken",
+          });
+          return reply.code(200).send(NEUTRAL_REGISTER_RESPONSE);
+        }
+        throw error;
+      }
+      await audit("USER_CREATED", context.tenantId, actorId, {
+        selfSignup: true,
+        role: "citizen",
+        personas: ["buerger"],
+      });
+      return reply.code(200).send(NEUTRAL_REGISTER_RESPONSE);
+    },
+  );
+
   app.post<{ Body: LoginRequestBody }>(
     "/auth/login",
+    publicRoute,
     async (request, reply) => {
+      // IP-Drossel ZUSÄTZLICH zum Konto-Lockout: der Lockout schützt EIN Konto,
+      // die Drossel bremst breites Durchprobieren vieler Konten von einer Quelle.
+      if (!credentialLimiter.allow(`login:${request.ip}`)) {
+        return reply.code(429).send({ error: "too many login attempts" });
+      }
       const body = request.body ?? {};
       if (typeof body.email !== "string" || typeof body.password !== "string") {
         return reply.code(400).send({ error: "invalid login request" });
@@ -242,51 +428,63 @@ export function registerAuthRoutes(
     },
   );
 
-  app.post(
-    "/auth/logout",
-    { preHandler: requirePrincipal },
-    async (request, reply) => {
-      const token = request.cookies[SESSION_COOKIE_NAME];
-      if (token) {
-        await deps.authStore.revokeSession(hashSessionToken(token));
-      }
-      reply.clearCookie(SESSION_COOKIE_NAME, { path: "/" });
-      return reply.code(204).send();
-    },
-  );
+  // Session-optional und idempotent: räumt Cookie/Session IMMER — auch eine abgelaufene
+  // Sitzung kann sich „abmelden", statt an 401 zu scheitern.
+  app.post("/auth/logout", publicRoute, async (request, reply) => {
+    const token = request.cookies[SESSION_COOKIE_NAME];
+    if (token) {
+      await deps.authStore.revokeSession(hashSessionToken(token));
+    }
+    reply.clearCookie(SESSION_COOKIE_NAME, { path: "/" });
+    return reply.code(204).send();
+  });
 
-  app.get(
-    "/auth/session",
-    { preHandler: requirePrincipal },
-    async (request, reply) => {
-      const principal = request.principal;
-      if (!principal) {
-        return reply.code(401).send({ error: "authentication required" });
-      }
-      const user = await deps.authStore.getUserById({
-        tenantId: principal.tenantId,
-        actorId: principal.actorId,
-      });
-      if (!user) {
-        return reply.code(401).send({ error: "authentication required" });
-      }
-      return reply.send({
-        actorId: user.actorId,
-        email: user.email,
+  app.get("/auth/session", authenticated, async (request, reply) => {
+    const principal = request.principal;
+    if (!principal) {
+      return reply.code(401).send({ error: "authentication required" });
+    }
+    const user = await deps.authStore.getUserById({
+      tenantId: principal.tenantId,
+      actorId: principal.actorId,
+    });
+    if (!user) {
+      return reply.code(401).send({ error: "authentication required" });
+    }
+    // Der Principal trägt FÄHIGKEITEN (permissions, personas), nicht nur Rohdaten:
+    // der Client autorisiert NUR über permissions; workspaceRole ist Anzeige/Diagnose
+    // (`role` bleibt EIN Release als deprecated Alias). E-Mail/DisplayName bleiben
+    // zusätzlich top-level, damit bereits gescaffoldete Clients weiterlaufen.
+    return reply.send({
+      actorId: user.actorId,
+      tenantId: user.tenantId,
+      identity: { provider: "local", subject: user.actorId },
+      account: {
         displayName: user.displayName,
-        role: user.role,
-        permissions: permissionsForRole(user.role),
-      });
-    },
-  );
+        email: user.email,
+        status: user.status,
+      },
+      email: user.email,
+      displayName: user.displayName,
+      workspaceRole: user.role,
+      role: user.role,
+      permissions: permissionsForRole(user.role),
+      personas: effectivePersonas(user),
+      personaManagementMode: user.personaManagementMode,
+      principalVersion: user.principalVersion,
+    });
+  });
 
   app.post<{ Body: PasswordChangeRequestBody }>(
     "/auth/password",
-    { preHandler: requirePrincipal },
+    authenticated,
     async (request, reply) => {
       const principal = request.principal;
       if (!principal) {
         return reply.code(401).send({ error: "authentication required" });
+      }
+      if (!credentialLimiter.allow(`password:${principal.actorId}`)) {
+        return reply.code(429).send({ error: "too many password attempts" });
       }
       const body = request.body ?? {};
       if (

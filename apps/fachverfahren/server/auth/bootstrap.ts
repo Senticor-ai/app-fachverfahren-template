@@ -103,28 +103,29 @@ export async function bootstrapWorkspace(
   const generateId = deps.generateId ?? defaultGenerateId;
   const actorId = generateId("actor");
 
-  const user = await deps.authStore.createUser({
-    actorId,
-    tenantId,
-    authorityId: DEFAULT_AUTHORITY_ID,
-    jurisdictionId: DEFAULT_JURISDICTION_ID,
-    email: input.email,
-    displayName: input.displayName,
-    status: "active",
-    role: "admin",
-    createdAt: nowIso,
-    updatedAt: nowIso,
-  });
-
-  // Rollback-Grenze: scheitert NACH dem User-Insert irgendetwas (Credential-Persistenz,
-  // Discovery-Board-Seed), würde `countUsers() > 0` den Tenant dauerhaft als „bootstrapped"
-  // melden — ohne Credential wäre der Workspace unbenutzbar UND nicht erneut einrichtbar.
-  // Auth- und Kanban-Store teilen keine Verbindung (jeder Call öffnet seine eigene), eine
-  // echte DB-Transaktion über beide gibt es daher nicht; die Kompensations-Löschung stellt
-  // `countUsers() === 0` wieder her, sodass der Operator das Setup erneut versuchen kann.
-  try {
-    const passwordHash = await hashPassword(input.password);
-    await deps.authStore.createLocalCredential({
+  // User + Credential + „local"-Identity-Link entstehen ATOMAR in einer Transaktion
+  // (createLocalUserWithCredential) — kein aktives Konto ohne Login-Weg möglich.
+  // Der erste Admin bekommt EXPLIZIT alle drei Arbeitsbereiche (fail-closed: es gibt
+  // bewusst keinen Personas-Default; jede Anlage entscheidet selbst).
+  const passwordHash = await hashPassword(input.password);
+  const user = await deps.authStore.createLocalUserWithCredential({
+    user: {
+      actorId,
+      tenantId,
+      authorityId: DEFAULT_AUTHORITY_ID,
+      jurisdictionId: DEFAULT_JURISDICTION_ID,
+      email: input.email,
+      displayName: input.displayName,
+      status: "active",
+      role: "admin",
+      localPersonas: ["buerger", "sachbearbeitung", "aufsicht"],
+      oidcPersonas: [],
+      personaManagementMode: "local",
+      principalVersion: 1,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    },
+    credential: {
       actorId,
       passwordHash,
       hashAlgo: "argon2id",
@@ -133,18 +134,15 @@ export async function bootstrapWorkspace(
       lockedUntil: null,
       createdAt: nowIso,
       updatedAt: nowIso,
-    });
+    },
+  });
 
-    // Authentifizierung ≠ Autorisierung: auch der lokale Login läuft über das
-    // Identity-Mapping (provider "local", subject = actorId) — ein späterer
-    // OIDC-Provider hängt sich an dieselbe Naht, ohne die Autorisierung zu ändern.
-    await deps.authStore.linkIdentity({
-      tenantId,
-      provider: "local",
-      subject: actorId,
-      actorId,
-    });
-
+  // Rollback-Grenze: scheitert NACH der (atomaren) Konto-Anlage der Discovery-Board-Seed,
+  // würde `countUsers() > 0` den Tenant dauerhaft als „bootstrapped" melden. Auth- und
+  // Kanban-Store teilen keine Verbindung (jeder Call öffnet seine eigene), eine echte
+  // DB-Transaktion über beide gibt es daher nicht; die Kompensations-Löschung stellt
+  // `countUsers() === 0` wieder her, sodass der Operator das Setup erneut versuchen kann.
+  try {
     // Das Discovery-Board ist das GETEILTE Team-Board des Workspaces (Feature-Entscheid
     // „Beides"): team-sichtbar, damit jedes später angelegte Konto mitarbeiten kann.
     const board = await seedDiscoveryBoard(

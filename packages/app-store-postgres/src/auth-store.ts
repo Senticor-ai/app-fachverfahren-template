@@ -4,8 +4,24 @@ export type UserStatus = "active" | "disabled";
 
 /** Workspace-Rolle (gespeichertes Primitiv). Das Permission-Mapping (users.manage,
  *  boards.collaborate, …) lebt bewusst im App-Server (workspace-permissions.ts), damit
- *  später feinere Rollen ohne Schema-Änderung entstehen können. */
-export type UserRole = "admin" | "member";
+ *  später feinere Rollen ohne Schema-Änderung entstehen können. `citizen` =
+ *  selbstregistrierte Bürger:innen (KEINE Workspace-Permissions). */
+export type UserRole = "admin" | "member" | "citizen";
+
+/** Personas = Arbeitsbereiche/Produkt-Erlebnis (Navigation), NIE Server-Autorisierung.
+ *  Kanonische Reihenfolge = diese Konstante; alle Vergleiche laufen über normalizePersonas. */
+export type UserPersona = "buerger" | "sachbearbeitung" | "aufsicht";
+export const USER_PERSONAS: readonly UserPersona[] = [
+  "buerger",
+  "sachbearbeitung",
+  "aufsicht",
+];
+
+/** Autoritäts-Policy der Persona-Pflege: wer „besitzt" die Zuweisungen?
+ *  local = nur Admin-Pflege; oidc_authoritative = nur externe Claims (lokale Pflege
+ *  gesperrt); oidc_additive = Union aus beiden (lokale Pflege bleibt erlaubt). */
+export type PersonaManagementMode =
+  "local" | "oidc_authoritative" | "oidc_additive";
 
 export interface UserAccount {
   actorId: string;
@@ -16,8 +32,121 @@ export interface UserAccount {
   displayName: string;
   status: UserStatus;
   role: UserRole;
+  /** Lokal (Admin/Self-Signup) gepflegte Arbeitsbereiche. PFLICHTFELD: jede Konto-Anlage
+   *  entscheidet explizit (fail-closed — es gibt bewusst keinen „alle drei"-Default). */
+  localPersonas: UserPersona[];
+  /** Extern (OIDC-Sync) gesetzte Arbeitsbereiche — getrennte Quelle, leer bei lokalen Konten. */
+  oidcPersonas: UserPersona[];
+  personaManagementMode: PersonaManagementMode;
+  /** Zählt JEDE principal-relevante Mutation (Status, Rolle, Persona-Quellen, Modus) —
+   *  Anker für optimistische Nebenläufigkeit (If-Match) und Principal-Invalidierung.
+   *  No-op-Mutationen bumpen NICHT (unveränderte OIDC-Claims sind kein Ereignis). */
+  principalVersion: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Kanonische Form: dedupliziert, Reihenfolge = USER_PERSONAS. Grundlage für
+ *  No-op-Erkennung (Mengen-Gleichheit) und stabile UI-Sortierung. */
+export function normalizePersonas(
+  input: readonly UserPersona[],
+): UserPersona[] {
+  return USER_PERSONAS.filter((persona) => input.includes(persona));
+}
+
+/** DIE eine Ableitung der wirksamen Arbeitsbereiche aus beiden Quellen je Modus —
+ *  deterministisch (kanonische Reihenfolge, dupe-frei); Server-Session und Doku
+ *  benutzen ausschließlich diese Funktion. */
+export function effectivePersonas(
+  account: Pick<
+    UserAccount,
+    "localPersonas" | "oidcPersonas" | "personaManagementMode"
+  >,
+): UserPersona[] {
+  switch (account.personaManagementMode) {
+    case "local":
+      return normalizePersonas(account.localPersonas);
+    case "oidc_authoritative":
+      return normalizePersonas(account.oidcPersonas);
+    case "oidc_additive":
+      return USER_PERSONAS.filter(
+        (persona) =>
+          account.localPersonas.includes(persona) ||
+          account.oidcPersonas.includes(persona),
+      );
+  }
+}
+
+/** Optimistische Nebenläufigkeit: `expectedPrincipalVersion` passt nicht zum Konto —
+ *  die Route antwortet 409, der Client lädt neu. */
+export class StalePrincipalVersionError extends Error {
+  constructor(
+    public readonly actorId: string,
+    public readonly expected: number,
+    public readonly actual: number,
+  ) {
+    super(
+      `principal version of "${actorId}" is ${actual}, expected ${expected}`,
+    );
+    this.name = "StalePrincipalVersionError";
+  }
+}
+
+export interface UserAccessPatch {
+  status?: UserStatus;
+  localPersonas?: UserPersona[];
+  oidcPersonas?: UserPersona[];
+  personaManagementMode?: PersonaManagementMode;
+}
+
+export interface UserAccessResult {
+  before: UserAccount;
+  after: UserAccount;
+  /** false = No-op nach Normalisierung: kein Version-Bump, kein Audit-Anlass. */
+  changed: boolean;
+}
+
+/** Gemeinsame Patch-Auflösung beider Store-Implementierungen: normalisiert Personas,
+ *  vergleicht als MENGE (Reihenfolge/Duplikate egal) und liefert nur real geänderte
+ *  Felder — die Grundlage der No-op-Erkennung. */
+function resolveUserAccessPatch(
+  current: UserAccount,
+  patch: UserAccessPatch,
+): { changed: boolean; fields: Partial<UserAccount> } {
+  const fields: Partial<UserAccount> = {};
+  if (patch.status !== undefined && patch.status !== current.status) {
+    fields.status = patch.status;
+  }
+  if (patch.localPersonas !== undefined) {
+    const normalized = normalizePersonas(patch.localPersonas);
+    if (!samePersonaSet(normalized, current.localPersonas)) {
+      fields.localPersonas = normalized;
+    }
+  }
+  if (patch.oidcPersonas !== undefined) {
+    const normalized = normalizePersonas(patch.oidcPersonas);
+    if (!samePersonaSet(normalized, current.oidcPersonas)) {
+      fields.oidcPersonas = normalized;
+    }
+  }
+  if (
+    patch.personaManagementMode !== undefined &&
+    patch.personaManagementMode !== current.personaManagementMode
+  ) {
+    fields.personaManagementMode = patch.personaManagementMode;
+  }
+  return { changed: Object.keys(fields).length > 0, fields };
+}
+
+function samePersonaSet(
+  normalized: readonly UserPersona[],
+  other: readonly UserPersona[],
+): boolean {
+  const canonical = normalizePersonas(other);
+  return (
+    normalized.length === canonical.length &&
+    normalized.every((persona, index) => persona === canonical[index])
+  );
 }
 
 /** Authentifizierung ≠ Autorisierung: externe Identität (provider/issuer + subject) →
@@ -54,6 +183,14 @@ export interface SessionRecord {
 
 export interface AuthStore {
   createUser(user: UserAccount): Promise<UserAccount>;
+  /** Lokale Konto-Anlage ATOMAR: User + Credential + „local"-Identity-Link entstehen in
+   *  EINER Transaktion oder gar nicht — sonst bliebe ein aktives Konto ohne Login-Weg
+   *  zurück, dessen E-Mail jede erneute Registrierung blockiert. Duplikat-E-Mail wirft
+   *  denselben „already exists"-Fehler wie createUser (Route → 409). */
+  createLocalUserWithCredential(input: {
+    user: UserAccount;
+    credential: LocalCredential;
+  }): Promise<UserAccount>;
   getUserByEmail(input: {
     tenantId: string;
     email: string;
@@ -64,10 +201,18 @@ export interface AuthStore {
   }): Promise<UserAccount | undefined>;
   countUsers(input: { tenantId: string }): Promise<number>;
   listUsers(input: { tenantId: string }): Promise<UserAccount[]>;
-  /** Statuswechsel ATOMAR mit der Session-Konsequenz: `disabled` widerruft in derselben
-   *  Transaktion alle aktiven Sessions des Actors — getrennte Schritte könnten nach einem
-   *  Teilfehler ein deaktiviertes Konto mit lebender 12h-Session zurücklassen
-   *  (requirePrincipal prüft user.status nicht pro Request). */
+  /** DIE atomare Principal-Mutation (Status, Persona-Quellen, Modus in EINEM Patch):
+   *  validiert/normalisiert zuerst, erkennt No-ops (kein Version-Bump, changed=false),
+   *  bumpt sonst principalVersion GENAU einmal, liefert before/after (Audit-Grundlage).
+   *  `expectedPrincipalVersion` (If-Match) → StalePrincipalVersionError bei Konflikt.
+   *  `status: "disabled"` widerruft Sessions ATOMAR mit dem Patch. */
+  updateUserAccess(input: {
+    tenantId: string;
+    actorId: string;
+    expectedPrincipalVersion?: number;
+    patch: UserAccessPatch;
+  }): Promise<UserAccessResult>;
+  /** Dünner Wrapper über updateUserAccess({ patch: { status } }) — bestehende Signatur. */
   updateUserStatus(input: {
     tenantId: string;
     actorId: string;
@@ -176,11 +321,12 @@ export class InMemoryAuthStore implements AuthStore {
       .map((user) => ({ ...user }));
   }
 
-  async updateUserStatus(input: {
+  async updateUserAccess(input: {
     tenantId: string;
     actorId: string;
-    status: UserStatus;
-  }): Promise<UserAccount> {
+    expectedPrincipalVersion?: number;
+    patch: UserAccessPatch;
+  }): Promise<UserAccessResult> {
     const key = userKey(input.tenantId, input.actorId);
     const current = this.users.get(key);
     if (!current) {
@@ -188,20 +334,64 @@ export class InMemoryAuthStore implements AuthStore {
         `user "${input.actorId}" not found in tenant "${input.tenantId}"`,
       );
     }
+    if (
+      input.expectedPrincipalVersion !== undefined &&
+      input.expectedPrincipalVersion !== current.principalVersion
+    ) {
+      throw new StalePrincipalVersionError(
+        input.actorId,
+        input.expectedPrincipalVersion,
+        current.principalVersion,
+      );
+    }
+    const resolved = resolveUserAccessPatch(current, input.patch);
+    const before: UserAccount = { ...current };
+    if (!resolved.changed) {
+      return { before, after: { ...current }, changed: false };
+    }
     const next: UserAccount = {
       ...current,
-      status: input.status,
+      ...resolved.fields,
+      principalVersion: current.principalVersion + 1,
       updatedAt: nowIso(),
     };
     this.users.set(key, next);
-    if (input.status === "disabled") {
+    if (resolved.fields.status === "disabled") {
       for (const [hash, session] of this.sessions) {
         if (session.actorId === input.actorId && !session.revokedAt) {
           this.sessions.set(hash, { ...session, revokedAt: nowIso() });
         }
       }
     }
-    return { ...next };
+    return { before, after: { ...next }, changed: true };
+  }
+
+  async updateUserStatus(input: {
+    tenantId: string;
+    actorId: string;
+    status: UserStatus;
+  }): Promise<UserAccount> {
+    const result = await this.updateUserAccess({
+      tenantId: input.tenantId,
+      actorId: input.actorId,
+      patch: { status: input.status },
+    });
+    return result.after;
+  }
+
+  async createLocalUserWithCredential(input: {
+    user: UserAccount;
+    credential: LocalCredential;
+  }): Promise<UserAccount> {
+    // „Transaktion" in-memory: erst ALLE Konflikte prüfen, dann schreiben — bei einem
+    // Duplikat entsteht weder User noch Credential noch Identity-Link.
+    const user = await this.createUser(input.user);
+    this.credentials.set(input.credential.actorId, { ...input.credential });
+    this.identityLinks.set(
+      identityKey(user.tenantId, "local", user.actorId),
+      user.actorId,
+    );
+    return user;
   }
 
   async deleteUser(input: {
@@ -391,6 +581,9 @@ export class UnavailableAuthStore implements AuthStore {
   async createUser(): Promise<UserAccount> {
     this.fail();
   }
+  async createLocalUserWithCredential(): Promise<UserAccount> {
+    this.fail();
+  }
   async getUserByEmail(): Promise<UserAccount | undefined> {
     this.fail();
   }
@@ -401,6 +594,9 @@ export class UnavailableAuthStore implements AuthStore {
     this.fail();
   }
   async listUsers(): Promise<UserAccount[]> {
+    this.fail();
+  }
+  async updateUserAccess(): Promise<UserAccessResult> {
     this.fail();
   }
   async updateUserStatus(): Promise<UserAccount> {
@@ -469,6 +665,10 @@ interface UserRow extends Record<string, unknown> {
   display_name: string;
   status: UserStatus;
   role: UserRole;
+  local_personas: UserPersona[];
+  oidc_personas: UserPersona[];
+  persona_management_mode: PersonaManagementMode;
+  principal_version: number | string;
   created_at: Date | string;
   updated_at: Date | string;
 }
@@ -508,28 +708,68 @@ export class PostgresAuthStore implements AuthStore {
   async createUser(user: UserAccount): Promise<UserAccount> {
     return this.withClient(async (client) => {
       const result = await client.query<UserRow>(
-        `
-          INSERT INTO app_users (
-            actor_id, tenant_id, authority_id, jurisdiction_id, email,
-            display_name, status, role, created_at, updated_at
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-          RETURNING *
-        `,
-        [
-          user.actorId,
-          user.tenantId,
-          user.authorityId,
-          user.jurisdictionId,
-          user.email,
-          user.displayName,
-          user.status,
-          user.role,
-          user.createdAt,
-          user.updatedAt,
-        ],
+        insertUserSql,
+        insertUserParams(user),
       );
       return userFromRow(requireRow(result.rows, "user", user.actorId));
+    });
+  }
+
+  async createLocalUserWithCredential(input: {
+    user: UserAccount;
+    credential: LocalCredential;
+  }): Promise<UserAccount> {
+    // EINE Transaktion für User + Credential + „local"-Identity-Link: entweder entsteht
+    // das Konto vollständig oder gar nicht (kein aktives Konto ohne Login-Weg, dessen
+    // E-Mail jede erneute Registrierung blockiert). Duplikate meldet der Unique-Index.
+    return this.withClient(async (client) => {
+      await client.query("BEGIN");
+      try {
+        const result = await client.query<UserRow>(
+          insertUserSql,
+          insertUserParams(input.user),
+        );
+        const row = requireRow(result.rows, "user", input.user.actorId);
+        await client.query(
+          `
+            INSERT INTO app_local_credentials (
+              actor_id, password_hash, hash_algo, password_changed_at,
+              failed_attempts, locked_until, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          `,
+          [
+            input.credential.actorId,
+            input.credential.passwordHash,
+            input.credential.hashAlgo,
+            input.credential.passwordChangedAt,
+            input.credential.failedAttempts,
+            input.credential.lockedUntil,
+            input.credential.createdAt,
+            input.credential.updatedAt,
+          ],
+        );
+        await client.query(
+          `
+            INSERT INTO app_identity_links (tenant_id, provider, subject, actor_id)
+            VALUES ($1, 'local', $2, $2)
+          `,
+          [input.user.tenantId, input.user.actorId],
+        );
+        await client.query("COMMIT");
+        return userFromRow(row);
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => {});
+        // Unique-Verletzung des tenant-scoped E-Mail-Index → dieselbe Fehlerform wie
+        // InMemory.createUser, damit die Routen einheitlich auf 409 mappen.
+        if (isUniqueViolation(error)) {
+          throw new Error(
+            `user with email "${input.user.email}" already exists in tenant "${input.user.tenantId}"`,
+            { cause: error },
+          );
+        }
+        throw error;
+      }
     });
   }
 
@@ -543,39 +783,91 @@ export class PostgresAuthStore implements AuthStore {
     });
   }
 
-  async updateUserStatus(input: {
+  async updateUserAccess(input: {
     tenantId: string;
     actorId: string;
-    status: UserStatus;
-  }): Promise<UserAccount> {
+    expectedPrincipalVersion?: number;
+    patch: UserAccessPatch;
+  }): Promise<UserAccessResult> {
     return this.withClient(async (client) => {
-      // Eine Transaktion für Status + Session-Revocation: sonst könnte ein Fehler nach
-      // dem Status-Update ein deaktiviertes Konto mit lebenden Sessions hinterlassen.
+      // EINE Transaktion: Zeile sperren (FOR UPDATE, kein TOCTOU), ganzen Patch auflösen,
+      // No-op ohne Version-Bump beenden, sonst GENAU ein Bump — und die Session-Konsequenz
+      // von `disabled` atomar mitnehmen (sonst bliebe nach einem Teilfehler ein
+      // deaktiviertes Konto mit lebender 12h-Session zurück).
       await client.query("BEGIN");
       try {
-        const result = await client.query<UserRow>(
+        const currentResult = await client.query<UserRow>(
+          `SELECT * FROM app_users WHERE tenant_id = $1 AND actor_id = $2 FOR UPDATE`,
+          [input.tenantId, input.actorId],
+        );
+        const currentRow = currentResult.rows[0];
+        if (!currentRow) {
+          throw new Error(
+            `user "${input.actorId}" not found in tenant "${input.tenantId}"`,
+          );
+        }
+        const before = userFromRow(currentRow);
+        if (
+          input.expectedPrincipalVersion !== undefined &&
+          input.expectedPrincipalVersion !== before.principalVersion
+        ) {
+          throw new StalePrincipalVersionError(
+            input.actorId,
+            input.expectedPrincipalVersion,
+            before.principalVersion,
+          );
+        }
+        const resolved = resolveUserAccessPatch(before, input.patch);
+        if (!resolved.changed) {
+          await client.query("COMMIT");
+          return { before, after: before, changed: false };
+        }
+        const merged = { ...before, ...resolved.fields };
+        const updateResult = await client.query<UserRow>(
           `
             UPDATE app_users
-            SET status = $3, updated_at = now()
+            SET status = $3, local_personas = $4, oidc_personas = $5,
+                persona_management_mode = $6,
+                principal_version = principal_version + 1, updated_at = now()
             WHERE tenant_id = $1 AND actor_id = $2
             RETURNING *
           `,
-          [input.tenantId, input.actorId, input.status],
+          [
+            input.tenantId,
+            input.actorId,
+            merged.status,
+            normalizePersonas(merged.localPersonas),
+            normalizePersonas(merged.oidcPersonas),
+            merged.personaManagementMode,
+          ],
         );
-        const row = requireRow(result.rows, "user", input.actorId);
-        if (input.status === "disabled") {
+        const row = requireRow(updateResult.rows, "user", input.actorId);
+        if (resolved.fields.status === "disabled") {
           await client.query(
             `UPDATE app_sessions SET revoked_at = now() WHERE actor_id = $1 AND revoked_at IS NULL`,
             [input.actorId],
           );
         }
         await client.query("COMMIT");
-        return userFromRow(row);
+        return { before, after: userFromRow(row), changed: true };
       } catch (error) {
         await client.query("ROLLBACK").catch(() => {});
         throw error;
       }
     });
+  }
+
+  async updateUserStatus(input: {
+    tenantId: string;
+    actorId: string;
+    status: UserStatus;
+  }): Promise<UserAccount> {
+    const result = await this.updateUserAccess({
+      tenantId: input.tenantId,
+      actorId: input.actorId,
+      patch: { status: input.status },
+    });
+    return result.after;
   }
 
   async getUserByEmail(input: {
@@ -891,6 +1183,58 @@ function requireRow<T>(rows: T[], resource: string, resourceId: string): T {
   return row;
 }
 
+// Von createUser UND createLocalUserWithCredential geteilt — die Spaltenliste existiert
+// genau einmal.
+const insertUserSql = `
+  INSERT INTO app_users (
+    actor_id, tenant_id, authority_id, jurisdiction_id, email,
+    display_name, status, role, local_personas, oidc_personas,
+    persona_management_mode, principal_version, created_at, updated_at
+  )
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+  RETURNING *
+`;
+
+function insertUserParams(user: UserAccount): unknown[] {
+  return [
+    user.actorId,
+    user.tenantId,
+    user.authorityId,
+    user.jurisdictionId,
+    user.email,
+    user.displayName,
+    user.status,
+    user.role,
+    normalizePersonas(user.localPersonas),
+    normalizePersonas(user.oidcPersonas),
+    user.personaManagementMode,
+    user.principalVersion,
+    user.createdAt,
+    user.updatedAt,
+  ];
+}
+
+/** Duplikat-Erkennung über beide Store-Implementierungen: Postgres meldet die
+ *  Unique-Violation als SQLSTATE 23505 (wird in createLocalUserWithCredential bereits
+ *  in die "already exists"-Form übersetzt), der InMemory-Store wirft "... already
+ *  exists" — Routen mappen dies einheitlich auf 409/neutral. */
+export function isDuplicateUserError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const code = (error as { code?: unknown }).code;
+  return code === "23505" || /already exists/i.test(error.message);
+}
+
+/** Postgres-Fehlercode 23505 = unique_violation (tenant-scoped E-Mail-Index). */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: string }).code === "23505"
+  );
+}
+
 function userFromRow(row: UserRow): UserAccount {
   return {
     actorId: row.actor_id,
@@ -901,6 +1245,11 @@ function userFromRow(row: UserRow): UserAccount {
     displayName: row.display_name,
     status: row.status,
     role: row.role,
+    localPersonas: normalizePersonas(row.local_personas ?? []),
+    oidcPersonas: normalizePersonas(row.oidc_personas ?? []),
+    personaManagementMode: row.persona_management_mode,
+    // bigint kommt aus pg als String an.
+    principalVersion: Number(row.principal_version),
     createdAt: toIsoString(row.created_at),
     updatedAt: toIsoString(row.updated_at),
   };

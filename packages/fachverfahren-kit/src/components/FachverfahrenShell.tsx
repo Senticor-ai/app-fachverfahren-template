@@ -46,8 +46,10 @@ export interface ShellNavItem {
 export interface FachverfahrenShellProps<T = Record<string, unknown>> {
   /** Der Leistungs-Vertrag — liefert Branding + leitet die Navigation ab. */
   config: LeistungConfig<T>;
-  /** Aktive Rolle (kontrolliert). */
-  persona: Persona;
+  /** Aktiver Arbeitsbereich (kontrolliert). OPTIONAL: der Team-Workspace (Boards) ist
+   *  Workspace-Navigation ohne aktive Persona — die Shell zeigt dann eine neutrale
+   *  Workspace-Nav statt eine Rolle vorzutäuschen. */
+  persona?: Persona;
   /** Rollen-Wechsel. */
   onPersonaChange: (persona: Persona) => void;
   /** Seiten-Inhalt (die persona-spezifische Sicht). */
@@ -92,9 +94,14 @@ function brandInitials(label: string): string {
  * Labels sind generische Verwaltungs-Begriffe; das konkrete Verfahren steckt im Branding, nicht in der Nav.
  */
 function navFor<T>(
-  persona: Persona,
+  persona: Persona | undefined,
   config: LeistungConfig<T>,
 ): ShellNavItem[] {
+  // Workspace-Modus (keine aktive Persona): nur der Team-Workspace-Einstieg — die
+  // Persona-Sichten erreicht man über den Arbeitsbereichs-Wechsler.
+  if (persona === undefined) {
+    return [boardsNavItem()];
+  }
   switch (persona) {
     case "buerger": {
       const items: ShellNavItem[] = [
@@ -163,6 +170,11 @@ const ROLLEN_LABEL: Record<Persona, string> = {
   aufsicht: "Aufsicht",
 };
 
+/** Überschrift/Badge-Text: aktive Persona oder der neutrale Workspace-Kontext. */
+function kontextLabel(persona: Persona | undefined): string {
+  return persona ? ROLLEN_LABEL[persona] : "Team-Workspace";
+}
+
 const MAIN_ID = "main-content";
 
 /** Die 3-Personen-Shell: Skip-Link · Marken-Sidebar mit persona-Nav + Switcher · Header · Main-Inhalt. */
@@ -181,14 +193,23 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
   // DATA-DRIVEN Rollen: explizite Prop > verfahrensspezifische Rollen aus dem Vertrag (config.personas, aus dem
   // Fachkonzept) > generische DEFAULT_PERSONAS. So spiegeln die 3 Sichten das jeweilige Verfahren, ohne Hardcode.
   const personaList = personas ?? config.personas ?? DEFAULT_PERSONAS;
-  // DEEP-LINK: ?persona=buerger|sachbearbeitung|aufsicht (aus der Governance-UI / geteilte Links) setzt die Rolle
-  // initial. GENERISCH für JEDE generierte App (alle rendern diese Shell); die App bleibt Quelle der Wahrheit
+  // Wechsler nur zeigen, wenn es etwas zu wechseln gibt: mehr als ein Arbeitsbereich —
+  // oder Workspace-Modus (keine aktive Persona) mit mindestens einem Einstieg.
+  const showSwitcher =
+    personaList.length > 1 ||
+    (personaList.length >= 1 && persona === undefined);
+  // DEEP-LINK: ?persona=… setzt die Rolle initial — validiert gegen die ZUGEWIESENEN
+  // Arbeitsbereiche (personaList), nicht gegen das hartkodierte Tripel: ein geteilter
+  // Link darf keine fremde Sicht aufrufen. Die App bleibt Quelle der Wahrheit
   // (onPersonaChange), wir stoßen nur den initialen Wechsel an.
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     const raw = new URLSearchParams(window.location.search).get("persona");
-    const valid: Persona[] = ["buerger", "sachbearbeitung", "aufsicht"];
-    if (raw && (valid as string[]).includes(raw) && raw !== persona)
+    if (
+      raw &&
+      personaList.some((entry) => entry.key === raw) &&
+      raw !== persona
+    )
       onPersonaChange(raw as Persona);
   }, []);
   const nav = navFor(persona, config);
@@ -278,11 +299,11 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
         {/* Persona-spezifische Navigation (data-driven). */}
         <nav
           className="flex-1 overflow-y-auto px-2 py-3"
-          aria-label={`Navigation — ${ROLLEN_LABEL[persona]}`}
+          aria-label={`Navigation — ${kontextLabel(persona)}`}
         >
           <div className="mb-4">
             <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-sidebar-muted">
-              {ROLLEN_LABEL[persona]}
+              {kontextLabel(persona)}
             </div>
             <ul className="flex flex-col gap-0.5">{nav.map(renderNavItem)}</ul>
           </div>
@@ -298,14 +319,16 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
           ))}
         </nav>
 
-        {/* Rollen-Wechsler (umschaltbar). */}
-        <div className="relative border-t border-sidebar-border p-2">
-          <PersonaSwitcher
-            persona={persona}
-            onPersonaChange={onPersonaChange}
-            personas={personaList}
-          />
-        </div>
+        {/* Arbeitsbereichs-Wechsler — nur wenn es etwas zu wechseln gibt. */}
+        {showSwitcher && (
+          <div className="relative border-t border-sidebar-border p-2">
+            <PersonaSwitcher
+              persona={persona}
+              onPersonaChange={onPersonaChange}
+              personas={personaList}
+            />
+          </div>
+        )}
       </aside>
 
       {/* ── Inhalts-Spalte: Header + Main ───────────────────────────────────── */}
@@ -333,7 +356,7 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
             {/* Aktive Rolle als ruhiger Kontext-Hinweis. */}
             <Badge tone="info" className="hidden sm:inline-flex">
               <ShieldCheck className="h-3 w-3" aria-hidden="true" />
-              {ROLLEN_LABEL[persona]}
+              {kontextLabel(persona)}
             </Badge>
             {/* Demo-/Datenschutz-Transparenz (synthetische Daten — keine Echtdaten).
                 Im Team-Workspace (echte Arbeitsdaten) via showDemoBadge=false abgeschaltet. */}
@@ -345,14 +368,16 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
           </div>
         </header>
 
-        {/* Persona-Wechsler auch im Header (mobil, wo die Sidebar verborgen ist). */}
-        <div className="border-b border-sidebar-border bg-sidebar px-2 py-1.5 md:hidden">
-          <PersonaSwitcher
-            persona={persona}
-            onPersonaChange={onPersonaChange}
-            personas={personaList}
-          />
-        </div>
+        {/* Arbeitsbereichs-Wechsler auch im Header (mobil, wo die Sidebar verborgen ist). */}
+        {showSwitcher && (
+          <div className="border-b border-sidebar-border bg-sidebar px-2 py-1.5 md:hidden">
+            <PersonaSwitcher
+              persona={persona}
+              onPersonaChange={onPersonaChange}
+              personas={personaList}
+            />
+          </div>
+        )}
 
         {/* Haupt-Inhalt (main-Landmark, Sprungziel des Skip-Links). */}
         <main

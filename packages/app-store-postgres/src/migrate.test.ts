@@ -99,6 +99,39 @@ describe("postgres migration runner", () => {
     expect(sql).toContain("'Fachverfahren Discovery Board'");
   });
 
+  it("ships the user-personas migration (NULL-Legacy-Marker, fail-closed defaults, citizen role)", async () => {
+    const migrations = await loadMigrations(
+      "packages/app-store-postgres/migrations",
+    );
+    const sql = migrations.map((migration) => migration.sql).join("\n");
+
+    // B1 replay-sicher: Spalte NULLABLE anlegen, NUR IS-NULL-Zeilen (= Bestand von VOR der
+    // Einführung) backfillen, danach leerer Default + NOT NULL. Ein bewusst leeres Konto
+    // ('{}') wird bei erneutem SQL-Lauf NICHT erneut befüllt.
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS local_personas text[];");
+    expect(sql).toContain("WHERE local_personas IS NULL");
+    expect(sql).toContain(
+      "ALTER COLUMN local_personas SET DEFAULT ARRAY[]::text[]",
+    );
+    expect(sql).toContain("ALTER COLUMN local_personas SET NOT NULL");
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS oidc_personas text[];");
+    expect(sql).toContain(
+      "ADD COLUMN IF NOT EXISTS persona_management_mode text NOT NULL DEFAULT 'local'",
+    );
+    expect(sql).toContain(
+      "ADD COLUMN IF NOT EXISTS principal_version bigint NOT NULL DEFAULT 1",
+    );
+    // Kanonische Wertebereiche als benannte CHECKs (inkl. Verbot von NULL-Elementen und >3).
+    expect(sql).toContain("app_users_local_personas_allowed");
+    expect(sql).toContain("app_users_oidc_personas_allowed");
+    expect(sql).toContain("app_users_persona_mode_allowed");
+    expect(sql).toContain("array_position(local_personas, NULL) IS NULL");
+    expect(sql).toContain("cardinality(local_personas) <= 3");
+    // Workspace-Rolle citizen (Self-Signup) — inline-CHECK aus workspace_foundation ersetzt.
+    expect(sql).toContain("app_users_role_check");
+    expect(sql).toContain("role IN ('admin', 'member', 'citizen')");
+  });
+
   it("keeps preference and mailbox semantics testable without a database", async () => {
     const messages: MailboxMessage[] = [
       {

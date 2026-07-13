@@ -29,4 +29,14 @@ describe("auth-forms — Passwort-Manager-Attribute", () => {
       expect(source).toContain(`name="${field}"`);
     }
   });
+
+  it("Registrierung: neues Passwort als new-password, Name als name, E-Mail als username", async () => {
+    const source = await authFormsSource();
+    const registerStart = source.indexOf("function RegisterForm");
+    expect(registerStart, "RegisterForm fehlt").toBeGreaterThan(-1);
+    const registerSource = source.slice(registerStart);
+    expect(registerSource).toContain('autoComplete="new-password"');
+    expect(registerSource).toContain('autoComplete="username"');
+    expect(registerSource).toContain('autoComplete="name"');
+  });
 });

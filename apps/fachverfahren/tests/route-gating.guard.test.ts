@@ -60,4 +60,24 @@ describe("App-Routen — Session-Gate", () => {
     const source = await appSource();
     expect(source).not.toContain('to="/buerger"');
   });
+
+  // Arbeitsbereichs-Gates: Persona-Routen liegen in drei RequirePersonaExperience-
+  // Gruppen (NUR Navigation, keine Autorisierungsgrenze) INNERHALB des Session-Gates;
+  // der Boards-Workspace verlangt zusätzlich die Permission boards.collaborate.
+  it("drei RequirePersonaExperience-Gruppen existieren innerhalb des Session-Gates", async () => {
+    const source = await appSource();
+    const gateStart = source.indexOf(
+      "<Route element={<RequireSessionOutlet />}>",
+    );
+    for (const persona of ["buerger", "sachbearbeitung", "aufsicht"]) {
+      const marker = `<RequirePersonaExperience persona="${persona}" />`;
+      const index = source.indexOf(marker);
+      expect(index, `${marker} fehlt`).toBeGreaterThan(gateStart);
+    }
+  });
+
+  it("/boards* verlangt die Permission boards.collaborate", async () => {
+    const source = await appSource();
+    expect(source).toContain('permission="boards.collaborate"');
+  });
 });

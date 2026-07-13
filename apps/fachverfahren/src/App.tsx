@@ -37,6 +37,12 @@ import { AdminUsersPage } from "./AdminUsersPage.js";
 import { createBoardClient } from "./board-client.js";
 import { LandingPage } from "./LandingPage.js";
 import { PasswordChangePage } from "./PasswordChangePage.js";
+import {
+  allowedPersonas,
+  PERSONA_HOME,
+  personaDescriptors,
+  personaHome,
+} from "./personas.js";
 import { useSession } from "./session.js";
 import { needsFirstRunSetup } from "./session-state.js";
 
@@ -61,22 +67,61 @@ function RequireSessionOutlet(): React.JSX.Element | null {
   return <Outlet />;
 }
 
-/** Guards `/admin/*`: prüft eine Workspace-Permission (wie die Server-Routen — nie
- *  Rollen-Literale). Ohne Permission geht es zurück auf /boards statt auf eine Fehlerseite. */
+/** Guards für Workspace-Bereiche: prüft eine Workspace-Permission (wie die Server-Routen —
+ *  nie Rollen-Literale). Ohne Permission geht es an `fallbackTo` (Default /boards; für den
+ *  Boards-Bereich selbst "/" — sonst entstünde eine Redirect-Schleife). */
 function RequirePermission({
   permission,
+  fallbackTo = "/boards",
   children,
 }: {
   permission: string;
+  fallbackTo?: string;
   children: React.ReactNode;
 }): React.JSX.Element | null {
   const { status, principal } = useSession();
   if (status === "loading") return null;
   if (status === "unauthenticated") return <Navigate to="/" replace />;
   if (!principal?.permissions?.includes(permission)) {
-    return <Navigate to="/boards" replace />;
+    return <Navigate to={fallbackTo} replace />;
   }
   return <>{children}</>;
+}
+
+/** Layout-Variante von RequirePermission für Routen-Gruppen (Boards-Workspace). */
+function RequirePermissionOutlet({
+  permission,
+  fallbackTo,
+}: {
+  permission: string;
+  fallbackTo: string;
+}): React.JSX.Element {
+  return (
+    <RequirePermission permission={permission} fallbackTo={fallbackTo}>
+      <Outlet />
+    </RequirePermission>
+  );
+}
+
+/** Arbeitsbereichs-Gate: steuert NUR Navigation/Produkt-Erlebnis — KEINE
+ *  Autorisierungsgrenze (die trifft der Server über Workspace-Permissions bzw. künftig
+ *  Resource-Autorisierung). Ein nicht zugewiesener Arbeitsbereich leitet auf den eigenen
+ *  Einstieg um (personaHome: erste eigene Persona → Boards nur mit Permission → Landing). */
+function RequirePersonaExperience({
+  persona,
+}: {
+  persona: Persona;
+}): React.JSX.Element | null {
+  const { status, principal, capabilities } = useSession();
+  if (status === "loading") return null;
+  if (status === "unauthenticated") return <Navigate to="/" replace />;
+  const allowed = allowedPersonas(principal, capabilities);
+  if (!allowed.includes(persona)) {
+    return (
+      <Navigate to={personaHome(allowed, principal?.permissions)} replace />
+    );
+  }
+  return <Outlet />;
 }
 
 /** Workspace-Hülle = DIESELBE Persona-Sidebar wie die Fach-Sichten (FachverfahrenShell), mit
@@ -90,7 +135,7 @@ function BoardsShell({
   activeNavKey: string;
   children: React.ReactNode;
 }): React.JSX.Element {
-  const { logout, principal } = useSession();
+  const { logout, principal, capabilities } = useSession();
   const navigate = useNavigate();
   const verwaltung: ShellNavSection[] = principal?.permissions?.includes(
     "users.manage",
@@ -112,8 +157,14 @@ function BoardsShell({
   return (
     <FachverfahrenShell
       config={store.config}
-      persona="sachbearbeitung"
+      // Boards = WORKSPACE-Navigation, keine Persona: keine aktive Rolle vortäuschen
+      // (Boards-only-Konten haben ggf. gar keinen Arbeitsbereich). Der Wechsler zeigt
+      // die zugewiesenen Arbeitsbereiche als Einstiege.
       onPersonaChange={(next) => navigate(PERSONA_HOME[next])}
+      personas={personaDescriptors(
+        allowedPersonas(principal, capabilities),
+        store.config,
+      )}
       activeNavKey={activeNavKey}
       onNavigate={(item: ShellNavItem) => {
         if (item.href) navigate(item.href);
@@ -195,13 +246,7 @@ function useStoreVersion(): unknown {
   );
 }
 
-// ── URL ↔ Persona. Die Shell-Personas hängen am Pfad-Präfix; ein Wechsel navigiert an den Persona-Einstieg. ──
-const PERSONA_HOME: Record<Persona, string> = {
-  buerger: "/buerger",
-  sachbearbeitung: "/amt",
-  aufsicht: "/aufsicht",
-};
-
+// ── URL ↔ Persona. Die Shell-Personas hängen am Pfad-Präfix (PERSONA_HOME in personas.ts). ──
 function personaFromPath(pathname: string): Persona {
   if (pathname.startsWith("/amt")) return "sachbearbeitung";
   if (pathname.startsWith("/aufsicht")) return "aufsicht";
@@ -219,6 +264,7 @@ function Shell({
   children: React.ReactNode;
 }): React.JSX.Element {
   const navigate = useNavigate();
+  const { principal, capabilities } = useSession();
   const onPersonaChange = (next: Persona) => navigate(PERSONA_HOME[next]);
   const onNavigate = (item: ShellNavItem) => {
     if (item.href) navigate(item.href);
@@ -230,6 +276,12 @@ function Shell({
       onPersonaChange={onPersonaChange}
       {...(activeNavKey ? { activeNavKey } : {})}
       onNavigate={onNavigate}
+      // Der Wechsler zeigt NUR zugewiesene Arbeitsbereiche (bei ≤1 blendet ihn die
+      // Shell aus) — Erlebnis-Filter, keine Autorisierung.
+      personas={personaDescriptors(
+        allowedPersonas(principal, capabilities),
+        store.config,
+      )}
     >
       {children}
     </FachverfahrenShell>
@@ -394,17 +446,37 @@ export function App(): React.JSX.Element {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route element={<RequireSessionOutlet />}>
-          <Route path="/buerger" element={<BuergerStart />} />
-          <Route path="/buerger/anmelden" element={<BuergerAnmelden />} />
+          {/* Arbeitsbereichs-Gates (nur Erlebnis/Navigation, keine Autorisierung). */}
+          <Route element={<RequirePersonaExperience persona="buerger" />}>
+            <Route path="/buerger" element={<BuergerStart />} />
+            <Route path="/buerger/anmelden" element={<BuergerAnmelden />} />
+            <Route
+              path="/buerger/bestaetigung/:id"
+              element={<BuergerBestaetigung />}
+            />
+          </Route>
           <Route
-            path="/buerger/bestaetigung/:id"
-            element={<BuergerBestaetigung />}
-          />
-          <Route path="/amt" element={<AmtEingang />} />
-          <Route path="/amt/vorgang/:id" element={<AmtVorgang />} />
-          <Route path="/aufsicht" element={<Aufsicht />} />
-          <Route path="/boards" element={<BoardsList />} />
-          <Route path="/boards/:boardId" element={<BoardDetail />} />
+            element={<RequirePersonaExperience persona="sachbearbeitung" />}
+          >
+            <Route path="/amt" element={<AmtEingang />} />
+            <Route path="/amt/vorgang/:id" element={<AmtVorgang />} />
+          </Route>
+          <Route element={<RequirePersonaExperience persona="aufsicht" />}>
+            <Route path="/aufsicht" element={<Aufsicht />} />
+          </Route>
+          {/* Team-Workspace: echte Autorisierung (Permission), Redirect-Ziel "/" —
+              /boards als Fallback ergäbe hier eine Schleife. */}
+          <Route
+            element={
+              <RequirePermissionOutlet
+                permission="boards.collaborate"
+                fallbackTo="/"
+              />
+            }
+          >
+            <Route path="/boards" element={<BoardsList />} />
+            <Route path="/boards/:boardId" element={<BoardDetail />} />
+          </Route>
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/konto/passwort" element={<KontoPasswort />} />
         </Route>
