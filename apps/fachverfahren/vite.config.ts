@@ -3,6 +3,7 @@ import path from "node:path";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
+import { devApiProxy } from "./dev-proxy.ts";
 
 // Referenz-App = reine KOMPOSITION des Kits. Tailwind v4 via Plugin (das Kit liefert die Tokens in styles.css,
 // das wir in src/styles.css importieren). React + react-dom werden dedupliziert, damit der Kit und die App
@@ -36,6 +37,8 @@ export default defineConfig({
   server: {
     host: process.env["VITE_DEV_HOST"] ?? "127.0.0.1",
     port: Number(process.env["VITE_DEV_PORT"] ?? 5174),
+    // Auth-/API-Pfade gehören der Fastify-Runtime, nicht dem SPA-Fallback (siehe dev-proxy.ts).
+    proxy: devApiProxy(process.env),
     // Hinter dem Preview-Proxy ist die App eine Snapshot-Vorschau — der HMR-WebSocket ließe sich durch den
     // GET/HEAD-Proxy ohnehin nicht upgraden (Handshake-Lärm in der Konsole). Standalone bleibt HMR an.
     ...(previewBase !== "/" ? { hmr: false as const } : {}),

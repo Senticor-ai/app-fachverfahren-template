@@ -14,28 +14,54 @@ import { apiPath } from "./board-client.js";
 import { useSession } from "./session.js";
 
 export function LoginPage(): React.ReactElement {
-  const { status, bootstrapped, refresh } = useSession();
+  const { status, bootstrapped, apiAvailable, refresh } = useSession();
   // Nach erfolgreichem Login (oder bereits bestehender Session) zurück in den Workspace —
   // sonst bliebe der Benutzer trotz gültiger Session auf dem Login-Formular stehen.
   if (status === "authenticated") {
     return <Navigate to="/boards" replace />;
   }
+  // Ist die API nicht erreichbar (Server down, Dev-Server ohne laufende Runtime), wäre jedes
+  // Formular zwecklos — ehrlicher Hinweis mit Retry statt „Passwort falsch"-Irreführung.
+  const title = apiAvailable
+    ? bootstrapped
+      ? "Anmelden"
+      : "Workspace einrichten"
+    : "Server nicht erreichbar";
   return (
     <div className="flex min-h-screen items-center justify-center bg-secondary/20 px-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>
-            {bootstrapped ? "Anmelden" : "Workspace einrichten"}
-          </CardTitle>
+          <CardTitle>{title}</CardTitle>
         </CardHeader>
         <CardContent>
-          {bootstrapped ? (
+          {!apiAvailable ? (
+            <ApiUnavailableNotice onRetry={refresh} />
+          ) : bootstrapped ? (
             <LoginForm onSuccess={refresh} />
           ) : (
             <BootstrapForm onSuccess={refresh} />
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function ApiUnavailableNotice({
+  onRetry,
+}: {
+  onRetry: () => Promise<void>;
+}): React.ReactElement {
+  return (
+    <div className="space-y-4">
+      <p role="alert" className="text-sm text-muted-foreground">
+        Der API-Server antwortet zurzeit nicht. Bitte versuchen Sie es gleich
+        erneut. In der lokalen Entwicklung: läuft die App-Runtime
+        (Fastify-Server), auf die der Vite-Dev-Proxy zeigt?
+      </p>
+      <Button type="button" className="w-full" onClick={() => void onRetry()}>
+        Erneut versuchen
+      </Button>
     </div>
   );
 }

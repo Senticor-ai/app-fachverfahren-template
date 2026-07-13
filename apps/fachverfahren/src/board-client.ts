@@ -76,6 +76,16 @@ async function request<T>(
   if (response.status === 204) {
     return { body: undefined as T, etag: null };
   }
+  // Nicht-JSON trotz 2xx = die Antwort kam NICHT von der Runtime (SPA-Fallback ohne Dev-Proxy,
+  // falsch konfigurierter Reverse-Proxy). Ein diagnostizierbarer Fehler statt einer nackten
+  // SyntaxError aus response.json().
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    throw new BoardRequestError(
+      response.status,
+      `request to ${path} returned "${contentType || "unknown"}" instead of JSON — is the API server running (dev proxy target)?`,
+    );
+  }
   const body = (await response.json()) as T;
   return { body, etag: response.headers.get("etag") };
 }
