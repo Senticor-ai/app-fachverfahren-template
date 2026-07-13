@@ -287,12 +287,22 @@ for (const impl of impls) {
           )
           .sort((a, b) => a.sortRank.localeCompare(b.sortRank));
         expect(items).toHaveLength(3);
-        const erledigt = items.filter(
-          (t) => t.data?.["erledigt"] === true,
-        ).length;
-        expect(erledigt).toBe(2);
-        // Fortschritt % NICHT persistiert, sondern projiziert:
-        expect(Math.round((erledigt / items.length) * 100)).toBe(67);
+        // Fortschritt % NICHT persistiert, sondern via dedizierter compute-on-read-Aggregation (Phase 3a) projiziert
+        // — LIMIT-frei, NIE ueber listTasks (das bei 200 kappt).
+        const [fortschritt] = await tasks.aggregateChildFlag({
+          tenantId: T,
+          parentTaskIds: [ziel.taskId],
+          taskKind: "checkliste-item",
+          flagKey: "erledigt",
+        });
+        expect(fortschritt).toEqual({
+          parentTaskId: ziel.taskId,
+          total: 3,
+          gesetzt: 2,
+        });
+        expect(
+          Math.round((fortschritt!.gesetzt / fortschritt!.total) * 100),
+        ).toBe(67);
 
         // Jede abgehakte Position traegt ihr Aktivitaets-Protokoll.
         for (const item of checkliste.slice(0, 2)) {

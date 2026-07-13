@@ -221,6 +221,43 @@ for (const impl of impls) {
       ).toBe(1);
     });
 
+    it("compute-on-read: aggregateChildFlag zaehlt Checkliste erledigt/gesamt LIMIT-frei (> listTasks-Cap), nie ueber listTasks — InMemory==Postgres", async () => {
+      const ziel = macheTask({ taskKind: "ziel" });
+      await store.insertTask(ziel);
+      const N = 250; // > listTasks-Cap (200) -> beweist, warum eine dedizierte Aggregation noetig ist
+      const erledigtN = 100;
+      for (let i = 0; i < N; i++) {
+        await store.insertTask(
+          macheTask({
+            parentTaskId: ziel.taskId,
+            taskKind: "checkliste-item",
+            sortRank: String(i).padStart(4, "0"),
+            data: { erledigt: i < erledigtN },
+          }),
+        );
+      }
+      const agg = await store.aggregateChildFlag({
+        tenantId: "t1",
+        parentTaskIds: [ziel.taskId],
+        taskKind: "checkliste-item",
+        flagKey: "erledigt",
+      });
+      expect(agg).toEqual([
+        { parentTaskId: ziel.taskId, total: N, gesetzt: erledigtN },
+      ]);
+      // listTasks GENUEGT NICHT: es kappt bei 200 (< N) und wuerde den Fortschritt verfaelschen.
+      const via = await store.listTasks({ tenantId: "t1", authorityId: "b1" });
+      expect(via.length).toBeLessThan(N);
+      // Eltern ohne passende Kinder erscheinen NICHT (Fehlen = 0/0).
+      const leer = await store.aggregateChildFlag({
+        tenantId: "t1",
+        parentTaskIds: ["kein-elternteil"],
+        taskKind: "checkliste-item",
+        flagKey: "erledigt",
+      });
+      expect(leer).toEqual([]);
+    });
+
     it("patcht Zuweisung/Priorität/Labels und erhöht die Version", async () => {
       const t = macheTask();
       await store.insertTask(t);

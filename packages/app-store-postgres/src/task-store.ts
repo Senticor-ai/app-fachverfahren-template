@@ -173,6 +173,18 @@ export interface TaskStore {
     taskId: string;
   }): Promise<AppTask | undefined>;
   listTasks(query: ListTasksQuery): Promise<AppTask[]>;
+  /** compute-on-read (Dual-Mode Phase 3): aggregiert je Eltern-Aufgabe (`parentTaskId` ∈ `parentTaskIds`) die
+   *  Kinder eines `taskKind` — Gesamtzahl + wie viele ein boolesches `data`-Flag gesetzt haben
+   *  (`data->>flagKey = 'true'`, deckt jsonb `true` UND `"true"`). Für den Ziele-Fortschritt (Checkliste
+   *  erledigt/gesamt) OHNE alle Kinder zu laden: eine dedizierte, LIMIT-FREIE Aggregation — NIE über `listTasks`
+   *  (das bei 200 kappt und den Fortschritt verfälschen würde). Eltern ohne passende Kinder erscheinen NICHT im
+   *  Ergebnis (Aufrufer behandelt Fehlen als 0/0). */
+  aggregateChildFlag(input: {
+    tenantId: string;
+    parentTaskIds: string[];
+    taskKind: string;
+    flagKey: string;
+  }): Promise<{ parentTaskId: string; total: number; gesetzt: number }[]>;
   /** Aufgaben mit ERREICHTER, NOCH NICHT emittierter Frist (`dueAt` ≤ `now`, `deadlineEmittedAt` < `dueAt` oder null) —
    *  die Quelle des zeitgetriebenen `frist-erreicht`-Triggers. BEHÖRDEN-scoped, damit das `limit`-Fenster je Behörde
    *  greift (sonst könnten Fristen einer Behörde die einer anderen verdrängen). */
@@ -408,6 +420,37 @@ export class InMemoryTaskStore implements TaskStore {
         labels: [...t.labels],
         data: { ...(t.data ?? {}) },
       }));
+  }
+
+  async aggregateChildFlag(input: {
+    tenantId: string;
+    parentTaskIds: string[];
+    taskKind: string;
+    flagKey: string;
+  }): Promise<{ parentTaskId: string; total: number; gesetzt: number }[]> {
+    const parents = new Set(input.parentTaskIds);
+    const acc = new Map<string, { total: number; gesetzt: number }>();
+    // Über ALLE Kinder (kein Cap) — das ist der Sinn der Methode; listTasks kappt bei 200 und wäre falsch.
+    for (const t of this.tasks.values()) {
+      if (
+        t.tenantId !== input.tenantId ||
+        t.taskKind !== input.taskKind ||
+        t.parentTaskId === null ||
+        !parents.has(t.parentTaskId)
+      )
+        continue;
+      const cur = acc.get(t.parentTaskId) ?? { total: 0, gesetzt: 0 };
+      cur.total += 1;
+      // Parität zu PG `data->>flagKey = 'true'`: jsonb-Boolean `true` UND String `"true"` zählen als gesetzt.
+      const v = t.data?.[input.flagKey];
+      if (v === true || v === "true") cur.gesetzt += 1;
+      acc.set(t.parentTaskId, cur);
+    }
+    return [...acc.entries()].map(([parentTaskId, v]) => ({
+      parentTaskId,
+      total: v.total,
+      gesetzt: v.gesetzt,
+    }));
   }
 
   async listDueTasks(input: {
@@ -836,6 +879,36 @@ export class PostgresTaskStore implements TaskStore {
         ],
       );
       return r.rows.map(taskFromRow);
+    });
+  }
+
+  async aggregateChildFlag(input: {
+    tenantId: string;
+    parentTaskIds: string[];
+    taskKind: string;
+    flagKey: string;
+  }): Promise<{ parentTaskId: string; total: number; gesetzt: number }[]> {
+    return this.withClient(async (c) => {
+      // LIMIT-frei: COUNT(*) FILTER … GROUP BY parent_task_id — kein Cap, keine geladenen Kind-Zeilen. Der Flag-Key
+      // ist parametrisiert (`data->>$4`); `= 'true'` deckt jsonb-Boolean `true` und String `"true"`.
+      const r = await c.query<{
+        parent_task_id: string;
+        total: string | number;
+        gesetzt: string | number;
+      }>(
+        `SELECT parent_task_id,
+                COUNT(*)::int AS total,
+                COUNT(*) FILTER (WHERE data->>$4 = 'true')::int AS gesetzt
+         FROM app_tasks
+         WHERE tenant_id = $1 AND task_kind = $2 AND parent_task_id = ANY($3::text[])
+         GROUP BY parent_task_id`,
+        [input.tenantId, input.taskKind, input.parentTaskIds, input.flagKey],
+      );
+      return r.rows.map((row) => ({
+        parentTaskId: row.parent_task_id,
+        total: Number(row.total),
+        gesetzt: Number(row.gesetzt),
+      }));
     });
   }
 
