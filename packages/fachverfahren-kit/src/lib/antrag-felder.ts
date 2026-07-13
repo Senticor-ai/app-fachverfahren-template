@@ -320,7 +320,7 @@ export function feldLabelFachlich(feld: FeldDef): string | undefined {
 }
 
 /** Stämme, die eindeutig eine Angabe zur antragstellenden PERSON bezeichnen → ihr WCAG-`autocomplete`-Token.
- *  Bewusst KONSERVATIV: „name" allein fehlt (mehrdeutig — z. B. der Name eines Hundes/einer Firma), „ort"/„strasse"
+ *  Bewusst KONSERVATIV: „name" allein fehlt (mehrdeutig — z. B. der Name eines Tieres/einer Firma), „ort"/„strasse"
  *  nur als Anschrift der Person (siehe ORT_EREIGNIS_AUSNAHME). Alles Übrige ⇒ kein Token (statt eines falschen). */
 const PERSONEN_AUTOCOMPLETE: Record<string, string> = {
   vorname: "given-name",
@@ -355,7 +355,7 @@ const ORT_EREIGNIS_AUSNAHME =
  *  EINE Wahrheit für die Zweck-Bestimmung: EXPLIZIT gesetztes `feld.autoComplete` gewinnt (der Zweck als DATEN — ""
  *  unterdrückt bewusst); sonst typ-getrieben (plz→postal-code, email→email, tel→tel); sonst KONSERVATIV aus dem
  *  letzten Segment des Feldnamens abgeleitet. Kein Treffer ⇒ `undefined` (kein Token). GENERISCH + anti-overfit:
- *  ein Feld ohne Personenbezug (z. B. „hund.name", „fundsache.ort") erhält KEINEN Token. */
+ *  ein Feld ohne Personenbezug (z. B. „tier.name", „fundsache.ort") erhält KEINEN Token. */
 export function feldAutoComplete(feld: FeldDef): string | undefined {
   if (feld.autoComplete !== undefined) return feld.autoComplete || undefined; // explizit (leer ⇒ bewusst keiner)
   if (feld.typ === "plz") return "postal-code";

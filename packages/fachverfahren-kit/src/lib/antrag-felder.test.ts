@@ -527,36 +527,72 @@ describe("feldLabel / feldHint / feldLabelFachlich — M2 Bürger-/Leichte-/Amts
 
 describe("feldAutoComplete — WCAG 1.3.5 (Eingabezweck), generisch + anti-overfit", () => {
   it("leitet den Personen-Token aus dem letzten Feldnamen-Segment ab (typ:'text')", () => {
-    expect(feldAutoComplete(feld({ name: "antragsteller.vorname", typ: "text" }))).toBe("given-name");
-    expect(feldAutoComplete(feld({ name: "antragsteller.nachname", typ: "text" }))).toBe("family-name");
-    expect(feldAutoComplete(feld({ name: "antragsteller.geburtsname", typ: "text" }))).toBe("family-name");
-    expect(feldAutoComplete(feld({ name: "antragsteller.ort", typ: "text" }))).toBe("address-level2");
-    expect(feldAutoComplete(feld({ name: "antragsteller.strasse", typ: "text" }))).toBe("street-address");
+    expect(
+      feldAutoComplete(feld({ name: "antragsteller.vorname", typ: "text" })),
+    ).toBe("given-name");
+    expect(
+      feldAutoComplete(feld({ name: "antragsteller.nachname", typ: "text" })),
+    ).toBe("family-name");
+    expect(
+      feldAutoComplete(
+        feld({ name: "antragsteller.geburtsname", typ: "text" }),
+      ),
+    ).toBe("family-name");
+    expect(
+      feldAutoComplete(feld({ name: "antragsteller.ort", typ: "text" })),
+    ).toBe("address-level2");
+    expect(
+      feldAutoComplete(feld({ name: "antragsteller.strasse", typ: "text" })),
+    ).toBe("street-address");
   });
 
   it("typ-getriebene Defaults (plz/email/tel) auch ohne Namens-Treffer", () => {
-    expect(feldAutoComplete(feld({ name: "a.plz", typ: "plz" }))).toBe("postal-code");
-    expect(feldAutoComplete(feld({ name: "a.mailadresse", typ: "email" }))).toBe("email");
-    expect(feldAutoComplete(feld({ name: "a.rueckruf", typ: "tel" }))).toBe("tel");
-    expect(feldAutoComplete(feld({ name: "a.geburtsdatum", typ: "date" }))).toBe("bday");
+    expect(feldAutoComplete(feld({ name: "a.plz", typ: "plz" }))).toBe(
+      "postal-code",
+    );
+    expect(
+      feldAutoComplete(feld({ name: "a.mailadresse", typ: "email" })),
+    ).toBe("email");
+    expect(feldAutoComplete(feld({ name: "a.rueckruf", typ: "tel" }))).toBe(
+      "tel",
+    );
+    expect(
+      feldAutoComplete(feld({ name: "a.geburtsdatum", typ: "date" })),
+    ).toBe("bday");
   });
 
   it("explizites feld.autoComplete gewinnt — auch die leere Zeichenkette unterdrückt bewusst", () => {
     expect(
-      feldAutoComplete(feld({ name: "a.vorname", typ: "text", autoComplete: "organization" })),
+      feldAutoComplete(
+        feld({ name: "a.vorname", typ: "text", autoComplete: "organization" }),
+      ),
     ).toBe("organization");
     // leer = bewusst KEIN Token (überschreibt die Heuristik)
-    expect(feldAutoComplete(feld({ name: "a.vorname", typ: "text", autoComplete: "" }))).toBeUndefined();
+    expect(
+      feldAutoComplete(
+        feld({ name: "a.vorname", typ: "text", autoComplete: "" }),
+      ),
+    ).toBeUndefined();
   });
 
   it("ANTI-OVERFIT: mehrdeutige/nicht-personenbezogene Felder erhalten KEINEN Token", () => {
-    // der Name eines Hundes ist keine Angabe zur antragstellenden Person
-    expect(feldAutoComplete(feld({ name: "hund.name", typ: "text" }))).toBeUndefined();
+    // der Name eines Tieres ist keine Angabe zur antragstellenden Person
+    expect(
+      feldAutoComplete(feld({ name: "tier.name", typ: "text" })),
+    ).toBeUndefined();
     // Ereignis-Orte sind nicht die Anschrift der Person
-    expect(feldAutoComplete(feld({ name: "fundsache.ort", typ: "text" }))).toBeUndefined();
-    expect(feldAutoComplete(feld({ name: "tat.ort", typ: "text" }))).toBeUndefined();
-    expect(feldAutoComplete(feld({ name: "person.geburtsort", typ: "text" }))).toBeUndefined();
+    expect(
+      feldAutoComplete(feld({ name: "fundsache.ort", typ: "text" })),
+    ).toBeUndefined();
+    expect(
+      feldAutoComplete(feld({ name: "tat.ort", typ: "text" })),
+    ).toBeUndefined();
+    expect(
+      feldAutoComplete(feld({ name: "person.geburtsort", typ: "text" })),
+    ).toBeUndefined();
     // unbekannter Stamm ⇒ kein Token
-    expect(feldAutoComplete(feld({ name: "antrag.aktenzeichen", typ: "text" }))).toBeUndefined();
+    expect(
+      feldAutoComplete(feld({ name: "antrag.aktenzeichen", typ: "text" })),
+    ).toBeUndefined();
   });
 });
