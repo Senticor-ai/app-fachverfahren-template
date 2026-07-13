@@ -1,3 +1,5 @@
+# Template-Vorgabe — pro Betreiber anpassen (Contact/Policy/Expires auf die eigene Organisation).
 Contact: mailto:security@senticor.ai
+Expires: 2027-07-13T00:00:00.000Z
 Preferred-Languages: de, en
-Policy: https://example.invalid/security-policy
+Policy: https://github.com/Senticor-ai/app-fachverfahren-template/blob/main/SECURITY.md

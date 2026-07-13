@@ -1,6 +1,6 @@
 # Fachverfahren App Platform Template
 
-[![CI pipeline](https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-platform/govtech-ai/govtech-ai-app-fachverfahren-template/badges/main/pipeline.svg)](https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-platform/govtech-ai/govtech-ai-app-fachverfahren-template/-/pipelines)
+[![CI](https://github.com/Senticor-ai/app-fachverfahren-template/actions/workflows/ci.yml/badge.svg)](https://github.com/Senticor-ai/app-fachverfahren-template/actions/workflows/ci.yml)
 [![License: EUPL-1.2](https://img.shields.io/badge/license-EUPL--1.2-blue)](LICENSE)
 
 **English summary:** This repository provides a reusable public-sector
@@ -58,8 +58,10 @@ Capability-Ports modelliert.
   `fachverfahren-kit` und der Public-Sector-UI-Fassade.
 - Datenbank: PostgreSQL-Migrator und Plattformtabellen in
   `@senticor/app-store-postgres` (`pnpm run db:migrate`).
-- Backend/BFF: (PLAN) Zielarchitektur Fastify mit OpenAPI, beschrieben in
-  `docs/reference/backend-fastify.md`; im Scaffold existiert noch kein Server.
+- Backend/BFF: server-autoritative Fastify-Domain-API unter
+  `apps/fachverfahren/server/` (Policy-Gate, Optimistic Locking via If-Match,
+  append-only Audit, Postgres-Store, Automations-Engine + KI-Assist-Endpunkte).
+  Zielarchitektur und OpenAPI-Ausbau in `docs/reference/backend-fastify.md`.
 - Design/TDD: Storybook, Screen Contracts, semantische Tokens.
 
 ## Erste Schritte
@@ -116,9 +118,10 @@ wenn Kubernetes aktiviert ist. Migrationen laufen über:
 pnpm run db:migrate
 ```
 
-E2E-Suiten (`test:e2e`, `test:e2e:postgres`) und ein kombinierter Dev-Start
-(`dev:postgres`, `dev:all`) sind (PLAN) Teil der Backend-Zielarchitektur und
-existieren im Scaffold noch nicht.
+E2E-Suiten (`test:e2e`, `test:e2e:postgres`, `test:e2e:server`) prüfen die
+Domain-API server-autoritativ (Vier-Augen, append-only Audit, Optimistic
+Locking, Multi-Tenancy). Der PG-gebundene Teil läuft attended gegen ein echtes
+Postgres (siehe `pnpm run db:migrate`).
 
 Coding Agents nutzen `agent.discovery.json`, `docs/agents/bootstrap.md` und die
 repo-lokalen Skills unter `.agents/skills`. Die Agent-Readiness und der
