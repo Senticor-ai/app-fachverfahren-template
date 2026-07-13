@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Sicherheitslücke melden
+    url: https://github.com/Senticor-ai/app-fachverfahren-template/blob/main/SECURITY.md
+    about: Sicherheitsprobleme NICHT als öffentliches Issue melden — bitte den Prozess in SECURITY.md nutzen.
