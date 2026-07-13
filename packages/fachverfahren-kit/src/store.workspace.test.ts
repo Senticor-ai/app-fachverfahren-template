@@ -160,6 +160,32 @@ describe("Board-Metadaten (kein fachliches Gate)", () => {
     expect(store.getTask("a-v1")!.labels).toEqual(["eilt"]);
   });
 
+  it("uebernehmeKiVorschlag setzt Metadaten UND protokolliert die KI-Herkunft (task.ki-uebernommen)", () => {
+    const store = createWorkspaceStore(macheWorkspace(), { now: NOW });
+    const v0 = store.getTask("a-v1")!.version;
+    store.uebernehmeKiVorschlag("a-v1", { prioritaet: "hoch" }, "sb.mueller");
+    const t = store.getTask("a-v1")!;
+    expect(t.prioritaet).toBe("hoch");
+    // GENAU EIN mutMeta → EIN Versions-Sprung (nicht je Feld); Server == InMemory.
+    expect(t.version).toBe(v0 + 1);
+    // Die KI-Herkunft ist auditierbar protokolliert (nicht nur UI-Badge) — der Bypass über setPrioritaet ist zu.
+    const marke = store
+      .listAktivitaet("a-v1")
+      .find((a) => a.typ === "task.ki-uebernommen");
+    expect(marke).toBeDefined();
+    expect(marke!.akteurId).toBe("sb.mueller");
+    expect(marke!.payload).toMatchObject({
+      marking: "ki-vorschlag",
+      prioritaet: "hoch",
+    });
+    // GENAU ein ki-uebernommen-Vermerk, KEINE zusätzliche prioritaet-geaendert-Aktivität (Spiegel von /ai/apply).
+    expect(
+      store
+        .listAktivitaet("a-v1")
+        .filter((a) => a.typ === "task.prioritaet-geaendert"),
+    ).toHaveLength(0);
+  });
+
   it("move ordnet neu ein und respektiert Optimistic Locking", () => {
     const store = createWorkspaceStore(macheWorkspace(), { now: NOW });
     const t = store.getTask("a-v2")!;

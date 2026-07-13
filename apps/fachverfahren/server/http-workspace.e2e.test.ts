@@ -25,6 +25,7 @@ import {
   headerSession,
   registerDomainApi,
 } from "./domain-api.js";
+import { HeuristicKiAssist } from "./ai-assist.js";
 
 const STATUS_MACHINE = {
   states: [
@@ -162,7 +163,7 @@ function macheIntake(over: Partial<AppIntakeItem> = {}): AppIntakeItem {
 }
 
 const PERMS =
-  "task.read,task.write,case.read,case.transition,case.decide,inbox.read,inbox.triage,comment.read,comment.write,audit.read,view.read,view.write,wiki.read,wiki.write";
+  "task.read,task.write,case.read,case.transition,case.decide,inbox.read,inbox.triage,comment.read,comment.write,audit.read,view.read,view.write,wiki.read,wiki.write,ai.assist";
 
 const SB = (actor: string) => ({
   "x-actor-id": actor,
@@ -192,6 +193,8 @@ function baueServer(opts: { wikiStore?: WikiStore } = {}): Aufbau {
     now: () => "2026-07-05T00:00:00.000Z",
     newAuditId: uid,
     newId: uid,
+    // Wie der reale Server (index.ts): mit KI-Assist-Port, damit /api/tasks/:id/ai/{assist,apply} registriert sind.
+    aiAssist: new HeuristicKiAssist(),
     ...(opts.wikiStore ? { wikiStore: opts.wikiStore } : {}),
   });
   // Fetch-Shim: fetch(url, init) → app.inject(...) → Response-ähnliches Objekt (nur .ok/.status/.text/.json genutzt).
@@ -312,6 +315,43 @@ describe("HttpWorkspacePort e2e — Metadaten-Mutationen (optimistisch + server-
     });
     expect(s?.priorityKey).toBe("hoch");
     expect(s?.labels).toContain("eilt");
+    await aufbau.app.close();
+  });
+
+  it("uebernehmeKiVorschlag schreibt Metadaten durch UND der Server protokolliert die KI-Herkunft", async () => {
+    const aufbau = baueServer();
+    const c = macheCase();
+    await aufbau.caseStore.insertCase(c);
+    const t = macheTask(c.caseId);
+    await aufbau.taskStore.insertTask(t);
+    const fehler: string[] = [];
+    const port = machePort(aufbau, {
+      onError: (e: unknown, k: string) =>
+        fehler.push(`${k}: ${(e as Error)?.message ?? String(e)}`),
+    });
+    await warteBis(() => port.listTasks().length === 1);
+
+    // Client ruft NICHT setPrioritaet, sondern POST /ai/apply → Versions-Sprung (1 → 2) bei Server-Bestätigung.
+    port.uebernehmeKiVorschlag(t.taskId, { prioritaet: "hoch" });
+    await warteBis(() => (port.getTask(t.taskId)?.version ?? 1) >= 2);
+    expect(fehler).toEqual([]);
+
+    const s = await aufbau.taskStore.getTask({
+      tenantId: "t1",
+      taskId: t.taskId,
+    });
+    expect(s?.priorityKey).toBe("hoch");
+    // Der server-autoritative Nachweis: die KI-Herkunft ist als Aktivität protokolliert (nicht nur UI-Badge).
+    const feed = await aufbau.taskStore.listTaskActivity({
+      tenantId: "t1",
+      taskId: t.taskId,
+    });
+    const marke = feed.find((a) => a.activityType === "task.ki-uebernommen");
+    expect(marke).toBeDefined();
+    expect(marke!.payload).toMatchObject({
+      marking: "ki-vorschlag",
+      prioritaet: "hoch",
+    });
     await aufbau.app.close();
   });
 

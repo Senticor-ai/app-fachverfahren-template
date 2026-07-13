@@ -714,6 +714,35 @@ export function createWorkspaceStore<T = Record<string, unknown>>(
       protokolliereAktivitaet(taskId, "task.label-entfernt", akteur, { label });
     },
 
+    uebernehmeKiVorschlag: (taskId, vorschlag, akteur) => {
+      // Spiegelt server POST /ai/apply: nur nicht-autoritative Metadaten, in EINEM mutMeta, plus GENAU EIN
+      // `task.ki-uebernommen`-Vermerk (nicht die je-Feld-Aktivitäten) — so ist die KI-Herkunft auditierbar und
+      // InMemory == Server. Labels additiv + dedupliziert (wie der Server), exactOptionalPropertyTypes via Spread.
+      mutMeta(taskId, (m) => ({
+        ...m,
+        ...(vorschlag.prioritaet !== undefined
+          ? { prioritaet: vorschlag.prioritaet }
+          : {}),
+        ...(vorschlag.zugewiesenAn !== undefined
+          ? { zugewiesenAn: vorschlag.zugewiesenAn }
+          : {}),
+        ...(vorschlag.labels !== undefined
+          ? { labels: [...new Set([...m.labels, ...vorschlag.labels])] }
+          : {}),
+        version: m.version + 1,
+      }));
+      protokolliereAktivitaet(taskId, "task.ki-uebernommen", akteur, {
+        marking: "ki-vorschlag",
+        ...(vorschlag.prioritaet !== undefined
+          ? { prioritaet: vorschlag.prioritaet }
+          : {}),
+        ...(vorschlag.zugewiesenAn !== undefined
+          ? { zugewiesenAn: vorschlag.zugewiesenAn }
+          : {}),
+        ...(vorschlag.labels !== undefined ? { labels: vorschlag.labels } : {}),
+      });
+    },
+
     move: (taskId, boardSpalte, rank, expectedVersion) =>
       mutMeta(taskId, (m) => {
         if (m.version !== expectedVersion)

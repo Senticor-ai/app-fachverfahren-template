@@ -117,6 +117,13 @@ interface TaskPatchBody {
   expectedVersion?: number;
 }
 
+/** Body von `POST /api/tasks/:id/ai/apply` (nicht-autoritative KI-Metadaten; Server-Feldnamen). */
+interface AiApplyBody {
+  prioritaet?: string;
+  zuweisenAn?: string;
+  labels?: string[];
+}
+
 /** Baut den PROD-`WorkspacePort` über die Domain-API. Die `config` (Verfahren/Prioritäten/Labels) bleibt clientseitig
  *  (sie treibt das Rendern); die DATEN (Aufgaben/Fälle/Inbox) kommen aus `/api/*`. */
 export function createHttpWorkspacePort<T = Record<string, unknown>>(
@@ -453,8 +460,12 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
   function mutiere(
     taskId: string,
     lokal: (t: Aufgabe) => Aufgabe,
-    body: TaskPatchBody,
+    body: TaskPatchBody | AiApplyBody,
     kontext: string,
+    endpoint: { method: "PATCH" | "POST"; path: string } = {
+      method: "PATCH",
+      path: `/api/tasks/${enc(taskId)}`,
+    },
   ): void {
     if (!taskCache.some((t) => t.id === taskId)) {
       melde(new Error(`Aufgabe ${taskId} nicht im Cache`), kontext);
@@ -465,8 +476,8 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
     void (async () => {
       try {
         const { task } = await api<{ task: AppTaskDTO }>(
-          "PATCH",
-          `/api/tasks/${enc(taskId)}`,
+          endpoint.method,
+          endpoint.path,
           body,
         );
         taskCache = taskCache.map((t) => {
@@ -533,6 +544,41 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
       (x) => ({ ...x, labels: neu }),
       { labels: neu },
       "removeLabel",
+    );
+  };
+
+  const uebernehmeKiVorschlag = (
+    taskId: string,
+    vorschlag: {
+      prioritaet?: Prioritaet;
+      zugewiesenAn?: string;
+      labels?: string[];
+    },
+  ): void => {
+    const t = taskCache.find((x) => x.id === taskId);
+    // Server-Feldnamen (`zuweisenAn`) + additiv-deduplizierte Labels (wie server /ai/apply).
+    const body: AiApplyBody = {};
+    if (vorschlag.prioritaet !== undefined)
+      body.prioritaet = vorschlag.prioritaet;
+    if (vorschlag.zugewiesenAn !== undefined)
+      body.zuweisenAn = vorschlag.zugewiesenAn;
+    if (vorschlag.labels !== undefined)
+      body.labels = [...new Set([...(t?.labels ?? []), ...vorschlag.labels])];
+    mutiere(
+      taskId,
+      (x) => {
+        const n: Aufgabe = { ...x };
+        if (vorschlag.prioritaet !== undefined)
+          n.prioritaet = vorschlag.prioritaet;
+        if (vorschlag.zugewiesenAn !== undefined)
+          n.zugewiesenAn = vorschlag.zugewiesenAn;
+        if (vorschlag.labels !== undefined)
+          n.labels = [...new Set([...(x.labels ?? []), ...vorschlag.labels])];
+        return n;
+      },
+      body,
+      "uebernehmeKiVorschlag",
+      { method: "POST", path: `/api/tasks/${enc(taskId)}/ai/apply` },
     );
   };
 
@@ -967,6 +1013,7 @@ export function createHttpWorkspacePort<T = Record<string, unknown>>(
     setPrioritaet,
     addLabel,
     removeLabel,
+    uebernehmeKiVorschlag,
     move,
     bulkAssign,
     bulkPrioritaet,

@@ -1148,6 +1148,19 @@ export interface WorkspacePort<TAntragsdaten = Record<string, unknown>> {
   ): void;
   addLabel(taskId: string, label: string, akteur?: string): void;
   removeLabel(taskId: string, label: string, akteur?: string): void;
+  /** Einen KI-Vorschlag ÜBERNEHMEN (HITL, EU-AI-Act Art. 50): setzt AUSSCHLIESSLICH nicht-autoritative Metadaten
+   *  (Priorität/Zuweisung/Labels) UND protokolliert die KI-Herkunft als `task.ki-uebernommen`
+   *  (`marking: "ki-vorschlag"`). NIE ein Vier-Augen-Gate, NIE ein `case.*`-Übergang — die KI ist strukturell nie
+   *  eines der zwei Augen. Spiegelt server-autoritativ `POST /api/tasks/:id/ai/apply` (eine Wahrheit). */
+  uebernehmeKiVorschlag(
+    taskId: string,
+    vorschlag: {
+      prioritaet?: Prioritaet;
+      zugewiesenAn?: string;
+      labels?: string[];
+    },
+    akteur?: string,
+  ): void;
   /** Board-Position/-Spalte ändern (Drag&Drop): `rank` aus `rankZwischen`, `expectedVersion` für Optimistic Locking. */
   move(
     taskId: string,

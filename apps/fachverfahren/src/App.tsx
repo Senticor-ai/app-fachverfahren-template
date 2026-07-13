@@ -480,9 +480,14 @@ function AmtVorgang(): React.JSX.Element {
                   },
                 }}
                 funktionsName="Priorisierung"
-                // HITL: der Mensch übernimmt → die Priorität wird gesetzt (Metadaten, KEIN Vier-Augen-Gate).
+                // HITL: der Mensch übernimmt → nicht-autoritative Metadaten setzen UND die KI-Herkunft protokollieren
+                // (`task.ki-uebernommen`, marking "ki-vorschlag"). KEIN Vier-Augen-Gate; server-autoritativ /ai/apply.
                 onUebernahme={(ergebnis) =>
-                  workspace.setPrioritaet(task.id, ergebnis.wert, akteur)
+                  workspace.uebernehmeKiVorschlag(
+                    task.id,
+                    { prioritaet: ergebnis.wert },
+                    akteur,
+                  )
                 }
               />
             </div>
