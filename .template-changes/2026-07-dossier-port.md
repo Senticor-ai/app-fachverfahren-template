@@ -4,11 +4,28 @@ updateMode: review
 migration: none
 ---
 
-# Auditierter DossierPort — `patchTaskDataWithActivity` (Dual-Mode Phase 1.5)
+# Auditierter DossierPort — `patchTaskDataWithActivity` + `patchCaseDataWithAudit` (Dual-Mode Phase 1.5)
 
-Neue Store-Methode `TaskStore.patchTaskDataWithActivity(...)` — die EINZIGE auditierte
-Naht für Dossier-`data`-Mutationen (Kern-Invariante des Dossier-Modus: KEINE
-`data`-Mutation ohne Protokoll). Sie patcht die `data`-Nutzlast einer Aufgabe (flacher
+Zwei symmetrische, auditierte Nähte für Dossier-`data`-Mutationen — die EINZIGEN Wege,
+über die die freie `data`-Nutzlast von Aufgabe bzw. Akte verändert werden darf
+(Kern-Invariante des Dossier-Modus: KEINE `data`-Mutation ohne Protokoll):
+
+- `TaskStore.patchTaskDataWithActivity(...)` — mutiert `app_tasks.data` (Ziele/Sub-
+  Sammlungen) + emittiert append-only `app_task_activity` in derselben TX.
+- `CaseStore.patchCaseDataWithAudit(...)` — mutiert `app_cases.data` (die langlebige
+  Akte selbst) + schreibt append-only `app_audit_events` in derselben TX, OHNE
+  Statuswechsel (anders als `transitionCase` — eine Akte lebt in einem Zustand fort).
+
+Beide: flacher Merge auf oberster Ebene (jsonb `||` / Objekt-Spread), Optimistic-
+Locking über `expectedVersion`, Guard vor jeder Mutation (`DossierActivityInvalidError`
+bzw. `DossierAuditInvalidError`, HTTP 422) — fehlende Behörde oder ein Protokoll, das
+auf einen anderen Task/Fall zeigt, wirft OHNE zu schreiben (Rollback-Parität).
+
+## `patchTaskDataWithActivity`
+
+Neue Store-Methode `TaskStore.patchTaskDataWithActivity(...)` — die auditierte Naht für
+Dossier-`data`-Mutationen der Aufgabe (Kern-Invariante: KEINE `data`-Mutation ohne
+Protokoll). Sie patcht die `data`-Nutzlast einer Aufgabe (flacher
 Merge auf oberster Ebene, jsonb `||` bzw. Objekt-Spread — Patch-Key ersetzt
 gleichnamigen Bestand) UND emittiert in DERSELBEN Transaktion eine append-only-
 `app_task_activity`. Schlägt der Aktivitäts-Insert fehl, rollt der `data`-Patch mit

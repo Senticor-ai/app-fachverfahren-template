@@ -4,6 +4,7 @@ import {
   type AppCase,
   type CaseStore,
   CaseVersionConflictError,
+  DossierAuditInvalidError,
   InMemoryCaseStore,
   PostgresCaseStore,
 } from "./case-store.js";
@@ -125,6 +126,84 @@ for (const impl of impls) {
       });
       expect(t.caseKind).toBe("dossier");
       expect(t.data).toEqual({ name: "Muster", stufe: "Orientierung" });
+    });
+
+    it("DOSSIERPORT (Phase 1.5): patchCaseDataWithAudit merged Akte-data + Audit atomar OHNE Statuswechsel; Guards rollen zurueck — InMemory==Postgres", async () => {
+      const c = macheCase({ caseKind: "dossier", data: { name: "Muster" } });
+      await store.insertCase(c);
+
+      // Happy path: FLACHER Merge, Version+1, Zustand UNVERAENDERT (eine Akte lebt fort), Audit im Protokoll.
+      const r1 = await store.patchCaseDataWithAudit({
+        tenantId: c.tenantId,
+        caseId: c.caseId,
+        expectedVersion: 1,
+        dataPatch: { stufe: "Orientierung", name: "Muster-Frau" },
+        auditEvent: macheAudit(c.caseId, "sb.a", {
+          eventType: "dossier.data.updated",
+        }),
+      });
+      expect(r1.data).toEqual({ name: "Muster-Frau", stufe: "Orientierung" });
+      expect(r1.version).toBe(2);
+      expect(r1.state).toBe("eingegangen");
+      expect(
+        (
+          await store.listAuditEvents({
+            tenantId: c.tenantId,
+            caseId: c.caseId,
+          })
+        ).some((e) => e.eventType === "dossier.data.updated"),
+      ).toBe(true);
+
+      // GUARD missing-authority: leere authorityId -> wirft, data + Version UNVERAENDERT, KEIN zweites Audit
+      // (Rollback-Paritaet: in PG rollt der data-Patch mit zurueck, in InMemory wird nie geschrieben).
+      await expect(
+        store.patchCaseDataWithAudit({
+          tenantId: c.tenantId,
+          caseId: c.caseId,
+          expectedVersion: 2,
+          dataPatch: { geheim: true },
+          auditEvent: macheAudit(c.caseId, "sb.a", { authorityId: "" }),
+        }),
+      ).rejects.toBeInstanceOf(DossierAuditInvalidError);
+      const nach = await store.getCase({
+        tenantId: c.tenantId,
+        caseId: c.caseId,
+      });
+      expect(nach?.data).toEqual({
+        name: "Muster-Frau",
+        stufe: "Orientierung",
+      });
+      expect(nach?.version).toBe(2);
+      expect(
+        (
+          await store.listAuditEvents({
+            tenantId: c.tenantId,
+            caseId: c.caseId,
+          })
+        ).length,
+      ).toBe(1);
+
+      // GUARD case-mismatch: Audit referenziert einen anderen Fall -> wirft (kein fremdes Protokoll).
+      await expect(
+        store.patchCaseDataWithAudit({
+          tenantId: c.tenantId,
+          caseId: c.caseId,
+          expectedVersion: 2,
+          dataPatch: { x: 1 },
+          auditEvent: macheAudit("anderer-fall", "sb.a"),
+        }),
+      ).rejects.toBeInstanceOf(DossierAuditInvalidError);
+
+      // Optimistic-Locking: falsche expectedVersion -> Konflikt.
+      await expect(
+        store.patchCaseDataWithAudit({
+          tenantId: c.tenantId,
+          caseId: c.caseId,
+          expectedVersion: 99,
+          dataPatch: { x: 1 },
+          auditEvent: macheAudit(c.caseId, "sb.a"),
+        }),
+      ).rejects.toBeInstanceOf(CaseVersionConflictError);
     });
 
     it("transitionCase: Statuswechsel + Audit-Append atomar, Version steigt", async () => {

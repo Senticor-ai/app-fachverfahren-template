@@ -100,6 +100,30 @@ export class CaseNotFoundError extends Error {
   }
 }
 
+/** Dual-Mode Phase 1.5: der Audit-Eintrag, der eine Dossier-`data`-Mutation der Akte begleitet, ist nicht
+ *  revisionssicher. `missing-authority`: leere `authorityId`; `case-mismatch`: der Audit-Eintrag referenziert
+ *  einen anderen Mandanten/Fall als die Mutation (fremdes Protokoll). → HTTP 422. */
+export class DossierAuditInvalidError extends Error {
+  constructor(readonly grund: "missing-authority" | "case-mismatch") {
+    super(`invalid dossier audit event: ${grund}`);
+    this.name = "DossierAuditInvalidError";
+  }
+}
+
+/** Vor-Lade-Guard des Fall-DossierPorts: der begleitende Audit-Eintrag MUSS eine Behörde tragen und exakt zu der
+ *  zu mutierenden Akte (Mandant + caseId, NICHT `null`) gehören. Läuft VOR jeder Mutation — schlägt er an, ist
+ *  nichts geschrieben (Rollback-Parität InMemory==Postgres). */
+function assertDossierAuditShape(input: {
+  tenantId: string;
+  caseId: string;
+  auditEvent: AppAuditEvent;
+}): void {
+  const a = input.auditEvent;
+  if (!a.authorityId) throw new DossierAuditInvalidError("missing-authority");
+  if (a.tenantId !== input.tenantId || a.caseId !== input.caseId)
+    throw new DossierAuditInvalidError("case-mismatch");
+}
+
 export interface CaseStore {
   insertCase(input: AppCase): Promise<AppCase>;
   getCase(input: {
@@ -112,6 +136,19 @@ export interface CaseStore {
   /** ATOMAR: Versionsprüfung + Statuswechsel + Audit-Append in EINER Transaktion. Wirft
    *  `CaseNotFoundError`/`CaseVersionConflictError`. */
   transitionCase(input: TransitionCaseInput): Promise<AppCase>;
+  /** DOSSIERPORT (Dual-Mode Phase 1.5) — die EINZIGE auditierte Naht für Dossier-`data`-Mutationen der Akte
+   *  (`app_cases.data`). Patcht die `data`-Nutzlast (flacher Merge auf oberster Ebene, jsonb `||`, NICHT ersetzen)
+   *  UND schreibt in DERSELBEN Transaktion einen append-only-`app_audit_events`-Eintrag — anders als `transitionCase`
+   *  OHNE Statuswechsel (eine Akte lebt in einem Zustand fort). Kern-Invariante: KEINE `data`-Mutation ohne Audit.
+   *  Guard (`assertDossierAuditShape`) vor jeder Mutation → `DossierAuditInvalidError`, ohne zu schreiben;
+   *  `expectedVersion` erzwingt Optimistic-Locking. Symmetrisch zu `TaskStore.patchTaskDataWithActivity`. */
+  patchCaseDataWithAudit(input: {
+    tenantId: string;
+    caseId: string;
+    expectedVersion: number;
+    dataPatch: Record<string, unknown>;
+    auditEvent: AppAuditEvent;
+  }): Promise<AppCase>;
   /** OPTIONAL: leichter Erreichbarkeits-Check für `/readyz` (Postgres: `SELECT 1`; In-Memory: sofort ok). */
   ping?(): Promise<void>;
 }
@@ -219,6 +256,44 @@ export class InMemoryCaseStore implements CaseStore {
     // Emission folgt danach. Der In-Memory-AutomationStore wirft nie, daher praktisch atomar.
     if (input.outboxEvent)
       await this.opts.automationStore?.enqueueEvent(input.outboxEvent);
+    return {
+      ...updated,
+      subjectIds: [...updated.subjectIds],
+      data: { ...(updated.data ?? {}) },
+    };
+  }
+
+  async patchCaseDataWithAudit(input: {
+    tenantId: string;
+    caseId: string;
+    expectedVersion: number;
+    dataPatch: Record<string, unknown>;
+    auditEvent: AppAuditEvent;
+  }): Promise<AppCase> {
+    // STAGING/ROLLBACK-Shim (Parität zu PG BEGIN..ROLLBACK): ALLE Prüfungen (Guard, Not-Found, Version) laufen VOR
+    // der ersten Mutation; data-Merge + Audit-Append erfolgen danach synchron-unteilbar. Wirft der Guard, ist nichts
+    // geschrieben.
+    assertDossierAuditShape(input);
+    const k = this.key(input.tenantId, input.caseId);
+    const current = this.cases.get(k);
+    if (!current) throw new CaseNotFoundError(input.caseId);
+    if (current.version !== input.expectedVersion)
+      throw new CaseVersionConflictError(
+        input.caseId,
+        input.expectedVersion,
+        current.version,
+      );
+    const updated: AppCase = {
+      ...current,
+      // flacher Merge auf oberster Ebene (Patch-Key ersetzt gleichnamigen Bestand) — Parität zu jsonb `||`.
+      data: { ...(current.data ?? {}), ...input.dataPatch },
+      version: current.version + 1,
+    };
+    this.cases.set(k, updated);
+    this.audit.push({
+      ...input.auditEvent,
+      payload: { ...input.auditEvent.payload },
+    });
     return {
       ...updated,
       subjectIds: [...updated.subjectIds],
@@ -378,6 +453,58 @@ export class PostgresCaseStore implements CaseStore {
         // NOTIFY-Fehler kann den Statuswechsel nicht mehr zurückrollen; der Poll bleibt das Sicherheitsnetz.
         if (input.outboxEvent)
           await notifyAutomationWake(client).catch(() => {});
+        return caseFromRow(upd.rows[0]!);
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => {});
+        throw error;
+      }
+    });
+  }
+
+  async patchCaseDataWithAudit(input: {
+    tenantId: string;
+    caseId: string;
+    expectedVersion: number;
+    dataPatch: Record<string, unknown>;
+    auditEvent: AppAuditEvent;
+  }): Promise<AppCase> {
+    // Guard VOR der Transaktion (kein Verbindungsleihen für einen ohnehin ungültigen Audit-Eintrag).
+    assertDossierAuditShape(input);
+    return this.withClient(async (client) => {
+      try {
+        // ATOMAR: data-Patch + Audit teilen EINE Transaktion (Muster wie transitionCase, aber OHNE Statuswechsel).
+        // Schlägt der Audit-Insert fehl, rollt der data-Patch mit zurück — keine Dossier-Mutation ohne ihr Protokoll.
+        await client.query("BEGIN");
+        const cur = await client.query<CaseRow>(
+          `SELECT case_id, tenant_id, authority_id, jurisdiction_id, procedure_id,
+                  procedure_version, state, version, subject_ids, opened_at, closed_at,
+                  case_kind, data
+           FROM app_cases WHERE tenant_id = $1 AND case_id = $2 FOR UPDATE`,
+          [input.tenantId, input.caseId],
+        );
+        const row = cur.rows[0];
+        if (!row) throw new CaseNotFoundError(input.caseId);
+        if (row.version !== input.expectedVersion)
+          throw new CaseVersionConflictError(
+            input.caseId,
+            input.expectedVersion,
+            row.version,
+          );
+        const upd = await client.query<CaseRow>(
+          // jsonb `||` = flacher Merge auf oberster Ebene (Patch-Key ersetzt gleichnamigen Bestand). Kein Statuswechsel.
+          `UPDATE app_cases
+           SET data = data || $3::jsonb, version = version + 1, updated_at = now()
+           WHERE tenant_id = $1 AND case_id = $2
+           RETURNING case_id, tenant_id, authority_id, jurisdiction_id, procedure_id,
+                     procedure_version, state, version, subject_ids, opened_at, closed_at,
+                     case_kind, data`,
+          [input.tenantId, input.caseId, JSON.stringify(input.dataPatch)],
+        );
+        await client.query(
+          auditInsertSql(),
+          auditInsertParams(input.auditEvent),
+        );
+        await client.query("COMMIT");
         return caseFromRow(upd.rows[0]!);
       } catch (error) {
         await client.query("ROLLBACK").catch(() => {});
