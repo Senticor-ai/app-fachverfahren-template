@@ -27,6 +27,7 @@ import type {
 } from "./types.js";
 import {
   abgeleiteteFelder,
+  abgeleiteteTransitions,
   effektiveBerechnung,
   effektiveNachweise,
 } from "./lib/interpreter.js";
@@ -72,9 +73,18 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
   const setState = (fn: (s: Vorgang<T>[]) => Vorgang<T>[]) =>
     use.setState((s) => ({ vorgaenge: fn(s.vorgaenge) }));
 
+  // EINE Wahrheit der Governance (Dual-Mode Phase 2b): die EFFEKTIVE State-Machine trägt die per `governance`-Opt-in
+  // MONOTON verschärften Vier-Augen-Transitionen. Ohne `governance` ist `abgeleiteteTransitions` die deklarierte Liste
+  // (per Referenz) → byte-identisches Verhalten. Alle Übergangs-Auflösungen (transitionsFrom + uebergang) lesen NUR
+  // hieraus, damit DEV-Store und PROD-Policy dieselbe abgeleitete Wahrheit sehen (keine zweite präzedenzlose Quelle).
+  const effektiveStatusMachine = {
+    ...config.statusMachine,
+    transitions: abgeleiteteTransitions(config),
+  };
+
   const transitionsFrom = (status: string, rolle?: string): Transition[] =>
     // Eine Wahrheit: die reine `erlaubteUebergaenge` (defensiv gegen eine unvollständig generierte Machine).
-    erlaubteUebergaenge(config.statusMachine, status, rolle);
+    erlaubteUebergaenge(effektiveStatusMachine, status, rolle);
 
   const store: FachverfahrenStore<T> = {
     config,
@@ -135,7 +145,7 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
     uebergang: (id, to, rolle, detail, akteur) => {
       const v = store.get(id);
       if (!v) throw new Error(`Vorgang ${id} nicht gefunden`);
-      const t = findeUebergang(config.statusMachine, v.status, to);
+      const t = findeUebergang(effektiveStatusMachine, v.status, to);
       if (!t) throw new Error(`Übergang ${v.status} → ${to} nicht erlaubt`);
       if (!t.rollen.includes(rolle))
         throw new Error(

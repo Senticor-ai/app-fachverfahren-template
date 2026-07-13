@@ -26,9 +26,17 @@ Neue reine Interpreter-Funktionen (aus `@senticor/fachverfahren-kit`):
   deklarierten Vier-Augen-Transitionen, die in der abgeleiteten Menge NICHT mehr gate-pflichtig
   sind (leer = ok). Verriegelt, dass die Ableitung Governance nur verstärkt, nie abschwächt.
 
-**Bewusst NOCH NICHT enthalten** (folgt supervised, mit voller Verifikation): das Verdrahten von
-`store.ts`/PROD-Policy auf `abgeleiteteTransitions` (der Verhaltenswechsel) und die Aufnahme der
-effektiven Vier-Augen-Menge in den `leistung.contract.json`-Snapshot. Bis dahin ist dieser Kern
-inert (keine Config nutzt `governance`, der Contract bleibt frisch/byte-identisch). Die
-Opt-in-Fähigkeiten `buergerPortal`/`bescheid`/`gebuehr` kommen erst, wenn ihre Capabilities
-verdrahtet werden (YAGNI). Contract-Paritätstest + Reinheits-/Idempotenz-Test decken den Kern ab.
+**Phase 2b (jetzt enthalten): DEV-Store verdrahtet.** `createFachverfahrenStore` löst ALLE
+Übergänge (`transitionsFrom` + `uebergang`) aus einer EFFEKTIVEN State-Machine auf
+(`{ ...statusMachine, transitions: abgeleiteteTransitions(config) }`), statt aus `config.statusMachine`
+direkt. Ein `governance`-Opt-in verschärft damit die Vier-Augen-Prüfung im Store real (End-to-End-
+Test: ein normal ungatterter Übergang verlangt mit Opt-in zwei verschiedene Akteure). HEUTE byte-
+identisch — keine Config nutzt `governance`, `abgeleiteteTransitions` liefert die deklarierte Liste
+per Referenz, der Contract bleibt frisch.
+
+**Noch offen** (folgt, mit voller Verifikation): (1) die PROD-Policy (`DefaultDenyPolicyEngine`)
+ebenfalls auf `abgeleiteteTransitions` beziehen — sie löst Vier-Augen heute über einen anderen Pfad
+auf (nicht direkt aus `statusMachine.transitions`); vor produktiver Nutzung eines `governance`-Opt-ins
+schließen. (2) Die effektive Vier-Augen-Menge in den `leistung.contract.json`-Snapshot aufnehmen
+(auditierbar). Die Opt-in-Fähigkeiten `buergerPortal`/`bescheid`/`gebuehr` kommen erst, wenn ihre
+Capabilities verdrahtet werden (YAGNI).

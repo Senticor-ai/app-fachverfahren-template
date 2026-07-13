@@ -144,3 +144,78 @@ describe("Vier-Augen (DEV-Store) — Vorbereiter ≠ Freigeber", () => {
     ).toThrow(/Vier-Augen/);
   });
 });
+
+describe("Governance-Opt-in (Phase 2b) — monotone Verschärfung greift im DEV-Store", () => {
+  // Basis OHNE deklarierte Vier-Augen — die Gate kommt ALLEIN aus dem `governance`-Opt-in.
+  function macheConfigOhneGate(): LeistungConfig {
+    const c = macheConfig();
+    c.statusMachine.transitions = [
+      {
+        from: "eingegangen",
+        to: "vorgelegt",
+        label: "Vorlegen",
+        rollen: ["sachbearbeitung"],
+      },
+      {
+        from: "vorgelegt",
+        to: "festgesetzt",
+        label: "Festsetzen",
+        rollen: ["sachbearbeitung"],
+      },
+    ];
+    return c;
+  }
+
+  it("ohne Opt-in: dieselbe Person darf festsetzen (der Übergang ist ungated)", () => {
+    const store = createFachverfahrenStore(macheConfigOhneGate(), { now: NOW });
+    store.uebergang(
+      "v1",
+      "vorgelegt",
+      "sachbearbeitung",
+      undefined,
+      "sb.mueller",
+    );
+    store.uebergang(
+      "v1",
+      "festgesetzt",
+      "sachbearbeitung",
+      undefined,
+      "sb.mueller",
+    );
+    expect(store.get("v1")?.status).toBe("festgesetzt");
+  });
+
+  it("MIT Opt-in auf vorgelegt→festgesetzt: dieselbe Person wird abgewiesen, eine ANDERE darf", () => {
+    const config = macheConfigOhneGate();
+    config.governance = {
+      zusaetzlicheVierAugen: [{ from: "vorgelegt", to: "festgesetzt" }],
+    };
+    const store = createFachverfahrenStore(config, { now: NOW });
+    store.uebergang(
+      "v1",
+      "vorgelegt",
+      "sachbearbeitung",
+      undefined,
+      "sb.mueller",
+    );
+    // Der Opt-in hat vorgelegt→festgesetzt zur Vier-Augen-Transition gemacht: derselbe Vorbereiter wird abgewiesen.
+    expect(() =>
+      store.uebergang(
+        "v1",
+        "festgesetzt",
+        "sachbearbeitung",
+        undefined,
+        "sb.mueller",
+      ),
+    ).toThrow(/Vier-Augen/);
+    // Eine andere Person darf freigeben (echte Vier-Augen, keine pauschale Sperre).
+    store.uebergang(
+      "v1",
+      "festgesetzt",
+      "sachbearbeitung",
+      undefined,
+      "sb.schmidt",
+    );
+    expect(store.get("v1")?.status).toBe("festgesetzt");
+  });
+});
