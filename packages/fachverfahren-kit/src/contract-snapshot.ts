@@ -13,6 +13,8 @@ export interface LeistungContractSnapshot {
   kommune: string;
   rechtsgrundlagen: LeistungConfig["rechtsgrundlagen"];
   fimLeistung?: LeistungConfig["fimLeistung"];
+  /** VERFAHRENS-MODUS als echte Zeile (nur wenn gesetzt — additiv, Bestands-Snapshots byte-gleich). */
+  kind?: LeistungConfig["kind"];
   antrag: { steps: LeistungConfig["antrag"]["steps"]; einleitung?: string };
   /** Benannte Auswahl-Listen (schlank, value/label) — als echte Zeilen. */
   datenlisten?: LeistungConfig["datenlisten"];
@@ -65,6 +67,9 @@ export function toContractSnapshot<T = Record<string, unknown>>(
     kommune: config.kommune,
     rechtsgrundlagen: config.rechtsgrundlagen,
     ...(config.fimLeistung ? { fimLeistung: config.fimLeistung } : {}),
+    // Modus nur projizieren, wenn gesetzt — `config.kind ?? "vorgang"` wuerde in JEDEN Bestands-Snapshot eine Zeile
+    // schreiben und den Null-Diff brechen. Fehlt kind, bleibt der Vertrag byte-identisch (Default-Semantik "vorgang").
+    ...(config.kind ? { kind: config.kind } : {}),
     antrag: {
       steps: config.antrag.steps,
       ...(config.antrag.einleitung

@@ -665,6 +665,11 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   kommune: string; // "Stadt Musterstadt"
   rechtsgrundlagen: { norm: string; titel: string; satzung?: boolean }[];
   fimLeistung?: { id: string; status: "belegt" | "annahme-zu-validieren" }; // GROUNDED — nie erfinden
+  /** VERFAHRENS-MODUS (additiv, Default-Semantik `"vorgang"`): `"vorgang"` = das heutige antrag-/vorgang-zentrierte
+   *  Verfahren (Antrag → StatusMachine → Vier-Augen → Bescheid). `"dossier"` = ein langlebiges, akkumulierendes
+   *  Subjekt-/Fallmanagement (interne Sachbearbeitung, Sub-Sammlungen an EINER Akte). Treibt später UI-Komposition
+   *  + `case_kind`; fehlt das Feld, verhält sich alles unverändert wie `"vorgang"` (Byte-identischer Vertrag). */
+  kind?: "vorgang" | "dossier";
   /** M3 — `konditionierendesFeld`: der P0-Feldpfad der Vorgangsart, der den Rest des Antrags konditioniert; MUSS
    *  in `steps[0]` (dem `rolle: "kontext"`-Schritt) liegen. Downstream-Schritte/-Felder blenden über `sichtbarWenn`
    *  darauf ein. OPTIONAL/additiv — fehlt es, gibt es keine progressive Disclosure (Verhalten wie bisher). */

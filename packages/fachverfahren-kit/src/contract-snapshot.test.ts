@@ -149,6 +149,22 @@ describe("toContractSnapshot — Business-Logik als ECHTE Zeilen, nicht '[functi
     // Vollständig JSON-serialisierbar (die IR ist DATEN, keine Funktion).
     expect(() => JSON.stringify(snap)).not.toThrow();
   });
+
+  it("VERFAHRENS-MODUS `kind`: fehlt der Schlüssel bei kind-loser Config (Null-Diff), projiziert 'dossier' als echte Zeile", () => {
+    // NULL-DIFF: eine Config OHNE `kind` (wie alle Bestands-Verfahren) erzeugt KEINE kind-Zeile → Vertrag byte-gleich.
+    // (Der reale Golden-Null-Diff gegen apps/fachverfahren/leistung.contract.json prüft check:leistung-contract; die
+    //  Modul-Grenze verbietet dem Kit-Test den Import aus apps/ — hier wird die Projektions-Invariante bewiesen.)
+    const ohne = toContractSnapshot(basis);
+    expect(ohne.kind).toBeUndefined();
+    expect(JSON.stringify(ohne)).not.toContain('"kind"');
+    // Dossier-Modus wird als echte Zeile projiziert.
+    expect(toContractSnapshot({ ...basis, kind: "dossier" }).kind).toBe(
+      "dossier",
+    );
+    expect(toContractSnapshot({ ...basis, kind: "vorgang" }).kind).toBe(
+      "vorgang",
+    );
+  });
 });
 
 describe("diffNurEinfacheSprache — self-diagnosing FRISCHE-Fehlermeldung", () => {
