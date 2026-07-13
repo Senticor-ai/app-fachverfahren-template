@@ -1,6 +1,18 @@
 {
   "name": "@senticor/provider-codesphere",
   "version": "0.1.0-rc.1",
+  "license": "EUPL-1.2",
+  "author": "Senticor GmbH",
+  "homepage": "https://github.com/Senticor-ai/app-fachverfahren-template#readme",
+  "bugs": "https://github.com/Senticor-ai/app-fachverfahren-template/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Senticor-ai/app-fachverfahren-template.git",
+    "directory": "packages/provider-codesphere"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

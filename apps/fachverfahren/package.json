@@ -2,6 +2,7 @@
   "name": "@senticor/fachverfahren",
   "private": true,
   "version": "0.1.0",
+  "license": "EUPL-1.2",
   "type": "module",
   "description": "Klickbare Referenz-App: KOMPOSITION aus @senticor/fachverfahren-kit (fertige Bausteine) + der EINEN LeistungConfig (src/leistung.config.ts — die Austausch-Naht, die der governte Build überschreibt). Keine fachliche Logik hier — nur Routing + die EINE Store-Instanz + die Config.",
   "scripts": {
