@@ -71,14 +71,12 @@ describe("domain app rendering", () => {
           () => false,
           () => true,
         );
-      expect(await fehlt(".agents/skills/govtech-deutschland-sdk")).toBe(true);
       expect(
         await fehlt(".agents/skills/deutschland-plattform-anforderungen"),
       ).toBe(true);
       expect(await fehlt(".agents/skills/fachverfahren-app")).toBe(false);
-      // auch die Claude-Shims der internen Skills dürfen nicht in einen Konsumenten lecken (sonst verwaiste Zeiger);
+      // auch der Claude-Shim des internen Skills darf nicht in einen Konsumenten lecken (sonst verwaiste Zeiger);
       // die Shims der konsumierbaren Skills schon.
-      expect(await fehlt(".claude/skills/govtech-deutschland-sdk")).toBe(true);
       expect(
         await fehlt(".claude/skills/deutschland-plattform-anforderungen"),
       ).toBe(true);

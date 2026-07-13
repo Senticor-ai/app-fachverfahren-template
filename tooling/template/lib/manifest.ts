@@ -50,7 +50,6 @@ export const defaultOwnership: TemplateOwnership = {
     // INTERNE Maintainer-Skills werden NICHT an Konsumenten geliefert (längeres Muster gewinnt in `explainOwnership`).
     // Sie bleiben im Template-Repo für dessen eigene Pflege, aber `template:update` pusht sie nie in einen Fork
     // (ergänzt zur Scaffold-Ausnahme in render.ts `repositoryOnlyPrefixes`) — kein Leck von Maintainer-Internem.
-    ".agents/skills/govtech-deutschland-sdk/**": "consumer",
     ".agents/skills/deutschland-plattform-anforderungen/**": "consumer",
     "docs/agents/**": "replace",
     "docs/assets/**": "replace",

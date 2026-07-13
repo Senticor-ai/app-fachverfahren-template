@@ -5,16 +5,19 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 import { setTimeout as sleep } from "node:timers/promises";
+import { mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PORT = process.env.UX_PORT ?? "5185";
 const BASE = `http://127.0.0.1:${PORT}`;
-const EXE =
-  process.env.HOME +
-  "/Library/Caches/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-mac-arm64/chrome-headless-shell";
-const OUT =
-  process.env.UX_OUT ??
-  "/private/tmp/claude-501/-Users-grto-Workspace-Cascade-Projects-app-fachverfahren-template/ae867f4f-f26e-4c21-8931-3616d9b1f73a/scratchpad";
+// Browser: standardmäßig von Playwright auflösen lassen (respektiert PLAYWRIGHT_BROWSERS_PATH). Nur wenn
+// PLAYWRIGHT_CHROME gesetzt ist, wird ein expliziter Pfad genutzt — KEIN maschinen-/OS-spezifischer Default.
+const EXE = process.env.PLAYWRIGHT_CHROME;
+// Ausgabe: OS-agnostischer, außerhalb des Repos liegender Temp-Ordner; per UX_OUT überschreibbar.
+const OUT = process.env.UX_OUT ?? join(tmpdir(), "ux-workspace");
+mkdirSync(OUT, { recursive: true });
 
 let fails = 0;
 const check = (desc, cond, got) => {
@@ -52,7 +55,7 @@ try {
   if (!(await waitReady(BASE)))
     throw new Error("dev server did not become ready");
   console.log("dev server ready");
-  browser = await chromium.launch({ executablePath: EXE });
+  browser = await chromium.launch(EXE ? { executablePath: EXE } : {});
   const page = await browser.newPage({
     viewport: { width: 1440, height: 900 },
   });

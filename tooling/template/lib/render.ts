@@ -56,11 +56,9 @@ const repositoryOnlyPaths = new Set([".gitlab/CODEOWNERS"]);
 // einen gescaffoldeten/konsumierbaren App-Baum kopiert — sonst leckt Maintainer-Internes (SDK-Publish-Interna,
 // interne Anforderungsregister mit contributor-lokalen Pfaden) in jeden Fork. Präfix-basiert, ganze Verzeichnisse.
 const repositoryOnlyPrefixes = [
-  ".agents/skills/govtech-deutschland-sdk/",
   ".agents/skills/deutschland-plattform-anforderungen/",
-  // auch die Claude-Shims der internen Skills — sonst erhielte ein Konsument einen verwaisten Zeiger auf einen
+  // auch der Claude-Shim des internen Skills — sonst erhielte ein Konsument einen verwaisten Zeiger auf einen
   // Skill, den er (korrekt) nicht bekommt.
-  ".claude/skills/govtech-deutschland-sdk/",
   ".claude/skills/deutschland-plattform-anforderungen/",
 ];
 
