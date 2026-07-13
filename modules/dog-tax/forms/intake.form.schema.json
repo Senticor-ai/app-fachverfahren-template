@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "properties": {
+    "reference": {
+      "minLength": 1,
+      "title": "Referenz",
+      "type": "string"
+    }
+  },
+  "required": ["reference"],
+  "title": "Hundesteuer Intake",
+  "type": "object"
+}

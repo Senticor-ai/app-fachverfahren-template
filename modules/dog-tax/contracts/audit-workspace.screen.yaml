@@ -1,0 +1,53 @@
+id: dog-tax-audit
+route: /audit/dog-tax
+owner: demo-domain
+persona: audit
+
+inputs:
+  - app-spec
+  - domain-contract
+
+outputs:
+  - screen
+  - validation-feedback
+
+states:
+  - loading
+  - empty
+  - error
+  - ready
+  - success
+
+ia:
+  pattern: audit-timeline
+  navigation: persona-local
+  profile: public-sector
+  scroll: stable
+
+content:
+  language: de
+  architectureTerms: hidden-from-users
+  title: Entscheidung nachvollziehen
+
+hcai:
+  mode: human-in-control
+  controls:
+    - review
+    - correction
+
+a11y:
+  landmarks: required
+  keyboard: required
+  focusOrder: deterministic
+  zoom: 200-percent
+  statusSemantics: text-and-color
+
+tests:
+  unit: required
+  integration: required
+  storybook: required
+
+evidence:
+  - screen-contract
+  - storybook-state
+  - audit-provenance

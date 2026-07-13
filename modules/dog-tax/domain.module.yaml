@@ -1,0 +1,82 @@
+id: dog-tax
+version: 0.1.0
+displayName: Hundesteuer
+
+routes:
+  - path: /services/dog-tax
+    surface: citizen
+  - path: /cases/dog-tax
+    surface: caseworker
+  - path: /audit/dog-tax
+    surface: audit
+
+requiredCapabilities:
+  - identity-and-trust
+  - payment
+  - mailbox
+  - audit
+  - workflow
+
+platformPorts:
+  - AuditPort
+  - IdentityAndTrustPort
+  - MailboxPort
+  - PaymentPort
+  - WorkflowPort
+
+permissions:
+  - permission: dog-tax.citizen
+    description: citizen Rechte
+  - permission: dog-tax.caseworker
+    description: caseworker Rechte
+  - permission: dog-tax.auditor
+    description: auditor Rechte
+
+events:
+  publishes:
+    - eventType: dog-tax.registration-created
+      version: v1
+    - eventType: dog-tax.decision-prepared
+      version: v1
+    - eventType: dog-tax.audit-reviewed
+      version: v1
+  consumes: []
+
+dataCategories:
+  - confidential
+
+retentionPolicies:
+  - dog-tax-case-records
+
+migrations:
+  database: migrations/database/
+  documents: migrations/documents/
+  externalSystems: []
+
+fimReferences:
+  sourceId: fimportal
+  rootId: "99102013000000"
+  services:
+    - id: "99102013002000"
+      label: Hundesteuer Festsetzung
+    - id: "99102013010000"
+      label: Hundesteuer Befreiung
+    - id: "99102013011000"
+      label: Hundesteuer Änderung
+    - id: "99102013070000"
+      label: Hundesteuer Abmeldung
+    - id: "99102013104000"
+      label: Hundesteuer Anmeldung
+    - id: "99102013149000"
+      label: Hundesteuer Ermäßigung
+
+humanApproval:
+  - tax-assessment
+  - dangerous-dog-classification
+  - exemption
+  - reduction
+
+screenContracts:
+  - contracts/citizen-intake.screen.yaml
+  - contracts/caseworker-workspace.screen.yaml
+  - contracts/audit-workspace.screen.yaml

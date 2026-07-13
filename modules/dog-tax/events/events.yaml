@@ -1,0 +1,5 @@
+publishes:
+  - dog-tax.registration-created
+  - dog-tax.decision-prepared
+  - dog-tax.audit-reviewed
+consumes: []

@@ -1,0 +1,35 @@
+{
+  "accessibility": {
+    "bitv": "planned",
+    "evidence": ["contracts/*.screen.yaml", "ui/*.stories.tsx"],
+    "wcag": "2.2-AA"
+  },
+  "audit": {
+    "appendOnly": true,
+    "events": [
+      "dog-tax.registration-created",
+      "dog-tax.decision-prepared",
+      "dog-tax.audit-reviewed"
+    ]
+  },
+  "dataProtection": {
+    "dataClassifications": ["confidential"],
+    "dsfa": "planned",
+    "retention": ["dog-tax-case-records"],
+    "vvt": "planned"
+  },
+  "externalSources": [
+    {
+      "citationRequired": true,
+      "sourceId": "fimportal"
+    }
+  ],
+  "humanApproval": [
+    "tax-assessment",
+    "dangerous-dog-classification",
+    "exemption",
+    "reduction"
+  ],
+  "module": "dog-tax",
+  "status": "example-generated"
+}

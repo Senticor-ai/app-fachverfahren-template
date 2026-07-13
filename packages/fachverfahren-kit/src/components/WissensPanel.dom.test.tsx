@@ -42,6 +42,12 @@ function feld(id: string): HTMLInputElement | HTMLTextAreaElement {
   if (!el) throw new Error(`Feld #${id} fehlt`);
   return el as HTMLInputElement | HTMLTextAreaElement;
 }
+/** Wie feld(), aber für ein <select> — eigener Helper statt Cast über den (nicht-überlappenden) feld()-Typ (TS2352). */
+function feldSelect(id: string): HTMLSelectElement {
+  const el = container.querySelector(`#${id}`);
+  if (!el) throw new Error(`Feld #${id} fehlt`);
+  return el as HTMLSelectElement;
+}
 /** Setzt den Wert eines KONTROLLIERTEN React-Inputs korrekt: nativer Value-Setter + input-Event, damit onChange greift. */
 function tippe(el: HTMLInputElement | HTMLTextAreaElement, wert: string): void {
   const proto =
@@ -196,7 +202,7 @@ describe("WissensPanel — Verlauf/Diff (#20 Phase 4b, jsdom)", () => {
     render(<WissensPanel artikel={ARTIKEL} revisionen={() => REVS} />);
     klick(knopf("Verlauf")!);
     // „Von" auf v2 stellen (wie „Bis") → identischer Vergleich, keine +/- Zeilen.
-    const von = feld("wissen-diff-von") as HTMLSelectElement;
+    const von = feldSelect("wissen-diff-von");
     act(() => {
       const setter = Object.getOwnPropertyDescriptor(
         HTMLSelectElement.prototype,
