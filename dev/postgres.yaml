@@ -7,6 +7,8 @@ metadata:
     app.kubernetes.io/part-of: fachverfahren-template
 type: Opaque
 stringData:
+  # NUR für lokale Entwicklung — KEIN echtes Geheimnis, niemals in Produktion verwenden.
+  # Produktion bezieht Zugangsdaten über Helm-`secretRefs`, nicht aus dieser Datei.
   POSTGRES_DB: app
   POSTGRES_USER: app
   POSTGRES_PASSWORD: app
