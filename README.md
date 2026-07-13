@@ -1,6 +1,6 @@
 # Fachverfahren App Platform Template
 
-[![CI pipeline](https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-platform/govtech-ai/govtech-ai-app-fachverfahren-template/badges/main/pipeline.svg)](https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-platform/govtech-ai/govtech-ai-app-fachverfahren-template/-/pipelines)
+[![CI](https://github.com/Senticor-ai/app-fachverfahren-template/actions/workflows/ci.yml/badge.svg)](https://github.com/Senticor-ai/app-fachverfahren-template/actions/workflows/ci.yml)
 [![License: EUPL-1.2](https://img.shields.io/badge/license-EUPL--1.2-blue)](LICENSE)
 
 **English summary:** This repository provides a reusable public-sector

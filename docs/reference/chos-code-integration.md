@@ -1,18 +1,19 @@
-# What the template needs from chos-code (and any external app generator)
+# What the template needs from an external app generator
 
-> Audience: the chos-code / opencode build team. This is the contract an
-> externally-generated Fachverfahren app must satisfy so its CI on
-> `gitlab.opencode.de` stays green. It complements — does not replace — the
-> canonical rules in `AGENTS.md` and the `fachverfahren-app` skill.
+> Audience: teams integrating an external Fachverfahren app generator (for
+> example chos-code / opencode) with this template. This is the contract an
+> externally-generated Fachverfahren app must satisfy so its CI stays green. It
+> complements — does not replace — the canonical rules in `AGENTS.md` and the
+> `fachverfahren-app` skill.
 
-## Why your pipelines are red right now
+## Common failure: partial content under `modules/`
 
 Every phase commit (`chos-phase: …`) runs the template's full gate
-(`scripts/ci-validate.sh` → `precommit:check`). The failing check is
-`check:domain-contracts`. Example (job on `hundesteuer-munchen-akhb34`):
+(`scripts/ci-validate.sh` → `precommit:check`). A frequent failing check is
+`check:domain-contracts`, for example:
 
 ```
-Error: ENOENT: no such file or directory, scandir '.../modules/hundesteuer/contracts'
+Error: ENOENT: no such file or directory, scandir '.../modules/<domain>/contracts'
     at checkScreenContracts (scripts/check-domain-contracts.mjs:115)
 ```
 
