@@ -150,9 +150,12 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
       // eigene Entscheidung freigeben). Ohne Akteur-Angabe bleibt es (abwärtskompatibel) beim reinen Vermerk.
       if (t.vierAugen && akteur) {
         const vorbereiter = letzterVorbereiter(v.history);
-        if (vorbereiter && vorbereiter === akteur)
+        // ZWEI-PERSONEN-INTEGRITÄT (deckungsgleich zur server-autoritativen Policy): es MUSS einen menschlichen
+        // Vorbereiter geben UND er MUSS ein ANDERER sein. FEHLT der Vorbereiter, ist die Regel nicht erfüllbar →
+        // verweigern (schliesst den Bypass „ohne vorherigen Übergang darf ein Einzelner allein freigeben").
+        if (!vorbereiter || vorbereiter === akteur)
           throw new Error(
-            `Vier-Augen verletzt: „${t.label}" erfordert eine ANDERE Person als ${akteur} (Vorbereiter des letzten Übergangs)`,
+            `Vier-Augen verletzt: „${t.label}" erfordert einen ANDEREN Menschen als Vorbereiter (nicht ${akteur})`,
           );
       }
       setState((vs) =>

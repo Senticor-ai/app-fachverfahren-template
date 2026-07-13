@@ -1,8 +1,9 @@
 // public-sector-sdk/case-service — die SERVER-AUTORITATIVE Entscheidung über einen Fall-Statuswechsel.
 //
 // Bündelt RBAC (PolicyEngine) + Vier-Augen + Optimistic-Locking + append-only Audit zu EINER geprüften Operation.
-// Der Vorbereiter einer kritischen Entscheidung (`previousApproverActorId`) ist der Akteur des LETZTEN fachlichen
-// Übergangs dieses Falls — die Vier-Augen-Regel der `DefaultDenyPolicyEngine` verlangt dann einen ANDEREN Menschen.
+// Der Vorbereiter einer kritischen Entscheidung (`previousApproverActorId`) ist der MENSCHLICHE Akteur, der den Fall
+// in seinen AKTUELLEN Zustand gebracht hat (Übergang mit `payload.toState === current.state`); die Vier-Augen-Regel
+// der `DefaultDenyPolicyEngine` verlangt einen ANDEREN Menschen UND dass ein solcher Vorbereiter überhaupt existiert.
 // Die Persistenz ist ein struktureller PORT (der `CaseStore` aus @senticor/app-store-postgres erfüllt ihn), sodass
 // die Domain an der ABSTRAKTION hängt, nicht an Postgres. Kein HTTP hier — der Fastify-Handler ist dünner Adapter.
 import { type PolicyEngine } from "./authorization.js";
@@ -34,6 +35,9 @@ export interface AuditRecord {
   actorId: string;
   eventType: string;
   occurredAt: string;
+  /** Ereignis-Nutzdaten (u. a. `toState` bei Übergängen) — für die Vier-Augen-Vorbereiter-Bestimmung (Übergang IN den
+   *  aktuellen Zustand). Der Store liefert sie ohnehin (AppAuditEvent); hier im Port-Vertrag sichtbar gemacht. */
+  payload: Record<string, unknown>;
 }
 
 /** Der append-only Audit-Eintrag, den `transitionCase` ATOMAR mit dem Statuswechsel schreibt. */
@@ -196,11 +200,15 @@ export async function executeCaseTransition(
       reason: "detail required for this action",
     };
 
-  // Vorbereiter = Akteur des LETZTEN fachlichen Übergangs (event_type "case.*") — ABER nur MENSCHLICHE Akteure zählen.
-  // Ein maschineller Dienst-Übergang (Automation) darf die Vier-Augen-Prüfung NICHT verfälschen: Sonst würde die
-  // Automation als „Vorbereiter" gezählt, der eigentliche menschliche Vorbereiter verdrängt, und EIN Mensch könnte
-  // eine Vier-Augen-Entscheidung allein abschließen (Automation legt vor → derselbe Mensch entscheidet → fälschlich
-  // erlaubt). Deshalb: Service-Akteure aus der Vorbereiter-Bestimmung ausschließen.
+  // VORBEREITER dieser Vier-Augen-Entscheidung = der MENSCHLICHE Akteur, der den Fall in seinen AKTUELLEN Zustand
+  // gebracht hat (der Übergang mit `payload.toState === current.state`) — NICHT irgendein letzter `case.*`-Übergang.
+  // Diese präzise Bindung schliesst zwei Bypässe:
+  //  (1) Ohne menschlichen Übergang in den aktuellen Zustand (z. B. Vier-Augen aus dem INITIAL-Zustand, oder nur ein
+  //      Dienst-/Automations-Übergang) bleibt der Vorbereiter `undefined` → die Policy verweigert (Zwei-Personen-Regel
+  //      unerfüllbar), statt wie bisher zu ERLAUBEN.
+  //  (2) Ein zwischenzeitlicher Übergang in einen ANDEREN Zustand kann den Vorbereiter NICHT mehr „zurücksetzen" — nur
+  //      der jüngste Übergang IN DEN AKTUELLEN Zustand zählt, sodass der Vorbereiter sich nicht selbst freigeben kann.
+  // Service-Akteure (Automation) sind ausgeschlossen: die KI/Automation ist NIE eines der zwei Augen.
   const audit = await deps.persistence.listAuditEvents({
     tenantId: session.tenantId,
     caseId: input.caseId,
@@ -208,7 +216,11 @@ export async function executeCaseTransition(
   const previousApproverActorId = [...audit]
     .reverse()
     .find(
-      (e) => e.eventType.startsWith("case.") && !isServiceActor(e.actorId),
+      (e) =>
+        e.eventType.startsWith("case.") &&
+        !isServiceActor(e.actorId) &&
+        (e.payload as { toState?: unknown } | undefined)?.toState ===
+          current.state,
     )?.actorId;
 
   const decision = deps.policy.decide({

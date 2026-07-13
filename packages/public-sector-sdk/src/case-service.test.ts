@@ -291,6 +291,61 @@ describe("executeCaseTransition — server-autoritative Fall-Entscheidung", () =
     if (!selbst.ok) expect(selbst.status).toBe(403);
   });
 
+  it("403 Vier-Augen BYPASS (a): OHNE menschlichen Vorbereiter im aktuellen Zustand kann niemand allein festsetzen", async () => {
+    const p = new FakePersistence();
+    // Fall DIREKT in 'vorgelegt' — KEIN vorlegen-Audit, also kein menschlicher Vorbereiter DIESES Zustands.
+    p.seed(macheCase({ state: "vorgelegt", version: 2 }));
+    const d = deps(p);
+    const res = await executeCaseTransition(d, {
+      session: session({ actorId: "sb.b" }), // hat diese Entscheidung nie vorbereitet
+      caseId: "c1",
+      action: "festsetzen",
+      expectedVersion: 2,
+      requestId: "r1",
+    });
+    // Bisher (Bug): previousApprover=undefined → Vier-Augen ÜBERSPRUNGEN → ERLAUBT (EIN Mensch entscheidet allein).
+    // Jetzt: kein Vorbereiter ⇒ Zwei-Personen-Regel unerfüllbar ⇒ DENY.
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.status).toBe(403);
+  });
+
+  it("403 Vier-Augen BYPASS (b): ein zwischenzeitlicher Fremd-Übergang setzt den Vorbereiter NICHT zurück (keine Selbst-Freigabe)", async () => {
+    const p = new FakePersistence();
+    p.seed(macheCase());
+    const d = deps(p);
+    // sb.a legt vor (→ 'vorgelegt') — der eigentliche Vorbereiter.
+    await executeCaseTransition(d, {
+      session: session({ actorId: "sb.a" }),
+      caseId: "c1",
+      action: "vorlegen",
+      expectedVersion: 1,
+      requestId: "r1",
+    });
+    // Zwischenzeitlich schreibt sb.c einen ANDEREN fachlichen Übergang (NICHT in den Zustand 'vorgelegt').
+    p.audit.push({
+      auditEventId: "audit-x",
+      caseId: "c1",
+      tenantId: "t1",
+      authorityId: "b1",
+      jurisdictionId: "de",
+      actorId: "sb.c",
+      eventType: "case.annotiert",
+      occurredAt: "2026-06-01T00:00:02.000Z",
+      payload: { toState: "irgendwo-anders" },
+    } as unknown as AuditRecord & CaseAuditEvent);
+    // sb.a (der Vorbereiter) versucht festzusetzen. Bisher (Bug): previousApprover=sb.c (letztes case.*) → sb.a≠sb.c →
+    // ERLAUBT (Selbst-Freigabe). Jetzt: nur der Übergang IN 'vorgelegt' zählt ⇒ Vorbereiter=sb.a ⇒ sb.a==sb.a ⇒ DENY.
+    const res = await executeCaseTransition(d, {
+      session: session({ actorId: "sb.a" }),
+      caseId: "c1",
+      action: "festsetzen",
+      expectedVersion: 2,
+      requestId: "r2",
+    });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.status).toBe(403);
+  });
+
   it("Outbox: ein MENSCHLICHER Übergang mit outboxTrigger emittiert genau ein Event", async () => {
     const p = new FakePersistence();
     p.seed(macheCase());

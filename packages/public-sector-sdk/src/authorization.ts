@@ -45,15 +45,21 @@ export class DefaultDenyPolicyEngine implements PolicyEngine {
         obligations: [],
       };
     }
-    if (
-      request.requiresFourEyes &&
-      request.previousApproverActorId === request.subject.actor.actorId
-    ) {
-      return {
-        effect: "deny",
-        reason: "four-eyes separation failed",
-        obligations: [],
-      };
+    if (request.requiresFourEyes) {
+      // ZWEI-PERSONEN-INTEGRITÄT: eine Vier-Augen-Entscheidung verlangt einen (menschlichen) VORBEREITER, der ein
+      // ANDERER ist als der Ausführende. FEHLT der Vorbereiter (`undefined`) — kein menschlicher Übergang hat den Fall
+      // in seinen aktuellen Zustand gebracht — ist die Zwei-Personen-Regel NICHT erfüllbar → DENY. (Bisher wurde ohne
+      // Vorbereiter fälschlich ERLAUBT: EIN Mensch konnte eine Vier-Augen-Entscheidung allein abschließen — der Bypass.)
+      if (
+        request.previousApproverActorId === undefined ||
+        request.previousApproverActorId === request.subject.actor.actorId
+      ) {
+        return {
+          effect: "deny",
+          reason: "four-eyes separation failed",
+          obligations: [],
+        };
+      }
     }
     return {
       effect: "allow",
