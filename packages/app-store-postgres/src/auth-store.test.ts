@@ -15,6 +15,7 @@ function makeUser(overrides: Partial<UserAccount> = {}): UserAccount {
     email: "admin@example.org",
     displayName: "Admin",
     status: "active",
+    role: "admin",
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -94,6 +95,205 @@ describe("InMemoryAuthStore — local credentials", () => {
 
     const unlocked = await store.setAccountLock("actor.1", null);
     expect(unlocked.lockedUntil).toBeNull();
+  });
+});
+
+describe("InMemoryAuthStore — administration", () => {
+  it("rejects a second user with the same email in the same tenant, case-insensitively", async () => {
+    const store = new InMemoryAuthStore();
+    await store.createUser(makeUser());
+
+    await expect(
+      store.createUser(
+        makeUser({ actorId: "actor.2", email: "ADMIN@example.org" }),
+      ),
+    ).rejects.toThrow(/already exists/);
+    // Anderer Tenant: gleiche E-Mail ist legitim (Unique-Index ist tenant-scoped).
+    await expect(
+      store.createUser(makeUser({ actorId: "actor.3", tenantId: "tenant.b" })),
+    ).resolves.toMatchObject({ actorId: "actor.3" });
+  });
+
+  it("lists users of one tenant ordered by creation time", async () => {
+    const store = new InMemoryAuthStore();
+    await store.createUser(
+      makeUser({
+        actorId: "actor.2",
+        email: "b@example.org",
+        createdAt: "2026-07-02T00:00:00.000Z",
+      }),
+    );
+    await store.createUser(
+      makeUser({
+        actorId: "actor.1",
+        email: "a@example.org",
+        createdAt: "2026-07-01T00:00:00.000Z",
+      }),
+    );
+    await store.createUser(
+      makeUser({
+        actorId: "actor.x",
+        tenantId: "tenant.b",
+        email: "x@example.org",
+      }),
+    );
+
+    const users = await store.listUsers({ tenantId: "tenant.local" });
+    expect(users.map((user) => user.actorId)).toEqual(["actor.1", "actor.2"]);
+  });
+
+  it("updates a user's status and fails for unknown actors", async () => {
+    const store = new InMemoryAuthStore();
+    await store.createUser(makeUser());
+
+    const disabled = await store.updateUserStatus({
+      tenantId: "tenant.local",
+      actorId: "actor.1",
+      status: "disabled",
+    });
+    expect(disabled.status).toBe("disabled");
+    expect(
+      (
+        await store.getUserById({
+          tenantId: "tenant.local",
+          actorId: "actor.1",
+        })
+      )?.status,
+    ).toBe("disabled");
+
+    await expect(
+      store.updateUserStatus({
+        tenantId: "tenant.local",
+        actorId: "actor.unknown",
+        status: "active",
+      }),
+    ).rejects.toThrow(/not found/);
+  });
+
+  it("replaces the password hash and resets lockout counters", async () => {
+    const store = new InMemoryAuthStore();
+    await store.createUser(makeUser());
+    await store.createLocalCredential(
+      makeCredential({
+        failedAttempts: 3,
+        lockedUntil: "2026-07-12T10:00:00.000Z",
+      }),
+    );
+
+    const updated = await store.updateLocalCredentialPassword({
+      actorId: "actor.1",
+      passwordHash: "argon2id$new-hash",
+      hashAlgo: "argon2id",
+      passwordChangedAt: "2026-07-12T11:00:00.000Z",
+    });
+    expect(updated.passwordHash).toBe("argon2id$new-hash");
+    expect(updated.failedAttempts).toBe(0);
+    expect(updated.lockedUntil).toBeNull();
+    expect(updated.passwordChangedAt).toBe("2026-07-12T11:00:00.000Z");
+  });
+
+  it("disabling a user revokes every active session ATOMICALLY with the status change", async () => {
+    const store = new InMemoryAuthStore();
+    await store.createUser(makeUser());
+    const future = new Date(Date.now() + 60_000).toISOString();
+    for (const hash of ["hash.a", "hash.b"]) {
+      await store.createSession({
+        sessionIdHash: hash,
+        actorId: "actor.1",
+        tenantId: "tenant.local",
+        authorityId: "authority.local",
+        jurisdictionId: "de",
+        createdAt: new Date().toISOString(),
+        expiresAt: future,
+        revokedAt: null,
+      });
+    }
+
+    await store.updateUserStatus({
+      tenantId: "tenant.local",
+      actorId: "actor.1",
+      status: "disabled",
+    });
+    expect(await store.getActiveSessionByHash("hash.a")).toBeUndefined();
+    expect(await store.getActiveSessionByHash("hash.b")).toBeUndefined();
+
+    // Re-Aktivierung lässt widerrufene Sessions widerrufen (kein Wiederaufleben).
+    await store.updateUserStatus({
+      tenantId: "tenant.local",
+      actorId: "actor.1",
+      status: "active",
+    });
+    expect(await store.getActiveSessionByHash("hash.a")).toBeUndefined();
+  });
+});
+
+describe("InMemoryAuthStore — identity links", () => {
+  it("links an external identity to an actor and resolves it tenant-scoped", async () => {
+    const store = new InMemoryAuthStore();
+    await store.createUser(makeUser());
+
+    await store.linkIdentity({
+      tenantId: "tenant.local",
+      provider: "local",
+      subject: "actor.1",
+      actorId: "actor.1",
+    });
+
+    expect(
+      await store.findActorByIdentity({
+        tenantId: "tenant.local",
+        provider: "local",
+        subject: "actor.1",
+      }),
+    ).toBe("actor.1");
+    // Tenant-Isolation: dieselbe externe Identität in einem anderen Tenant löst NICHT auf.
+    expect(
+      await store.findActorByIdentity({
+        tenantId: "tenant.other",
+        provider: "local",
+        subject: "actor.1",
+      }),
+    ).toBeUndefined();
+  });
+
+  it("rejects a duplicate identity link (mirrors the composite primary key)", async () => {
+    const store = new InMemoryAuthStore();
+    await store.createUser(makeUser());
+    await store.linkIdentity({
+      tenantId: "tenant.local",
+      provider: "oidc:example",
+      subject: "sub-123",
+      actorId: "actor.1",
+    });
+
+    await expect(
+      store.linkIdentity({
+        tenantId: "tenant.local",
+        provider: "oidc:example",
+        subject: "sub-123",
+        actorId: "actor.1",
+      }),
+    ).rejects.toThrow(/already linked/);
+  });
+
+  it("removes identity links when the user is deleted (compensating bootstrap delete)", async () => {
+    const store = new InMemoryAuthStore();
+    await store.createUser(makeUser());
+    await store.linkIdentity({
+      tenantId: "tenant.local",
+      provider: "local",
+      subject: "actor.1",
+      actorId: "actor.1",
+    });
+
+    await store.deleteUser({ tenantId: "tenant.local", actorId: "actor.1" });
+    expect(
+      await store.findActorByIdentity({
+        tenantId: "tenant.local",
+        provider: "local",
+        subject: "actor.1",
+      }),
+    ).toBeUndefined();
   });
 });
 

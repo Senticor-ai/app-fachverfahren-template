@@ -5,8 +5,10 @@ import { pathToFileURL } from "node:url";
 import path from "node:path";
 import fastifyCookie from "@fastify/cookie";
 import {
+  createAuditStoreFromEnv,
   createAuthStoreFromEnv,
   createKanbanStoreFromEnv,
+  type AuditStore,
   type AuthStore,
   type KanbanStore,
 } from "@senticor/app-store-postgres";
@@ -15,8 +17,11 @@ import fastify, {
   type FastifyReply,
   type FastifyRequest,
 } from "fastify";
+import { registerAuditRoutes } from "./audit/routes.js";
+import { autoBootstrapAdminFromEnv } from "./auth/auto-bootstrap.js";
 import { registerAuthRoutes } from "./auth/routes.js";
 import { registerBoardRoutes } from "./kanban/routes.js";
+import { registerUserRoutes } from "./users/routes.js";
 
 const NO_STORE = "no-store";
 const IMMUTABLE = "public, max-age=31536000, immutable";
@@ -196,6 +201,7 @@ export function buildPublicServer({
   metrics = new RuntimeMetrics(),
   authStore = createAuthStoreFromEnv(),
   kanbanStore = createKanbanStoreFromEnv(),
+  auditStore = createAuditStoreFromEnv(),
   bootstrapToken = process.env["BOOTSTRAP_TOKEN"],
 }: {
   config?: RuntimeConfig;
@@ -203,6 +209,7 @@ export function buildPublicServer({
   metrics?: RuntimeMetrics;
   authStore?: AuthStore;
   kanbanStore?: KanbanStore;
+  auditStore?: AuditStore;
   bootstrapToken?: string | undefined;
 } = {}): FastifyInstance {
   const app = fastify({
@@ -214,8 +221,15 @@ export function buildPublicServer({
   app.server.headersTimeout = DEFAULT_HEADER_TIMEOUT_MS;
   registerPublicHooks(app, config, metrics);
   app.register(fastifyCookie);
-  registerAuthRoutes(app, { authStore, kanbanStore, bootstrapToken });
-  registerBoardRoutes(app, { authStore, kanbanStore });
+  registerAuthRoutes(app, {
+    authStore,
+    kanbanStore,
+    auditStore,
+    bootstrapToken,
+  });
+  registerBoardRoutes(app, { authStore, kanbanStore, auditStore });
+  registerUserRoutes(app, { authStore, kanbanStore, auditStore });
+  registerAuditRoutes(app, { authStore, auditStore });
   app.get("/livez", async (_request, reply) => {
     return reply.header("Cache-Control", NO_STORE).send({ status: "ok" });
   });
@@ -302,8 +316,28 @@ export async function startRuntime(env: NodeJS.ProcessEnv = process.env) {
   await assertStaticDir(config);
   const state = createRuntimeState();
   const metrics = new RuntimeMetrics();
-  const publicServer = buildPublicServer({ config, state, metrics });
+  const authStore = createAuthStoreFromEnv(env);
+  const kanbanStore = createKanbanStoreFromEnv(env);
+  const auditStore = createAuditStoreFromEnv(env);
+  const publicServer = buildPublicServer({
+    config,
+    state,
+    metrics,
+    authStore,
+    kanbanStore,
+    auditStore,
+  });
   const internalServer = buildInternalServer({ config, metrics });
+  // Fresh-Deployment-Akzeptanz: mit AUTH_BOOTSTRAP_ADMIN_* entsteht der Admin samt
+  // Team-Discovery-Board beim Start — idempotent, wirft nie (Fehler landen im Log).
+  await autoBootstrapAdminFromEnv({
+    authStore,
+    kanbanStore,
+    auditStore,
+    env,
+    log: (level, event, fields) =>
+      level === "error" ? logError(event, fields) : logInfo(event, fields),
+  });
   await Promise.all([
     publicServer.listen({ host: config.host, port: config.port }),
     internalServer.listen({ host: config.host, port: config.internalPort }),

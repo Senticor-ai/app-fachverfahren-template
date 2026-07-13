@@ -23,6 +23,8 @@ function makeBoard(overrides: Partial<Board> = {}): Board {
     contentLocale: "de",
     templateKey: "fachverfahren-discovery-v1",
     templateVersion: 1,
+    purpose: null,
+    lifecycleStage: null,
     version: 1,
     archivedAt: null,
     createdAt: now,
@@ -101,9 +103,59 @@ describe("InMemoryKanbanStore — boards", () => {
 
     const listed = await store.listBoards({
       tenantId: "tenant.local",
-      ownerActorId: "actor.owner",
+      actorId: "actor.owner",
     });
     expect(listed.map((board) => board.boardId)).toEqual(["board.1"]);
+  });
+
+  it("lists team boards of other owners but hides their personal boards", async () => {
+    const store = new InMemoryKanbanStore();
+    await store.createBoard(
+      makeBoard({ boardId: "board.own", ownerActorId: "actor.member" }),
+    );
+    await store.createBoard(
+      makeBoard({
+        boardId: "board.team",
+        ownerActorId: "actor.owner",
+        visibility: "team",
+      }),
+    );
+    await store.createBoard(
+      makeBoard({ boardId: "board.foreign", ownerActorId: "actor.owner" }),
+    );
+    await store.createBoard(
+      makeBoard({
+        boardId: "board.other-tenant",
+        tenantId: "tenant.other",
+        visibility: "team",
+      }),
+    );
+
+    const listed = await store.listBoards({
+      tenantId: "tenant.local",
+      actorId: "actor.member",
+    });
+    expect(listed.map((board) => board.boardId).sort()).toEqual([
+      "board.own",
+      "board.team",
+    ]);
+  });
+
+  it("carries purpose and lifecycle stage as board metadata", async () => {
+    const store = new InMemoryKanbanStore();
+    await store.createBoard(
+      makeBoard({
+        purpose: "requirements-discovery",
+        lifecycleStage: "design",
+      }),
+    );
+
+    const fetched = await store.getBoard({
+      tenantId: "tenant.local",
+      boardId: "board.1",
+    });
+    expect(fetched?.purpose).toBe("requirements-discovery");
+    expect(fetched?.lifecycleStage).toBe("design");
   });
 
   it("rejects an update with a stale version", async () => {

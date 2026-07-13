@@ -2,6 +2,7 @@ import type {
   Board,
   BoardCard,
   BoardColumn,
+  BoardVisibility,
   CardKind,
   KanbanStore,
 } from "@senticor/app-store-postgres";
@@ -146,6 +147,8 @@ export interface SeedDiscoveryBoardInput {
   jurisdictionId: string;
   ownerActorId: string;
   contentLocale: string;
+  /** "team" beim Workspace-Bootstrap (geteiltes Discovery-Board), "personal" in Tests/Fixtures. */
+  visibility: BoardVisibility;
   now: Date;
 }
 
@@ -162,13 +165,15 @@ export async function seedDiscoveryBoard(
     authorityId: input.authorityId,
     jurisdictionId: input.jurisdictionId,
     ownerActorId: input.ownerActorId,
-    title: "Build the Fachverfahren",
+    title: "Fachverfahren Discovery Board",
     description:
       "Definieren, validieren, bauen und betreiben Sie die richtige Fachverfahren-Anwendung.",
-    visibility: "personal",
+    visibility: input.visibility,
     contentLocale: input.contentLocale,
     templateKey: DISCOVERY_TEMPLATE_KEY,
     templateVersion: DISCOVERY_TEMPLATE_VERSION,
+    purpose: "requirements-discovery",
+    lifecycleStage: "design",
     version: 1,
     archivedAt: null,
     createdAt: nowIso,

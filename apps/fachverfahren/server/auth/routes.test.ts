@@ -1,5 +1,6 @@
 import fastifyCookie from "@fastify/cookie";
 import {
+  InMemoryAuditStore,
   InMemoryAuthStore,
   InMemoryKanbanStore,
 } from "@senticor/app-store-postgres";
@@ -15,15 +16,22 @@ import { registerAuthRoutes } from "./routes.js";
 function buildTestApp(bootstrapToken: string | undefined) {
   const authStore = new InMemoryAuthStore();
   const kanbanStore = new InMemoryKanbanStore();
+  const auditStore = new InMemoryAuditStore();
   const app: FastifyInstance = fastify({ logger: false });
 
-  return { app, authStore, kanbanStore, bootstrapToken };
+  return { app, authStore, kanbanStore, auditStore, bootstrapToken };
 }
 
 async function setUp(bootstrapToken: string | undefined) {
-  const { app, authStore, kanbanStore } = buildTestApp(bootstrapToken);
+  const { app, authStore, kanbanStore, auditStore } =
+    buildTestApp(bootstrapToken);
   await app.register(fastifyCookie);
-  registerAuthRoutes(app, { authStore, kanbanStore, bootstrapToken });
+  registerAuthRoutes(app, {
+    authStore,
+    kanbanStore,
+    auditStore,
+    bootstrapToken,
+  });
 
   const requirePrincipal = createRequirePrincipal(authStore);
   app.get(
@@ -33,7 +41,7 @@ async function setUp(bootstrapToken: string | undefined) {
   );
 
   await app.ready();
-  return { app, authStore, kanbanStore };
+  return { app, authStore, kanbanStore, auditStore };
 }
 
 const bootstrapBody = {
@@ -199,6 +207,174 @@ describe("auth routes", () => {
     });
     expect(session.statusCode).toBe(200);
     expect(session.json().email).toBe(bootstrapBody.email);
+    // Frontend-Guards brauchen Rolle + Permissions aus dem App-Identity-Modell.
+    expect(session.json().role).toBe("admin");
+    expect(session.json().permissions).toContain("users.manage");
+  });
+});
+
+describe("auth routes — password change", () => {
+  let app: FastifyInstance;
+  let cookie: string;
+
+  beforeEach(async () => {
+    ({ app } = await setUp("test-bootstrap-token"));
+    const bootstrapResponse = await app.inject({
+      method: "POST",
+      url: "/auth/bootstrap",
+      payload: bootstrapBody,
+    });
+    cookie = extractCookie(bootstrapResponse);
+  });
+
+  it("requires a session", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/auth/password",
+      payload: { currentPassword: "x", newPassword: "y" },
+    });
+    expect(response.statusCode).toBe(401);
+  });
+
+  it("rejects weak new passwords and wrong current passwords", async () => {
+    const weak = await app.inject({
+      method: "POST",
+      url: "/auth/password",
+      headers: { cookie },
+      payload: { currentPassword: bootstrapBody.password, newPassword: "kurz" },
+    });
+    expect(weak.statusCode).toBe(400);
+
+    const wrongCurrent = await app.inject({
+      method: "POST",
+      url: "/auth/password",
+      headers: { cookie },
+      payload: {
+        currentPassword: "definitely-not-it", // pragma: allowlist-secret
+        newPassword: "another correct horse battery", // pragma: allowlist-secret
+      },
+    });
+    expect(wrongCurrent.statusCode).toBe(403);
+  });
+
+  it("locks the account after repeated wrong current passwords (stolen-session guessing)", async () => {
+    // Eine gestohlene Session darf currentPassword nicht unbegrenzt raten:
+    // derselbe Failure-/Lockout-Pfad wie beim Login (Codex-Review PR #27, Runde 2).
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const response = await app.inject({
+        method: "POST",
+        url: "/auth/password",
+        headers: { cookie },
+        payload: {
+          currentPassword: `wrong-guess-${attempt}`,
+          newPassword: "another correct horse battery", // pragma: allowlist-secret
+        },
+      });
+      expect(response.statusCode).toBe(403);
+    }
+
+    const locked = await app.inject({
+      method: "POST",
+      url: "/auth/password",
+      headers: { cookie },
+      payload: {
+        currentPassword: bootstrapBody.password,
+        newPassword: "another correct horse battery", // pragma: allowlist-secret
+      },
+    });
+    expect(locked.statusCode).toBe(423);
+
+    // Auch der Login ist jetzt gesperrt — ein gemeinsamer Zähler, kein Nebeneingang.
+    const login = await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: bootstrapBody.email,
+        password: bootstrapBody.password,
+      },
+    });
+    expect(login.statusCode).toBe(423);
+  });
+
+  it("changes the password: old stops working, new works", async () => {
+    const newPassword = "another correct horse battery"; // pragma: allowlist-secret
+    const change = await app.inject({
+      method: "POST",
+      url: "/auth/password",
+      headers: { cookie },
+      payload: { currentPassword: bootstrapBody.password, newPassword },
+    });
+    expect(change.statusCode).toBe(204);
+
+    const oldLogin = await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: bootstrapBody.email,
+        password: bootstrapBody.password,
+      },
+    });
+    expect(oldLogin.statusCode).toBe(401);
+
+    const newLogin = await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: bootstrapBody.email, password: newPassword },
+    });
+    expect(newLogin.statusCode).toBe(200);
+  });
+});
+
+describe("auth routes — audit trail", () => {
+  it("writes audit events for bootstrap, successful and failed logins", async () => {
+    const { app, auditStore } = await setUp("test-bootstrap-token");
+    await app.inject({
+      method: "POST",
+      url: "/auth/bootstrap",
+      payload: bootstrapBody,
+    });
+    await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { email: bootstrapBody.email, password: "totally-wrong" }, // pragma: allowlist-secret
+    });
+    await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: {
+        email: bootstrapBody.email,
+        password: bootstrapBody.password,
+      },
+    });
+
+    const events = await auditStore.listEvents({ tenantId: "default" });
+    const types = events.map((event) => event.eventType);
+    expect(types).toContain("USER_CREATED");
+    expect(types).toContain("LOGIN_FAILED");
+    expect(types).toContain("LOGIN_SUCCESS");
+  });
+
+  it("audits successful password changes", async () => {
+    const { app, auditStore } = await setUp("test-bootstrap-token");
+    const bootstrapResponse = await app.inject({
+      method: "POST",
+      url: "/auth/bootstrap",
+      payload: bootstrapBody,
+    });
+    const cookie = extractCookie(bootstrapResponse);
+    await app.inject({
+      method: "POST",
+      url: "/auth/password",
+      headers: { cookie },
+      payload: {
+        currentPassword: bootstrapBody.password,
+        newPassword: "another correct horse battery", // pragma: allowlist-secret
+      },
+    });
+    const events = await auditStore.listEvents({ tenantId: "default" });
+    expect(events.map((event) => event.eventType)).toContain(
+      "PASSWORD_CHANGED",
+    );
   });
 });
 

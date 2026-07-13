@@ -26,8 +26,10 @@ import {
   type ShellNavItem,
 } from "@senticor/fachverfahren-kit";
 import { store } from "./store.js";
+import { AdminUsersPage } from "./AdminUsersPage.js";
 import { createBoardClient } from "./board-client.js";
 import { LoginPage } from "./LoginPage.js";
+import { PasswordChangePage } from "./PasswordChangePage.js";
 import { useSession } from "./session.js";
 
 const boardPort = createBoardClient();
@@ -44,6 +46,24 @@ function RequireSession({
   return <>{children}</>;
 }
 
+/** Guards `/admin/*`: prüft eine Workspace-Permission (wie die Server-Routen — nie
+ *  Rollen-Literale). Ohne Permission geht es zurück auf /boards statt auf eine Fehlerseite. */
+function RequirePermission({
+  permission,
+  children,
+}: {
+  permission: string;
+  children: React.ReactNode;
+}): React.JSX.Element | null {
+  const { status, principal } = useSession();
+  if (status === "loading") return null;
+  if (status === "unauthenticated") return <Navigate to="/login" replace />;
+  if (!principal?.permissions?.includes(permission)) {
+    return <Navigate to="/boards" replace />;
+  }
+  return <>{children}</>;
+}
+
 /** Minimal shell for the workspace/boards area — deliberately outside the 3-persona FachverfahrenShell,
  *  since Kanban boards are cross-cutting platform tooling, not tied to a Leistung's personas. */
 function BoardsShell({
@@ -56,15 +76,33 @@ function BoardsShell({
   return (
     <div className="flex min-h-screen flex-col">
       <header className="flex items-center justify-between border-b border-border px-4 py-2">
-        <button
-          type="button"
-          className="text-sm font-semibold text-foreground"
-          onClick={() => navigate("/boards")}
-        >
-          Boards
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            className="text-sm font-semibold text-foreground"
+            onClick={() => navigate("/boards")}
+          >
+            Boards
+          </button>
+          {principal?.permissions?.includes("users.manage") && (
+            <button
+              type="button"
+              className="text-sm text-muted-foreground hover:text-foreground"
+              onClick={() => navigate("/admin/users")}
+            >
+              Benutzer
+            </button>
+          )}
+        </div>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           {principal?.email}
+          <button
+            type="button"
+            className="text-sm text-muted-foreground hover:text-foreground"
+            onClick={() => navigate("/konto/passwort")}
+          >
+            Passwort ändern
+          </button>
           <Button
             type="button"
             variant="ghost"
@@ -103,6 +141,28 @@ function BoardDetail(): React.JSX.Element {
       <BoardsShell>
         <KanbanBoard boardId={boardId} port={boardPort} />
       </BoardsShell>
+    </RequireSession>
+  );
+}
+
+function KontoPasswort(): React.JSX.Element {
+  return (
+    <RequireSession>
+      <BoardsShell>
+        <PasswordChangePage />
+      </BoardsShell>
+    </RequireSession>
+  );
+}
+
+function AdminUsers(): React.JSX.Element {
+  return (
+    <RequireSession>
+      <RequirePermission permission="users.manage">
+        <BoardsShell>
+          <AdminUsersPage />
+        </BoardsShell>
+      </RequirePermission>
     </RequireSession>
   );
 }
@@ -307,6 +367,8 @@ export function App(): React.JSX.Element {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/boards" element={<BoardsList />} />
       <Route path="/boards/:boardId" element={<BoardDetail />} />
+      <Route path="/admin/users" element={<AdminUsers />} />
+      <Route path="/konto/passwort" element={<KontoPasswort />} />
       <Route path="*" element={<Navigate to="/buerger" replace />} />
     </Routes>
   );

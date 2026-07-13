@@ -32,13 +32,11 @@ export class BootstrapError extends Error {
 export interface BootstrapDeps {
   authStore: AuthStore;
   kanbanStore: KanbanStore;
-  bootstrapToken: string | undefined;
   now?: () => Date;
   generateId?: (prefix: string) => string;
 }
 
 export interface BootstrapInput {
-  token: string;
   email: string;
   password: string;
   displayName: string;
@@ -55,27 +53,35 @@ function defaultGenerateId(prefix: string): string {
   return `${prefix}.${randomUUID()}`;
 }
 
-/**
- * First-user bootstrap (kanban plan decision 3): requires the operator's
- * `BOOTSTRAP_TOKEN`, and — critically — becomes permanently unavailable for
- * a tenant the moment any user exists in it, which is what makes a second
- * bootstrap call impossible regardless of whether the token is known. Real
- * concurrent-request race protection (a Postgres advisory lock held across
- * this whole call) is the HTTP route's job, not this function's — this
- * function is deliberately store-agnostic so it stays unit-testable against
- * in-memory stores.
- */
-export async function bootstrapWorkspace(
-  deps: BootstrapDeps,
-  input: BootstrapInput,
-): Promise<BootstrapResult> {
-  if (!deps.bootstrapToken || input.token !== deps.bootstrapToken) {
+/** Token-Gate des HTTP-Bootstraps — bewusst AUS `bootstrapWorkspace` herausgezogen:
+ *  die Route ruft es vor dem Advisory-Lock; der vertrauenswürdige Startup-Pfad
+ *  (Auto-Bootstrap aus Env-Variablen, auto-bootstrap.ts) ruft `bootstrapWorkspace`
+ *  direkt — wer die Server-Env kontrolliert, braucht kein zweites Geheimnis. */
+export function assertBootstrapToken(
+  configuredToken: string | undefined,
+  providedToken: string,
+): void {
+  if (!configuredToken || providedToken !== configuredToken) {
     throw new BootstrapError(
       "invalid-token",
       "bootstrap token is missing or incorrect",
     );
   }
+}
 
+/**
+ * First-user bootstrap (kanban plan decision 3): becomes permanently
+ * unavailable for a tenant the moment any user exists in it, which is what
+ * makes a second bootstrap call impossible. Token gating lives in the HTTP
+ * route (`assertBootstrapToken`); real concurrent-request race protection
+ * (a Postgres advisory lock held across this whole call) is the caller's
+ * job, not this function's — this function is deliberately store-agnostic
+ * so it stays unit-testable against in-memory stores.
+ */
+export async function bootstrapWorkspace(
+  deps: BootstrapDeps,
+  input: BootstrapInput,
+): Promise<BootstrapResult> {
   const tenantId = input.tenantId ?? DEFAULT_TENANT_ID;
   const existingUsers = await deps.authStore.countUsers({ tenantId });
   if (existingUsers > 0) {
@@ -105,6 +111,7 @@ export async function bootstrapWorkspace(
     email: input.email,
     displayName: input.displayName,
     status: "active",
+    role: "admin",
     createdAt: nowIso,
     updatedAt: nowIso,
   });
@@ -128,6 +135,18 @@ export async function bootstrapWorkspace(
       updatedAt: nowIso,
     });
 
+    // Authentifizierung ≠ Autorisierung: auch der lokale Login läuft über das
+    // Identity-Mapping (provider "local", subject = actorId) — ein späterer
+    // OIDC-Provider hängt sich an dieselbe Naht, ohne die Autorisierung zu ändern.
+    await deps.authStore.linkIdentity({
+      tenantId,
+      provider: "local",
+      subject: actorId,
+      actorId,
+    });
+
+    // Das Discovery-Board ist das GETEILTE Team-Board des Workspaces (Feature-Entscheid
+    // „Beides"): team-sichtbar, damit jedes später angelegte Konto mitarbeiten kann.
     const board = await seedDiscoveryBoard(
       deps.kanbanStore,
       {
@@ -136,6 +155,7 @@ export async function bootstrapWorkspace(
         jurisdictionId: DEFAULT_JURISDICTION_ID,
         ownerActorId: actorId,
         contentLocale: input.contentLocale ?? "de",
+        visibility: "team",
         now,
       },
       { generateId },
@@ -143,6 +163,10 @@ export async function bootstrapWorkspace(
 
     return { user, board };
   } catch (error) {
+    // deleteUser räumt in Postgres per ON DELETE CASCADE auch Credential, Sessions,
+    // Identity-Links UND den bereits geseedeten Board-Graph ab (owner_actor_id-FK,
+    // Migration workspace_foundation) — sonst bliebe nach einem Seed-Teilfehler ein
+    // Zombie-Konto mit gültigem Initialpasswort zurück (Codex-Review PR #27).
     await deps.authStore.deleteUser({ tenantId, actorId }).catch(() => {
       // Best effort: schlägt auch die Kompensation fehl (z. B. DB weg), gewinnt der
       // ursprüngliche Fehler — er beschreibt die eigentliche Ursache.

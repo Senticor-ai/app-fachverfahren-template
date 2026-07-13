@@ -2,6 +2,11 @@ import { createPgClient, type PgClient } from "./client.js";
 
 export type UserStatus = "active" | "disabled";
 
+/** Workspace-Rolle (gespeichertes Primitiv). Das Permission-Mapping (users.manage,
+ *  boards.collaborate, …) lebt bewusst im App-Server (workspace-permissions.ts), damit
+ *  später feinere Rollen ohne Schema-Änderung entstehen können. */
+export type UserRole = "admin" | "member";
+
 export interface UserAccount {
   actorId: string;
   tenantId: string;
@@ -10,8 +15,19 @@ export interface UserAccount {
   email: string;
   displayName: string;
   status: UserStatus;
+  role: UserRole;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Authentifizierung ≠ Autorisierung: externe Identität (provider/issuer + subject) →
+ *  Application Actor. Der IdP beweist nur Identität; Actor, Rollen und Tenant-Kontext
+ *  gehören der Anwendung (siehe docs/capabilities/identity-and-trust.md). */
+export interface IdentityLink {
+  tenantId: string;
+  provider: string;
+  subject: string;
+  actorId: string;
 }
 
 export interface LocalCredential {
@@ -47,6 +63,16 @@ export interface AuthStore {
     actorId: string;
   }): Promise<UserAccount | undefined>;
   countUsers(input: { tenantId: string }): Promise<number>;
+  listUsers(input: { tenantId: string }): Promise<UserAccount[]>;
+  /** Statuswechsel ATOMAR mit der Session-Konsequenz: `disabled` widerruft in derselben
+   *  Transaktion alle aktiven Sessions des Actors — getrennte Schritte könnten nach einem
+   *  Teilfehler ein deaktiviertes Konto mit lebender 12h-Session zurücklassen
+   *  (requirePrincipal prüft user.status nicht pro Request). */
+  updateUserStatus(input: {
+    tenantId: string;
+    actorId: string;
+    status: UserStatus;
+  }): Promise<UserAccount>;
   /** Kompensations-Löschung für abgebrochene Bootstraps: entfernt Benutzer samt Credential
    *  und Sessions (Postgres: ON DELETE CASCADE), damit `countUsers()` wieder 0 meldet und der
    *  Operator das Setup erneut versuchen kann. */
@@ -64,12 +90,27 @@ export interface AuthStore {
     actorId: string,
     lockedUntil: string | null,
   ): Promise<LocalCredential>;
+  /** Ersetzt den Passwort-Hash und resettet Lockout-Zähler (Passwortwechsel = Neustart
+   *  der Brute-Force-Zählung). */
+  updateLocalCredentialPassword(input: {
+    actorId: string;
+    passwordHash: string;
+    hashAlgo: string;
+    passwordChangedAt: string;
+  }): Promise<LocalCredential>;
 
   createSession(session: SessionRecord): Promise<SessionRecord>;
   getActiveSessionByHash(
     sessionIdHash: string,
   ): Promise<SessionRecord | undefined>;
   revokeSession(sessionIdHash: string): Promise<void>;
+
+  linkIdentity(link: IdentityLink): Promise<IdentityLink>;
+  findActorByIdentity(input: {
+    tenantId: string;
+    provider: string;
+    subject: string;
+  }): Promise<string | undefined>;
 }
 
 // ─── InMemory ────────────────────────────────────────────────────────────
@@ -78,9 +119,21 @@ export class InMemoryAuthStore implements AuthStore {
   private readonly users = new Map<string, UserAccount>();
   private readonly credentials = new Map<string, LocalCredential>();
   private readonly sessions = new Map<string, SessionRecord>();
+  private readonly identityLinks = new Map<string, string>();
   private readonly bootstrapLocks = new Map<string, Promise<unknown>>();
 
   async createUser(user: UserAccount): Promise<UserAccount> {
+    // Spiegelt den Postgres-Unique-Index (tenant_id, lower(email)), damit der
+    // 409-Duplikat-Pfad der Benutzer-API auch in-memory testbar ist.
+    const existing = await this.getUserByEmail({
+      tenantId: user.tenantId,
+      email: user.email,
+    });
+    if (existing) {
+      throw new Error(
+        `user with email "${user.email}" already exists in tenant "${user.tenantId}"`,
+      );
+    }
     this.users.set(userKey(user.tenantId, user.actorId), { ...user });
     return { ...user };
   }
@@ -112,6 +165,45 @@ export class InMemoryAuthStore implements AuthStore {
     ).length;
   }
 
+  async listUsers(input: { tenantId: string }): Promise<UserAccount[]> {
+    return [...this.users.values()]
+      .filter((user) => user.tenantId === input.tenantId)
+      .sort(
+        (a, b) =>
+          a.createdAt.localeCompare(b.createdAt) ||
+          a.actorId.localeCompare(b.actorId),
+      )
+      .map((user) => ({ ...user }));
+  }
+
+  async updateUserStatus(input: {
+    tenantId: string;
+    actorId: string;
+    status: UserStatus;
+  }): Promise<UserAccount> {
+    const key = userKey(input.tenantId, input.actorId);
+    const current = this.users.get(key);
+    if (!current) {
+      throw new Error(
+        `user "${input.actorId}" not found in tenant "${input.tenantId}"`,
+      );
+    }
+    const next: UserAccount = {
+      ...current,
+      status: input.status,
+      updatedAt: nowIso(),
+    };
+    this.users.set(key, next);
+    if (input.status === "disabled") {
+      for (const [hash, session] of this.sessions) {
+        if (session.actorId === input.actorId && !session.revokedAt) {
+          this.sessions.set(hash, { ...session, revokedAt: nowIso() });
+        }
+      }
+    }
+    return { ...next };
+  }
+
   async deleteUser(input: {
     tenantId: string;
     actorId: string;
@@ -121,6 +213,11 @@ export class InMemoryAuthStore implements AuthStore {
     for (const [hash, session] of this.sessions) {
       if (session.actorId === input.actorId) {
         this.sessions.delete(hash);
+      }
+    }
+    for (const [key, actorId] of this.identityLinks) {
+      if (actorId === input.actorId) {
+        this.identityLinks.delete(key);
       }
     }
   }
@@ -191,6 +288,26 @@ export class InMemoryAuthStore implements AuthStore {
     return { ...next };
   }
 
+  async updateLocalCredentialPassword(input: {
+    actorId: string;
+    passwordHash: string;
+    hashAlgo: string;
+    passwordChangedAt: string;
+  }): Promise<LocalCredential> {
+    const current = this.requireCredential(input.actorId);
+    const next: LocalCredential = {
+      ...current,
+      passwordHash: input.passwordHash,
+      hashAlgo: input.hashAlgo,
+      passwordChangedAt: input.passwordChangedAt,
+      failedAttempts: 0,
+      lockedUntil: null,
+      updatedAt: nowIso(),
+    };
+    this.credentials.set(input.actorId, next);
+    return { ...next };
+  }
+
   async createSession(session: SessionRecord): Promise<SessionRecord> {
     this.sessions.set(session.sessionIdHash, { ...session });
     return { ...session };
@@ -216,6 +333,27 @@ export class InMemoryAuthStore implements AuthStore {
     }
   }
 
+  async linkIdentity(link: IdentityLink): Promise<IdentityLink> {
+    const key = identityKey(link.tenantId, link.provider, link.subject);
+    if (this.identityLinks.has(key)) {
+      throw new Error(
+        `identity "${link.provider}:${link.subject}" is already linked in tenant "${link.tenantId}"`,
+      );
+    }
+    this.identityLinks.set(key, link.actorId);
+    return { ...link };
+  }
+
+  async findActorByIdentity(input: {
+    tenantId: string;
+    provider: string;
+    subject: string;
+  }): Promise<string | undefined> {
+    return this.identityLinks.get(
+      identityKey(input.tenantId, input.provider, input.subject),
+    );
+  }
+
   private requireCredential(actorId: string): LocalCredential {
     const credential = this.credentials.get(actorId);
     if (!credential) {
@@ -227,6 +365,14 @@ export class InMemoryAuthStore implements AuthStore {
 
 function userKey(tenantId: string, actorId: string): string {
   return `${tenantId}:${actorId}`;
+}
+
+function identityKey(
+  tenantId: string,
+  provider: string,
+  subject: string,
+): string {
+  return `${tenantId}:${provider}:${subject}`;
 }
 
 function nowIso(): string {
@@ -254,6 +400,12 @@ export class UnavailableAuthStore implements AuthStore {
   async countUsers(): Promise<number> {
     this.fail();
   }
+  async listUsers(): Promise<UserAccount[]> {
+    this.fail();
+  }
+  async updateUserStatus(): Promise<UserAccount> {
+    this.fail();
+  }
   async deleteUser(): Promise<void> {
     this.fail();
   }
@@ -275,6 +427,9 @@ export class UnavailableAuthStore implements AuthStore {
   async setAccountLock(): Promise<LocalCredential> {
     this.fail();
   }
+  async updateLocalCredentialPassword(): Promise<LocalCredential> {
+    this.fail();
+  }
   async createSession(): Promise<SessionRecord> {
     this.fail();
   }
@@ -282,6 +437,12 @@ export class UnavailableAuthStore implements AuthStore {
     this.fail();
   }
   async revokeSession(): Promise<void> {
+    this.fail();
+  }
+  async linkIdentity(): Promise<IdentityLink> {
+    this.fail();
+  }
+  async findActorByIdentity(): Promise<string | undefined> {
     this.fail();
   }
 }
@@ -307,8 +468,16 @@ interface UserRow extends Record<string, unknown> {
   email: string;
   display_name: string;
   status: UserStatus;
+  role: UserRole;
   created_at: Date | string;
   updated_at: Date | string;
+}
+
+interface IdentityLinkRow extends Record<string, unknown> {
+  tenant_id: string;
+  provider: string;
+  subject: string;
+  actor_id: string;
 }
 
 interface CredentialRow extends Record<string, unknown> {
@@ -342,9 +511,9 @@ export class PostgresAuthStore implements AuthStore {
         `
           INSERT INTO app_users (
             actor_id, tenant_id, authority_id, jurisdiction_id, email,
-            display_name, status, created_at, updated_at
+            display_name, status, role, created_at, updated_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           RETURNING *
         `,
         [
@@ -355,11 +524,57 @@ export class PostgresAuthStore implements AuthStore {
           user.email,
           user.displayName,
           user.status,
+          user.role,
           user.createdAt,
           user.updatedAt,
         ],
       );
       return userFromRow(requireRow(result.rows, "user", user.actorId));
+    });
+  }
+
+  async listUsers(input: { tenantId: string }): Promise<UserAccount[]> {
+    return this.withClient(async (client) => {
+      const result = await client.query<UserRow>(
+        `SELECT * FROM app_users WHERE tenant_id = $1 ORDER BY created_at ASC, actor_id ASC`,
+        [input.tenantId],
+      );
+      return result.rows.map(userFromRow);
+    });
+  }
+
+  async updateUserStatus(input: {
+    tenantId: string;
+    actorId: string;
+    status: UserStatus;
+  }): Promise<UserAccount> {
+    return this.withClient(async (client) => {
+      // Eine Transaktion für Status + Session-Revocation: sonst könnte ein Fehler nach
+      // dem Status-Update ein deaktiviertes Konto mit lebenden Sessions hinterlassen.
+      await client.query("BEGIN");
+      try {
+        const result = await client.query<UserRow>(
+          `
+            UPDATE app_users
+            SET status = $3, updated_at = now()
+            WHERE tenant_id = $1 AND actor_id = $2
+            RETURNING *
+          `,
+          [input.tenantId, input.actorId, input.status],
+        );
+        const row = requireRow(result.rows, "user", input.actorId);
+        if (input.status === "disabled") {
+          await client.query(
+            `UPDATE app_sessions SET revoked_at = now() WHERE actor_id = $1 AND revoked_at IS NULL`,
+            [input.actorId],
+          );
+        }
+        await client.query("COMMIT");
+        return userFromRow(row);
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => {});
+        throw error;
+      }
     });
   }
 
@@ -533,6 +748,75 @@ export class PostgresAuthStore implements AuthStore {
     });
   }
 
+  async updateLocalCredentialPassword(input: {
+    actorId: string;
+    passwordHash: string;
+    hashAlgo: string;
+    passwordChangedAt: string;
+  }): Promise<LocalCredential> {
+    return this.withClient(async (client) => {
+      const result = await client.query<CredentialRow>(
+        `
+          UPDATE app_local_credentials
+          SET password_hash = $2, hash_algo = $3, password_changed_at = $4,
+              failed_attempts = 0, locked_until = NULL, updated_at = now()
+          WHERE actor_id = $1
+          RETURNING *
+        `,
+        [
+          input.actorId,
+          input.passwordHash,
+          input.hashAlgo,
+          input.passwordChangedAt,
+        ],
+      );
+      return credentialFromRow(
+        requireRow(result.rows, "local credential", input.actorId),
+      );
+    });
+  }
+
+  async linkIdentity(link: IdentityLink): Promise<IdentityLink> {
+    return this.withClient(async (client) => {
+      const result = await client.query<IdentityLinkRow>(
+        `
+          INSERT INTO app_identity_links (tenant_id, provider, subject, actor_id)
+          VALUES ($1, $2, $3, $4)
+          RETURNING tenant_id, provider, subject, actor_id
+        `,
+        [link.tenantId, link.provider, link.subject, link.actorId],
+      );
+      const row = requireRow(
+        result.rows,
+        "identity link",
+        `${link.provider}:${link.subject}`,
+      );
+      return {
+        tenantId: row.tenant_id,
+        provider: row.provider,
+        subject: row.subject,
+        actorId: row.actor_id,
+      };
+    });
+  }
+
+  async findActorByIdentity(input: {
+    tenantId: string;
+    provider: string;
+    subject: string;
+  }): Promise<string | undefined> {
+    return this.withClient(async (client) => {
+      const result = await client.query<IdentityLinkRow>(
+        `
+          SELECT actor_id FROM app_identity_links
+          WHERE tenant_id = $1 AND provider = $2 AND subject = $3
+        `,
+        [input.tenantId, input.provider, input.subject],
+      );
+      return result.rows[0]?.actor_id;
+    });
+  }
+
   async createSession(session: SessionRecord): Promise<SessionRecord> {
     return this.withClient(async (client) => {
       const result = await client.query<SessionRow>(
@@ -616,6 +900,7 @@ function userFromRow(row: UserRow): UserAccount {
     email: row.email,
     displayName: row.display_name,
     status: row.status,
+    role: row.role,
     createdAt: toIsoString(row.created_at),
     updatedAt: toIsoString(row.updated_at),
   };

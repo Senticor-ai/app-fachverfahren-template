@@ -1,11 +1,13 @@
 import fastifyCookie from "@fastify/cookie";
 import {
+  InMemoryAuditStore,
   InMemoryAuthStore,
   InMemoryKanbanStore,
 } from "@senticor/app-store-postgres";
 import fastify, { type FastifyInstance } from "fastify";
 import { beforeEach, describe, expect, it } from "vitest";
 import { registerAuthRoutes } from "../auth/routes.js";
+import { registerUserRoutes } from "../users/routes.js";
 import { registerBoardRoutes } from "./routes.js";
 
 const bootstrapBody = {
@@ -15,17 +17,26 @@ const bootstrapBody = {
   displayName: "Owner",
 };
 
+const memberBody = {
+  email: "member@example.org",
+  displayName: "Mitglied",
+  initialPassword: "initial member password", // pragma: allowlist-secret
+};
+
 async function setUp() {
   const authStore = new InMemoryAuthStore();
   const kanbanStore = new InMemoryKanbanStore();
+  const auditStore = new InMemoryAuditStore();
   const app: FastifyInstance = fastify({ logger: false });
   await app.register(fastifyCookie);
   registerAuthRoutes(app, {
     authStore,
     kanbanStore,
+    auditStore,
     bootstrapToken: "test-bootstrap-token",
   });
-  registerBoardRoutes(app, { authStore, kanbanStore });
+  registerUserRoutes(app, { authStore, kanbanStore, auditStore });
+  registerBoardRoutes(app, { authStore, kanbanStore, auditStore });
   await app.ready();
 
   const bootstrapResponse = await app.inject({
@@ -36,7 +47,39 @@ async function setUp() {
   const ownerCookie = extractCookie(bootstrapResponse);
   const boardIdFromBootstrap = bootstrapResponse.json().boardId as string;
 
-  return { app, authStore, kanbanStore, ownerCookie, boardIdFromBootstrap };
+  return {
+    app,
+    authStore,
+    kanbanStore,
+    auditStore,
+    ownerCookie,
+    boardIdFromBootstrap,
+  };
+}
+
+/** Legt via Admin-API ein Member-Konto an und liefert dessen Session-Cookie —
+ *  der echte Zwei-Personen-Pfad (das alte „Gate P0-B"-Provisorium ist Geschichte). */
+async function createMemberSession(
+  app: FastifyInstance,
+  adminCookie: string,
+): Promise<{ cookie: string; actorId: string }> {
+  const created = await app.inject({
+    method: "POST",
+    url: "/api/v1/users",
+    headers: { cookie: adminCookie },
+    payload: memberBody,
+  });
+  expect(created.statusCode).toBe(201);
+  const login = await app.inject({
+    method: "POST",
+    url: "/auth/login",
+    payload: { email: memberBody.email, password: memberBody.initialPassword },
+  });
+  expect(login.statusCode).toBe(200);
+  return {
+    cookie: extractCookie(login),
+    actorId: created.json().actorId as string,
+  };
 }
 
 function extractCookie(response: { headers: Record<string, unknown> }): string {
@@ -99,18 +142,7 @@ describe("board CRUD routes", () => {
     expect(body.cards.length).toBeGreaterThan(0);
   });
 
-  it("denies access to another actor's board (ownership check)", async () => {
-    const strangerBootstrap = await app.inject({
-      method: "POST",
-      url: "/auth/login",
-      payload: { email: "nobody@example.org", password: "irrelevant-value" }, // pragma: allowlist-secret
-    });
-    expect(strangerBootstrap.statusCode).toBe(401); // sanity: no such user exists
-
-    // simulate a second, unrelated principal via a fresh registration path is
-    // out of scope for P0-A (invite-only registration is Gate P0-B); instead
-    // directly assert that a request with no cookie at all is denied, and
-    // that a forged/unknown session cookie is denied too.
+  it("denies a forged/unknown session cookie", async () => {
     const forged = await app.inject({
       method: "GET",
       url: `/api/v1/boards/${boardIdFromBootstrap}`,
@@ -324,5 +356,184 @@ describe("board CRUD routes", () => {
     expect(response.statusCode).toBe(201);
     expect(response.json().kind).toBe("task");
     expect(response.json().priority).toBe("normal");
+  });
+});
+
+describe("team board access", () => {
+  let ctx: Awaited<ReturnType<typeof setUp>>;
+  let member: { cookie: string; actorId: string };
+
+  beforeEach(async () => {
+    ctx = await setUp();
+    member = await createMemberSession(ctx.app, ctx.ownerCookie);
+  });
+
+  it("lists the team discovery board alongside the member's own starter board", async () => {
+    const response = await ctx.app.inject({
+      method: "GET",
+      url: "/api/v1/boards",
+      headers: { cookie: member.cookie },
+    });
+    expect(response.statusCode).toBe(200);
+    const boards = response.json() as Array<Record<string, unknown>>;
+    const titles = boards.map((board) => board["title"]).sort();
+    expect(titles).toEqual(["Fachverfahren Discovery Board", "Mein Board"]);
+  });
+
+  it("lets a member read and collaborate on the team board (card create)", async () => {
+    const detail = await ctx.app.inject({
+      method: "GET",
+      url: `/api/v1/boards/${ctx.boardIdFromBootstrap}`,
+      headers: { cookie: member.cookie },
+    });
+    expect(detail.statusCode).toBe(200);
+    const firstColumnId = detail.json().columns[0].columnId as string;
+
+    const card = await ctx.app.inject({
+      method: "POST",
+      url: `/api/v1/boards/${ctx.boardIdFromBootstrap}/cards`,
+      headers: { cookie: member.cookie },
+      payload: { columnId: firstColumnId, title: "Beitrag des Mitglieds" },
+    });
+    expect(card.statusCode).toBe(201);
+  });
+
+  it("refuses board management (PATCH/archive) for members on the team board", async () => {
+    const patch = await ctx.app.inject({
+      method: "PATCH",
+      url: `/api/v1/boards/${ctx.boardIdFromBootstrap}`,
+      headers: { cookie: member.cookie, "if-match": '"1"' },
+      payload: { title: "Umbenannt" },
+    });
+    expect(patch.statusCode).toBe(403);
+
+    const archive = await ctx.app.inject({
+      method: "POST",
+      url: `/api/v1/boards/${ctx.boardIdFromBootstrap}/archive`,
+      headers: { cookie: member.cookie, "if-match": '"1"' },
+    });
+    expect(archive.statusCode).toBe(403);
+  });
+
+  it("lets an admin manage a team board they do not own (boards.manage permission)", async () => {
+    // Member legt ein EIGENES Team-Board an …
+    const created = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/boards",
+      headers: { cookie: member.cookie },
+      payload: { title: "Team-Thema", visibility: "team" },
+    });
+    expect(created.statusCode).toBe(201);
+    const boardId = created.json().boardId as string;
+
+    // … und der Admin (nicht Owner) darf es verwalten.
+    const patch = await ctx.app.inject({
+      method: "PATCH",
+      url: `/api/v1/boards/${boardId}`,
+      headers: { cookie: ctx.ownerCookie, "if-match": '"1"' },
+      payload: { title: "Team-Thema (kuratiert)" },
+    });
+    expect(patch.statusCode).toBe(200);
+  });
+
+  it("keeps foreign personal boards invisible (list AND detail 404)", async () => {
+    // Das Starter-Board des Members taucht in der Owner-Liste nicht auf …
+    const list = await ctx.app.inject({
+      method: "GET",
+      url: "/api/v1/boards",
+      headers: { cookie: ctx.ownerCookie },
+    });
+    const boards = list.json() as Array<Record<string, unknown>>;
+    expect(boards.map((board) => board["title"])).not.toContain("Mein Board");
+
+    // … und der direkte Zugriff wird als 404 maskiert.
+    const memberBoards = await ctx.app.inject({
+      method: "GET",
+      url: "/api/v1/boards",
+      headers: { cookie: member.cookie },
+    });
+    const starterBoard = (
+      memberBoards.json() as Array<Record<string, unknown>>
+    ).find((board) => board["title"] === "Mein Board");
+    const detail = await ctx.app.inject({
+      method: "GET",
+      url: `/api/v1/boards/${starterBoard?.["boardId"]}`,
+      headers: { cookie: ctx.ownerCookie },
+    });
+    expect(detail.statusCode).toBe(404);
+  });
+
+  it("freezes archived boards: reading stays possible, collaboration is rejected until restore", async () => {
+    // Archivierte Team-Boards dürfen mit gespeicherter URL nicht weiter mutierbar sein
+    // (Codex-Review PR #27, Runde 2); Lesen bleibt möglich (Restore-UI braucht die Version).
+    const detailBefore = await ctx.app.inject({
+      method: "GET",
+      url: `/api/v1/boards/${ctx.boardIdFromBootstrap}`,
+      headers: { cookie: member.cookie },
+    });
+    const firstColumnId = detailBefore.json().columns[0].columnId as string;
+
+    await ctx.app.inject({
+      method: "POST",
+      url: `/api/v1/boards/${ctx.boardIdFromBootstrap}/archive`,
+      headers: { cookie: ctx.ownerCookie, "if-match": '"1"' },
+    });
+
+    const read = await ctx.app.inject({
+      method: "GET",
+      url: `/api/v1/boards/${ctx.boardIdFromBootstrap}`,
+      headers: { cookie: member.cookie },
+    });
+    expect(read.statusCode).toBe(200);
+
+    const card = await ctx.app.inject({
+      method: "POST",
+      url: `/api/v1/boards/${ctx.boardIdFromBootstrap}/cards`,
+      headers: { cookie: member.cookie },
+      payload: { columnId: firstColumnId, title: "Nachzügler" },
+    });
+    expect(card.statusCode).toBe(409);
+
+    // Owner darf nach dem Restore wieder kollaborieren.
+    await ctx.app.inject({
+      method: "POST",
+      url: `/api/v1/boards/${ctx.boardIdFromBootstrap}/restore`,
+      headers: { cookie: ctx.ownerCookie, "if-match": '"2"' },
+    });
+    const afterRestore = await ctx.app.inject({
+      method: "POST",
+      url: `/api/v1/boards/${ctx.boardIdFromBootstrap}/cards`,
+      headers: { cookie: member.cookie },
+      payload: { columnId: firstColumnId, title: "Wieder offen" },
+    });
+    expect(afterRestore.statusCode).toBe(201);
+  });
+
+  it("audits board creation, visibility changes, and archiving", async () => {
+    const created = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/boards",
+      headers: { cookie: member.cookie },
+      payload: { title: "Audit-Board", visibility: "personal" },
+    });
+    const boardId = created.json().boardId as string;
+
+    await ctx.app.inject({
+      method: "PATCH",
+      url: `/api/v1/boards/${boardId}`,
+      headers: { cookie: member.cookie, "if-match": '"1"' },
+      payload: { visibility: "team" },
+    });
+    await ctx.app.inject({
+      method: "POST",
+      url: `/api/v1/boards/${boardId}/archive`,
+      headers: { cookie: member.cookie, "if-match": '"2"' },
+    });
+
+    const events = await ctx.auditStore.listEvents({ tenantId: "default" });
+    const types = events.map((event) => event.eventType);
+    expect(types).toContain("BOARD_CREATED");
+    expect(types).toContain("BOARD_VISIBILITY_CHANGED");
+    expect(types).toContain("BOARD_ARCHIVED");
   });
 });
