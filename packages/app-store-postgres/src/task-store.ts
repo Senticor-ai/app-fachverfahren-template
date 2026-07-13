@@ -911,7 +911,7 @@ export class PostgresTaskStore implements TaskStore {
       }>(
         `SELECT parent_task_id,
                 COUNT(*)::int AS total,
-                COUNT(*) FILTER (WHERE data->>$4 = 'true')::int AS gesetzt
+                (COUNT(*) FILTER (WHERE data->>$4 = 'true'))::int AS gesetzt
          FROM app_tasks
          WHERE tenant_id = $1 AND task_kind = $2 AND parent_task_id = ANY($3::text[])
          GROUP BY parent_task_id`,
