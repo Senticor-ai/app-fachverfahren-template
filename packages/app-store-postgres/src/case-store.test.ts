@@ -93,6 +93,40 @@ for (const impl of impls) {
       ).toBeUndefined();
     });
 
+    it("DUAL-MODE: caseKind/data defaulten ('vorgang'/{}) und round-trippen (Dossier-Nutzlast) — InMemory==Postgres", async () => {
+      // Default (Vorgang-Modus, keine Nutzlast): caseKind 'vorgang', data {} in BEIDEN Laufzeiten.
+      const c1 = macheCase();
+      await store.insertCase(c1);
+      const g1 = await store.getCase({
+        tenantId: c1.tenantId,
+        caseId: c1.caseId,
+      });
+      expect(g1?.caseKind).toBe("vorgang");
+      expect(g1?.data).toEqual({});
+      // Dossier-Fall mit Akte-Nutzlast round-trippt verlustfrei.
+      const c2 = macheCase({
+        caseKind: "dossier",
+        data: { name: "Muster", stufe: "Orientierung" },
+      });
+      await store.insertCase(c2);
+      const g2 = await store.getCase({
+        tenantId: c2.tenantId,
+        caseId: c2.caseId,
+      });
+      expect(g2?.caseKind).toBe("dossier");
+      expect(g2?.data).toEqual({ name: "Muster", stufe: "Orientierung" });
+      // transitionCase (Statuswechsel) ERHAeLT caseKind + data unveraendert.
+      const t = await store.transitionCase({
+        tenantId: c2.tenantId,
+        caseId: c2.caseId,
+        expectedVersion: 1,
+        toState: "aktiv",
+        auditEvent: macheAudit(c2.caseId, "sb.a"),
+      });
+      expect(t.caseKind).toBe("dossier");
+      expect(t.data).toEqual({ name: "Muster", stufe: "Orientierung" });
+    });
+
     it("transitionCase: Statuswechsel + Audit-Append atomar, Version steigt", async () => {
       const c = macheCase();
       await store.insertCase(c);

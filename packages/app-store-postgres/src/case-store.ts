@@ -28,6 +28,13 @@ export interface AppCase {
   subjectIds: string[];
   openedAt: string;
   closedAt: string | null;
+  /** DUAL-MODE (additiv): Modus dieser Fall-Instanz — `"vorgang"` (Default) oder `"dossier"` (langlebige Akte).
+   *  Spiegelt `LeistungConfig.kind`. Fehlt beim Schreiben, defaultet der Store auf `"vorgang"`. */
+  caseKind?: string;
+  /** DUAL-MODE (additiv): frei-formiger Nutzlast-Traeger der langlebigen Akte (Dossier-Stammfelder). Vorgang-Modus
+   *  laesst ihn leer. Beim Schreiben optional; der Store defaultet auf `{}`. Mutationen laufen (ab Phase 1.5) NUR
+   *  ueber den auditierten DossierPort (append-only-Activity in derselben TX). */
+  data?: Record<string, unknown>;
 }
 
 export interface AppAuditEvent {
@@ -125,9 +132,15 @@ export class InMemoryCaseStore implements CaseStore {
   }
 
   async insertCase(input: AppCase): Promise<AppCase> {
-    const stored: AppCase = { ...input, subjectIds: [...input.subjectIds] };
+    // Dual-Mode: caseKind/data mit denselben Defaults wie Postgres ('vorgang' / {}) — InMemory==Postgres-Paritaet.
+    const stored: AppCase = {
+      ...input,
+      subjectIds: [...input.subjectIds],
+      caseKind: input.caseKind ?? "vorgang",
+      data: { ...(input.data ?? {}) },
+    };
     this.cases.set(this.key(input.tenantId, input.caseId), stored);
-    return { ...stored };
+    return { ...stored, data: { ...stored.data } };
   }
 
   async getCase(input: {
@@ -135,7 +148,9 @@ export class InMemoryCaseStore implements CaseStore {
     caseId: string;
   }): Promise<AppCase | undefined> {
     const c = this.cases.get(this.key(input.tenantId, input.caseId));
-    return c ? { ...c, subjectIds: [...c.subjectIds] } : undefined;
+    return c
+      ? { ...c, subjectIds: [...c.subjectIds], data: { ...(c.data ?? {}) } }
+      : undefined;
   }
 
   async listCases(query: ListCasesQuery): Promise<AppCase[]> {
@@ -150,7 +165,11 @@ export class InMemoryCaseStore implements CaseStore {
       )
       .sort((a, b) => b.openedAt.localeCompare(a.openedAt))
       .slice(0, query.limit ?? 100)
-      .map((c) => ({ ...c, subjectIds: [...c.subjectIds] }));
+      .map((c) => ({
+        ...c,
+        subjectIds: [...c.subjectIds],
+        data: { ...(c.data ?? {}) },
+      }));
   }
 
   async appendAuditEvent(event: AppAuditEvent): Promise<AppAuditEvent> {
@@ -200,7 +219,11 @@ export class InMemoryCaseStore implements CaseStore {
     // Emission folgt danach. Der In-Memory-AutomationStore wirft nie, daher praktisch atomar.
     if (input.outboxEvent)
       await this.opts.automationStore?.enqueueEvent(input.outboxEvent);
-    return { ...updated, subjectIds: [...updated.subjectIds] };
+    return {
+      ...updated,
+      subjectIds: [...updated.subjectIds],
+      data: { ...(updated.data ?? {}) },
+    };
   }
 
   async ping(): Promise<void> {
@@ -220,10 +243,12 @@ export class PostgresCaseStore implements CaseStore {
     return this.withClient(async (client) => {
       const res = await client.query<CaseRow>(
         `INSERT INTO app_cases (case_id, tenant_id, authority_id, jurisdiction_id,
-           procedure_id, procedure_version, state, version, subject_ids, opened_at, closed_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11)
+           procedure_id, procedure_version, state, version, subject_ids, opened_at, closed_at,
+           case_kind, data)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13::jsonb)
          RETURNING case_id, tenant_id, authority_id, jurisdiction_id, procedure_id,
-                   procedure_version, state, version, subject_ids, opened_at, closed_at`,
+                   procedure_version, state, version, subject_ids, opened_at, closed_at,
+                   case_kind, data`,
         [
           input.caseId,
           input.tenantId,
@@ -236,6 +261,8 @@ export class PostgresCaseStore implements CaseStore {
           JSON.stringify(input.subjectIds),
           input.openedAt,
           input.closedAt,
+          input.caseKind ?? "vorgang",
+          JSON.stringify(input.data ?? {}),
         ],
       );
       return caseFromRow(res.rows[0]!);
@@ -249,7 +276,8 @@ export class PostgresCaseStore implements CaseStore {
     return this.withClient(async (client) => {
       const res = await client.query<CaseRow>(
         `SELECT case_id, tenant_id, authority_id, jurisdiction_id, procedure_id,
-                procedure_version, state, version, subject_ids, opened_at, closed_at
+                procedure_version, state, version, subject_ids, opened_at, closed_at,
+                case_kind, data
          FROM app_cases WHERE tenant_id = $1 AND case_id = $2`,
         [input.tenantId, input.caseId],
       );
@@ -262,7 +290,8 @@ export class PostgresCaseStore implements CaseStore {
     return this.withClient(async (client) => {
       const res = await client.query<CaseRow>(
         `SELECT case_id, tenant_id, authority_id, jurisdiction_id, procedure_id,
-                procedure_version, state, version, subject_ids, opened_at, closed_at
+                procedure_version, state, version, subject_ids, opened_at, closed_at,
+                case_kind, data
          FROM app_cases
          WHERE tenant_id = $1 AND authority_id = $2
            AND ($3::text IS NULL OR state = $3)
@@ -309,7 +338,8 @@ export class PostgresCaseStore implements CaseStore {
         await client.query("BEGIN");
         const cur = await client.query<CaseRow>(
           `SELECT case_id, tenant_id, authority_id, jurisdiction_id, procedure_id,
-                  procedure_version, state, version, subject_ids, opened_at, closed_at
+                  procedure_version, state, version, subject_ids, opened_at, closed_at,
+                  case_kind, data
            FROM app_cases WHERE tenant_id = $1 AND case_id = $2 FOR UPDATE`,
           [input.tenantId, input.caseId],
         );
@@ -326,7 +356,8 @@ export class PostgresCaseStore implements CaseStore {
            SET state = $3, version = version + 1, closed_at = $4, updated_at = now()
            WHERE tenant_id = $1 AND case_id = $2
            RETURNING case_id, tenant_id, authority_id, jurisdiction_id, procedure_id,
-                     procedure_version, state, version, subject_ids, opened_at, closed_at`,
+                     procedure_version, state, version, subject_ids, opened_at, closed_at,
+                     case_kind, data`,
           [
             input.tenantId,
             input.caseId,
@@ -389,6 +420,8 @@ interface CaseRow extends Record<string, unknown> {
   subject_ids: unknown;
   opened_at: Date | string;
   closed_at: Date | string | null;
+  case_kind?: string;
+  data?: unknown;
 }
 
 interface AuditRow extends Record<string, unknown> {
@@ -426,6 +459,11 @@ function caseFromRow(row: CaseRow): AppCase {
       : [],
     openedAt: iso(row.opened_at)!,
     closedAt: iso(row.closed_at),
+    caseKind: row.case_kind ?? "vorgang",
+    data:
+      row.data && typeof row.data === "object"
+        ? (row.data as Record<string, unknown>)
+        : {},
   };
 }
 
