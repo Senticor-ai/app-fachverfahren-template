@@ -54,7 +54,10 @@ export function defaultMigrationOptionsFromEnv(
     databaseUrl: resolved.url,
     migrationsDir:
       env["APP_MIGRATIONS_DIR"] ??
-      join(process.cwd(), "packages/app-store-postgres/migrations"),
+      // MODUL-RELATIV (nicht cwd-relativ): sowohl `src/migrate.ts` als auch `dist/migrate.js` liegen eine Ebene
+      // unter dem Paket-Root, `../migrations` findet die Migrationen also unabhaengig vom Arbeitsverzeichnis. Die
+      // frueher cwd-relative Aufloesung brach bei `pnpm --filter … db:migrate` (cwd = Paketordner → doppelter Pfad).
+      fileURLToPath(new URL("../migrations", import.meta.url)),
     migrationTable: env["APP_MIGRATION_TABLE"] ?? "app_schema_migrations",
     advisoryLockId: BigInt(env["APP_MIGRATION_LOCK_ID"] ?? "5311101"),
   };
