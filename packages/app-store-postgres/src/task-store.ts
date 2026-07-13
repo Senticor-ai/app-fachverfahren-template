@@ -37,6 +37,13 @@ export interface AppTask {
   version: number;
   createdAt: string;
   updatedAt: string;
+  /** DUAL-MODE (additiv): freier Typ-Diskriminator — Default `"aufgabe"`; spaeter z. B. `"ziel"`/`"checkliste-item"`
+   *  fuer Dossier-Sub-Sammlungen. Beim Schreiben optional; der Store defaultet. */
+  taskKind?: string;
+  /** DUAL-MODE (additiv): frei-formige Nutzlast eines Sub-Sammlungs-Eintrags (z. B. Ziel-Kategorie/Deadline/
+   *  Completion-Flag). Beim Schreiben optional; der Store defaultet auf `{}`. Mutationen laufen ab Phase 1.5 NUR
+   *  ueber den auditierten DossierPort. */
+  data?: Record<string, unknown>;
 }
 
 export type IntakeSource = "antrag" | "email" | "formular" | "register";
@@ -313,14 +320,22 @@ export class InMemoryTaskStore implements TaskStore {
   }
 
   async insertTask(task: AppTask): Promise<AppTask> {
-    const stored = { ...task, labels: [...task.labels] };
+    // Dual-Mode: taskKind/data mit denselben Defaults wie Postgres ('aufgabe' / {}) — InMemory==Postgres-Paritaet.
+    const stored: AppTask = {
+      ...task,
+      labels: [...task.labels],
+      taskKind: task.taskKind ?? "aufgabe",
+      data: { ...(task.data ?? {}) },
+    };
     this.tasks.set(this.tk(task.tenantId, task.taskId), stored);
-    return { ...stored, labels: [...stored.labels] };
+    return { ...stored, labels: [...stored.labels], data: { ...stored.data } };
   }
 
   async getTask(input: { tenantId: string; taskId: string }) {
     const t = this.tasks.get(this.tk(input.tenantId, input.taskId));
-    return t ? { ...t, labels: [...t.labels] } : undefined;
+    return t
+      ? { ...t, labels: [...t.labels], data: { ...(t.data ?? {}) } }
+      : undefined;
   }
 
   async listTasks(query: ListTasksQuery): Promise<AppTask[]> {
@@ -344,7 +359,11 @@ export class InMemoryTaskStore implements TaskStore {
           a.createdAt.localeCompare(b.createdAt),
       )
       .slice(0, query.limit ?? 200)
-      .map((t) => ({ ...t, labels: [...t.labels] }));
+      .map((t) => ({
+        ...t,
+        labels: [...t.labels],
+        data: { ...(t.data ?? {}) },
+      }));
   }
 
   async listDueTasks(input: {
@@ -376,7 +395,11 @@ export class InMemoryTaskStore implements TaskStore {
             : 0,
       )
       .slice(0, input.limit ?? 500)
-      .map((t) => ({ ...t, labels: [...t.labels] }));
+      .map((t) => ({
+        ...t,
+        labels: [...t.labels],
+        data: { ...(t.data ?? {}) },
+      }));
   }
 
   async markDeadlineEmitted(input: {
@@ -420,7 +443,11 @@ export class InMemoryTaskStore implements TaskStore {
       updatedAt: this.now(),
     };
     this.tasks.set(key, next);
-    return { ...next, labels: [...next.labels] };
+    return {
+      ...next,
+      labels: [...next.labels],
+      data: { ...(next.data ?? {}) },
+    };
   }
 
   async insertIntake(item: AppIntakeItem): Promise<AppIntakeItem> {
@@ -1172,10 +1199,10 @@ export function createTaskStoreFromEnv(
 // ── SQL + Row-Mapping ───────────────────────────────────────────────────────────────────────────
 const TASK_COLS = `task_id, tenant_id, authority_id, jurisdiction_id, procedure_id, case_id, title,
   priority_key, assignee_actor_id, labels, due_at, deadline_emitted_at, sort_rank, parent_task_id,
-  board_column, version, created_at, updated_at`;
+  board_column, version, created_at, updated_at, task_kind, data`;
 const TASK_SELECT = `SELECT ${TASK_COLS} FROM app_tasks`;
 const TASK_INSERT_SQL = `INSERT INTO app_tasks (${TASK_COLS})
-  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18)
+  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20::jsonb)
   RETURNING ${TASK_COLS}`;
 
 interface TaskRow extends Record<string, unknown> {
@@ -1197,6 +1224,8 @@ interface TaskRow extends Record<string, unknown> {
   version: number;
   created_at: Date | string;
   updated_at: Date | string;
+  task_kind?: string;
+  data?: unknown;
 }
 
 function iso(v: Date | string | null): string | null {
@@ -1224,6 +1253,8 @@ function taskInsertParams(t: AppTask): readonly unknown[] {
     t.version,
     t.createdAt,
     t.updatedAt,
+    t.taskKind ?? "aufgabe",
+    JSON.stringify(t.data ?? {}),
   ];
 }
 
@@ -1247,6 +1278,11 @@ function taskFromRow(r: TaskRow): AppTask {
     version: Number(r.version),
     createdAt: iso(r.created_at)!,
     updatedAt: iso(r.updated_at)!,
+    taskKind: r.task_kind ?? "aufgabe",
+    data:
+      r.data && typeof r.data === "object"
+        ? (r.data as Record<string, unknown>)
+        : {},
   };
 }
 

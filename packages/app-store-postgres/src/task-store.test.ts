@@ -105,6 +105,35 @@ for (const impl of impls) {
       ).toBeUndefined();
     });
 
+    it("DUAL-MODE: taskKind/data defaulten ('aufgabe'/{}) und round-trippen; patchTask erhaelt sie — InMemory==Postgres", async () => {
+      // Default: ohne taskKind/data -> 'aufgabe' + {} in BEIDEN Laufzeiten.
+      const t1 = macheTask();
+      await store.insertTask(t1);
+      const g1 = await store.getTask({ tenantId: "t1", taskId: t1.taskId });
+      expect(g1?.taskKind).toBe("aufgabe");
+      expect(g1?.data).toEqual({});
+      // Dossier-Sub-Sammlungs-Eintrag (z. B. Ziel) mit Nutzlast round-trippt.
+      const t2 = macheTask({
+        taskKind: "ziel",
+        data: { kategorie: "Wohnen", zieltermin: "2026-09-01" },
+      });
+      await store.insertTask(t2);
+      const g2 = await store.getTask({ tenantId: "t1", taskId: t2.taskId });
+      expect(g2?.taskKind).toBe("ziel");
+      expect(g2?.data).toEqual({
+        kategorie: "Wohnen",
+        zieltermin: "2026-09-01",
+      });
+      // patchTask (Metadaten) ERHAeLT taskKind + data unveraendert.
+      const p = await store.patchTask({
+        tenantId: "t1",
+        taskId: t2.taskId,
+        priorityKey: "hoch",
+      });
+      expect(p.taskKind).toBe("ziel");
+      expect(p.data).toEqual({ kategorie: "Wohnen", zieltermin: "2026-09-01" });
+    });
+
     it("patcht Zuweisung/Priorität/Labels und erhöht die Version", async () => {
       const t = macheTask();
       await store.insertTask(t);
