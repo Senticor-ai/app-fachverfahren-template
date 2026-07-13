@@ -141,3 +141,35 @@ describe("effektiveLeistungConfig — Contract-Projektion der abgeleiteten Gover
     );
   });
 });
+
+describe("abgeleiteteTransitions — kollisionssicherer Trenner (Sicherheit)", () => {
+  it("verwechselt kollidierende from/to-Paare mit Leerzeichen NICHT (U+0000-Trenner)", () => {
+    // Status-Schluessel mit Leerzeichen sind ungewoehnlich, aber generierbare Configs koennen sie tragen. Mit einem
+    // Leerzeichen-Trenner haetten "x"→"y z" und "x y"→"z" DENSELBEN Schluessel ("x y z") — ein Opt-in auf das eine
+    // wuerde das andere faelschlich mitgatten. Governance ist sicherheitsrelevant: der Trenner muss eindeutig sein.
+    const smKollision: StatusMachine = {
+      initial: "x",
+      states: [
+        { key: "x", label: "X", tone: "neu" },
+        { key: "y z", label: "YZ", tone: "info" },
+        { key: "x y", label: "XY", tone: "info" },
+        { key: "z", label: "Z", tone: "ok", terminal: true },
+      ],
+      transitions: [
+        { from: "x", to: "y z", label: "A", rollen: ["sb"] },
+        { from: "x y", to: "z", label: "B", rollen: ["sb"] },
+      ],
+    };
+    const abgeleitet = abgeleiteteTransitions({
+      statusMachine: smKollision,
+      governance: { zusaetzlicheVierAugen: [{ from: "x", to: "y z" }] },
+    });
+    // NUR A ist gegatet — B bleibt ungated (kein Kollisions-Match).
+    expect(
+      abgeleitet.find((t) => t.from === "x" && t.to === "y z")?.vierAugen,
+    ).toBe(true);
+    expect(
+      abgeleitet.find((t) => t.from === "x y" && t.to === "z")?.vierAugen,
+    ).toBeUndefined();
+  });
+});

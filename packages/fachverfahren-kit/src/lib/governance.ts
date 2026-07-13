@@ -5,7 +5,11 @@
 // EINE Wahrheit der abgeleiteten Governance — keine zweite, praezedenzlose Quelle.
 import type { LeistungConfig, Transition } from "../types.js";
 
-const transitionKey = (t: { from: string; to: string }) => `${t.from} ${t.to}`;
+// Trenner ist U+0000 (kein legaler Status-Schluessel-Bestandteil), damit KEINE zwei verschiedenen from→to-Paare
+// denselben Schluessel erzeugen koennen (z. B. "x"→"y z" vs. "x y"→"z"): Governance ist sicherheitsrelevant, ein
+// Kollisions-Match wuerde die falsche Transition Vier-Augen-pflichtig machen (oder eben nicht).
+const transitionKey = (t: { from: string; to: string }) =>
+  `${t.from}\u0000${t.to}`;
 
 /** Die EFFEKTIVEN Transitionen: die deklarierten `statusMachine.transitions`, wobei jede Transition, die
  *  `governance.zusaetzlicheVierAugen` (from→to) nennt, zusaetzlich `vierAugen: true` traegt. Schaltet Vier-Augen
