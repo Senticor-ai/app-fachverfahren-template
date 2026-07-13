@@ -1,13 +1,20 @@
 # UX/UI-Vertrag für Fachverfahren
 
+> **Für Agenten: Quellen & Pflicht-Lektüre.**
+> Status: IST für den generischen UX/UI-Vertrag; PLAN-Stellen sind einzeln
+> markiert.
+> Quellen: `.agents/skills/ux-ui/references/`,
+> `packages/fachverfahren-kit/src/stories/`,
+> `packages/public-sector-ui/src/`.
+> Pflicht-Lektüre vorher: `AGENTS.md`, `.agents/skills/ux-ui/SKILL.md`.
+
 Dieses Dokument integriert das lokale UX/UI-Guidance-Set in den App-Stack. Es
 ist der verbindliche Vertrag für generierte Fachverfahren-Apps,
 Bürgerportale, interne Sachbearbeitung und Storybook-Abnahme.
 
-Der aktuelle Abgleich mit dem Fachverfahren Design Manual steht in
-`docs/ux-ui/fachverfahren-design-manual-audit.md`.
-Der aktuelle Abgleich mit der generischen Public-Sector-UX-Methodik steht in
-`docs/ux-ui/ux-methodik-public-sector-audit.md`.
+Der aktuelle Abgleich mit Design Manual, Public-Sector-UX-Methodik und dem
+repo-lokalen Source-Set steht gebündelt in
+`docs/ux-ui/template-conformance.md`.
 
 ## Grundsatz
 

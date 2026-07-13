@@ -1,0 +1,30 @@
+{
+  "id": "2026-07-docs-consolidation",
+  "from": ">=0.0.0",
+  "to": "next",
+  "mode": "review",
+  "preconditions": [
+    "deprecated documentation is absent, unchanged from the template, or reviewed as consumer-customized"
+  ],
+  "postconditions": [
+    "unchanged deprecated documentation is removed",
+    "consumer-customized deprecated documentation is preserved and reported for manual review"
+  ],
+  "touches": [
+    "docs/README.md",
+    "docs/agents/**",
+    "docs/compliance/**",
+    "docs/reference/**",
+    "docs/ux-ui/**",
+    "agent.discovery.json",
+    "tooling/template/lib/manifest.ts",
+    "tooling/template/lib/merge.ts"
+  ],
+  "checks": [
+    "check:docs-language",
+    "check:agent-discovery",
+    "check:storybook",
+    "check:template-invariants",
+    "check:scaffold"
+  ]
+}

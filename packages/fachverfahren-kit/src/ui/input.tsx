@@ -1,4 +1,4 @@
-// shadcn/ui Input — modernisiert nach DESIGN-UPGRADE-SPEC (Spec 4.1).
+// shadcn/ui Input — folgt dem kanonischen UX/UI-Vertrag.
 import * as React from "react";
 
 import { cn } from "../lib/utils.js";

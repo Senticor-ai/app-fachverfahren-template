@@ -51,9 +51,12 @@ export const defaultOwnership: TemplateOwnership = {
     // Sie bleiben im Template-Repo für dessen eigene Pflege, aber `template:update` pusht sie nie in einen Fork
     // (ergänzt zur Scaffold-Ausnahme in render.ts `repositoryOnlyPrefixes`) — kein Leck von Maintainer-Internem.
     ".agents/skills/deutschland-plattform-anforderungen/**": "consumer",
+    "docs/README.md": "replace",
     "docs/agents/**": "replace",
     "docs/assets/**": "replace",
+    "docs/compliance/**": "replace",
     "docs/reference/**": "replace",
+    "docs/ux-ui/**": "replace",
     "policy/**": "replace",
     "schemas/**": "replace",
     "platform/capabilities.json": "replace",

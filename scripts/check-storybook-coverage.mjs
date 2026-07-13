@@ -15,9 +15,7 @@ const requiredFiles = [
   "docs/reference/storybook.md",
   "docs/reference/test-driven-development.md",
   "docs/ux-ui/fachverfahren-ux-contract.md",
-  "docs/ux-ui/fachverfahren-design-manual-audit.md",
-  "docs/ux-ui/source-set-template-audit.md",
-  "docs/ux-ui/ux-methodik-public-sector-audit.md",
+  "docs/ux-ui/template-conformance.md",
 ];
 const storyRoots = [
   "modules",

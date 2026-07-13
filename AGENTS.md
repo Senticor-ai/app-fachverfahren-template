@@ -43,12 +43,13 @@ Aktuell gilt insbesondere:
 - Es existiert eine neutrale Fastify-Web-Runtime unter
   `apps/fachverfahren/server/` für SPA-Auslieferung, Runtime-Konfiguration,
   Security-/Cache-Header, Health, Metrics und Build-Info.
-- Fachliche API-, OpenAPI-, Postgres-E2E- und Domain-Route-Schichten sind
-  weiterhin Ausbauschritte; Zielarchitektur:
+- Eine server-autoritative Domain-API und E2E-Stufen sind vorhanden;
+  OpenAPI bleibt ein Ausbauschritt. Details:
   `docs/reference/backend-fastify.md`.
 - Es existiert KEIN MSW-Mocking: `docs/reference/mock-data-msw.md` (PLAN).
-- Es existieren KEINE E2E-Suiten und keine Scripts `test:e2e`,
-  `test:e2e:postgres`, `dev:postgres`, `dev:all`.
+- Es existieren die Scripts `test:e2e`, `test:e2e:postgres` und
+  `test:e2e:server`; Komfortskripte `dev:postgres` und `dev:all` existieren
+  nicht.
 - `modules/` enthält KEINE Instanz (nur Dokumentation). Der Generator-Pfad
   `app:new` kann dort ein Modul-Gerüst erzeugen, aber die laufende App bindet
   Module NICHT ein (kein Modul-Mount). Details: `modules/README.md`.
