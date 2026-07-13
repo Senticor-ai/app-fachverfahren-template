@@ -670,3 +670,230 @@ describe("InMemoryAutomationStore.backlogStats — absolute Zählung (#10)", () 
     ).toEqual({ due: 3, claimable: 3, scheduled: 0 });
   });
 });
+
+describe("claimDueEvents — #15 FAIRER per-Tenant-Claim (kein Verhungern unter Flut)", () => {
+  // Frischer, isolierter Store (der Claim ist NICHT mandanten-scoped → globale Ordnung). Beweist die Fairness-
+  // SEMANTIK offline; die PG-Laufzeit nutzt DENSELBEN ORDER BY fair_rank,created_at,event_id (attended).
+  it("ein flutender Mandant verdrängt einen ruhigen Mandanten NICHT (round-robin über fair_rank)", async () => {
+    const store = new InMemoryAutomationStore();
+    // Mandant A FLUTET zuerst (frühere created_at) mit 5 Events → fair_rank 0..4.
+    for (let i = 0; i < 5; i++) {
+      await store.enqueueEvent(
+        macheEvent({
+          eventId: `a-${i}`,
+          tenantId: "t-A",
+          createdAt: `2026-06-01T00:0${i}:00.000Z`,
+        }),
+      );
+    }
+    // Mandant B reiht DANACH (spätere created_at) 2 Events ein → fair_rank 0..1.
+    for (let i = 0; i < 2; i++) {
+      await store.enqueueEvent(
+        macheEvent({
+          eventId: `b-${i}`,
+          tenantId: "t-B",
+          createdAt: `2026-06-01T01:0${i}:00.000Z`,
+        }),
+      );
+    }
+    // Ein Tick mit begrenztem Budget 4. Unter dem ALTEN globalen FIFO (created_at) kämen NUR A-Events (a-0..a-3),
+    // B verhungerte. FAIR: fair_rank round-robin → beide B-Events (rang 0,1) sind dabei.
+    const claimed = await store.claimDueEvents({
+      now: "2026-06-02T00:00:00.000Z",
+      limit: 4,
+    });
+    const ids = claimed.map((e) => e.eventId);
+    // Reihenfolge: rang0 [a-0(älter), b-0], rang1 [a-1, b-1] → a-0, b-0, a-1, b-1.
+    expect(ids).toEqual(["a-0", "b-0", "a-1", "b-1"]);
+    // Kernaussage: BEIDE Mandanten kommen dran; B (der ruhige) ist NICHT verhungert.
+    expect(claimed.filter((e) => e.tenantId === "t-B")).toHaveLength(2);
+    expect(new Set(claimed.map((e) => e.tenantId))).toEqual(
+      new Set(["t-A", "t-B"]),
+    );
+  });
+
+  it("bei EINEM Mandanten bleibt es reine created_at/Anlage-Reihenfolge (rückwärtskompatibel)", async () => {
+    const store = new InMemoryAutomationStore();
+    for (let i = 0; i < 3; i++) {
+      await store.enqueueEvent(
+        macheEvent({
+          eventId: `x-${i}`,
+          tenantId: "t-solo",
+          createdAt: `2026-06-01T00:0${i}:00.000Z`,
+        }),
+      );
+    }
+    const claimed = await store.claimDueEvents({
+      now: "2026-06-02T00:00:00.000Z",
+      limit: 10,
+    });
+    expect(claimed.map((e) => e.eventId)).toEqual(["x-0", "x-1", "x-2"]);
+  });
+
+  it("eine idempotente Wiederkehr verbraucht KEINEN Rang (Dublette ändert die Fairness nicht)", async () => {
+    const store = new InMemoryAutomationStore();
+    await store.enqueueEvent(macheEvent({ eventId: "a-0", tenantId: "t-A" }));
+    // Dieselbe id erneut (at-least-once) → no-op, KEIN neuer Rang.
+    await store.enqueueEvent(macheEvent({ eventId: "a-0", tenantId: "t-A" }));
+    await store.enqueueEvent(macheEvent({ eventId: "a-1", tenantId: "t-A" }));
+    await store.enqueueEvent(macheEvent({ eventId: "b-0", tenantId: "t-B" }));
+    const claimed = await store.claimDueEvents({
+      now: "2026-06-02T00:00:00.000Z",
+      limit: 2,
+    });
+    // a-0 (rang0) + b-0 (rang0) — die Dublette hat a-1 NICHT auf rang0 vorgezogen.
+    expect(new Set(claimed.map((e) => e.eventId))).toEqual(
+      new Set(["a-0", "b-0"]),
+    );
+  });
+});
+
+describe("claimDueEvents — #15 STEADY-STATE-Fairness (Rang resetet nach Abbau)", () => {
+  it("ein etablierter Mandant startet nach dem Leeren seiner Warteschlange wieder bei Rang 0 (kein Verhungern durch neue Mandanten)", async () => {
+    const store = new InMemoryAutomationStore();
+    // Mandant A arbeitet seine 2 Events VOLLSTÄNDIG ab (drained).
+    await store.enqueueEvent(
+      macheEvent({
+        eventId: "a-0",
+        tenantId: "t-A",
+        createdAt: "2026-06-01T00:00:00.000Z",
+      }),
+    );
+    await store.enqueueEvent(
+      macheEvent({
+        eventId: "a-1",
+        tenantId: "t-A",
+        createdAt: "2026-06-01T00:00:01.000Z",
+      }),
+    );
+    const ersteRunde = await store.claimDueEvents({
+      now: "2026-06-02T00:00:00.000Z",
+      limit: 10,
+    });
+    for (const e of ersteRunde)
+      await store.markProcessed({
+        eventId: e.eventId,
+        now: "2026-06-02T00:00:01.000Z",
+      });
+    // A ist GELEERT → sein neues Event resetet auf Rang 0 (nicht Rang 2 wie bei Lifetime-Zähler).
+    await store.enqueueEvent(
+      macheEvent({
+        eventId: "a-2",
+        tenantId: "t-A",
+        createdAt: "2026-06-02T02:00:00.000Z",
+      }),
+    );
+    // Ein neuer Mandant B reiht SPÄTER ein → ebenfalls Rang 0.
+    await store.enqueueEvent(
+      macheEvent({
+        eventId: "b-0",
+        tenantId: "t-B",
+        createdAt: "2026-06-02T03:00:00.000Z",
+      }),
+    );
+    const zweiteRunde = await store.claimDueEvents({
+      now: "2026-06-03T00:00:00.000Z",
+      limit: 10,
+    });
+    // BEIDE bei Rang 0 → Gleichstand über created_at: a-2 (früher) VOR b-0. Ohne Reset wäre a-2 Rang 2 → [b-0, a-2].
+    // Dass a-2 ZUERST kommt, beweist den Reset (A verhungert NICHT gegenüber dem neuen Mandanten B).
+    expect(zweiteRunde.map((e) => e.eventId)).toEqual(["a-2", "b-0"]);
+  });
+});
+
+describe("claimDueEvents — #15 WFQ: dauer-aktiver Mandant wird NICHT von Neuzugängen verdrängt (Review-Fund)", () => {
+  it("ein Mandant mit PERSISTENTEM Rückstau (leert nie ganz) verhungert NICHT hinter neuen Rang-0-Mandanten", async () => {
+    const store = new InMemoryAutomationStore();
+    // Mandant A hält dauerhaft Rückstau: a-0,a-1,a-2 (Ränge 0,1,2).
+    await store.enqueueEvent(
+      macheEvent({
+        eventId: "a-0",
+        tenantId: "t-A",
+        createdAt: "2026-06-01T00:00:00.000Z",
+      }),
+    );
+    await store.enqueueEvent(
+      macheEvent({
+        eventId: "a-1",
+        tenantId: "t-A",
+        createdAt: "2026-06-01T00:00:01.000Z",
+      }),
+    );
+    await store.enqueueEvent(
+      macheEvent({
+        eventId: "a-2",
+        tenantId: "t-A",
+        createdAt: "2026-06-01T00:00:02.000Z",
+      }),
+    );
+    // A arbeitet a-0 ab — behält aber a-1,a-2 pending (leert NIE ganz). Front V = MIN(pending) = 1.
+    const r1 = await store.claimDueEvents({
+      now: "2026-06-02T00:00:00.000Z",
+      limit: 1,
+    });
+    expect(r1.map((e) => e.eventId)).toEqual(["a-0"]);
+    await store.markProcessed({
+      eventId: "a-0",
+      now: "2026-06-02T00:00:01.000Z",
+    });
+    // Ein NEUER Mandant B reiht (später) ein Event ein. WFQ floort es auf V=1 (NICHT 0) → es kann a-1 NICHT überholen.
+    await store.enqueueEvent(
+      macheEvent({
+        eventId: "b-0",
+        tenantId: "t-B",
+        createdAt: "2026-06-02T05:00:00.000Z",
+      }),
+    );
+    // Nächster Tick mit Budget 1: A's Rückstau (a-1, Rang 1, älter) wird bedient — B verdrängt A NICHT.
+    // Bei der (kaputten) reset-auf-0-Variante wäre b-0 Rang 0 → [b-0], A verhungert. WFQ: [a-1].
+    const r2 = await store.claimDueEvents({
+      now: "2026-06-03T00:00:00.000Z",
+      limit: 1,
+    });
+    expect(r2.map((e) => e.eventId)).toEqual(["a-1"]);
+  });
+
+  it("mehrere Drain-Refill-Mandanten koennen einen dauer-aktiven Mandanten NICHT aushungern", async () => {
+    const store = new InMemoryAutomationStore();
+    // A: persistenter Rückstau von 3 (Ränge 0,1,2), bearbeitet a-0 ab → pending a-1(1),a-2(2), Front V=1.
+    for (let i = 0; i < 3; i++)
+      await store.enqueueEvent(
+        macheEvent({
+          eventId: `a-${i}`,
+          tenantId: "t-A",
+          createdAt: `2026-06-01T00:00:0${i}.000Z`,
+        }),
+      );
+    const erst = await store.claimDueEvents({
+      now: "2026-06-02T00:00:00.000Z",
+      limit: 1,
+    });
+    await store.markProcessed({
+      eventId: erst[0]!.eventId,
+      now: "2026-06-02T00:00:01.000Z",
+    });
+    // Zwei frische Mandanten reihen je ein Event ein → WFQ floort BEIDE auf V=1 (nicht 0).
+    await store.enqueueEvent(
+      macheEvent({
+        eventId: "b-0",
+        tenantId: "t-B",
+        createdAt: "2026-06-02T06:00:00.000Z",
+      }),
+    );
+    await store.enqueueEvent(
+      macheEvent({
+        eventId: "c-0",
+        tenantId: "t-C",
+        createdAt: "2026-06-02T06:00:01.000Z",
+      }),
+    );
+    // Budget 2: A's älteste Rückstau-Events (a-1 Rang1, älter als b/c) MUSS dabei sein → A nicht ausgehungert.
+    const claim = await store.claimDueEvents({
+      now: "2026-06-03T00:00:00.000Z",
+      limit: 2,
+    });
+    expect(claim.map((e) => e.tenantId)).toContain("t-A");
+    // a-1 (Rang1, created 00:00:01) kommt vor b-0/c-0 (Rang1, created 06:00:xx) → [a-1, b-0].
+    expect(claim.map((e) => e.eventId)).toEqual(["a-1", "b-0"]);
+  });
+});

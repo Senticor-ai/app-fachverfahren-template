@@ -224,6 +224,10 @@ export const AUTOMATION_WAKE_CHANNEL = "app_automation_wake";
 export class InMemoryAutomationStore implements AutomationStore {
   private readonly rules = new Map<string, AppAutomationRule>();
   private readonly events = new Map<string, AppAutomationEvent>();
+  // #15 FAIRER Claim: per-Tenant fair_rank je Event (INTERN — nicht am öffentlichen AppAutomationEvent, damit
+  // InMemory==PG-Reads identisch bleiben). Bei der Anlage = MAX(fair_rank der UNVERARBEITETEN Events des Mandanten)+1,
+  // also RESET auf 0 sobald der Mandant abgebaut hat (spiegelt den PG-Trigger). Der Claim ordnet danach round-robin.
+  private readonly fairRankOf = new Map<string, number>();
   /** OPTIONAL (#17): wird nach dem Einreihen eines NEUEN Events aufgerufen — der In-Prozess-Poller weckt daraufhin
    *  sofort einen Tick (früher als das Poll-Intervall). Best-effort; fehlt der Callback, bleibt es beim Poll. */
   wakeNotify?: () => void;
@@ -283,6 +287,23 @@ export class InMemoryAutomationStore implements AutomationStore {
     // zurücksetzen und die Frist erneut feuern. Bestehendes Event bleibt daher unverändert.
     const vorhanden = this.events.get(event.eventId);
     if (vorhanden) return { ...vorhanden, payload: { ...vorhanden.payload } };
+    // #15 VIRTUAL-TIME FAIR QUEUING (WFQ) — spiegelt den PG-Trigger EXAKT:
+    //   fair_rank = GREATEST( per-Tenant MAX(pending)+1 , GLOBALES MIN(pending) )
+    // Der globale MIN (die „virtuelle Zeit"/Front) verhindert, dass ein leerer/neuer Mandant an rückgestauten Events
+    // vorbeizieht → kein Verhungern etablierter dauer-aktiver Mandanten; ein Flutender klettert über seinen MAX+1 und
+    // wird deprioritisiert. Dubletten sind oben früh raus (kein Rang-Verbrauch, wie der Trigger bei ON CONFLICT).
+    let tenantMax = -1;
+    let globalMin = Number.POSITIVE_INFINITY;
+    for (const [id, ev] of this.events) {
+      if (ev.processedAt !== null) continue;
+      const r = this.fairRankOf.get(id) ?? 0;
+      if (r < globalMin) globalMin = r;
+      if (ev.tenantId === event.tenantId && r > tenantMax) tenantMax = r;
+    }
+    const virtuelleZeit =
+      globalMin === Number.POSITIVE_INFINITY ? 0 : globalMin;
+    const rank = Math.max(tenantMax + 1, virtuelleZeit);
+    this.fairRankOf.set(event.eventId, rank);
     this.events.set(event.eventId, {
       ...event,
       // Normalisieren, damit `claimDueEvents` verlässlich gegen null vergleicht (nicht gegen undefined).
@@ -322,7 +343,16 @@ export class InMemoryAutomationStore implements AutomationStore {
             e.scheduledFor === undefined ||
             e.scheduledFor <= input.now),
       )
-      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
+      // #15 FAIR: (fair_rank, created_at, event_id) — round-robin über Mandanten (deckungsgleich zur PG-ORDER-BY).
+      // Ein flutender Mandant besetzt hohe Ränge; ein ruhiger Mandant mit Rang-0-Event wird nie verdrängt.
+      .sort((a, b) => {
+        const ra = this.fairRankOf.get(a.eventId) ?? 0;
+        const rb = this.fairRankOf.get(b.eventId) ?? 0;
+        if (ra !== rb) return ra < rb ? -1 : 1;
+        if (a.createdAt !== b.createdAt)
+          return a.createdAt < b.createdAt ? -1 : 1;
+        return a.eventId < b.eventId ? -1 : 1;
+      })
       .slice(0, input.limit);
     for (const e of due) {
       // LEASE: locked_until setzen + attempts hochzählen; processed_at bleibt NULL (das setzt erst `markProcessed`).
@@ -622,17 +652,29 @@ export class PostgresAutomationStore implements AutomationStore {
            WHERE processed_at IS NULL
              AND (locked_until IS NULL OR locked_until <= $2)
              AND (scheduled_for IS NULL OR scheduled_for <= $2)
-           ORDER BY created_at ASC
+           -- #15 FAIR: per-Tenant round-robin über den bei der Anlage vergebenen fair_rank; created_at/event_id brechen
+           -- Gleichstand. EIN ORDER-BY über INDIZIERTE Spalten (fairclaim_idx) + LIMIT → Frueh-Terminierung ERHALTEN
+           -- (kein Full-Scan/Sort, KEINE korrelierte Subquery wie im revertierten 1. Versuch).
+           ORDER BY fair_rank ASC, created_at ASC, event_id ASC
            LIMIT $1
            FOR UPDATE SKIP LOCKED
          )
-         RETURNING ${EVENT_COLS}, attempts, locked_until`,
+         RETURNING ${EVENT_COLS}, attempts, locked_until, fair_rank`,
         [input.limit, input.now, lockedUntil],
       );
-      // RETURNING garantiert die Reihenfolge nicht → nach created_at sortieren (Parität zur In-Memory-Ordnung).
-      return r.rows
-        .map(eventFromRow)
-        .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+      // RETURNING garantiert die Reihenfolge nicht → die ROHZEILEN nach (fair_rank, created_at, event_id) sortieren
+      // (deckungsgleich zur In-Memory-Ordnung), DANN mappen. fair_rank bleibt intern (nicht am AppAutomationEvent).
+      return [...r.rows]
+        .sort((a, b) => {
+          const ra = Number(a.fair_rank ?? 0);
+          const rb = Number(b.fair_rank ?? 0);
+          if (ra !== rb) return ra < rb ? -1 : 1;
+          const ca = isoOrNull(a.created_at) ?? "";
+          const cb = isoOrNull(b.created_at) ?? "";
+          if (ca !== cb) return ca < cb ? -1 : 1;
+          return a.event_id < b.event_id ? -1 : 1;
+        })
+        .map(eventFromRow);
     });
   }
 
@@ -1009,6 +1051,8 @@ interface EventRow extends Record<string, unknown> {
   // Nur im claimDueEvents-RETURNING vorhanden (nicht in der schlanken EVENT_COLS-Spaltenliste); daher optional.
   attempts?: number;
   locked_until?: Date | string | null;
+  // #15 fair_rank — nur im claimDueEvents-RETURNING selektiert (fürs Sortieren; NICHT am AppAutomationEvent).
+  fair_rank?: number | string | null;
 }
 
 function eventInsertParams(e: AppAutomationEvent): readonly unknown[] {

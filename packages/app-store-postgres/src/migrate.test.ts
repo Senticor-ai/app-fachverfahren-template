@@ -145,6 +145,22 @@ describe("postgres migration runner", () => {
     expect(sql).toContain("CREATE TRIGGER app_task_activity_no_mutation");
     expect(sql).toContain("CREATE TRIGGER app_task_comments_no_truncate");
     expect(sql).toContain("CREATE TRIGGER app_task_activity_no_truncate");
+
+    // #15 fairer per-Tenant-Claim: fair_rank-Spalte + BEFORE-INSERT-Trigger (MAX+1 je Mandant) + Claim-Index.
+    expect(sql).toContain(
+      "ALTER TABLE app_automation_events ADD COLUMN IF NOT EXISTS fair_rank",
+    );
+    expect(sql).toContain(
+      "CREATE OR REPLACE FUNCTION app_automation_events_fair_rank",
+    );
+    expect(sql).toContain("CREATE TRIGGER app_automation_events_fair_rank");
+    expect(sql).toContain("app_automation_events_fairclaim_idx");
+    // WFQ (virtual time): der Rang wird auf die globale Front (MIN pending) gehoben → kein Verhungern etablierter
+    // Mandanten durch Rang-0-Neuzugaenge (Review-Fund). GREATEST(per-Tenant MAX+1, globales MIN).
+    expect(sql).toContain("NEW.fair_rank := GREATEST(");
+    expect(sql).toContain(
+      "SELECT MIN(fair_rank) FROM app_automation_events WHERE processed_at IS NULL",
+    );
   });
 
   it("keeps preference and mailbox semantics testable without a database", async () => {
