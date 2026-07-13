@@ -138,10 +138,10 @@ echte Bundle und prüft die SPA-Auslieferung). Eine Postgres-E2E-Suite
 `dev:all`) sind (PLAN) Teil der Backend-Zielarchitektur und existieren im
 Scaffold noch nicht.
 
-Coding Agents nutzen `agent.discovery.json`, `docs/agents/bootstrap.md` und die
-repo-lokalen Skills unter `.agents/skills`. Die Agent-Readiness und der
-Standalone-Export sind in `docs/reference/opencode-agent-readiness.md`
-beschrieben.
+Die Dokumentationsübersicht steht in `docs/README.md`. Coding Agents nutzen
+`agent.discovery.json`, `docs/agents/bootstrap.md` und die repo-lokalen Skills
+unter `.agents/skills`. Lifecycle und Standalone-Export beschreibt
+`docs/reference/template-lifecycle.md`.
 
 Vendor-neutrale Agenten starten mit Package-Script `agent:discover`, wählen
 danach mit `agent:context` den task-spezifischen Kontext und erzeugen neue
