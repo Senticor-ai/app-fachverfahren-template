@@ -9,6 +9,11 @@ import {
   type ProcedureCatalog,
   type CaseworkerSession,
   executeCaseTransition,
+  isServiceActor,
+  assertHumanActor,
+  AUTOMATION_SERVICE_ACTOR,
+  PROCESS_SERVICE_ACTOR,
+  KI_ASSIST_ACTOR,
 } from "./case-service.js";
 
 // Ein selbst-genügsamer In-Memory-Persistenz-Fake (dieselbe Form wie der echte CaseStore) — beweist die
@@ -414,5 +419,34 @@ describe("executeCaseTransition — server-autoritative Fall-Entscheidung", () =
     });
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.status).toBe(409);
+  });
+});
+
+describe("isServiceActor / assertHumanActor — geschlossene Dienst-Akteur-Wahrheit (B1)", () => {
+  it("erkennt alle benannten Dienst-Akteure UND jedes `service:`-Präfix", () => {
+    expect(isServiceActor(AUTOMATION_SERVICE_ACTOR)).toBe(true); // Legacy, ohne Präfix
+    expect(isServiceActor(PROCESS_SERVICE_ACTOR)).toBe(true);
+    expect(isServiceActor(KI_ASSIST_ACTOR)).toBe(true);
+    // Ein künftiger Dienst-Akteur mit Präfix ist automatisch abgedeckt (Menge muss nicht wachsen).
+    expect(isServiceActor("service:irgendein-neuer-dienst")).toBe(true);
+  });
+
+  it("behandelt menschliche Akteure NICHT als Dienst", () => {
+    for (const human of [
+      "sb.eins",
+      "sb.mueller",
+      "aufsicht.42",
+      "automation",
+      "servicedesk",
+    ])
+      expect(isServiceActor(human)).toBe(false);
+  });
+
+  it("assertHumanActor wirft für Dienst-Akteure, ist für Menschen still", () => {
+    expect(() => assertHumanActor(PROCESS_SERVICE_ACTOR)).toThrow();
+    expect(() => assertHumanActor(KI_ASSIST_ACTOR)).toThrow();
+    expect(() => assertHumanActor(AUTOMATION_SERVICE_ACTOR)).toThrow();
+    expect(() => assertHumanActor("service:x")).toThrow();
+    expect(() => assertHumanActor("sb.eins")).not.toThrow();
   });
 });

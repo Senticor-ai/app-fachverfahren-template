@@ -85,6 +85,27 @@ describe("requireSession — Session/401 + Tenant-Pinning/403", () => {
     };
     expect(requireSession(deps, req, reply)).toBe(SESSION);
   });
+
+  it("GRENZWÄCHTER: eine Sitzung mit reserviertem Dienst-Akteur ⇒ 403 reserved-service-actor (B1)", () => {
+    // Ein zu permissiver IdP/Header liefert eine „gültige" Sitzung, deren actorId aber ein maschineller Dienst ist —
+    // fail-closed abweisen, sonst könnte sich ein Mensch als Service tarnen und die Vier-Augen-Regel aushebeln.
+    for (const actorId of [
+      "service:process",
+      "service:ki-assist",
+      "automation.service",
+    ]) {
+      const { reply, state } = mockReply();
+      const deps: SessionGuardDeps = {
+        resolveSession: () => ({ ...SESSION, actorId }),
+      };
+      expect(requireSession(deps, req, reply)).toBeUndefined();
+      expect(state.code).toBe(403);
+      expect(state.payload).toEqual({
+        error: "forbidden",
+        reason: "reserved-service-actor",
+      });
+    }
+  });
 });
 
 describe("forbidden — einheitlicher RBAC-Deny", () => {

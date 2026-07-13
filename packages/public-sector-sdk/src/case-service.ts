@@ -9,13 +9,40 @@
 import { type PolicyEngine } from "./authorization.js";
 import type { Clock, IdGenerator } from "./clock.js";
 
-/** Der maschinelle Dienst-Akteur der Automations-Engine — EINE Wahrheit (auch die Engine importiert diesen Wert).
- *  Ein Service-Akteur ist NIE ein „Auge" einer Vier-Augen-Entscheidung. */
+// MASCHINELLE DIENST-AKTEURE — eine GESCHLOSSENE Wahrheit im SDK. Ein Service-Akteur ist NIE ein „Auge" einer
+// Vier-Augen-Entscheidung, wird NIE zum Vorbereiter (`previousApproverActorId`) und loest die Outbox-Rekursions-
+// Sperre aus. Neben den benannten Akteuren gilt ein reserviertes PRAEFIX `service:` — so ist JEDER kuenftige
+// Dienst-Akteur (Prozess-Engine, KI-Assist) automatisch abgedeckt, OHNE dass diese Menge erweitert werden muss.
+/** Legacy-Name der Automations-Engine (bewusst OHNE Praefix — Rueckwaertskompatibilitaet). */
 export const AUTOMATION_SERVICE_ACTOR = "automation.service";
+/** Reserviertes Praefix aller kuenftigen Dienst-Akteure. Ein menschlicher Akteur darf es NIE tragen. */
+export const SERVICE_ACTOR_PREFIX = "service:";
+/** Dienst-Akteur der Prozess-Engine (BPMN-Runtime, Service-Tasks). */
+export const PROCESS_SERVICE_ACTOR = "service:process";
+/** Dienst-Akteur der KI-Assistenz — strukturell nie ein Auge, schreibt nie autoritativ. */
+export const KI_ASSIST_ACTOR = "service:ki-assist";
+
+const SERVICE_ACTORS = new Set<string>([
+  AUTOMATION_SERVICE_ACTOR,
+  PROCESS_SERVICE_ACTOR,
+  KI_ASSIST_ACTOR,
+]);
 
 /** Ist der Akteur ein maschineller Dienst (kein Mensch)? Dann zählt er nicht als Vorbereiter/Freigeber. */
 export function isServiceActor(actorId: string): boolean {
-  return actorId === AUTOMATION_SERVICE_ACTOR;
+  return (
+    SERVICE_ACTORS.has(actorId) || actorId.startsWith(SERVICE_ACTOR_PREFIX)
+  );
+}
+
+/** Grenzwaechter: wirft, wenn ein (menschlicher) Akteur einen reservierten Dienst-Akteur/das `service:`-Praefix
+ *  traegt. An der Session-/Actor-Grenze aufzurufen (externe Requests), damit sich niemand als Dienst ausgibt und
+ *  so die Vier-Augen-/Rekursions-Invarianten aushebelt. */
+export function assertHumanActor(actorId: string): void {
+  if (isServiceActor(actorId))
+    throw new Error(
+      `actorId „${actorId}" ist ein reservierter maschineller Dienst-Akteur — kein menschlicher Akteur darf ihn tragen`,
+    );
 }
 
 /** Ein Fall, reduziert auf die für die Entscheidung nötigen Felder (der `CaseStore` liefert mehr — strukturell ok). */

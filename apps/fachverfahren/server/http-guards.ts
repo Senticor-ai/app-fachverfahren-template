@@ -7,6 +7,7 @@
 // den Monolithen zurück-importiert (kein Zyklus) und derselbe Guard vom ModuleHost wiederverwendbar ist.
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { CaseworkerSession } from "@senticor/public-sector-sdk";
+import { isServiceActor } from "@senticor/public-sector-sdk";
 
 /** `Cache-Control: no-store` — Sitzungs- und Fehler-Antworten dürfen nie zwischengespeichert werden. */
 export const NO_STORE = "no-store";
@@ -52,6 +53,13 @@ export function requireSession(
     !deps.allowedTenants.includes(session.tenantId)
   ) {
     forbidden(reply, "tenant-not-served");
+    return undefined;
+  }
+  // GRENZWÄCHTER: ein externer Request darf sich NIE als maschineller Dienst-Akteur ausgeben (reservierte Namen +
+  // `service:`-Präfix). Sonst könnte ein zu permissiver IdP/Header einen Menschen als Service tarnen und so die
+  // Vier-Augen-Regel (Service ist nie ein Auge) bzw. die Outbox-Rekursions-Sperre aushebeln — fail-closed 403.
+  if (isServiceActor(session.actorId)) {
+    forbidden(reply, "reserved-service-actor");
     return undefined;
   }
   return session;
