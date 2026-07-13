@@ -172,7 +172,9 @@
   /* Status — Signalfarben mit Soft-Variante */
   --status-ok: hsl(152 65% 27%);
   --status-ok-soft: hsl(152 50% 94%);
-  --status-warn: hsl(32 95% 34%);
+  /* Warn-Familie auf EINEN Hue (38) — Text, Soft und Dark teilen denselben Farbton (ok/info/block sind bereits
+     hue-konsistent). L unverändert (34%), daher Kontrast wie zuvor; nur die Farb-Harmonie gewinnt. */
+  --status-warn: hsl(38 95% 34%);
   --status-warn-soft: hsl(38 95% 94%);
   --status-block: hsl(0 72% 42%);
   --status-block-soft: hsl(0 80% 96%);
