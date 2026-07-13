@@ -269,10 +269,12 @@ export function ProzessEditor({
                       value={k.catalogAction}
                       disabled={nurLesen}
                       onChange={(e) =>
+                        // Cast umgeht die exactOptionalPropertyTypes-Reibung beim Spread des (narrowed) Knotens —
+                        // optionale Felder werden dabei typseitig zu `T | undefined`; der Wert ist zur Laufzeit valide.
                         setzeKnoten(k.id, {
                           ...k,
                           catalogAction: e.target.value,
-                        })
+                        } as ProzessKnoten)
                       }
                     />
                   </div>
@@ -284,7 +286,10 @@ export function ProzessEditor({
                       checked={Boolean(k.vierAugen)}
                       disabled={nurLesen}
                       onChange={(e) =>
-                        setzeKnoten(k.id, { ...k, vierAugen: e.target.checked })
+                        setzeKnoten(k.id, {
+                          ...k,
+                          vierAugen: e.target.checked,
+                        } as ProzessKnoten)
                       }
                     />
                     <Label htmlFor={`${uid}-${k.id}-va`}>Vier-Augen</Label>
