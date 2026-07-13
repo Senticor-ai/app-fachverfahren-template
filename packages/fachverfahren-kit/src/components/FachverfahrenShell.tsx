@@ -17,6 +17,7 @@ import {
   Home,
   Inbox,
   LineChart,
+  Menu,
   ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
@@ -24,6 +25,12 @@ import * as React from "react";
 import type { LeistungConfig } from "../types.js";
 import { cn } from "../lib/utils.js";
 import { Badge } from "../ui/badge.js";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetTitle,
+} from "../ui/sheet.js";
 import { useKommuneTheme, KommuneLogo } from "./KommuneTheme.js";
 import {
   DEFAULT_PERSONAS,
@@ -176,6 +183,38 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
     }
   };
 
+  // Mobiles Nav-Sheet: KONTROLLIERT, damit ein Link-Klick es sicher schließt. (Radix SheetClose überspringt sein
+  // Schließen, wenn der Link-Handler preventDefault ruft — was handleNav beim Client-Routing tut.)
+  const [navOpen, setNavOpen] = React.useState(false);
+
+  // EINE Markup-Quelle für einen Nav-Link — Desktop-Sidebar UND mobiles Nav-Sheet teilen sie, damit die Navigation
+  // konsistent bleibt (3.2.3) und nicht auseinanderdriftet. `onAfterClick` schließt (nur mobil) das Sheet.
+  const renderNavLink = (item: ShellNavItem, onAfterClick?: () => void) => {
+    const Icon = item.icon;
+    const isActive = item.key === activeKey;
+    return (
+      <a
+        href={item.href ?? "#"}
+        aria-current={isActive ? "page" : undefined}
+        onClick={(e) => {
+          handleNav(item)(e);
+          onAfterClick?.();
+        }}
+        className={cn(
+          "flex min-h-11 items-center gap-2.5 rounded-md px-2.5 text-sm",
+          "transition-colors ease-out motion-reduce:transition-none",
+          "outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+          isActive
+            ? "bg-sidebar-accent/20 font-medium text-sidebar-foreground"
+            : "text-sidebar-muted hover:bg-white/5 hover:text-sidebar-foreground",
+        )}
+      >
+        <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <span className="truncate">{item.label}</span>
+      </a>
+    );
+  };
+
   return (
     // lang="de": deutschsprachige Verwaltungs-Oberfläche; min-h-dvh = volle Höhe.
     <div
@@ -229,31 +268,9 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
               {ROLLEN_LABEL[persona]}
             </div>
             <ul className="flex flex-col gap-0.5">
-              {nav.map((item) => {
-                const Icon = item.icon;
-                const isActive = item.key === activeKey;
-                return (
-                  <li key={item.key}>
-                    <a
-                      href={item.href ?? "#"}
-                      aria-current={isActive ? "page" : undefined}
-                      onClick={handleNav(item)}
-                      className={cn(
-                        "flex min-h-11 items-center gap-2.5 rounded-md px-2.5 text-sm",
-                        // Kanonisches Fokus-Rezept (Spec 3.2): weicher 3px-Ring, EIN Rezept kit-weit.
-                        "transition-colors ease-out motion-reduce:transition-none",
-                        "outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-                        isActive
-                          ? "bg-sidebar-accent/20 font-medium text-sidebar-foreground"
-                          : "text-sidebar-muted hover:bg-white/5 hover:text-sidebar-foreground",
-                      )}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                      <span className="truncate">{item.label}</span>
-                    </a>
-                  </li>
-                );
-              })}
+              {nav.map((item) => (
+                <li key={item.key}>{renderNavLink(item)}</li>
+              ))}
             </ul>
           </div>
         </nav>
@@ -272,6 +289,43 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Kopfzeile (banner) — Kommune + Leistung + Demo-Transparenz. */}
         <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card px-4">
+          {/* 3.2.3/1.3.1 — mobiler Navigations-Zugang (unter md ist die Sidebar-Nav verborgen): ein Menü-Button
+              öffnet ein Nav-Sheet mit DENSELBEN Items (renderNavLink → eine Quelle). SheetClose schließt nach Auswahl. */}
+          <Sheet open={navOpen} onOpenChange={setNavOpen}>
+            <SheetTrigger asChild>
+              <button
+                type="button"
+                aria-label={`Navigation öffnen — ${ROLLEN_LABEL[persona]}`}
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-md text-muted-foreground outline-none hover:bg-muted focus-visible:ring-ring/50 focus-visible:ring-[3px] md:hidden"
+              >
+                <Menu className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </SheetTrigger>
+            <SheetContent
+              side="left"
+              className="w-[280px] border-sidebar-border bg-sidebar p-0 text-sidebar-foreground"
+            >
+              <SheetTitle className="sr-only">
+                Navigation — {ROLLEN_LABEL[persona]}
+              </SheetTitle>
+              <nav
+                className="px-2 py-4"
+                aria-label={`Navigation — ${ROLLEN_LABEL[persona]}`}
+              >
+                <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-sidebar-muted">
+                  {ROLLEN_LABEL[persona]}
+                </div>
+                <ul className="flex flex-col gap-0.5">
+                  {nav.map((item) => (
+                    <li key={item.key}>
+                      {renderNavLink(item, () => setNavOpen(false))}
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            </SheetContent>
+          </Sheet>
+
           {/* Mobile-Marke (Sidebar ist ab md sichtbar). */}
           <span className="flex items-center gap-2 md:hidden">
             <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-xs font-bold text-primary-foreground">
