@@ -258,6 +258,47 @@ for (const impl of impls) {
       expect(leer).toEqual([]);
     });
 
+    it("listTasks filtert nach caseId + taskKind (Dossier-Ziele einer Akte) — InMemory==Postgres", async () => {
+      const caseA = `case-${uid()}`;
+      const caseB = `case-${uid()}`;
+      const zielA = macheTask({
+        caseId: caseA,
+        taskKind: "ziel",
+        sortRank: "1",
+      });
+      const itemA = macheTask({
+        caseId: caseA,
+        taskKind: "checkliste-item",
+        parentTaskId: zielA.taskId,
+        sortRank: "2",
+      });
+      const zielB = macheTask({
+        caseId: caseB,
+        taskKind: "ziel",
+        sortRank: "3",
+      });
+      await store.insertTask(zielA);
+      await store.insertTask(itemA);
+      await store.insertTask(zielB);
+      // caseId eingrenzen: nur die Aufgaben von caseA (ziel + checkliste-item), NICHT caseB.
+      const ausA = await store.listTasks({
+        tenantId: "t1",
+        authorityId: "b1",
+        caseId: caseA,
+      });
+      expect(ausA.every((t) => t.caseId === caseA)).toBe(true);
+      expect(ausA.some((t) => t.taskId === zielB.taskId)).toBe(false);
+      expect(ausA).toHaveLength(2);
+      // caseId + taskKind: nur die ZIELE von caseA (ohne checkliste-item).
+      const zieleA = await store.listTasks({
+        tenantId: "t1",
+        authorityId: "b1",
+        caseId: caseA,
+        taskKind: "ziel",
+      });
+      expect(zieleA.map((t) => t.taskId)).toEqual([zielA.taskId]);
+    });
+
     it("patcht Zuweisung/Priorität/Labels und erhöht die Version", async () => {
       const t = macheTask();
       await store.insertTask(t);

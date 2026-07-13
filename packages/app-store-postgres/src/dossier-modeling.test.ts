@@ -330,6 +330,16 @@ for (const impl of impls) {
         expect(zielGelesen?.dueAt).toBe("2026-12-01T00:00:00.000Z");
         expect(zielGelesen?.taskKind).toBe("ziel");
         expect(zielGelesen?.data).toMatchObject({ kategorie: "Sprache" });
+
+        // Die Dossier-Ansicht listet die Ziele GENAU DIESER Akte ueber den caseId+taskKind-Filter — hier 1 Ziel,
+        // die Checkliste-Items bleiben aussen vor.
+        const zieleDerAkte = await tasks.listTasks({
+          tenantId: T,
+          authorityId: B,
+          caseId: akte.caseId,
+          taskKind: "ziel",
+        });
+        expect(zieleDerAkte.map((z) => z.taskId)).toEqual([ziel.taskId]);
       });
     },
   );

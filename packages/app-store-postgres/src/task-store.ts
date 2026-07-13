@@ -76,6 +76,12 @@ export interface ListTasksQuery {
   assigneeActorId?: string | "$none";
   priorityKey?: string;
   state?: string;
+  /** DUAL-MODE (additiv): auf die Aufgaben EINES Falls/EINER Akte einschränken (`app_tasks.case_id`). Die
+   *  Dossier-Ansicht listet so die Ziele/Termine genau einer Klient:innen-Akte. */
+  caseId?: string;
+  /** DUAL-MODE (additiv): auf einen Aufgaben-Typ einschränken (z. B. `'ziel'`), damit eine Dossier-Ansicht die
+   *  Ziele einer Akte ohne die Checkliste-Items/Termine zieht. */
+  taskKind?: string;
   limit?: number;
 }
 
@@ -402,6 +408,9 @@ export class InMemoryTaskStore implements TaskStore {
           t.authorityId === query.authorityId &&
           (query.procedureId === undefined ||
             t.procedureId === query.procedureId) &&
+          (query.caseId === undefined || t.caseId === query.caseId) &&
+          (query.taskKind === undefined ||
+            (t.taskKind ?? "aufgabe") === query.taskKind) &&
           (query.priorityKey === undefined ||
             t.priorityKey === query.priorityKey) &&
           (query.assigneeActorId === undefined ||
@@ -867,14 +876,18 @@ export class PostgresTaskStore implements TaskStore {
            AND ($5::text IS NULL OR
                 ($5 = '$none' AND assignee_actor_id IS NULL) OR
                 ($5 <> '$none' AND assignee_actor_id = $5))
+           AND ($6::text IS NULL OR case_id = $6)
+           AND ($7::text IS NULL OR task_kind = $7)
          ORDER BY sort_rank ASC, created_at ASC
-         LIMIT $6`,
+         LIMIT $8`,
         [
           query.tenantId,
           query.authorityId,
           query.procedureId ?? null,
           query.priorityKey ?? null,
           assignee ?? null,
+          query.caseId ?? null,
+          query.taskKind ?? null,
           query.limit ?? 200,
         ],
       );
