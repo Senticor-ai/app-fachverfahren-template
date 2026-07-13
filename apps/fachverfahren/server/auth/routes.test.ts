@@ -3,6 +3,7 @@ import {
   InMemoryAuditStore,
   InMemoryAuthStore,
   InMemoryKanbanStore,
+  UnavailableAuthStore,
 } from "@senticor/app-store-postgres";
 import fastify, { type FastifyInstance } from "fastify";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -387,6 +388,31 @@ describe("auth routes — bootstrap disabled (no BOOTSTRAP_TOKEN configured)", (
       payload: bootstrapBody,
     });
     expect(response.statusCode).toBe(403);
+  });
+});
+
+describe("auth routes — auth store unavailable (no APP_PG_URL)", () => {
+  // Ohne Datenbank antwortet /auth/status bewusst degradiert (200 + storeAvailable=false)
+  // statt 500: Web-Tier oben, Datenbank unten. Der Client behandelt das wie „API nicht
+  // erreichbar" (session-state.ts), und der Browser loggt keinen Ressourcen-Fehler —
+  // der hermetische PWA-Browser-Audit läuft genau in diesem Zustand gegen die Landing.
+  it("reports storeAvailable=false with 200 instead of throwing", async () => {
+    const app: FastifyInstance = fastify({ logger: false });
+    await app.register(fastifyCookie);
+    registerAuthRoutes(app, {
+      authStore: new UnavailableAuthStore("db down"),
+      kanbanStore: new InMemoryKanbanStore(),
+      auditStore: new InMemoryAuditStore(),
+      bootstrapToken: undefined,
+    });
+    await app.ready();
+    const response = await app.inject({ method: "GET", url: "/auth/status" });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      bootstrapped: false,
+      storeAvailable: false,
+    });
+    await app.close();
   });
 });
 

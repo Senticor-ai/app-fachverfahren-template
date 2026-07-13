@@ -1,5 +1,5 @@
 // session — Client-seitiger Session-Zustand: wer ist angemeldet, ist das Board-Workspace schon
-// eingerichtet (bootstrapped)? EIN Hook, den LoginPage und die geschützten Routen gemeinsam nutzen.
+// eingerichtet (bootstrapped)? EIN Hook, den die Landing und die geschützten Routen gemeinsam nutzen.
 // Das eigentliche Laden (inkl. „API nicht erreichbar"-Fällen) lebt testbar in ./session-state.
 import * as React from "react";
 import { apiPath } from "./board-client.js";

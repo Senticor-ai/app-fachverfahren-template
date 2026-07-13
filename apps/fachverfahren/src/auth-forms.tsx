@@ -1,53 +1,12 @@
-// LoginPage — zeigt je nach `/auth/status` entweder das Einmal-Setup (Bootstrap, token-gated) oder
-// den normalen Login. Kein Fachliches: nur die App-Komposition der Kit-Primitive.
+// auth-forms — die Auth-Formulare der Landing-Page: Login, Einmal-Setup (Bootstrap, token-gated)
+// und der ehrliche API-Hinweis. Kein Fachliches: nur App-Komposition der Kit-Primitive.
+// Die autoComplete/name-Attribute sind der Passwort-Manager-Vertrag
+// (tests/auth-forms-password-manager.guard.test.ts) — nicht entfernen.
 import * as React from "react";
-import { Navigate } from "react-router-dom";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Input,
-} from "@senticor/fachverfahren-kit";
+import { Button, Input } from "@senticor/fachverfahren-kit";
 import { apiPath } from "./board-client.js";
-import { useSession } from "./session.js";
 
-export function LoginPage(): React.ReactElement {
-  const { status, bootstrapped, apiAvailable, refresh } = useSession();
-  // Nach erfolgreichem Login (oder bereits bestehender Session) zurück in den Workspace —
-  // sonst bliebe der Benutzer trotz gültiger Session auf dem Login-Formular stehen.
-  if (status === "authenticated") {
-    return <Navigate to="/boards" replace />;
-  }
-  // Ist die API nicht erreichbar (Server down, Dev-Server ohne laufende Runtime), wäre jedes
-  // Formular zwecklos — ehrlicher Hinweis mit Retry statt „Passwort falsch"-Irreführung.
-  const title = apiAvailable
-    ? bootstrapped
-      ? "Anmelden"
-      : "Workspace einrichten"
-    : "Server nicht erreichbar";
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-secondary/20 px-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>{title}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!apiAvailable ? (
-            <ApiUnavailableNotice onRetry={refresh} />
-          ) : bootstrapped ? (
-            <LoginForm onSuccess={refresh} />
-          ) : (
-            <BootstrapForm onSuccess={refresh} />
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function ApiUnavailableNotice({
+export function ApiUnavailableNotice({
   onRetry,
 }: {
   onRetry: () => Promise<void>;
@@ -66,7 +25,7 @@ function ApiUnavailableNotice({
   );
 }
 
-function LoginForm({
+export function LoginForm({
   onSuccess,
 }: {
   onSuccess: () => Promise<void>;
@@ -140,7 +99,7 @@ function LoginForm({
   );
 }
 
-function BootstrapForm({
+export function BootstrapForm({
   onSuccess,
 }: {
   onSuccess: () => Promise<void>;

@@ -26,7 +26,7 @@ export interface SessionSnapshot {
   principal: SessionPrincipal | null;
   bootstrapped: boolean;
   /** false = der API-Server hat nicht mit JSON geantwortet (down/kein Proxy/Fehlkonfiguration).
-   *  Die LoginPage zeigt dann einen Hinweis statt der Formulare — Anmelden wäre zwecklos. */
+   *  Die Landing zeigt dann einen Hinweis statt der Formulare — Anmelden wäre zwecklos. */
   apiAvailable: boolean;
 }
 
@@ -65,9 +65,16 @@ export async function fetchSessionState(
     if (!statusResponse.ok || !isJsonResponse(statusResponse)) {
       return API_UNAVAILABLE;
     }
-    const { bootstrapped } = (await statusResponse.json()) as {
+    const { bootstrapped, storeAvailable } = (await statusResponse.json()) as {
       bootstrapped: boolean;
+      storeAvailable?: boolean;
     };
+    // Degradierte Server-Antwort (Web-Tier oben, Datenbank unten): der Server meldet
+    // storeAvailable=false mit 200 statt 500, damit der Browser keinen Ressourcen-
+    // Fehler loggt — für die UI ist das „API nicht erreichbar" (Anmelden zwecklos).
+    if (storeAvailable === false) {
+      return API_UNAVAILABLE;
+    }
 
     const sessionResponse = await fetchImpl(apiPath("/auth/session"), {
       credentials: "include",

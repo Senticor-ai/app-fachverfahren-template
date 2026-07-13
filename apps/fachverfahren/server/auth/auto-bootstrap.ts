@@ -30,7 +30,7 @@ export interface AutoBootstrapDeps {
  *  Env-Variablen, kein manuelles „Workspace einrichten".
  *
  *  Wirft NIE: Fehlkonfiguration oder DB-Ausfall werden laut geloggt, der Server
- *  startet trotzdem (die Personas-Demo und /login funktionieren weiterhin).
+ *  startet trotzdem (die Landing samt Anmeldung funktioniert weiterhin).
  *  Das Passwort erscheint in keinem Logfeld. */
 function defaultGenerateId(prefix: string): string {
   return `${prefix}.${randomUUID()}`;

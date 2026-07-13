@@ -1,5 +1,5 @@
 // PasswordChangePage — Self-Service-Passwortwechsel (POST /auth/password). Kein Fachliches:
-// App-Komposition der Kit-Primitive, Muster wie LoginPage (Zustände, role="alert").
+// App-Komposition der Kit-Primitive, Muster wie die Auth-Formulare (Zustände, role="alert").
 import * as React from "react";
 import {
   Button,

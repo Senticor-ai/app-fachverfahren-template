@@ -66,6 +66,26 @@ describe("fetchSessionState", () => {
     expect(snapshot.status).toBe("unauthenticated");
   });
 
+  it("Web-Tier oben, Datenbank unten (storeAvailable=false) → apiAvailable=false", async () => {
+    // Der Server antwortet OHNE erreichbaren Auth-Store bewusst degradiert mit 200 +
+    // storeAvailable=false statt 500 — kein Konsolen-Fehler im Browser (PWA-Audit),
+    // aber Anmelden wäre zwecklos: die Landing zeigt den API-Hinweis.
+    const snapshot = await fetchSessionState(
+      fetchStub({
+        "/auth/status": () =>
+          jsonResponse({ bootstrapped: false, storeAvailable: false }),
+        // Selbst wenn /auth/session antworten würde: storeAvailable=false zählt.
+        "/auth/session": () => jsonResponse({ error: "unauthorized" }, 401),
+      }),
+    );
+    expect(snapshot).toEqual({
+      status: "unauthenticated",
+      principal: null,
+      bootstrapped: false,
+      apiAvailable: false,
+    });
+  });
+
   it("bootstrapped ohne Session (401) → unauthenticated, apiAvailable=true", async () => {
     const snapshot = await fetchSessionState(
       fetchStub({
