@@ -24,3 +24,14 @@ Rein additiv (neue Komponente, aus dem Barrel exportiert). DOM-Test (jsdom) deck
 Hinzufügen/Entfernen+Kaskade/Validierungs-a11y/Read-only ab. css-tokens + motion + storybook
 grün. Nicht-V1-BPMN-Elemente werden im Editor gar nicht erst angeboten (der Interpreter bleibt
 fail-closed). Guard-Bedingungen (`Bedingung`) werden in V1 nicht im UI editiert (config-authored).
+
+## Optionaler KI-Assistent (`kiPort`)
+
+`ProzessEditor` nimmt optional einen `kiPort?: KiAssistPort` (die bestehende KI-Naht). Ist er
+verbunden, erscheint ein „KI-Vorschlag anfordern"-Button, der über `useAiAssist` einen
+transparenten Vorschlag (5 Transparenzelemente via `KiAssistPanel`) zur Vervollständigung/
+Verbesserung des Prozesses holt — **strikt HITL**: `reviewErforderlich` ist im Typ `true`, der
+Mensch übernimmt manuell, die KI ist nie eines der zwei Augen. **Fehlt der Port, arbeitet der
+Editor vollständig ohne KI** (die KI ist strikt additiv/optional — genau die Vorgabe „KI-Funktionen
+immer optional, intelligent eingewoben"). Test deckt beide Fälle (ohne Port kein Button; mit
+Stub-Port erscheint der geprüfte Vorschlag).

@@ -4,7 +4,7 @@
 // Formularfelder (BITV AA — voll tastaturbedienbar, kein Maus-/Canvas-Zwang). Kontrolliert: jede Änderung ruft
 // `beiAenderung(neueDefinition)`. Live-Validierung via `validateProzessGraph` (fail-closed, gegen die StatusMachine).
 import { useId } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Sparkles, Trash2 } from "lucide-react";
 import type { StatusMachine } from "../types.js";
 import type {
   ProzessDefinition,
@@ -12,9 +12,12 @@ import type {
   ProzessKnoten,
   ProzessKnotenTyp,
 } from "../lib/process-ir.js";
+import type { KiAssistPort } from "../lib/ai-assist.js";
 import { validateProzessGraph } from "../lib/process-graph.js";
 import { prozessDefZuMermaid } from "../lib/process-ir-view.js";
+import { useAiAssist } from "../hooks/use-ai-assist.js";
 import { MermaidView } from "./MermaidView.js";
+import { KiAssistPanel } from "./KiAssistPanel.js";
 import { Button } from "../ui/button.js";
 import { Input } from "../ui/input.js";
 import { Label } from "../ui/label.js";
@@ -82,6 +85,10 @@ export interface ProzessEditorProps {
   beiAenderung: (def: ProzessDefinition) => void;
   /** Read-only-Ansicht (nur Vorschau + Tabelle, keine Edit-Controls). */
   nurLesen?: boolean;
+  /** OPTIONAL: KI-Assistent. Ist er verbunden, bietet der Editor einen transparenten, MENSCHLICH zu prüfenden
+   *  Vorschlag zur Vervollständigung/Verbesserung an (HITL — der Mensch übernimmt manuell, KI ist nie eines der
+   *  zwei Augen). Fehlt er, arbeitet der Editor vollständig OHNE KI (die KI ist strikt additiv/optional). */
+  kiPort?: KiAssistPort;
 }
 
 export function ProzessEditor({
@@ -89,10 +96,18 @@ export function ProzessEditor({
   statusMachine,
   beiAenderung,
   nurLesen = false,
+  kiPort,
 }: ProzessEditorProps) {
   const uid = useId().replace(/:/g, "_");
   const fehler = validateProzessGraph(wert, statusMachine);
   const knotenIds = wert.knoten.map((k) => k.id);
+  const assist = useAiAssist(kiPort);
+  const kiKontextText =
+    `Prozess „${wert.label ?? wert.id}" mit ${wert.knoten.length} Knoten und ${wert.kanten.length} Kanten. ` +
+    (fehler.length > 0
+      ? `Offene Validierungsfehler: ${fehler.map((f) => f.detail).join("; ")}. `
+      : "Aktuell valide. ") +
+    "Wie lässt sich der Prozess sinnvoll vervollständigen oder verbessern?";
 
   const setzeKnoten = (id: string, neu: ProzessKnoten) =>
     beiAenderung({
@@ -165,6 +180,39 @@ export function ProzessEditor({
           </div>
         )}
       </div>
+
+      {/* ── KI-Assistent (OPTIONAL, strikt additiv, HITL) — nur sichtbar, wenn ein Port verbunden ist ── */}
+      {kiPort && !nurLesen && (
+        <div className="flex flex-col gap-2">
+          <div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={assist.laedt}
+              onClick={() =>
+                void assist.anfragen({
+                  text: kiKontextText,
+                  kontext: { prozess: wert },
+                })
+              }
+            >
+              <Sparkles className="size-4" aria-hidden />
+              {assist.laedt
+                ? "KI erstellt Vorschlag …"
+                : "KI-Vorschlag anfordern"}
+            </Button>
+          </div>
+          {assist.vorschlag && (
+            <KiAssistPanel
+              vorschlag={assist.vorschlag}
+              risikoklasse="begrenzt"
+              funktionsName="Prozess-Assistent"
+              onVerwerfen={assist.zuruecksetzen}
+            />
+          )}
+        </div>
+      )}
 
       {/* ── Knoten ── */}
       <fieldset className="flex flex-col gap-3 rounded-md border border-border p-4">

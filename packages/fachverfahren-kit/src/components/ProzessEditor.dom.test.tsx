@@ -6,6 +6,7 @@ import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { StatusMachine } from "../types.js";
 import type { ProzessDefinition } from "../lib/process-ir.js";
+import { createStubAiAssistPort } from "../lib/ai-assist.js";
 import { ProzessEditor } from "./ProzessEditor.js";
 
 vi.mock("./MermaidView.js", () => ({ MermaidView: () => null }));
@@ -113,5 +114,37 @@ describe("ProzessEditor (DOM, a11y-Autorenpfad)", () => {
       />,
     );
     expect(knopf("Knoten hinzufügen")).toBeUndefined();
+  });
+
+  it("KI ist strikt optional: ohne kiPort erscheint KEIN KI-Button", () => {
+    render(
+      <ProzessEditor
+        wert={def({ knoten: [{ id: "k1", typ: "start" }] })}
+        statusMachine={sm}
+        beiAenderung={vi.fn()}
+      />,
+    );
+    expect(knopf("KI-Vorschlag anfordern")).toBeUndefined();
+  });
+
+  it("mit kiPort rendert der Vorschlag-Button den transparenten, menschlich zu pruefenden KI-Vorschlag (HITL)", async () => {
+    const kiPort = createStubAiAssistPort({
+      vorschlag:
+        "Ergänzen Sie einen Ende-Knoten und verbinden Sie den Start damit.",
+    });
+    render(
+      <ProzessEditor
+        wert={def({ knoten: [{ id: "k1", typ: "start" }] })}
+        statusMachine={sm}
+        beiAenderung={vi.fn()}
+        kiPort={kiPort}
+      />,
+    );
+    const btn = knopf("KI-Vorschlag anfordern");
+    expect(btn).toBeTruthy();
+    await act(async () => {
+      btn?.click();
+    });
+    expect(container.textContent).toContain("Ergänzen Sie einen Ende-Knoten");
   });
 });
