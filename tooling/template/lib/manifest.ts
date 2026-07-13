@@ -69,6 +69,11 @@ export const defaultOwnership: TemplateOwnership = {
     "apps/*/deploy/helm/**": "replace",
     "apps/*/public/**": "replace",
     "apps/*/server/**": "replace",
+    // Die geteilten Runtime-Pakete sind Vorlagen-Fundament, kein Konsumenten-Code: Vorlagen-PRs
+    // ändern Server-Code und Paket-API im Gleichschritt (z.B. app-store-postgres). Ohne diesen
+    // Eintrag aktualisierte template:update nur apps/*/server/** und ließ die Pakete stehen —
+    // der Konsument brach mit TS-Fehlern gegen die alte Paket-API (Deploy-Run 29241279544).
+    "packages/*/**": "replace",
     "apps/*/src/domain/**": "consumer",
     "docs/domain/**": "consumer",
     "modules/*/**": "consumer",
