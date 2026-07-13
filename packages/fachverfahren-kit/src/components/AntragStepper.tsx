@@ -43,6 +43,7 @@ import type {
 import {
   asString,
   feldAnzeige,
+  feldAutoComplete,
   feldHint,
   feldLabel,
   getPath,
@@ -985,6 +986,8 @@ function FeldRenderer({
   function renderControl(): React.ReactElement {
     const s = asString(wert);
     const invalidAttr = !!sichtbarerFehler;
+    // WCAG 2.2 SC 1.3.5 (Eingabezweck) — EINE Wahrheit: der autocomplete-Token je Feld (explizit ∨ typ ∨ Namens-Heuristik).
+    const ac = feldAutoComplete(feld);
 
     // M1 — ABGELEITETES Feld: nicht editierbar, sondern eine read-only Anzeige des automatisch gesetzten Werts
     // („automatisch abgeleitet"-Badge). Der Wert stammt aus der Codelisten-Merkmal-Ableitung (VOR der Berechnung).
@@ -1143,7 +1146,7 @@ function FeldRenderer({
             maxLength={5}
             placeholder={hint}
             required={feld.required}
-            autoComplete="postal-code"
+            autoComplete={ac}
             aria-invalid={invalidAttr}
             aria-describedby={describedBy}
           />
@@ -1174,6 +1177,7 @@ function FeldRenderer({
             value={s}
             onChange={(e) => onChange(e.target.value)}
             required={feld.required}
+            autoComplete={ac}
             aria-invalid={invalidAttr}
             aria-describedby={describedBy}
           />
@@ -1189,7 +1193,7 @@ function FeldRenderer({
             onBlur={(e) => onRegisterLookup(e.target.value)}
             placeholder={hint}
             required={feld.required}
-            autoComplete="email"
+            autoComplete={ac}
             aria-invalid={invalidAttr}
             aria-describedby={describedBy}
           />
@@ -1204,7 +1208,7 @@ function FeldRenderer({
             onChange={(e) => onChange(e.target.value)}
             placeholder={hint}
             required={feld.required}
-            autoComplete="tel"
+            autoComplete={ac}
             inputMode="tel"
             aria-invalid={invalidAttr}
             aria-describedby={describedBy}
@@ -1221,6 +1225,7 @@ function FeldRenderer({
             onBlur={(e) => onRegisterLookup(e.target.value)}
             placeholder={hint}
             required={feld.required}
+            autoComplete={ac}
             aria-invalid={invalidAttr}
             aria-describedby={describedBy}
           />

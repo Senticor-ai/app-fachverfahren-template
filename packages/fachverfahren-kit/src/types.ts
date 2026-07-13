@@ -210,6 +210,13 @@ export interface FeldDef {
   /** Nur `typ: "file"`: erlaubte Datei-Typen für den Datei-Dialog (das native `accept`-Attribut, z. B. "application/pdf,image/*"). */
   accept?: string;
   hint?: string; // Hilfetext / Beispiel
+  /** WCAG 2.2 SC 1.3.5 (Eingabezweck / Identify Input Purpose, AA) — der HTML-`autocomplete`-Token, wenn dieses Feld
+   *  eine Angabe ZUR PERSON erhebt (z. B. "given-name", "family-name", "address-level2", "bday", "tel"). Als DATEN
+   *  gesetzt gewinnt er vor der generischen Ableitung aus Typ + Feldname (`feldAutoComplete`). NUR die von der HTML-
+   *  Spezifikation anerkannten Tokens verwenden (die WCAG als „programmatisch bestimmbar" akzeptiert). Für Felder OHNE
+   *  Personenbezug (z. B. den Namen eines Hundes, einen Fund-/Tatort) leer lassen — ein falscher Token schadet mehr
+   *  als keiner. */
+  autoComplete?: string;
   onceOnly?: boolean; // aus Register vorbefüllbar + editierbar (Once-Only)
   /** NORM-ABGELEITETE Feldregeln als DATEN (additiv zu required/pattern/min/max): bedingte Pflicht („pflicht"
    *  + `wenn`), Format, Bereich, erlaubte Werte — jede mit `normRef`. Der reine Interpreter wertet sie aus; ein

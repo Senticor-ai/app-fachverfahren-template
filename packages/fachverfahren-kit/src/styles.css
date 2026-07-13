@@ -146,7 +146,10 @@
   --destructive-foreground: hsl(0 0% 100%);
 
   --border: hsl(220 15% 88%);
-  --input: hsl(220 15% 88%);
+  /* WCAG 2.2 SC 1.4.11 (Nicht-Text-Kontrast, AA): der Feld-Rahmen ist die EINZIGE Begrenzung (Feld-Fläche = weiß =
+     Card), daher ≥ 3:1 gegen weiße Card UND den Seiten-Hintergrund — hsl(220 12% 56%) = 3,47:1 / 3,24:1. Bewusst
+     stärker als das dekorative `--border` (Trenner/Card-Kanten tragen keinen Zustand, bleiben luftig). */
+  --input: hsl(220 12% 56%);
   --ring: hsl(215 60% 32%);
 
   /* Feld-Fläche: weiß im Light-Modus → hebt Inputs von bg-background/bg-card ab. */
@@ -210,7 +213,10 @@
   --accent: hsl(215 30% 18%);
   --accent-foreground: hsl(215 50% 82%);
   --border: hsl(220 15% 28%);
-  --input: hsl(220 15% 28%);
+  /* WCAG 2.2 SC 1.4.11 (Nicht-Text-Kontrast, AA): auch im Dark-Modus trägt der Feld-Rahmen die Begrenzung (Fläche
+     hsl(220 20% 13%) vs Card 22% nur 1,34:1). hsl(220 15% 54%) = 3,27:1 gegen die Card — heller als das dekorative
+     `--border`. */
+  --input: hsl(220 15% 54%);
   --ring: hsl(215 85% 72%);
 
   /* Feld-Fläche dunkler als Card (= surface-2) → Feld bleibt sichtbar. */
@@ -248,6 +254,11 @@
     min-height: 100%;
     text-size-adjust: 100%;
     -webkit-text-size-adjust: 100%;
+    /* WCAG 2.2 SC 2.4.11 (Fokus nicht verdeckt, AA): der Body ist der Scroll-Container und der Shell-Header ist
+       sticky (FachverfahrenShell h-14 = 3.5rem). Ohne Offset scrollt ein programmatisch fokussiertes Feld ODER der
+       Fehler-Zusammenfassungs-Anker (AntragStepper focus()) hinter den Header. scroll-padding-top hält das Sprungziel
+       frei (Header 3.5rem + 0.75rem Luft). */
+    scroll-padding-top: 4.25rem;
   }
 
   body {
