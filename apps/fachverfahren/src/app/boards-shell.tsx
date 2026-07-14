@@ -18,6 +18,7 @@ import {
 } from "../personas.js";
 import { useSession } from "../session.js";
 import { store } from "../store.js";
+import { PUBLIC_FOOTER_LINKS } from "./shell.js";
 
 export function BoardsShell({
   activeNavKey,
@@ -62,6 +63,7 @@ export function BoardsShell({
       }}
       extraNavSections={verwaltung}
       showDemoBadge={false}
+      footerLinks={PUBLIC_FOOTER_LINKS}
       accountSlot={
         <span className="flex items-center gap-3 text-sm text-muted-foreground">
           <span className="hidden md:inline">{principal?.email}</span>

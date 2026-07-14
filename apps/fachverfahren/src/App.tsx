@@ -3,7 +3,8 @@
 //   2. Der daraus ABGELEITETE react-router-Baum (src/app/build-routes.tsx): öffentliche
 //      Routen, GENAU EIN Session-Gate (RequireSessionOutlet), Arbeitsbereichs- und
 //      Permission-Gruppen, Catch-all → Landing. Vertrag in tests/route-gating.guard.test.ts.
-//   3. Das First-Run-Gate um alles (Einmal-Setup auf der Landing, solange kein Admin existiert).
+//   3. Das First-Run-Gate um alles (Einmal-Setup auf der Landing; Landing und
+//      Barrierefreiheit bleiben davor öffentlich erreichbar).
 // Alles Fachliche (Antrag-Schritte, Subsumtion, Status-Machine, Arbeitsvorrat-Spalten, Aufsichts-Kennzahlen)
 // kommt aus den Kit-Bausteinen + der Config. Tausche die Config (./leistung.config) → dieselbe App, anderes Verfahren.
 import { Routes } from "react-router-dom";
@@ -20,6 +21,4 @@ export function App(): React.JSX.Element {
   );
 }
 
-// `personaFromPath` re-exportiert für etwaige Tests / Deep-Links (URL bleibt die Wahrheit
-// über die aktive Persona; die Implementierung lebt in src/app/shell.tsx).
 export { personaFromPath };

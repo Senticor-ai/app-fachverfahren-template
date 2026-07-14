@@ -3,6 +3,7 @@
 // Sicht oder eine Sicht ohne Gate ist ein Typfehler, kein Laufzeit-Loch.
 import { Navigate } from "react-router-dom";
 import { LandingPage } from "../LandingPage.js";
+import { BarrierefreiheitPage } from "../BarrierefreiheitPage.js";
 import { AdminUsersRoute } from "../pages/admin-users.js";
 import { AmtEingangPage } from "../pages/amt-eingang.js";
 import { AmtVorgangPage } from "../pages/amt-vorgang.js";
@@ -19,6 +20,7 @@ import { routeGates, type AppRoutePath } from "./route-gates.js";
 const routeElements: Record<AppRoutePath, React.JSX.Element> = {
   "/": <LandingPage />,
   "/login": <Navigate to="/" replace />,
+  "/barrierefreiheit": <BarrierefreiheitPage />,
   "/buerger": <BuergerStartPage />,
   "/buerger/anmelden": <BuergerAnmeldenPage />,
   "/buerger/bestaetigung/:id": <BuergerBestaetigungPage />,

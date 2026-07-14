@@ -1,11 +1,43 @@
 // landing-state.test.ts — Vertrag der Landing-Page-Logik: welche Sicht zeigt "/" für welchen
 // Session-Zustand, und wohin darf nach dem Login zurückgeleitet werden. Die Landing ist die
-// EINZIGE unauthentifizierte Route; alle Persona- und Workspace-Routen bouncen unangemeldet
-// mit `state.from` hierher. Beide Funktionen sind pur (Muster needsFirstRunSetup), damit der
-// Vertrag ohne DOM testbar bleibt.
+// eine von zwei unauthentifizierten Seiten; alle Persona- und Workspace-Routen bouncen
+// unangemeldet mit `state.from` hierher. Die Funktionen sind pur (Muster
+// needsFirstRunSetup), damit der Vertrag ohne DOM testbar bleibt.
 import { describe, expect, it } from "vitest";
 
-import { landingView, postLoginRedirect } from "../src/landing-state.js";
+import {
+  canonicalPublicPath,
+  isPublicPath,
+  landingView,
+  postLoginRedirect,
+} from "../src/landing-state.js";
+
+describe("public paths", () => {
+  it.each(["/", "/barrierefreiheit"])(
+    "%s ist ein exakter öffentlicher Pfad",
+    (pathname) => {
+      expect(isPublicPath(pathname)).toBe(true);
+    },
+  );
+
+  it.each([
+    "/login",
+    "/boards",
+    "/barrierefreiheit/",
+    "/barrierefreiheit/x",
+    "/Barrierefreiheit",
+    "//barrierefreiheit",
+    "/%62arrierefreiheit",
+  ])("%s umgeht die Gates nicht", (pathname) => {
+    expect(isPublicPath(pathname)).toBe(false);
+  });
+
+  it("kanonisiert ausschließlich den sicheren Trailing-Slash-Pfad", () => {
+    expect(canonicalPublicPath("/barrierefreiheit/")).toBe("/barrierefreiheit");
+    expect(canonicalPublicPath("/barrierefreiheit/x")).toBe(null);
+    expect(canonicalPublicPath("/Barrierefreiheit/")).toBe(null);
+  });
+});
 
 describe("landingView", () => {
   const base = {

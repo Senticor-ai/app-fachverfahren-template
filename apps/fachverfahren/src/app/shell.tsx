@@ -14,6 +14,14 @@ import {
 import { useSession } from "../session.js";
 import { store } from "../store.js";
 
+export const PUBLIC_FOOTER_LINKS: readonly ShellNavItem[] = [
+  {
+    key: "barrierefreiheit",
+    label: "Erklärung zur Barrierefreiheit",
+    href: "/barrierefreiheit",
+  },
+];
+
 /** Eine Shell-Hülle um jede Route: Branding + Persona-Nav aus der Config, Persona-Wechsel + Nav-Klicks → Router. */
 export function Shell({
   persona,
@@ -43,6 +51,7 @@ export function Shell({
         allowedPersonas(principal, capabilities),
         store.config,
       )}
+      footerLinks={PUBLIC_FOOTER_LINKS}
     >
       {children}
     </FachverfahrenShell>

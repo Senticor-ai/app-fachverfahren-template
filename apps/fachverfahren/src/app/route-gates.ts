@@ -11,10 +11,10 @@ import {
 } from "./route-definition.js";
 
 export const routeGates = {
-  // Die Landing ist die EINZIGE unauthentifizierte Route; /login bleibt nur als Alias
-  // für Bookmarks und Doku bestehen.
+  // Landing und Erklärung sind öffentliche Inhalte; /login bleibt nur ein Alias.
   "/": publicGate,
   "/login": publicGate,
+  "/barrierefreiheit": publicGate,
   // Arbeitsbereichs-Gates (nur Erlebnis/Navigation, keine Autorisierung).
   "/buerger": personaGate("buerger"),
   "/buerger/anmelden": personaGate("buerger"),

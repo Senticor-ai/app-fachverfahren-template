@@ -1,0 +1,65 @@
+id: admin-onboarding
+route: /boards
+owner: apps/fachverfahren and packages/fachverfahren-kit
+persona: caseworker-management
+inputs:
+  - activeSession
+  - userCount
+  - actorScopedDismissal
+outputs:
+  - onboarding.team-opened
+  - onboarding.dismissed
+states:
+  - hidden-unauthorized
+  - hidden-loading
+  - hidden-error
+  - visible
+  - dismissed
+ia:
+  pattern: contextual-checklist
+  navigation:
+    - team step navigates to the existing user administration route
+  profile:
+    - actor-scoped dismissal never affects another account
+  scroll:
+    - card precedes the board list in normal document order
+content:
+  language:
+    - steps describe operator tasks in concise German
+  architectureTerms:
+    - repository documentation names appear only as supporting text
+hcai:
+  mode: none
+  controls: []
+a11y:
+  landmarks:
+    - card section is labelled by its heading
+    - board content region is the focus destination after dismissal
+  labels:
+    - dismiss and navigation controls have visible or accessible names
+  keyboard:
+    - every step link and dismiss action is keyboard reachable
+  focusOrder:
+    - onboarding heading
+    - actionable step
+    - dismiss action
+    - boards content region
+  zoom:
+    - checklist reflows at 400 percent zoom
+  statusSemantics:
+    - completed steps use icon and visible text in addition to color
+tests:
+  unit:
+    - permission, count, actor, dismissal, and step decisions are deterministic
+  integration:
+    - unauthorized actors never enumerate users
+    - failed responses hide the card without breaking the board list
+    - dismissal restores focus and is actor scoped
+  storybook:
+    - open steps
+    - completed step
+    - navigation and dismissal interactions
+evidence:
+  - onboarding Storybook story
+  - app integration story
+  - Storybook Axe result

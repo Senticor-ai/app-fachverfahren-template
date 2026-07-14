@@ -1,0 +1,61 @@
+id: public-accessibility
+route: /barrierefreiheit
+owner: apps/fachverfahren
+persona: mixed-public
+inputs:
+  - staticLeistungConfig
+  - accessibilityDeclarationConfig
+outputs:
+  - accessibility.feedback-opened
+  - accessibility.arbitration-opened
+states:
+  - provisional-partially-conformant
+  - approved-conformant
+ia:
+  pattern: public-legal-information
+  navigation:
+    - start page remains reachable without a session
+  profile:
+    - no session assumption or account action exists
+  scroll:
+    - document follows normal page flow
+content:
+  language:
+    - provisional status is explicit and cannot be read as an approved assessment
+  architectureTerms:
+    - no internal runtime terminology is shown
+hcai:
+  mode: none
+  controls: []
+a11y:
+  landmarks:
+    - one banner
+    - one main
+    - one contentinfo
+  labels:
+    - feedback and arbitration destinations have descriptive link names
+  keyboard:
+    - all links are reachable and have visible focus
+  focusOrder:
+    - page heading
+    - provisional notice
+    - declaration sections
+    - feedback link
+    - arbitration link
+    - start-page link
+  zoom:
+    - 400 percent zoom reflows without function loss
+  statusSemantics:
+    - conformance status uses visible text and icon
+tests:
+  unit:
+    - canonical and near-match path decisions are deterministic
+  integration:
+    - declaration renders before bootstrap and without a session
+  storybook:
+    - partially conformant with all optional fields
+    - conformant without non-conformity section
+evidence:
+  - declaration Storybook stories
+  - Storybook Axe result
+  - router integration story

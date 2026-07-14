@@ -38,7 +38,7 @@ export interface ShellNavItem {
   /** Stabiler Schlüssel (auch für aria-current/Aktiv-Vergleich). */
   key: string;
   label: string;
-  icon: LucideIcon;
+  icon?: LucideIcon;
   /** Ziel-Pfad (App-spezifisch). Optional — sonst rein über onNavigate. */
   href?: string;
 }
@@ -66,9 +66,13 @@ export interface FachverfahrenShellProps<T = Record<string, unknown>> {
   /** Konto-Bereich rechts im Header (E-Mail, Passwort ändern, Abmelden) — Screen-Contract
    *  boards-list: „profile and settings remain reachable from the persistent shell". */
   accountSlot?: React.ReactNode;
+  /** Deployment-level notice between the global header and the page main. */
+  bannerSlot?: React.ReactNode;
   /** „Demo · synthetische Daten"-Badge (Default true, die Persona-Sichten sind Demos). Der
    *  Team-Workspace zeigt ECHTE Arbeitsdaten — dort wäre das Badge irreführend → false. */
   showDemoBadge?: boolean;
+  /** Rechtliche/öffentliche Ziele im globalen Footer. Die App liefert reale Router-Pfade. */
+  footerLinks?: readonly ShellNavItem[];
 }
 
 /** Eine zusätzliche, benannte Nav-Sektion der Sidebar (siehe extraNavSections). */
@@ -188,7 +192,9 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
   personas,
   extraNavSections,
   accountSlot,
+  bannerSlot,
   showDemoBadge = true,
+  footerLinks,
 }: FachverfahrenShellProps<T>): React.JSX.Element {
   // DATA-DRIVEN Rollen: explizite Prop > verfahrensspezifische Rollen aus dem Vertrag (config.personas, aus dem
   // Fachkonzept) > generische DEFAULT_PERSONAS. So spiegeln die 3 Sichten das jeweilige Verfahren, ohne Hardcode.
@@ -246,7 +252,7 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
               : "text-sidebar-muted hover:bg-white/5 hover:text-sidebar-foreground",
           )}
         >
-          <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+          {Icon && <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />}
           <span className="truncate">{item.label}</span>
         </a>
       </li>
@@ -273,10 +279,7 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
         aria-label="Hauptnavigation"
       >
         {/* Marke — Branding ausschließlich aus config. */}
-        <div
-          className="flex h-14 shrink-0 items-center gap-2.5 border-b border-sidebar-border px-3"
-          role="banner"
-        >
+        <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-sidebar-border px-3">
           {wappen ? (
             <KommuneLogo logo={wappen} height={28} className="shrink-0" />
           ) : (
@@ -379,6 +382,8 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
           </div>
         )}
 
+        {bannerSlot}
+
         {/* Haupt-Inhalt (main-Landmark, Sprungziel des Skip-Links). */}
         <main
           id={MAIN_ID}
@@ -389,16 +394,38 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
         </main>
 
         {/* Fußzeile (contentinfo) — Rechtsgrundlage/Kommune, sofern vorhanden. */}
-        {config.rechtsgrundlagen.length > 0 && (
+        {(config.rechtsgrundlagen.length > 0 ||
+          (footerLinks?.length ?? 0) > 0) && (
           <footer
-            className="border-t border-border bg-card px-4 py-2 text-xs text-muted-foreground"
+            className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border bg-card px-4 py-2 text-xs text-muted-foreground"
             role="contentinfo"
           >
-            <span className="font-medium text-foreground">
-              {config.kommune}
-            </span>
-            {" · "}
-            {config.rechtsgrundlagen.map((r) => r.norm).join(" · ")}
+            {config.rechtsgrundlagen.length > 0 && (
+              <span>
+                <span className="font-medium text-foreground">
+                  {config.kommune}
+                </span>
+                {" · "}
+                {config.rechtsgrundlagen.map((r) => r.norm).join(" · ")}
+              </span>
+            )}
+            {(footerLinks?.length ?? 0) > 0 && (
+              <nav aria-label="Rechtliche Hinweise">
+                <ul className="flex flex-wrap items-center gap-3">
+                  {footerLinks?.map((item) => (
+                    <li key={item.key}>
+                      <a
+                        href={item.href ?? "#"}
+                        onClick={handleNav(item)}
+                        className="inline-flex min-h-6 items-center rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {item.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            )}
           </footer>
         )}
       </div>

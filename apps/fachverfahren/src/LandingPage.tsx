@@ -1,4 +1,4 @@
-// LandingPage — die EINE unauthentifizierte Route ("/"). Alle Rollen melden sich HIER an:
+// LandingPage — die öffentliche Anmelde-Route ("/"). Alle Rollen melden sich HIER an:
 // Branding aus der LeistungConfig, die Auth-Karte (Login / Registrieren / Einmal-Setup /
 // API-Hinweis, Logik in landing-state.ts) und die Einstiege in die Bereiche. Angemeldet
 // filtern sich die Bereiche auf die ZUGEWIESENEN Arbeitsbereiche (personas.ts) — ohne
@@ -112,72 +112,87 @@ export function LandingPage(): React.ReactElement | null {
       : BEREICHE;
 
   return (
-    <main className="min-h-screen bg-secondary/20 px-4 py-10 md:py-16">
-      <div className="mx-auto w-full max-w-4xl space-y-10">
-        <header className="space-y-1 text-center">
+    <div className="flex min-h-screen flex-col bg-secondary/20 text-foreground">
+      <header className="px-4 pb-6 pt-10 text-center md:pt-16">
+        <div className="mx-auto w-full max-w-4xl space-y-1">
           <h1 className="text-2xl font-semibold text-foreground">
             {store.config.label}
           </h1>
           <p className="text-sm text-muted-foreground">
             {store.config.kommune}
           </p>
-        </header>
-        <div className="grid items-start gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <h2 className="font-semibold leading-none tracking-tight">
-                {authTitle}
-              </h2>
-            </CardHeader>
-            <CardContent>
-              <AuthCardBody
-                view={view}
-                showRegister={showRegister}
-                registerOffen={registerOffen}
-                onAuthModeChange={setAuthMode}
-              />
-            </CardContent>
-          </Card>
-          <section aria-labelledby="bereiche-heading" className="space-y-3">
-            <h2
-              id="bereiche-heading"
-              className="font-semibold leading-none tracking-tight"
-            >
-              Bereiche
-            </h2>
-            {sichtbareBereiche.length > 0 ? (
-              <ul className="space-y-3">
-                {sichtbareBereiche.map((bereich) => (
-                  <li key={bereich.href}>
-                    <Link
-                      to={bereich.href}
-                      className="block rounded-lg border border-border bg-card p-4 transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <span className="block text-sm font-medium text-foreground">
-                        {bereich.label}
-                      </span>
-                      <span className="mt-0.5 block text-sm text-muted-foreground">
-                        {bereich.beschreibung}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              // Null-Arbeitsbereiche-Zustand: gültig — Konto existiert, aber es wurde
-              // (noch) kein Arbeitsbereich freigeschaltet bzw. wieder entzogen.
-              <p
-                role="status"
-                className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground"
-              >
-                Für Ihr Konto ist noch kein Arbeitsbereich freigeschaltet. Bitte
-                wenden Sie sich an Ihre Administration.
-              </p>
-            )}
-          </section>
         </div>
-      </div>
-    </main>
+      </header>
+      <main className="flex-1 px-4 pb-10" id="main-content">
+        <div className="mx-auto w-full max-w-4xl">
+          <div className="grid items-start gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <h2 className="font-semibold leading-none tracking-tight">
+                  {authTitle}
+                </h2>
+              </CardHeader>
+              <CardContent>
+                <AuthCardBody
+                  view={view}
+                  showRegister={showRegister}
+                  registerOffen={registerOffen}
+                  onAuthModeChange={setAuthMode}
+                />
+              </CardContent>
+            </Card>
+            <section aria-labelledby="bereiche-heading" className="space-y-3">
+              <h2
+                id="bereiche-heading"
+                className="font-semibold leading-none tracking-tight"
+              >
+                Bereiche
+              </h2>
+              {sichtbareBereiche.length > 0 ? (
+                <ul className="space-y-3">
+                  {sichtbareBereiche.map((bereich) => (
+                    <li key={bereich.href}>
+                      <Link
+                        to={bereich.href}
+                        className="block rounded-lg border border-border bg-card p-4 transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <span className="block text-sm font-medium text-foreground">
+                          {bereich.label}
+                        </span>
+                        <span className="mt-0.5 block text-sm text-muted-foreground">
+                          {bereich.beschreibung}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                // Null-Arbeitsbereiche-Zustand: gültig — Konto existiert, aber es wurde
+                // (noch) kein Arbeitsbereich freigeschaltet bzw. wieder entzogen.
+                <p
+                  role="status"
+                  className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground"
+                >
+                  Für Ihr Konto ist noch kein Arbeitsbereich freigeschaltet.
+                  Bitte wenden Sie sich an Ihre Administration.
+                </p>
+              )}
+            </section>
+          </div>
+        </div>
+      </main>
+      <footer className="border-t border-border bg-card px-4 py-4 text-sm text-muted-foreground">
+        <div className="mx-auto flex w-full max-w-4xl flex-wrap items-center justify-between gap-3">
+          <span>{store.config.kommune}</span>
+          <Link
+            to="/barrierefreiheit"
+            className="inline-flex min-h-11 items-center rounded-md font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Erklärung zur Barrierefreiheit
+          </Link>
+        </div>
+      </footer>
+    </div>
   );
 }
 

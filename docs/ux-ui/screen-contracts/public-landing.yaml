@@ -1,0 +1,66 @@
+id: public-landing
+route: /
+owner: apps/fachverfahren
+persona: mixed-public
+inputs:
+  - staticLeistungConfig
+  - runtimeConfig
+  - activeSession
+outputs:
+  - authentication.started
+  - public-area.opened
+  - accessibility-declaration.opened
+states:
+  - loading
+  - api-unavailable
+  - bootstrap
+  - login
+  - register
+  - authenticated
+ia:
+  pattern: public-service-entry
+  navigation:
+    - all public and protected destinations use real app routes
+  profile:
+    - account actions are visible only for an authenticated session
+  scroll:
+    - page reflows without a horizontal page scrollbar
+content:
+  language:
+    - German UI text addresses citizens and workforce roles clearly
+  architectureTerms:
+    - no provider, port, or adapter vocabulary is shown
+hcai:
+  mode: none
+  controls: []
+a11y:
+  landmarks:
+    - one banner
+    - one main
+    - one contentinfo
+  labels:
+    - authentication and navigation controls have visible names
+  keyboard:
+    - Tab reaches authentication, area links, and footer link
+  focusOrder:
+    - page heading
+    - authentication actions
+    - area links
+    - accessibility declaration link
+  zoom:
+    - 400 percent zoom reflows without function loss
+  statusSemantics:
+    - demo and API status use text and icon, never color alone
+tests:
+  unit:
+    - landing state selects one deterministic view
+  integration:
+    - public and protected routes preserve their gate behavior
+  storybook:
+    - public before bootstrap
+    - demo mode
+    - protected-route redirect
+evidence:
+  - public service Storybook story
+  - Storybook Axe result
+  - keyboard focus note
