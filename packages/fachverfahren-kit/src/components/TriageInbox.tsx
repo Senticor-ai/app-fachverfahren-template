@@ -64,14 +64,16 @@ export function TriageInbox({
       <p role="status" aria-live="polite" className="sr-only">
         {ansage}
       </p>
-      <h2
+      {/* Seiten-H1 der Vollbild-Inbox-Sicht (page-has-heading-one / BITV): dies IST der
+          Seitentitel; die Inbox hat keine tieferen Ueberschriften, daher h1 ohne Ordnungs-Sprung. */}
+      <h1
         id={ueberschriftId}
         className="flex items-center gap-2 text-base font-semibold text-foreground"
       >
         <Inbox aria-hidden="true" className="h-5 w-5" />
         Eingang (verfahrensübergreifend)
         <span className="text-muted-foreground">({eingaenge.length})</span>
-      </h2>
+      </h1>
 
       {eingaenge.length === 0 ? (
         <p className="rounded-md border border-border bg-card px-4 py-6 text-center text-sm text-muted-foreground">
