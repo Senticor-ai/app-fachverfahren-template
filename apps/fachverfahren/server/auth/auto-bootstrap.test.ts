@@ -53,6 +53,34 @@ describe("autoBootstrapAdminFromEnv", () => {
     );
   });
 
+  it("creates three demo accounts only during a fresh environment bootstrap", async () => {
+    const deps = makeDeps({
+      ...configuredEnv,
+      DEMO_MODE: "true",
+      DEMO_USER_PASSWORD: "demo password with sufficient length", // pragma: allowlist-secret
+    });
+    expect(await autoBootstrapAdminFromEnv(deps)).toBe("created");
+    expect(await deps.authStore.countUsers({ tenantId: "default" })).toBe(4);
+
+    const admin = await deps.authStore.getUserByEmail({
+      tenantId: "default",
+      email: "admin@example.org",
+    });
+    const boards = await deps.kanbanStore.listBoards({
+      tenantId: "default",
+      actorId: admin?.actorId ?? "",
+    });
+    expect(boards).toHaveLength(1);
+    expect(boards[0]?.visibility).toBe("team");
+
+    expect(await autoBootstrapAdminFromEnv(deps)).toBe("skipped-existing");
+    expect(await deps.authStore.countUsers({ tenantId: "default" })).toBe(4);
+    const events = await deps.auditStore.listEvents({ tenantId: "default" });
+    expect(
+      events.filter((event) => event.eventType === "USER_CREATED"),
+    ).toHaveLength(4);
+  });
+
   it("is idempotent: a second start skips without touching the store", async () => {
     const deps = makeDeps(configuredEnv);
     await autoBootstrapAdminFromEnv(deps);

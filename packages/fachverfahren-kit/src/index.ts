@@ -77,6 +77,7 @@ export * from "./components/Postfach.js";
 export * from "./components/ConfirmDialog.js";
 export * from "./components/LanguageSwitch.js";
 export * from "./components/Barrierefreiheitserklaerung.js";
+export * from "./components/AdminOnboarding.js";
 export * from "./components/KiAssistPanel.js";
 
 // ── Vollständige Primitiv-Bibliothek (shadcn/Radix, MIT) — öffentlich für Konsumenten ──

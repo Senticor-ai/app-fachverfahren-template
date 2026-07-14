@@ -9,6 +9,7 @@ const repoRoot = path.resolve(dirname, "..");
 const config: StorybookConfig = {
   framework: "@storybook/react-vite",
   stories: [
+    "../apps/fachverfahren/src/**/*.stories.@(ts|tsx)",
     "../packages/fachverfahren-kit/src/**/*.stories.@(ts|tsx)",
     "../modules/**/ui/**/*.stories.@(ts|tsx)",
     "../packages/public-sector-ui/src/**/*.stories.@(ts|tsx)",
@@ -50,6 +51,7 @@ const config: StorybookConfig = {
     config.server.fs.allow = [
       ...(config.server.fs.allow ?? []),
       repoRoot,
+      path.resolve(repoRoot, "apps/fachverfahren"),
       path.resolve(repoRoot, "packages/fachverfahren-kit"),
       path.resolve(repoRoot, "modules"),
       path.resolve(repoRoot, "packages/public-sector-ui"),

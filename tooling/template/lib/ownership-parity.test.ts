@@ -125,6 +125,9 @@ const updateUnmanagedPaths: string[] = [
   "scripts/smoke-generated-app.sh",
   "scripts/test-generated-app-ci.guard.test.ts",
   "scripts/test-generated-app-ci.sh",
+  // GitHub-Workflow-Vertrag: .github/workflows/** ist Konsumenten-Hoheit und
+  // wird gemeinsam mit diesem Test bei Bedarf manuell übernommen.
+  "scripts/ci-storybook-contract.test.ts",
   // Flotten-Registry der Vorlagen-Maintainer.
   "template-consumers.yaml",
 ];

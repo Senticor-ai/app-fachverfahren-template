@@ -65,6 +65,8 @@ export const defaultOwnership: TemplateOwnership = {
     "scripts/smoke-runtime.mjs": "replace",
     "scripts/check-web-delivery.mjs": "replace",
     "scripts/check-k8s-delivery.mjs": "replace",
+    "scripts/check-accessibility-declaration.mjs": "replace",
+    "scripts/check-accessibility-declaration.test.mjs": "replace",
     "scripts/check-supply-chain.sh": "replace",
     "scripts/validate-k8s-render.sh": "replace",
     "scripts/scaffold-*.mjs": "replace",

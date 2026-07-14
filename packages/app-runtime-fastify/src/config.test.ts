@@ -10,6 +10,7 @@ describe("readRuntimeConfig", () => {
     expect(config.internalPort).toBe(9090);
     expect(config.staticDir).toBe(path.join(process.cwd(), "dist"));
     expect(config.serviceWorkerEnabled).toBe(false);
+    expect(config.demoMode).toBe(false);
     expect(config.enableHsts).toBe(false);
     expect(config.cspMode).toBe("enforce");
     expect(config.frameAncestors).toBe("'self'");
@@ -29,6 +30,7 @@ describe("readRuntimeConfig", () => {
       application: { applicationId: "app", displayName: "App" },
       tenant: { tenantId: "default", label: "Standardmandant" },
       delivery: { publicBaseUrl: "", serviceWorkerEnabled: false },
+      features: { demoMode: false },
     });
   });
 
@@ -78,6 +80,10 @@ describe("readRuntimeConfig", () => {
     expect(() =>
       readRuntimeConfig({ APP_ENABLE_SERVICE_WORKER: "banane" }),
     ).toThrow(/invalid boolean/);
+    expect(readRuntimeConfig({ DEMO_MODE: "yes" }).demoMode).toBe(true);
+    expect(() => readRuntimeConfig({ DEMO_MODE: "manchmal" })).toThrow(
+      /invalid boolean/,
+    );
   });
 
   it("HSTS folgt NODE_ENV=production als Default", () => {

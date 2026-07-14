@@ -4,7 +4,9 @@ import type {
   AuthStore,
   KanbanStore,
 } from "@senticor/app-store-postgres";
+import { parseBoolean } from "@senticor/app-runtime-fastify";
 import { bootstrapWorkspace, DEFAULT_TENANT_ID } from "./bootstrap.js";
+import { seedDemoUsers } from "./demo-seed.js";
 
 export type AutoBootstrapOutcome =
   "created" | "skipped-existing" | "skipped-unconfigured" | "failed";
@@ -14,6 +16,8 @@ export interface AutoBootstrapDeps {
   kanbanStore: KanbanStore;
   auditStore: AuditStore;
   env?: NodeJS.ProcessEnv;
+  /** Actual runtime passes the already parsed RuntimeConfig value. */
+  demoMode?: boolean;
   now?: () => Date;
   generateId?: (prefix: string) => string;
   log?: (
@@ -103,6 +107,20 @@ export async function autoBootstrapAdminFromEnv(
             reason: error instanceof Error ? error.message : String(error),
           });
         }
+        await seedDemoUsers(
+          {
+            authStore: deps.authStore,
+            auditStore: deps.auditStore,
+            ...(deps.now ? { now: deps.now } : {}),
+            ...(deps.generateId ? { generateId: deps.generateId } : {}),
+            log,
+          },
+          {
+            tenantId: DEFAULT_TENANT_ID,
+            demoMode: deps.demoMode ?? parseBoolean(env["DEMO_MODE"], false),
+            password: env["DEMO_USER_PASSWORD"],
+          },
+        );
         log("info", "runtime.auth.bootstrap.created", {
           actorId: result.user.actorId,
           boardId: result.board.boardId,

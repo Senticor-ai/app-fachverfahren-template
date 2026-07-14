@@ -13,6 +13,16 @@ import {
 } from "../personas.js";
 import { useSession } from "../session.js";
 import { store } from "../store.js";
+import { DemoModeBanner } from "../DemoModeBanner.js";
+import { useRuntimeConfig } from "../runtime-config.js";
+
+export const PUBLIC_FOOTER_LINKS: readonly ShellNavItem[] = [
+  {
+    key: "barrierefreiheit",
+    label: "Erklärung zur Barrierefreiheit",
+    href: "/barrierefreiheit",
+  },
+];
 
 /** Eine Shell-Hülle um jede Route: Branding + Persona-Nav aus der Config, Persona-Wechsel + Nav-Klicks → Router. */
 export function Shell({
@@ -26,6 +36,7 @@ export function Shell({
 }): React.JSX.Element {
   const navigate = useNavigate();
   const { principal, capabilities } = useSession();
+  const { demoMode } = useRuntimeConfig();
   const onPersonaChange = (next: Persona) => navigate(PERSONA_HOME[next]);
   const onNavigate = (item: ShellNavItem) => {
     if (item.href) navigate(item.href);
@@ -43,6 +54,8 @@ export function Shell({
         allowedPersonas(principal, capabilities),
         store.config,
       )}
+      footerLinks={PUBLIC_FOOTER_LINKS}
+      bannerSlot={demoMode ? <DemoModeBanner /> : undefined}
     >
       {children}
     </FachverfahrenShell>

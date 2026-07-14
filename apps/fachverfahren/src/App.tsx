@@ -1,18 +1,15 @@
-// App = die KOMPOSITION. Hier ist NULL fachliche Logik und KEIN verfahrens-spezifischer Screen — nur:
-//   1. Die Routen-Deskriptoren (src/app/routes.tsx: Pfad → Gate → Sicht aus src/pages/*).
-//   2. Der daraus ABGELEITETE react-router-Baum (src/app/build-routes.tsx): öffentliche
-//      Routen, GENAU EIN Session-Gate (RequireSessionOutlet), Arbeitsbereichs- und
-//      Permission-Gruppen, Catch-all → Landing. Vertrag in tests/route-gating.guard.test.ts.
-//   3. Das First-Run-Gate um alles (Einmal-Setup auf der Landing, solange kein Admin existiert).
-// Alles Fachliche (Antrag-Schritte, Subsumtion, Status-Machine, Arbeitsvorrat-Spalten, Aufsichts-Kennzahlen)
-// kommt aus den Kit-Bausteinen + der Config. Tausche die Config (./leistung.config) → dieselbe App, anderes Verfahren.
+// App = die KOMPOSITION. Der Routen-Baum wird aus Deskriptoren abgeleitet; die Runtime-
+// Konfiguration wird vor interaktiven Routen aufgelöst, damit Demo-Warnungen nie flackern.
 import { Routes } from "react-router-dom";
 import { buildAppRouteChildren } from "./app/build-routes.js";
 import { FirstRunGate } from "./app/guards.js";
 import { appRoutes } from "./app/routes.js";
 import { personaFromPath } from "./app/shell.js";
+import { useRuntimeConfig } from "./runtime-config.js";
 
 export function App(): React.JSX.Element {
+  const runtimeConfig = useRuntimeConfig();
+  if (runtimeConfig.status === "loading") return <></>;
   return (
     <FirstRunGate>
       <Routes>{buildAppRouteChildren(appRoutes)}</Routes>
@@ -20,6 +17,4 @@ export function App(): React.JSX.Element {
   );
 }
 
-// `personaFromPath` re-exportiert für etwaige Tests / Deep-Links (URL bleibt die Wahrheit
-// über die aktive Persona; die Implementierung lebt in src/app/shell.tsx).
 export { personaFromPath };

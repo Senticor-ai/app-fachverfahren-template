@@ -7,6 +7,7 @@ import type { Persona } from "@senticor/fachverfahren-kit";
 import { allowedPersonas, personaHome } from "../personas.js";
 import { useSession } from "../session.js";
 import { needsFirstRunSetup } from "../session-state.js";
+import { canonicalPublicPath, isPublicPath } from "../landing-state.js";
 
 /** Das EINE Session-Gate (Layout-Route): jede Route außer der Landing braucht eine Session.
  *  Unangemeldet geht es mit `state.from` zur Landing — nach dem Login kehrt die Landing auf
@@ -84,9 +85,9 @@ export function RequirePersonaExperience({
   return <Outlet />;
 }
 
-/** First-Run-Gate: solange der Workspace nicht eingerichtet ist (kein Admin existiert), führt
- *  JEDER Pfad zuerst zum Einmal-Setup auf der Landing — die zeigt dann das Bootstrap-Formular.
- *  Die Prädikat-Logik (inkl. Preview-Ausnahme ohne API) lebt testbar in session-state.ts. */
+/** First-Run-Gate: öffentliche Inhalte bleiben vor dem Setup erreichbar. Die einzige
+ *  tolerierte Pfadvariante der Erklärung wird kanonisch umgeleitet; Near-Matches laufen
+ *  durch die normalen First-Run-/Fallback-Regeln. */
 export function FirstRunGate({
   children,
 }: {
@@ -94,7 +95,20 @@ export function FirstRunGate({
 }): React.JSX.Element {
   const session = useSession();
   const location = useLocation();
-  if (needsFirstRunSetup(session) && location.pathname !== "/") {
+  const canonicalPath = canonicalPublicPath(location.pathname);
+  if (canonicalPath) {
+    return (
+      <Navigate
+        to={{
+          pathname: canonicalPath,
+          search: location.search,
+          hash: location.hash,
+        }}
+        replace
+      />
+    );
+  }
+  if (needsFirstRunSetup(session) && !isPublicPath(location.pathname)) {
     return <Navigate to="/" replace />;
   }
   return <>{children}</>;

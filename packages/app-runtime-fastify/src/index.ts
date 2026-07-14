@@ -13,6 +13,7 @@ export {
 export {
   DEFAULT_MAX_BODY_BYTES,
   DEFAULT_SHUTDOWN_TIMEOUT_MS,
+  parseBoolean,
   readRuntimeConfig,
   redactedConfigSummary,
   type BuildInfo,

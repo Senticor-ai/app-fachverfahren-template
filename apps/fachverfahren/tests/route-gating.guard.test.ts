@@ -1,11 +1,6 @@
-// route-gating.guard.test.ts — Vertrag des Routen-Baums: die Landing ("/") ist die EINZIGE
-// unauthentifizierte Route (plus /login-Alias); ALLE Persona- und Workspace-Routen liegen
-// hinter GENAU EINEM Session-Gate (RequireSessionOutlet-Layout-Route). Seit Issue #35 ist
-// der Vertrag STRUKTURELL statt Quelltext-Grep: die abgenommene Klassifizierung lebt als
-// pure Daten in src/app/route-gates.ts, und der aus den Deskriptoren gebaute react-router-
-// Baum wird über createRoutesFromChildren inspiziert — weiterhin OHNE DOM-Rendering
-// (das Repo führt bewusst keine DOM-Render-Testinfrastruktur für die App; Komponenten-
-// Verhalten läuft über Storybook-/Browser-Tests des Kits).
+// route-gating.guard.test.ts — struktureller Vertrag des abgeleiteten Routen-Baums.
+// Gerenderte First-Run-/Session-Szenarien laufen zusätzlich in der App-Story; dieser
+// Test prüft Metadaten statt Quelltext-Reihenfolge und bleibt damit refactoring-stabil.
 import type { ReactElement } from "react";
 import { createRoutesFromChildren, type RouteObject } from "react-router-dom";
 import { describe, expect, it } from "vitest";
@@ -17,6 +12,7 @@ import {
 } from "../src/app/guards.js";
 import { routeGates } from "../src/app/route-gates.js";
 import { appRoutes } from "../src/app/routes.js";
+import { isPublicPath } from "../src/landing-state.js";
 
 function elementOf(route: RouteObject): ReactElement {
   return route.element as ReactElement;
@@ -37,6 +33,7 @@ describe("App-Routen — Session-Gate", () => {
     expect(routeGates).toEqual({
       "/": { kind: "public" },
       "/login": { kind: "public" },
+      "/barrierefreiheit": { kind: "public" },
       "/buerger": { kind: "persona", persona: "buerger" },
       "/buerger/anmelden": { kind: "persona", persona: "buerger" },
       "/buerger/bestaetigung/:id": { kind: "persona", persona: "buerger" },
@@ -58,29 +55,31 @@ describe("App-Routen — Session-Gate", () => {
     });
   });
 
-  it("jede klassifizierte Route hat genau eine Sicht (Deskriptor-Vollständigkeit)", () => {
+  it("jede klassifizierte Route hat genau eine Sicht", () => {
     expect(appRoutes.map((route) => route.path).sort()).toEqual(
       Object.keys(routeGates).sort(),
     );
-    for (const route of appRoutes) {
+    for (const route of appRoutes)
       expect(route.element, route.path).toBeTruthy();
-    }
   });
 
-  it("es gibt genau EINE RequireSessionOutlet-Layout-Route — und nur / + /login davor", () => {
+  it("besitzt genau ein Session-Gate hinter den drei öffentlichen Deskriptoren", () => {
     const gates = tree.filter(
       (route) => gateType(route) === RequireSessionOutlet,
     );
     expect(gates).toHaveLength(1);
-
-    const topLevelPaths = tree.map((route) => route.path ?? "(layout)");
-    expect(topLevelPaths).toEqual(["/", "/login", "(layout)", "*"]);
+    expect(tree.map((route) => route.path ?? "(layout)")).toEqual([
+      "/",
+      "/login",
+      "/barrierefreiheit",
+      "(layout)",
+      "*",
+    ]);
   });
 
-  it("alle Persona- und Workspace-Routen stehen INNERHALB des Gates", () => {
+  it("alle Persona- und Workspace-Routen stehen innerhalb des Gates", () => {
     const gate = tree.find((route) => gateType(route) === RequireSessionOutlet);
     const groups = gate?.children ?? [];
-
     const personaGroups = groups.filter(
       (group) => gateType(group) === RequirePersonaExperience,
     );
@@ -104,24 +103,30 @@ describe("App-Routen — Session-Gate", () => {
     expect(permissionGroups).toHaveLength(1);
     expect(elementOf(permissionGroups[0] as RouteObject).props).toMatchObject({
       permission: "boards.collaborate",
-      // Redirect-Ziel "/" — /boards als Fallback ergäbe hier eine Schleife.
       fallbackTo: "/",
     });
     expect(childPaths(permissionGroups[0] as RouteObject)).toEqual([
       "/boards",
       "/boards/:boardId",
     ]);
-
-    const sessionLeaves = groups.filter((group) => group.path);
-    expect(sessionLeaves.map((route) => route.path)).toEqual([
-      "/admin/users",
-      "/konto/passwort",
-    ]);
+    expect(
+      groups.filter((group) => group.path).map((route) => route.path),
+    ).toEqual(["/admin/users", "/konto/passwort"]);
   });
 
-  it("der Catch-all führt zur Landing — der alte Default-Redirect nach /buerger ist weg", () => {
+  it.each([
+    "/buerger",
+    "/boards",
+    "/barrierefreiheit/",
+    "/barrierefreiheit/intern",
+    "/Barrierefreiheit",
+    "//barrierefreiheit",
+  ])("%s ist kein exakter öffentlicher Pfad", (pathname) => {
+    expect(isPublicPath(pathname)).toBe(false);
+  });
+
+  it("der Catch-all führt zur Landing", () => {
     const fallback = tree.find((route) => route.path === "*");
-    expect(fallback).toBeTruthy();
     expect(elementOf(fallback as RouteObject).props).toMatchObject({
       to: "/",
       replace: true,
