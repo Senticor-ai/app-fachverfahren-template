@@ -34,6 +34,7 @@ export default defineConfig({
       "@senticor/platform-contracts": pkg("platform-contracts"),
       "@senticor/conformance-kit": pkg("conformance-kit"),
       "@senticor/app-store-postgres": pkg("app-store-postgres"),
+      "@senticor/app-runtime-fastify": pkg("app-runtime-fastify"),
     },
   },
   test: {

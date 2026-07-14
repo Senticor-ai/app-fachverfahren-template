@@ -113,8 +113,14 @@ if (serviceWorker) {
   }
 }
 
-const server = read(join(appRoot, "server/index.ts"));
-if (server) {
+// Der Web-Delivery-Vertrag lebt im Runtime-Quelltext: App-Komposition PLUS die
+// extrahierte Runtime (@senticor/app-runtime-fastify). Die Literale müssen IRGENDWO
+// in dieser Quellmenge stehen — egal, wie weit die Extraktion fortgeschritten ist.
+const server = [
+  read(join(appRoot, "server/index.ts")),
+  ...runtimePackageSources(join(root, "packages/app-runtime-fastify/src")),
+].join("\n");
+if (server.trim()) {
   for (const required of [
     "Content-Security-Policy",
     "Content-Security-Policy-Report-Only",
@@ -175,6 +181,17 @@ function read(path) {
     return "";
   }
   return readFileSync(path, "utf8");
+}
+
+function runtimePackageSources(srcDir) {
+  if (!existsSync(srcDir)) {
+    failures.push(`missing ${display(srcDir)}`);
+    return [];
+  }
+  return readdirSync(srcDir)
+    .filter((file) => file.endsWith(".ts") && !file.endsWith(".test.ts"))
+    .sort()
+    .map((file) => readFileSync(join(srcDir, file), "utf8"));
 }
 
 function display(path) {

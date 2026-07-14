@@ -11,6 +11,7 @@
     { "path": "packages/conformance-kit" },
     { "path": "packages/migration-kit" },
     { "path": "packages/app-store-postgres" },
+    { "path": "packages/app-runtime-fastify" },
     { "path": "jurisdictions/eu" },
     { "path": "jurisdictions/de" }
   ]
