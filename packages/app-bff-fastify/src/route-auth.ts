@@ -21,6 +21,12 @@ declare module "fastify" {
   interface FastifyRequest {
     bffSession?: ResolvedSession;
   }
+  // Bewusst `unknown` statt BffRouteAuth: die App-Komposition trägt in config.auth
+  // ihre eigene RouteAuthPolicy-Union — beide Formen müssen zuweisbar bleiben
+  // (der Startup-Guard prüft nur Präsenz).
+  interface FastifyContextConfig {
+    auth?: unknown;
+  }
 }
 
 export type BffRouteAuth =
