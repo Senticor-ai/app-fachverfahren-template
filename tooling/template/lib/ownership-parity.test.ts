@@ -81,17 +81,10 @@ const updateUnmanagedPaths: string[] = [
   // Lokale Entwicklungsumgebung + E2E: Konsumenten-Hoheit.
   "dev/**",
   "tests/e2e/**",
-  // Doku außerhalb der verwalteten docs/agents|assets|reference|capabilities-Bäume.
-  "docs/UX-UPGRADE-PLAN.md",
+  // Doku außerhalb der verwalteten docs/agents|assets|compliance|reference|ux-ui-Bäume.
   "docs/adr/**",
   "docs/architecture/**",
-  "docs/compliance/**",
-  "docs/contributing/**",
   "docs/examples/**",
-  "docs/migration/**",
-  "docs/operations/**",
-  "docs/ux-ui/**",
-  "docs/validation/**",
   // Rechtsraum-Pakete: Konsumenten ergänzen eigene Jurisdiktionen — Kandidat für replace,
   // sobald die Abgrenzung geteilt/konsumenten-eigen entschieden ist.
   "jurisdictions/*/**",
