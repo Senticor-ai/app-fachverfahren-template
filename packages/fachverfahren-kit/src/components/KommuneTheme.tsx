@@ -71,6 +71,34 @@ function parseColor(c: string): [number, number, number] | null {
   }
   const m = s.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i);
   if (m) return [Number(m[1]), Number(m[2]), Number(m[3])];
+  // hsl()/hsla() — WICHTIG fuer die Kontrast-Ableitung: Markenfarben liegen oft als hsl vor (z. B.
+  // die Default-Kommune). Ohne diesen Zweig liefert pickForeground null -> es wird KEIN
+  // --primary-foreground injiziert -> im Dark-Mode faellt der Token-Wert (dunkel) ein und der
+  // Marken-Hintergrund traegt dunklen Text (BITV-Verstoss). Mit hsl-Parsing wird der Vordergrund
+  // korrekt (schwarz/weiss) abgeleitet und Theme-unabhaengig gesetzt.
+  const hslM = s.match(
+    /hsla?\(\s*([\d.]+)\s*[,\s]\s*([\d.]+)%\s*[,\s]\s*([\d.]+)%/i,
+  );
+  if (hslM) {
+    const h = (((Number(hslM[1]) % 360) + 360) % 360) / 60;
+    const sat = Math.min(1, Math.max(0, Number(hslM[2]) / 100));
+    const li = Math.min(1, Math.max(0, Number(hslM[3]) / 100));
+    const chroma = (1 - Math.abs(2 * li - 1)) * sat;
+    const x = chroma * (1 - Math.abs((h % 2) - 1));
+    const mm = li - chroma / 2;
+    let r1, g1, b1;
+    if (h < 1) [r1, g1, b1] = [chroma, x, 0];
+    else if (h < 2) [r1, g1, b1] = [x, chroma, 0];
+    else if (h < 3) [r1, g1, b1] = [0, chroma, x];
+    else if (h < 4) [r1, g1, b1] = [0, x, chroma];
+    else if (h < 5) [r1, g1, b1] = [x, 0, chroma];
+    else [r1, g1, b1] = [chroma, 0, x];
+    return [
+      Math.round((r1 + mm) * 255),
+      Math.round((g1 + mm) * 255),
+      Math.round((b1 + mm) * 255),
+    ];
+  }
   return null;
 }
 
