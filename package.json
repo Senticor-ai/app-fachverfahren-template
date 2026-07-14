@@ -70,6 +70,7 @@
     "check:esm": "node scripts/check-esm-policy.mjs",
     "check:dockerfile-paths": "node scripts/check-dockerfile-paths.mjs",
     "check:openapi": "node scripts/check-openapi.mjs",
+    "smoke:runtime": "node scripts/smoke-runtime.mjs",
     "check:web-delivery": "node scripts/check-web-delivery.mjs",
     "check:pwa-runtime": "node scripts/check-pwa-runtime.mjs",
     "check:pwa": "pnpm run build:app && pnpm run build:server && pnpm run check:pwa-runtime",
