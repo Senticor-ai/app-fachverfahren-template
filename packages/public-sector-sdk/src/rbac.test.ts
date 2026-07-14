@@ -15,6 +15,23 @@ describe("public sector RBAC registry", () => {
     expect(hasPermission(["caseworker"], "case.decision.prepare")).toBe(true);
   });
 
+  it("trennt Mailbox-SCHREIBRECHTE nach eigenem vs. behördlichem Postfach", () => {
+    // Schreiben reitet NIE auf einem Leserecht: POST /api/mailbox verlangt
+    // eigene Write-Permissions (Issue #11, Design-Constraint).
+    expect(hasPermission(["citizen"], "mailbox.own.write")).toBe(true);
+    expect(hasPermission(["citizen"], "mailbox.authority.write")).toBe(false);
+
+    expect(hasPermission(["caseworker"], "mailbox.authority.write")).toBe(true);
+    expect(hasPermission(["caseworker"], "mailbox.own.write")).toBe(false);
+
+    expect(resolvePermissionsForRoles(["citizen"])).toContain(
+      "mailbox.own.write",
+    );
+    expect(resolvePermissionsForRoles(["caseworker"])).toContain(
+      "mailbox.authority.write",
+    );
+  });
+
   it("fails closed for unknown roles", () => {
     expect(() => resolvePermissionsForRoles(["unknown-role"])).toThrow(
       /unknown role/,

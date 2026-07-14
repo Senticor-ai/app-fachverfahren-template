@@ -148,9 +148,15 @@ Permissions aus der RBAC-Registry.
 - `preferences.read`
 - `preferences.write`
 - `mailbox.own.read`
+- `mailbox.own.write`
 - `mailbox.authority.read`
+- `mailbox.authority.write`
 - `case.read`
 - `case.decision.prepare`
+
+Schreiben reitet nie auf einem Leserecht: Mailbox-POSTs verlangen die
+eigenen `*.write`-Permissions (Bürger nur `mailbox.own.write`,
+Sachbearbeitung nur `mailbox.authority.write`).
 
 ## Neue Rollen ergänzen
 
