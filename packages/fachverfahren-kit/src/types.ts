@@ -719,3 +719,14 @@ export interface VorgangPort<TAntragsdaten = Record<string, unknown>> {
   /** Once-Only-Lookup gegen das Register. */
   lookupRegister(query: string): Record<string, string> | undefined;
 }
+
+/** Ein Wissensartikel als DATEN. Inhalte werden über die gemeinsame Markdown-Render-Schicht dargestellt. */
+export interface WissensArtikel {
+  id: string;
+  titel: string;
+  markdown: string;
+  /** Optionale Gruppierung in der Wissens-Navigation. */
+  kategorie?: string;
+  /** Optionaler ISO-Zeitstempel der letzten Änderung. */
+  standIso?: string;
+}
