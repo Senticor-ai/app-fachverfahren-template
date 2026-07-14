@@ -1,8 +1,9 @@
 # Backend mit Fastify
 
 > **Für Agenten: Quellen & Pflicht-Lektüre.**
-> Status: IST für die neutrale Web-Delivery-Runtime unter
-> `apps/fachverfahren/server/`; fachliche API-, OpenAPI-, App-Daten- und
+> Status: IST für die neutrale Web-Delivery-Runtime in
+> `packages/app-runtime-fastify` (komponiert unter
+> `apps/fachverfahren/server/`); fachliche API-, OpenAPI-, App-Daten- und
 > Postgres-E2E-Routen bleiben explizite Ausbauschritte.
 > Quellen: Architekturentscheidungen dieses Templates, `AGENTS.md`.
 > Pflicht-Lektüre vorher: `AGENTS.md`.
@@ -10,6 +11,16 @@
 Das Template nutzt einen TypeScript-Fastify-Server als Web-Delivery-Runtime.
 Der SPA-Build bleibt austauschbar, aber Health, Runtime-Konfiguration,
 Security-Header, Cache-Header und interne Betriebsendpunkte sind Fastify-first.
+
+Die neutrale Runtime lebt als wiederverwendbares Paket in
+`packages/app-runtime-fastify` (`@senticor/app-runtime-fastify`):
+Runtime-Config, Dual-Port-Server (public/internal), Health, Static/SPA,
+Security-Header, Metrics, Logging, Graceful Shutdown.
+`apps/fachverfahren/server/index.ts` ist die dünne Komposition darüber:
+App-Identität (`RuntimeConfigOverrides`), Store-Konstruktion und
+App-Routen-Registrierung über die Registrar-Naht
+(`registerRoutes(app, context)` bzw. `startRuntime({ registerPublicRoutes,
+registerInternalRoutes, beforeListen })`).
 
 ## Endpunkte
 
@@ -25,10 +36,11 @@ kritische Abhängigkeiten prüfen; Liveness darf das nicht.
 
 ## Plattform- und Domain-Routen
 
-Der aktuelle Template-Server unter `apps/fachverfahren/server/` liefert den
-Web-Delivery-Vertrag: SPA, Health, Runtime-Konfiguration, Security-Header,
-Cache-Header, Metrics und Build-Info. Plattform- oder Domain-APIs werden als
-explizite Fastify-Routen ergänzt und behalten ihre Permissions, Events und
+Die Runtime (`@senticor/app-runtime-fastify`, komponiert in
+`apps/fachverfahren/server/`) liefert den Web-Delivery-Vertrag: SPA, Health,
+Runtime-Konfiguration, Security-Header, Cache-Header, Metrics und Build-Info.
+Plattform- oder Domain-APIs werden als explizite Fastify-Routen über die
+Registrar-Naht ergänzt und behalten ihre Permissions, Events und
 Compliance-Hinweise im Domain-Manifest.
 
 Der Server-Build ist absichtlich eng geschnitten:

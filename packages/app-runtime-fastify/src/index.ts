@@ -1,6 +1,7 @@
 // @senticor/app-runtime-fastify — neutrale Web-Delivery-Runtime (Fastify): Runtime-Config,
-// Metrics und Logging. Server-Bau, Static-Delivery und Shutdown folgen in der Extraktion
-// aus apps/*/server/index.ts (Issue #11, Phase A/B).
+// Dual-Port-Server (public/internal), Health, Static/SPA-Auslieferung, Security-Header,
+// Metrics, Logging und Graceful Shutdown. Apps komponieren ihre BFF-Routen über die
+// Registrar-Nähte (RouteRegistrar/InternalRouteRegistrar) — das Paket bleibt domainfrei.
 export {
   DEFAULT_MAX_BODY_BYTES,
   DEFAULT_SHUTDOWN_TIMEOUT_MS,
@@ -11,5 +12,33 @@ export {
   type RuntimeConfig,
   type RuntimeConfigOverrides,
 } from "./config.js";
-export { RuntimeMetrics, label } from "./metrics.js";
+export { IMMUTABLE, NO_STORE } from "./constants.js";
+export {
+  assertStaticDir,
+  checkRequiredUpstreams,
+  staticDirIsReadable,
+} from "./health.js";
+export {
+  readHeader,
+  registerPublicHooks,
+  routeForMetrics,
+  safePathname,
+} from "./hooks.js";
 export { logAudit, logError, logInfo } from "./logging.js";
+export { RuntimeMetrics, label } from "./metrics.js";
+export {
+  startRuntime,
+  type InternalRouteRegistrar,
+  type RunningRuntime,
+  type StartRuntimeOptions,
+} from "./runtime.js";
+export { applySecurityHeaders } from "./security-headers.js";
+export {
+  buildInternalServer,
+  buildPublicServer,
+  createRuntimeState,
+  type RouteRegistrar,
+  type RuntimeContext,
+  type RuntimeState,
+} from "./servers.js";
+export { cachePolicy, serveStatic } from "./static.js";

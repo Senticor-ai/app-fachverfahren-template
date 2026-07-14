@@ -11,6 +11,7 @@
     "tsBuildInfoFile": "dist-server/.tsbuildinfo"
   },
   "references": [
+    { "path": "../../packages/app-runtime-fastify" },
     { "path": "../../packages/app-store-postgres" },
     { "path": "../../packages/provider-local-auth" }
   ],

@@ -1,3 +1,8 @@
+// index.test — KOMPOSITIONS-Test der dünnen App-Runtime: beweist, dass die Wrapper die
+// Paket-Runtime (@senticor/app-runtime-fastify) korrekt verdrahten (Header via Hooks,
+// public/internal-Trennung) UND dass die App-Routen über die registerRoutes-Naht
+// tatsächlich registriert werden. Das vollständige Runtime-Verhalten sichern die
+// Paket-Tests (packages/app-runtime-fastify/src/servers.test.ts).
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,8 +13,8 @@ import {
   readRuntimeConfig,
 } from "./index.js";
 
-describe("fachverfahren runtime", () => {
-  it("sets redeploy-safe cache and security headers", async () => {
+describe("fachverfahren runtime composition", () => {
+  it("verdrahtet die Paket-Runtime: Header, App-Identität, public/internal-Trennung", async () => {
     const staticDir = await createStaticDir();
     const config = readRuntimeConfig({
       STATIC_DIR: staticDir,
@@ -20,57 +25,24 @@ describe("fachverfahren runtime", () => {
       config,
       state: { startupComplete: true, shuttingDown: false },
     });
+    const internalApp = buildInternalServer({ config });
     try {
       const root = await app.inject({ method: "GET", url: "/" });
       expect(root.statusCode).toBe(200);
       expect(root.headers["cache-control"]).toBe("no-store");
       expect(root.headers["content-security-policy"]).toContain(
-        "object-src 'none'",
-      );
-      expect(root.headers["content-security-policy"]).toContain(
         "style-src-elem 'self' 'unsafe-inline'",
-      );
-      expect(root.headers["strict-transport-security"]).toContain(
-        "max-age=31536000",
-      );
-      expect(root.headers["x-content-type-options"]).toBe("nosniff");
-      expect(root.headers["referrer-policy"]).toBe(
-        "strict-origin-when-cross-origin",
-      );
-      expect(root.headers["permissions-policy"]).toContain("camera=()");
-
-      const asset = await app.inject({
-        method: "GET",
-        url: "/assets/index-12345678.js",
-      });
-      expect(asset.statusCode).toBe(200);
-      expect(asset.headers["cache-control"]).toBe(
-        "public, max-age=31536000, immutable",
       );
 
       const runtimeConfig = await app.inject({
         method: "GET",
         url: "/runtime-config.json",
       });
-      expect(runtimeConfig.statusCode).toBe(200);
-      expect(runtimeConfig.headers["cache-control"]).toBe("no-store");
-      expect(runtimeConfig.json().delivery.serviceWorkerEnabled).toBe(false);
-    } finally {
-      await app.close();
-      await rm(staticDir, { recursive: true, force: true });
-    }
-  });
+      expect(runtimeConfig.json().application.applicationId).toBe(
+        "fachverfahren",
+      );
 
-  it("keeps internal endpoints off the public app port", async () => {
-    const staticDir = await createStaticDir();
-    const config = readRuntimeConfig({ STATIC_DIR: staticDir });
-    const publicApp = buildPublicServer({
-      config,
-      state: { startupComplete: true, shuttingDown: false },
-    });
-    const internalApp = buildInternalServer({ config });
-    try {
-      const publicMetrics = await publicApp.inject({
+      const publicMetrics = await app.inject({
         method: "GET",
         url: "/internal/metrics",
       });
@@ -82,34 +54,27 @@ describe("fachverfahren runtime", () => {
       });
       expect(internalMetrics.statusCode).toBe(200);
       expect(internalMetrics.body).toContain("app_build_info");
-
-      const buildInfo = await internalApp.inject({
-        method: "GET",
-        url: "/internal/build-info",
-      });
-      expect(buildInfo.statusCode).toBe(200);
-      expect(buildInfo.json().config.serviceWorkerEnabled).toBe(false);
     } finally {
-      await publicApp.close();
+      await app.close();
       await internalApp.close();
       await rm(staticDir, { recursive: true, force: true });
     }
   });
 
-  it("marks readiness false during shutdown", async () => {
+  it("registriert die App-Routen über die Naht (401 statt SPA-Fallback)", async () => {
     const staticDir = await createStaticDir();
     const config = readRuntimeConfig({ STATIC_DIR: staticDir });
-    const state = { startupComplete: true, shuttingDown: false };
-    const app = buildPublicServer({ config, state });
+    const app = buildPublicServer({
+      config,
+      state: { startupComplete: true, shuttingDown: false },
+    });
     try {
-      const ready = await app.inject({ method: "GET", url: "/readyz" });
-      expect(ready.statusCode).toBe(200);
-      state.shuttingDown = true;
-      const shuttingDown = await app.inject({
-        method: "GET",
-        url: "/readyz",
-      });
-      expect(shuttingDown.statusCode).toBe(503);
+      const boards = await app.inject({ method: "GET", url: "/api/v1/boards" });
+      expect(boards.statusCode).toBe(401);
+      expect(boards.json()).toEqual({ error: "authentication required" });
+
+      const status = await app.inject({ method: "GET", url: "/auth/status" });
+      expect(status.statusCode).toBe(200);
     } finally {
       await app.close();
       await rm(staticDir, { recursive: true, force: true });
