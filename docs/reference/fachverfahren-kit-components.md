@@ -87,6 +87,7 @@ not carry copied component templates.
 - `AuditTimeline`
 - `ReportingPanel`
 - `TerminFristPanel`
+- `VerfahrenInspektor` (Storybook-/Diagnosefläche für die Struktur der `LeistungConfig`)
 
 `Arbeitsvorrat` rendert Desktop als sortierbare Tabelle mit sticky Header und
 auf Mobil als touchfähige Kartenliste mit eigener Sortierkontrolle. Die
