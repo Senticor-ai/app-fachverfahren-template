@@ -1,83 +1,130 @@
 // route-gating.guard.test.ts — Vertrag des Routen-Baums: die Landing ("/") ist die EINZIGE
-// unauthentifizierte Route; ALLE Persona- und Workspace-Routen liegen hinter dem
-// Session-Gate (RequireSessionOutlet-Layout-Route). Guard auf Quelltext-Ebene, weil das Repo
-// bewusst keine DOM-Render-Testinfrastruktur für die App führt (Komponenten-Verhalten läuft
-// über Storybook-/Browser-Tests des Kits).
-import { readFile } from "node:fs/promises";
+// unauthentifizierte Route (plus /login-Alias); ALLE Persona- und Workspace-Routen liegen
+// hinter GENAU EINEM Session-Gate (RequireSessionOutlet-Layout-Route). Seit Issue #35 ist
+// der Vertrag STRUKTURELL statt Quelltext-Grep: die abgenommene Klassifizierung lebt als
+// pure Daten in src/app/route-gates.ts, und der aus den Deskriptoren gebaute react-router-
+// Baum wird über createRoutesFromChildren inspiziert — weiterhin OHNE DOM-Rendering
+// (das Repo führt bewusst keine DOM-Render-Testinfrastruktur für die App; Komponenten-
+// Verhalten läuft über Storybook-/Browser-Tests des Kits).
+import type { ReactElement } from "react";
+import { createRoutesFromChildren, type RouteObject } from "react-router-dom";
 import { describe, expect, it } from "vitest";
+import { buildAppRouteChildren } from "../src/app/build-routes.js";
+import {
+  RequirePermissionOutlet,
+  RequirePersonaExperience,
+  RequireSessionOutlet,
+} from "../src/app/guards.js";
+import { routeGates } from "../src/app/route-gates.js";
+import { appRoutes } from "../src/app/routes.js";
 
-const appSource = () =>
-  readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
+function elementOf(route: RouteObject): ReactElement {
+  return route.element as ReactElement;
+}
 
-const GATED_PATHS = [
-  'path="/buerger"',
-  'path="/buerger/anmelden"',
-  'path="/buerger/bestaetigung/:id"',
-  'path="/amt"',
-  'path="/amt/vorgang/:id"',
-  'path="/aufsicht"',
-  'path="/boards"',
-  'path="/boards/:boardId"',
-  'path="/admin/users"',
-  'path="/konto/passwort"',
-];
+function gateType(route: RouteObject): unknown {
+  return elementOf(route)?.type;
+}
+
+function childPaths(route: RouteObject): string[] {
+  return (route.children ?? []).map((child) => child.path ?? "(layout)");
+}
+
+const tree = createRoutesFromChildren(buildAppRouteChildren(appRoutes));
 
 describe("App-Routen — Session-Gate", () => {
-  it("es gibt genau EINE RequireSessionOutlet-Layout-Route", async () => {
-    const source = await appSource();
-    const markers = source.match(
-      /<Route element=\{<RequireSessionOutlet \/>\}>/g,
-    );
-    expect(markers).toHaveLength(1);
+  it("die Routen-Tabelle ist die abgenommene Klassifizierung", () => {
+    expect(routeGates).toEqual({
+      "/": { kind: "public" },
+      "/login": { kind: "public" },
+      "/buerger": { kind: "persona", persona: "buerger" },
+      "/buerger/anmelden": { kind: "persona", persona: "buerger" },
+      "/buerger/bestaetigung/:id": { kind: "persona", persona: "buerger" },
+      "/amt": { kind: "persona", persona: "sachbearbeitung" },
+      "/amt/vorgang/:id": { kind: "persona", persona: "sachbearbeitung" },
+      "/aufsicht": { kind: "persona", persona: "aufsicht" },
+      "/boards": {
+        kind: "permission",
+        permission: "boards.collaborate",
+        fallbackTo: "/",
+      },
+      "/boards/:boardId": {
+        kind: "permission",
+        permission: "boards.collaborate",
+        fallbackTo: "/",
+      },
+      "/admin/users": { kind: "session" },
+      "/konto/passwort": { kind: "session" },
+    });
   });
 
-  it("alle Persona- und Workspace-Routen stehen INNERHALB des Gates", async () => {
-    const source = await appSource();
-    const gateStart = source.indexOf(
-      "<Route element={<RequireSessionOutlet />}>",
+  it("jede klassifizierte Route hat genau eine Sicht (Deskriptor-Vollständigkeit)", () => {
+    expect(appRoutes.map((route) => route.path).sort()).toEqual(
+      Object.keys(routeGates).sort(),
     );
-    const gateEnd = source.indexOf('path="*"');
-    expect(gateStart).toBeGreaterThan(-1);
-    expect(gateEnd).toBeGreaterThan(gateStart);
-    for (const path of GATED_PATHS) {
-      const index = source.indexOf(path);
-      expect(index, `${path} fehlt`).toBeGreaterThan(gateStart);
-      expect(index, `${path} liegt außerhalb des Gates`).toBeLessThan(gateEnd);
+    for (const route of appRoutes) {
+      expect(route.element, route.path).toBeTruthy();
     }
   });
 
-  it('die Landing liegt VOR dem Gate und "/login" bleibt nur ein Alias', async () => {
-    const source = await appSource();
-    const gateStart = source.indexOf(
-      "<Route element={<RequireSessionOutlet />}>",
+  it("es gibt genau EINE RequireSessionOutlet-Layout-Route — und nur / + /login davor", () => {
+    const gates = tree.filter(
+      (route) => gateType(route) === RequireSessionOutlet,
     );
-    expect(source.indexOf('path="/"')).toBeGreaterThan(-1);
-    expect(source.indexOf('path="/"')).toBeLessThan(gateStart);
-    expect(source.indexOf('path="/login"')).toBeLessThan(gateStart);
+    expect(gates).toHaveLength(1);
+
+    const topLevelPaths = tree.map((route) => route.path ?? "(layout)");
+    expect(topLevelPaths).toEqual(["/", "/login", "(layout)", "*"]);
   });
 
-  it("der alte unauthentifizierte Default-Redirect nach /buerger ist weg", async () => {
-    const source = await appSource();
-    expect(source).not.toContain('to="/buerger"');
-  });
+  it("alle Persona- und Workspace-Routen stehen INNERHALB des Gates", () => {
+    const gate = tree.find((route) => gateType(route) === RequireSessionOutlet);
+    const groups = gate?.children ?? [];
 
-  // Arbeitsbereichs-Gates: Persona-Routen liegen in drei RequirePersonaExperience-
-  // Gruppen (NUR Navigation, keine Autorisierungsgrenze) INNERHALB des Session-Gates;
-  // der Boards-Workspace verlangt zusätzlich die Permission boards.collaborate.
-  it("drei RequirePersonaExperience-Gruppen existieren innerhalb des Session-Gates", async () => {
-    const source = await appSource();
-    const gateStart = source.indexOf(
-      "<Route element={<RequireSessionOutlet />}>",
+    const personaGroups = groups.filter(
+      (group) => gateType(group) === RequirePersonaExperience,
     );
-    for (const persona of ["buerger", "sachbearbeitung", "aufsicht"]) {
-      const marker = `<RequirePersonaExperience persona="${persona}" />`;
-      const index = source.indexOf(marker);
-      expect(index, `${marker} fehlt`).toBeGreaterThan(gateStart);
-    }
+    expect(
+      personaGroups.map((group) => elementOf(group).props.persona),
+    ).toEqual(["buerger", "sachbearbeitung", "aufsicht"]);
+    expect(childPaths(personaGroups[0] as RouteObject)).toEqual([
+      "/buerger",
+      "/buerger/anmelden",
+      "/buerger/bestaetigung/:id",
+    ]);
+    expect(childPaths(personaGroups[1] as RouteObject)).toEqual([
+      "/amt",
+      "/amt/vorgang/:id",
+    ]);
+    expect(childPaths(personaGroups[2] as RouteObject)).toEqual(["/aufsicht"]);
+
+    const permissionGroups = groups.filter(
+      (group) => gateType(group) === RequirePermissionOutlet,
+    );
+    expect(permissionGroups).toHaveLength(1);
+    expect(elementOf(permissionGroups[0] as RouteObject).props).toMatchObject({
+      permission: "boards.collaborate",
+      // Redirect-Ziel "/" — /boards als Fallback ergäbe hier eine Schleife.
+      fallbackTo: "/",
+    });
+    expect(childPaths(permissionGroups[0] as RouteObject)).toEqual([
+      "/boards",
+      "/boards/:boardId",
+    ]);
+
+    const sessionLeaves = groups.filter((group) => group.path);
+    expect(sessionLeaves.map((route) => route.path)).toEqual([
+      "/admin/users",
+      "/konto/passwort",
+    ]);
   });
 
-  it("/boards* verlangt die Permission boards.collaborate", async () => {
-    const source = await appSource();
-    expect(source).toContain('permission="boards.collaborate"');
+  it("der Catch-all führt zur Landing — der alte Default-Redirect nach /buerger ist weg", () => {
+    const fallback = tree.find((route) => route.path === "*");
+    expect(fallback).toBeTruthy();
+    expect(elementOf(fallback as RouteObject).props).toMatchObject({
+      to: "/",
+      replace: true,
+    });
   });
 });

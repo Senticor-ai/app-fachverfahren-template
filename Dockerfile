@@ -16,6 +16,7 @@ COPY packages/platform-contracts/package.json packages/platform-contracts/packag
 COPY packages/public-sector-sdk/package.json packages/public-sector-sdk/package.json
 COPY packages/public-sector-ui/package.json packages/public-sector-ui/package.json
 COPY packages/provider-local/package.json packages/provider-local/package.json
+COPY packages/provider-local-auth/package.json packages/provider-local-auth/package.json
 COPY packages/provider-codesphere/package.json packages/provider-codesphere/package.json
 COPY packages/provider-dvc-generic/package.json packages/provider-dvc-generic/package.json
 COPY packages/conformance-kit/package.json packages/conformance-kit/package.json
