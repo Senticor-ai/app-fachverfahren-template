@@ -21,7 +21,7 @@ export const managedCandidateFiles = [
   "docs/reference/storybook.md",
   "docs/reference/test-driven-development.md",
   "docs/ux-ui/fachverfahren-ux-contract.md",
-  "docs/ux-ui/template-conformance.md",
+  "docs/ux-ui/template-review-gaps.md",
   "platform/capabilities.json",
   "schemas/agent-discovery.schema.json",
   "schemas/agent-run-report.schema.json",

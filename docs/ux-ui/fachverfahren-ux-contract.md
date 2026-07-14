@@ -12,9 +12,9 @@ Dieses Dokument integriert das lokale UX/UI-Guidance-Set in den App-Stack. Es
 ist der verbindliche Vertrag für generierte Fachverfahren-Apps,
 Bürgerportale, interne Sachbearbeitung und Storybook-Abnahme.
 
-Der aktuelle Abgleich mit Design Manual, Public-Sector-UX-Methodik und dem
-repo-lokalen Source-Set steht gebündelt in
-`docs/ux-ui/template-conformance.md`.
+Offene Nachweise und Architekturentscheidungen aus Design Manual,
+Public-Sector-UX-Methodik und dem repo-lokalen Source-Set stehen gebündelt in
+`docs/ux-ui/template-review-gaps.md`.
 
 ## Grundsatz
 

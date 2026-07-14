@@ -7,7 +7,8 @@ migration: 2026-07-docs-consolidation
 # Dokumentation konsolidiert
 
 - ergänzt `docs/README.md` als kanonischen Einstieg
-- bündelt drei UX/UI-Audits in einem aktuellen Konformitätsnachweis
+- bündelt drei UX/UI-Audits in einem Review-Gap-Register ohne
+  Konformitätsbehauptung
 - ersetzt vendor-spezifische Agenten-Handbücher durch einen vendor-neutralen
   Bootstrap
 - aktualisiert Querverweise und bündelt die Runtime-Dokumentation unter

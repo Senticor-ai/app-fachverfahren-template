@@ -85,8 +85,8 @@ Symbolleiste ersetzt keine manuelle Tastatur-/Screenreader-Prüfung).
 - Bei neuer UI zuerst Screen Contract und Story anlegen.
 - Stories folgen der Persona-Dichte aus
   `docs/ux-ui/fachverfahren-ux-contract.md`.
-- Bei UI- oder Screen-Contract-Änderungen den aktuellen Abgleich in
-  `docs/ux-ui/template-conformance.md` prüfen und die betroffenen Stories
+- Bei UI- oder Screen-Contract-Änderungen die offenen Review-Punkte in
+  `docs/ux-ui/template-review-gaps.md` prüfen und die betroffenen Stories
   aktualisieren.
 - Bei Sachbearbeitung, Bürgerportal, Zuständen oder App-Shell die Story
   `Design Manual/Fachverfahren` aktualisieren.

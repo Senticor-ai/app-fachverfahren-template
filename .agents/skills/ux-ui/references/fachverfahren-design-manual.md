@@ -84,7 +84,7 @@ Bürgerportale and Storybook review surfaces.
 - Use status badges with semantic text/icon.
 - Bulk review is expected where many similar decisions exist.
 - If pagination or bulk review is not implemented yet, keep it visible as an
-  RC-Gap in `docs/ux-ui/template-conformance.md`.
+  RC-Gap in `docs/ux-ui/template-review-gaps.md`.
 - Rows that navigate must be whole-row keyboard targets with Enter/Space support
   and clear `aria-label`s.
 

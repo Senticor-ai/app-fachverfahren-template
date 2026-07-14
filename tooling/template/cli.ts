@@ -1619,7 +1619,7 @@ async function validateGeneratedScaffold(root) {
     "scripts/smoke-runtime.mjs",
     "docs/README.md",
     "docs/agents/bootstrap.md",
-    "docs/ux-ui/template-conformance.md",
+    "docs/ux-ui/template-review-gaps.md",
     "platform/capabilities.json",
     "policy/k8s-delivery.rego",
     "sources/registry.yaml",

@@ -1,6 +1,6 @@
 // fachverfahren-kit/components/Stepper — standalone responsiver Fortschritts-Navigator.
 //
-// Setzt den UX/UI-Vertrag (Zwei-Modus-Muster nach KERN/EU-ECL, WCAG 2.2) als eigenständiges,
+// Setzt das bestehende responsive Fortschrittsmuster als eigenständiges,
 // generisches Primitiv um und behebt den Stepper-Überlauf an der Wurzel:
 //   A. IMMER sichtbares Text-Heading „Schritt X von Y — <Name>" (robuster, maßgeblicher Kern).
 //   B. IMMER sichtbarer dünner Fortschrittsbalken (role="progressbar", läuft nie über).
