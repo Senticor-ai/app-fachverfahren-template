@@ -1,11 +1,8 @@
 # Drittanbieter-Hinweise (Third-Party Notices)
 
 Dieses Werk steht unter der **EUPL-1.2** (siehe [`LICENSE`](LICENSE), Copyright © 2024–2026
-Senticor GmbH). Es nutzt und verteilt die unten genannten Open-Source-Komponenten unter deren
-jeweils eigenen Lizenzen. Diese Datei erfüllt die Attributionspflicht (EUPL-1.2 Art. 5 sowie die
-Copyright-/Lizenz-Hinweispflichten von MIT/ISC/BSD/Apache-2.0/EPL-2.0) und ist besonders für
-gebündelte Build-Artefakte (Docker-Image, App-Bundle) relevant, in denen die `node_modules`-
-Lizenzdateien nicht mitlaufen.
+Senticor GmbH). Es nutzt die unten genannten Open-Source-Komponenten unter deren jeweils eigenen
+Lizenzen. Maßgeblich bleiben die Lizenz- und Copyright-Dateien der konkreten Paketversionen.
 
 Die **vollständige** Liste aller mit-distribuierten Abhängigkeiten und ihrer Lizenzen lässt sich
 jederzeit reproduzieren mit:
@@ -13,10 +10,6 @@ jederzeit reproduzieren mit:
 ```
 pnpm licenses list --prod
 ```
-
-Auswertung des Produktions-Baums zum Release-Zeitpunkt: ausschließlich permissive bzw. datei-/
-modulweise reziproke Lizenzen — **kein** starkes Copyleft (kein GPL/AGPL/LGPL/SSPL/BUSL/CDDL),
-keine proprietären Pakete. Damit besteht kein Distributionskonflikt mit der EUPL-1.2.
 
 ## Adaptierte UI-Primitive
 
@@ -58,15 +51,12 @@ nach dem Copy-&-Adapt-Modell von **shadcn/ui** übernommene und angepasste Kompo
 ### Eclipse Public License 2.0 (EPL-2.0)
 
 - **elkjs** — © Kiel University / Eclipse Foundation. Transitiv über `@mermaid-js/layout-elk`
-  bzw. `mermaid`. Wird als **unverändertes, separat lizenziertes** npm-Modul eingebunden (kein
-  Source-Merge in EUPL-lizenzierte Dateien); EPL-2.0-Komponenten sind dynamische Dependencies und
-  keine Derivative Works des EUPL-Werks. Bei etwaigem Vendoring/Patchen von elkjs müsste der
-  Quellcode der geänderten EPL-Dateien unter EPL-2.0 angeboten werden.
+  bzw. `mermaid`.
 
 ### Dual-lizenziert
 
-- **dompurify** — `(MPL-2.0 OR Apache-2.0)`; hier wird die **Apache-2.0**-Option gewählt (voll
-  EUPL-1.2-kompatibel). © Dr.-Ing. Mario Heiderich, Cure53. Transitiv über `isomorphic-dompurify`.
+- **dompurify** — `(MPL-2.0 OR Apache-2.0)`. © Dr.-Ing. Mario Heiderich, Cure53. Transitiv über
+  `isomorphic-dompurify`.
 
 ## Schriften
 

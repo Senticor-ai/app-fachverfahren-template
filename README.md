@@ -210,9 +210,7 @@ siehe [`LICENSE`](LICENSE). Copyright © 2024–2026 **Senticor GmbH** (Produkt:
 das Projekt betreut. Beiträge werden unter derselben Lizenz (EUPL-1.2) eingebracht.
 
 Mitgelieferte Open-Source-Komponenten und ihre Lizenzen sind in
-[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) aufgeführt (Attribution nach EUPL-1.2 Art. 5).
-Alle Produktions-Abhängigkeiten sind permissiv bzw. datei-/modulweise reziprok lizenziert; es gibt
-kein starkes Copyleft und damit keinen Lizenzkonflikt mit der EUPL-1.2.
+[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) aufgeführt.
 
 ## Wichtige Regeln
 
