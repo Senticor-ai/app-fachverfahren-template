@@ -10,7 +10,7 @@ import { checkRequiredUpstreams, staticDirIsReadable } from "./health.js";
 import { registerPublicHooks } from "./hooks.js";
 import { RuntimeMetrics } from "./metrics.js";
 import { redactedConfigSummary } from "./config.js";
-import { serveStatic } from "./static.js";
+import { registerStaticDelivery } from "./static.js";
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 const DEFAULT_HEADER_TIMEOUT_MS = 10_000;
@@ -97,16 +97,7 @@ export function buildPublicServer({
       .header("Cache-Control", NO_STORE)
       .send({ status: "not-found" });
   });
-  app.setNotFoundHandler(async (request, reply) => {
-    if (request.method !== "GET" && request.method !== "HEAD") {
-      return reply
-        .code(405)
-        .header("Allow", "GET, HEAD")
-        .header("Cache-Control", NO_STORE)
-        .send({ status: "method-not-allowed" });
-    }
-    return serveStatic(request, reply, config);
-  });
+  registerStaticDelivery(app, config);
   return app;
 }
 

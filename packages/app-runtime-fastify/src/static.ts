@@ -1,86 +1,62 @@
-// static — SPA-Auslieferung mit redeploy-sicherer Cache-Politik: index.html/Root-Dateien
-// no-store, content-gehashte Assets immutable, SPA-Fallback für extensionslose Pfade,
-// Traversal-Schutz, HEAD ohne Body. (Umbau auf @fastify/static: Issue #11, Phase B —
-// die Politik hier ist der Vertrag, die Dateiauslieferung das austauschbare Detail.)
-import { access, readFile, stat } from "node:fs/promises";
-import { constants } from "node:fs";
+// static — SPA-Auslieferung über @fastify/static; die POLITIK bleibt hier: redeploy-
+// sichere Cache-Header (index.html/Wurzeldokumente no-store, content-gehashte Assets
+// immutable), 404-JSON für fehlende Dateien MIT Extension, SPA-Fallback für
+// extensionslose Pfade, 405 für Nicht-GET/HEAD, Dotfile-Verzeichnisse (.well-known)
+// erlaubt. Traversal-Abwehr und HEAD-Semantik liefert @fastify/send; der Vertrag ist
+// in static.test.ts implementierungsneutral gepinnt.
 import path from "node:path";
-import type { FastifyReply, FastifyRequest } from "fastify";
+import fastifyStatic from "@fastify/static";
+import type { FastifyInstance } from "fastify";
 import type { RuntimeConfig } from "./config.js";
 import { IMMUTABLE, NO_STORE } from "./constants.js";
 import { safePathname } from "./hooks.js";
 
-export async function serveStatic(
-  request: FastifyRequest,
-  reply: FastifyReply,
+export function registerStaticDelivery(
+  app: FastifyInstance,
   config: RuntimeConfig,
-) {
-  const pathname = safePathname(request.url);
-  const staticFile = await resolveStaticFile(config.staticDir, pathname);
-  if (!staticFile) {
+): void {
+  app.register(fastifyStatic, {
+    root: config.staticDir,
+    wildcard: true,
+    index: "index.html",
+    // Cache-Politik UND Content-Types sind UNSERE (setHeaders); Validator-Header
+    // bleiben aus, damit sich das Verhalten gegenüber der bisherigen Runtime nicht
+    // ändert (kein etag/last-modified/range-Handling, das Proxies anders cachen
+    // ließe; .js bleibt text/javascript nach RFC 9239 — @fastify/send würde das
+    // veraltete application/javascript senden, check:pwa-runtime pinnt das).
+    cacheControl: false,
+    etag: false,
+    lastModified: false,
+    acceptRanges: false,
+    contentType: false,
+    // Delivery-Vertrag verlangt /.well-known/security.txt (check-web-delivery).
+    dotfiles: "allow",
+    serveDotFiles: true,
+    setHeaders: (res, filePath) => {
+      res.setHeader(
+        "cache-control",
+        cachePolicyForFile(config.staticDir, filePath),
+      );
+      res.setHeader("content-type", contentType(filePath));
+    },
+  });
+  app.setNotFoundHandler(async (request, reply) => {
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      return reply
+        .code(405)
+        .header("Allow", "GET, HEAD")
+        .header("Cache-Control", NO_STORE)
+        .send({ status: "method-not-allowed" });
+    }
+    const pathname = safePathname(request.url);
     if (path.extname(pathname)) {
       return reply
         .code(404)
         .header("Cache-Control", NO_STORE)
         .send({ status: "not-found" });
     }
-    return sendFile({
-      request,
-      reply,
-      filePath: path.join(config.staticDir, "index.html"),
-      cacheControl: NO_STORE,
-    });
-  }
-  return sendFile({
-    request,
-    reply,
-    filePath: staticFile,
-    cacheControl: cachePolicy(pathname),
+    return reply.header("Cache-Control", NO_STORE).sendFile("index.html");
   });
-}
-
-async function sendFile({
-  request,
-  reply,
-  filePath,
-  cacheControl,
-}: {
-  request: FastifyRequest;
-  reply: FastifyReply;
-  filePath: string;
-  cacheControl: string;
-}) {
-  const body = await readFile(filePath);
-  reply.header("Cache-Control", cacheControl).type(contentType(filePath));
-  if (request.method === "HEAD") {
-    return reply.send();
-  }
-  return reply.send(body);
-}
-
-async function resolveStaticFile(
-  staticDir: string,
-  pathname: string,
-): Promise<string | null> {
-  const normalized = path.normalize(pathname).replace(/^(\.\.(\/|\\|$))+/, "");
-  const relative = normalized.replace(/^[/\\]+/, "");
-  let candidate = path.join(staticDir, relative);
-  if (
-    candidate !== staticDir &&
-    !candidate.startsWith(`${staticDir}${path.sep}`)
-  ) {
-    return null;
-  }
-  try {
-    const candidateStat = await stat(candidate);
-    if (candidateStat.isDirectory()) {
-      candidate = path.join(candidate, "index.html");
-    }
-    await access(candidate, constants.R_OK);
-    return candidate;
-  } catch {
-    return null;
-  }
 }
 
 export function cachePolicy(pathname: string): string {
@@ -98,6 +74,12 @@ export function cachePolicy(pathname: string): string {
     return IMMUTABLE;
   }
   return NO_STORE;
+}
+
+function cachePolicyForFile(staticDir: string, filePath: string): string {
+  const relative = path.relative(staticDir, filePath);
+  const pathname = `/${relative.split(path.sep).join("/")}`;
+  return cachePolicy(pathname);
 }
 
 function contentType(filePath: string): string {

@@ -46,15 +46,20 @@ export function registerPublicHooks(
     const durationSeconds = context
       ? Number(process.hrtime.bigint() - context.startedAt) / 1_000_000_000
       : 0;
+    // Die Wildcard-Route des Static-Plugins ("/*") wäre als Label wertlos — Static-/
+    // SPA-Treffer werden wie ungeroutete Pfade beschriftet (/assets/*, spa, Datei).
+    const routeUrl = request.routeOptions.url;
+    const route =
+      routeUrl && routeUrl !== "/*" ? routeUrl : routeForMetrics(request.url);
     metrics.observe({
       method: request.method,
-      route: request.routeOptions.url ?? routeForMetrics(request.url),
+      route,
       statusCode: reply.statusCode,
       durationSeconds,
     });
     logInfo("runtime.request", {
       method: request.method,
-      route: request.routeOptions.url ?? routeForMetrics(request.url),
+      route,
       statusCode: reply.statusCode,
       durationMs: Math.round(durationSeconds * 1000),
       requestId: context?.requestId ?? request.id,

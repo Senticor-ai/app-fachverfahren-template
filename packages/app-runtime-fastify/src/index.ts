@@ -41,4 +41,4 @@ export {
   type RuntimeContext,
   type RuntimeState,
 } from "./servers.js";
-export { cachePolicy, serveStatic } from "./static.js";
+export { cachePolicy, registerStaticDelivery } from "./static.js";
