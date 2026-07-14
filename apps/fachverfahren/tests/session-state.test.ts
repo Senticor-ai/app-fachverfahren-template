@@ -49,6 +49,7 @@ describe("fetchSessionState", () => {
       apiAvailable: false,
       registration: "disabled",
       capabilities: {},
+      demoMode: false,
     });
   });
 
@@ -87,6 +88,7 @@ describe("fetchSessionState", () => {
       apiAvailable: false,
       registration: "disabled",
       capabilities: {},
+      demoMode: false,
     });
   });
 
@@ -105,6 +107,7 @@ describe("fetchSessionState", () => {
       // Alt-Server ohne Envelope: Registrierung geschlossen, keine Capabilities.
       registration: "disabled",
       capabilities: {},
+      demoMode: false,
     });
   });
 
@@ -116,12 +119,32 @@ describe("fetchSessionState", () => {
             bootstrapped: true,
             registration: "open_unverified",
             capabilities: { userPersonas: true },
+            demoMode: true,
           }),
         "/auth/session": () => jsonResponse({ error: "unauthorized" }, 401),
       }),
     );
     expect(snapshot.registration).toBe("open_unverified");
     expect(snapshot.capabilities).toEqual({ userPersonas: true });
+    expect(snapshot.demoMode).toBe(true);
+  });
+
+  it("setzt fehlende oder nicht-boolsche demoMode-Felder alter Server auf false", async () => {
+    const missing = await fetchSessionState(
+      fetchStub({
+        "/auth/status": () => jsonResponse({ bootstrapped: true }),
+        "/auth/session": () => jsonResponse({ error: "unauthorized" }, 401),
+      }),
+    );
+    const malformed = await fetchSessionState(
+      fetchStub({
+        "/auth/status": () =>
+          jsonResponse({ bootstrapped: true, demoMode: "true" }),
+        "/auth/session": () => jsonResponse({ error: "unauthorized" }, 401),
+      }),
+    );
+    expect(missing.demoMode).toBe(false);
+    expect(malformed.demoMode).toBe(false);
   });
 
   it("gültige Session → authenticated mit Principal", async () => {

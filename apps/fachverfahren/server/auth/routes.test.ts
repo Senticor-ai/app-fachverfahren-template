@@ -23,7 +23,7 @@ function buildTestApp(bootstrapToken: string | undefined) {
   return { app, authStore, kanbanStore, auditStore, bootstrapToken };
 }
 
-async function setUp(bootstrapToken: string | undefined) {
+async function setUp(bootstrapToken: string | undefined, demoMode = false) {
   const { app, authStore, kanbanStore, auditStore } =
     buildTestApp(bootstrapToken);
   await app.register(fastifyCookie);
@@ -32,6 +32,7 @@ async function setUp(bootstrapToken: string | undefined) {
     kanbanStore,
     auditStore,
     bootstrapToken,
+    demoMode,
   });
 
   const requirePrincipal = createRequirePrincipal(authStore);
@@ -244,6 +245,17 @@ describe("auth routes", () => {
     expect(body.capabilities).toEqual({ userPersonas: true });
     // Registrierung ist ohne explizite Konfiguration AUS.
     expect(body.registration).toBe("disabled");
+    expect(body.demoMode).toBe(false);
+  });
+
+  it("mirrors the parsed demo-mode setting on GET /auth/status", async () => {
+    const demo = await setUp("test-bootstrap-token", true);
+    const status = await demo.app.inject({
+      method: "GET",
+      url: "/auth/status",
+    });
+    expect(status.json().demoMode).toBe(true);
+    await demo.app.close();
   });
 });
 

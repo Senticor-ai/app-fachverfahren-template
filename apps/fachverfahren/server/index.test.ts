@@ -1,8 +1,4 @@
-// index.test — KOMPOSITIONS-Test der dünnen App-Runtime: beweist, dass die Wrapper die
-// Paket-Runtime (@senticor/app-runtime-fastify) korrekt verdrahten (Header via Hooks,
-// public/internal-Trennung) UND dass die App-Routen über die registerRoutes-Naht
-// tatsächlich registriert werden. Das vollständige Runtime-Verhalten sichern die
-// Paket-Tests (packages/app-runtime-fastify/src/servers.test.ts).
+// index.test — Kompositionsvertrag der dünnen App-Runtime über das Runtime-Paket.
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,12 +10,21 @@ import {
 } from "./index.js";
 
 describe("fachverfahren runtime composition", () => {
-  it("verdrahtet die Paket-Runtime: Header, App-Identität, public/internal-Trennung", async () => {
+  it("parst DEMO_MODE mit der gemeinsamen strikten Boolean-Grammatik", () => {
+    expect(readRuntimeConfig({ DEMO_MODE: "true" }).demoMode).toBe(true);
+    expect(readRuntimeConfig({}).demoMode).toBe(false);
+    expect(() => readRuntimeConfig({ DEMO_MODE: "sometimes" })).toThrow(
+      "invalid boolean value: sometimes",
+    );
+  });
+
+  it("verdrahtet Header, App-Identität, Demo-Feature und Port-Trennung", async () => {
     const staticDir = await createStaticDir();
     const config = readRuntimeConfig({
       STATIC_DIR: staticDir,
       NODE_ENV: "production",
       APP_ENABLE_SERVICE_WORKER: "false",
+      DEMO_MODE: "true",
     });
     const app = buildPublicServer({
       config,
@@ -38,16 +43,18 @@ describe("fachverfahren runtime composition", () => {
         method: "GET",
         url: "/runtime-config.json",
       });
-      expect(runtimeConfig.json().application.applicationId).toBe(
-        "fachverfahren",
-      );
-
-      const publicMetrics = await app.inject({
-        method: "GET",
-        url: "/internal/metrics",
+      expect(runtimeConfig.statusCode).toBe(200);
+      expect(runtimeConfig.headers["cache-control"]).toBe("no-store");
+      expect(runtimeConfig.json()).toMatchObject({
+        application: { applicationId: "fachverfahren" },
+        delivery: { serviceWorkerEnabled: false },
+        features: { demoMode: true },
       });
-      expect(publicMetrics.statusCode).toBe(404);
 
+      expect(
+        (await app.inject({ method: "GET", url: "/internal/metrics" }))
+          .statusCode,
+      ).toBe(404);
       const internalMetrics = await internalApp.inject({
         method: "GET",
         url: "/internal/metrics",
@@ -61,7 +68,7 @@ describe("fachverfahren runtime composition", () => {
     }
   });
 
-  it("registriert die App-Routen über die Naht (401 statt SPA-Fallback)", async () => {
+  it("registriert die App-Routen über die Naht", async () => {
     const staticDir = await createStaticDir();
     const config = readRuntimeConfig({ STATIC_DIR: staticDir });
     const app = buildPublicServer({
@@ -75,6 +82,7 @@ describe("fachverfahren runtime composition", () => {
 
       const status = await app.inject({ method: "GET", url: "/auth/status" });
       expect(status.statusCode).toBe(200);
+      expect(status.json().demoMode).toBe(false);
     } finally {
       await app.close();
       await rm(staticDir, { recursive: true, force: true });

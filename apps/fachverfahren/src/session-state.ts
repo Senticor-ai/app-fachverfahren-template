@@ -51,6 +51,8 @@ export interface SessionSnapshot {
   /** Self-Signup-Politik des Servers — steuert den Registrieren-Umschalter der Landing. */
   registration: RegistrationMode;
   capabilities: SessionCapabilities;
+  /** Compatibility mirror from /auth/status; banners use runtime-config instead. */
+  demoMode: boolean;
 }
 
 const API_UNAVAILABLE: SessionSnapshot = {
@@ -60,6 +62,7 @@ const API_UNAVAILABLE: SessionSnapshot = {
   apiAvailable: false,
   registration: "disabled",
   capabilities: {},
+  demoMode: false,
 };
 
 function isJsonResponse(response: Response): boolean {
@@ -90,13 +93,19 @@ export async function fetchSessionState(
     if (!statusResponse.ok || !isJsonResponse(statusResponse)) {
       return API_UNAVAILABLE;
     }
-    const { bootstrapped, storeAvailable, registration, capabilities } =
-      (await statusResponse.json()) as {
-        bootstrapped: boolean;
-        storeAvailable?: boolean;
-        registration?: RegistrationMode;
-        capabilities?: SessionCapabilities;
-      };
+    const {
+      bootstrapped,
+      storeAvailable,
+      registration,
+      capabilities,
+      demoMode,
+    } = (await statusResponse.json()) as {
+      bootstrapped: boolean;
+      storeAvailable?: boolean;
+      registration?: RegistrationMode;
+      capabilities?: SessionCapabilities;
+      demoMode?: unknown;
+    };
     // Degradierte Server-Antwort (Web-Tier oben, Datenbank unten): der Server meldet
     // storeAvailable=false mit 200 statt 500, damit der Browser keinen Ressourcen-
     // Fehler loggt — für die UI ist das „API nicht erreichbar" (Anmelden zwecklos).
@@ -107,6 +116,7 @@ export async function fetchSessionState(
       registration:
         registration === "open_unverified" ? registration : "disabled",
       capabilities: capabilities ?? {},
+      demoMode: demoMode === true,
     } as const;
 
     const sessionResponse = await fetchImpl(apiPath("/auth/session"), {

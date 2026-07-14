@@ -23,6 +23,8 @@ import {
 } from "./auth-forms.js";
 import { landingView, postLoginRedirect } from "./landing-state.js";
 import { allowedPersonas } from "./personas.js";
+import { DemoModeBanner } from "./DemoModeBanner.js";
+import { useRuntimeConfig } from "./runtime-config.js";
 import { useSession } from "./session.js";
 import { store } from "./store.js";
 
@@ -64,6 +66,7 @@ const BEREICHE: ReadonlyArray<{
 
 export function LandingPage(): React.ReactElement | null {
   const session = useSession();
+  const { demoMode } = useRuntimeConfig();
   const location = useLocation();
   const view = landingView(session);
   const [authMode, setAuthMode] = React.useState<"login" | "register">("login");
@@ -125,6 +128,7 @@ export function LandingPage(): React.ReactElement | null {
       </header>
       <main className="flex-1 px-4 pb-10" id="main-content">
         <div className="mx-auto w-full max-w-4xl">
+          {demoMode ? <DemoModeBanner /> : null}
           <div className="grid items-start gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>

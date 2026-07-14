@@ -33,12 +33,12 @@ describe("deliveryPath — BASE_URL-relative Auslieferungspfade", () => {
   });
 });
 
-describe("main.tsx — keine root-absoluten Auslieferungspfade", () => {
-  const mainSource = () =>
-    readFile(new URL("../src/main.tsx", import.meta.url), "utf8");
+describe("RuntimeConfigProvider — keine root-absoluten Auslieferungspfade", () => {
+  const providerSource = () =>
+    readFile(new URL("../src/runtime-config.tsx", import.meta.url), "utf8");
 
   it("runtime-config.json und Service-Worker laufen über deliveryPath", async () => {
-    const source = await mainSource();
+    const source = await providerSource();
     expect(source).not.toContain('fetch("/runtime-config.json"');
     expect(source).not.toContain('registerServiceWorker("/service-worker.js")');
     expect(source).toContain('deliveryPath("runtime-config.json")');

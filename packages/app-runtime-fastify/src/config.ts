@@ -23,6 +23,7 @@ export interface RuntimeConfig {
   internalPort: number;
   publicBaseUrl?: string;
   serviceWorkerEnabled: boolean;
+  demoMode: boolean;
   enableHsts: boolean;
   cspMode: CspMode;
   frameAncestors: string;
@@ -58,6 +59,7 @@ export function readRuntimeConfig(
     env["APP_ENABLE_SERVICE_WORKER"],
     false,
   );
+  const demoMode = parseBoolean(env["DEMO_MODE"], false);
   const enableHsts = parseBoolean(
     env["APP_ENABLE_HSTS"],
     env["NODE_ENV"] === "production",
@@ -81,6 +83,7 @@ export function readRuntimeConfig(
     internalPort: parsePort(env["INTERNAL_PORT"], 9090),
     ...(publicBaseUrl ? { publicBaseUrl } : {}),
     serviceWorkerEnabled,
+    demoMode,
     enableHsts,
     cspMode,
     frameAncestors,
@@ -98,6 +101,7 @@ export function readRuntimeConfig(
     buildInfo,
     publicRuntimeConfig: buildPublicRuntimeConfig(env, {
       serviceWorkerEnabled,
+      demoMode,
       publicBaseUrl,
       buildInfo,
       overrides,
@@ -109,11 +113,13 @@ function buildPublicRuntimeConfig(
   env: NodeJS.ProcessEnv,
   {
     serviceWorkerEnabled,
+    demoMode,
     publicBaseUrl,
     buildInfo,
     overrides,
   }: {
     serviceWorkerEnabled: boolean;
+    demoMode: boolean;
     publicBaseUrl: string | undefined;
     buildInfo: BuildInfo;
     overrides: RuntimeConfigOverrides;
@@ -139,6 +145,9 @@ function buildPublicRuntimeConfig(
       publicBaseUrl: publicBaseUrl ?? "",
       serviceWorkerEnabled,
     },
+    features: {
+      demoMode,
+    },
   };
 }
 
@@ -149,6 +158,7 @@ export function redactedConfigSummary(config: RuntimeConfig) {
     internalPort: config.internalPort,
     publicBaseUrl: config.publicBaseUrl ?? "",
     serviceWorkerEnabled: config.serviceWorkerEnabled,
+    demoMode: config.demoMode,
     enableHsts: config.enableHsts,
     cspMode: config.cspMode,
     trustProxy: config.trustProxy,
@@ -186,7 +196,10 @@ function parseCspMode(raw: string): CspMode {
   throw new Error("APP_CSP_MODE must be enforce or report-only");
 }
 
-function parseBoolean(raw: string | undefined, fallback: boolean): boolean {
+export function parseBoolean(
+  raw: string | undefined,
+  fallback: boolean,
+): boolean {
   if (raw === undefined || raw === "") return fallback;
   if (/^(1|true|yes)$/i.test(raw)) return true;
   if (/^(0|false|no)$/i.test(raw)) return false;

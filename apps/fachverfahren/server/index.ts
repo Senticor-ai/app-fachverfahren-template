@@ -1,8 +1,6 @@
 // server/index — DÜNNE Komposition über @senticor/app-runtime-fastify: die neutrale
-// Web-Delivery-Runtime (Config, Dual-Port, Health, Static, Security-Header, Metrics,
-// Shutdown) lebt im Paket; hier stehen nur App-Identität, Store-Konstruktion und die
-// Registrierung der App-Routen über die Registrar-Naht. Die Exporte bleiben stabil
-// (index.test.ts, tests/e2e/personas.e2e.test.ts importieren sie).
+// Web-Delivery-Runtime lebt im Paket; hier stehen App-Identität, Store-Konstruktion und
+// die Registrierung der App-Routen über die Registrar-Naht.
 import { pathToFileURL } from "node:url";
 import path from "node:path";
 import fastifyCookie from "@fastify/cookie";
@@ -45,21 +43,14 @@ import { createCookieSessionResolver } from "./auth/session-resolver.js";
 import { registerBoardRoutes } from "./kanban/routes.js";
 import { registerUserRoutes } from "./users/routes.js";
 
-// App-Identität: der Renderer schreibt Domain-Token beim Scaffolding um — deshalb stehen
-// sie HIER (consumer-seitig) und nicht im template-verwalteten Runtime-Paket.
 const APP_IDENTITY = {
   defaultStaticDir: path.join(process.cwd(), "apps/fachverfahren/dist"),
   applicationId: "fachverfahren",
   displayName: "Fachverfahren",
 };
 
-/** Self-Signup-Politik aus der Env: default AUS; `open_unverified` heißt ehrlich so,
- *  bis E-Mail-Verifikation existiert. Unbekannte Werte fallen GESCHLOSSEN zurück. */
 function parseRegistrationMode(value: string | undefined): RegistrationMode {
   if (value === "open_unverified") {
-    // Der Default-Rate-Limiter zählt im Prozess: bei mehreren App-Instanzen drosselt
-    // jede für sich — für Multi-Instanz-Deployments einen verteilten RateLimiter
-    // konfigurieren (auth/rate-limit.ts).
     console.warn(
       "[auth] AUTH_REGISTRATION_MODE=open_unverified: Registrierung ist OFFEN (ohne E-Mail-Verifikation); In-Memory-Rate-Limiter trägt nur Single-Process-Deployments.",
     );
@@ -86,20 +77,20 @@ interface BffWiring {
   auditSink: AuditSink;
 }
 
+interface AppPolicy {
+  bootstrapToken: string | undefined;
+  registrationMode: RegistrationMode;
+  demoMode: boolean;
+}
+
 function registerAppRoutes(
   app: FastifyInstance,
   stores: AppStores,
-  policy: {
-    bootstrapToken: string | undefined;
-    registrationMode: RegistrationMode;
-  },
+  policy: AppPolicy,
   bff: BffWiring,
 ): void {
-  // K2: /auth-/api-Route ohne Autorisierungs-Policy = Boot-Fehler, nicht erst Test-Rot.
   registerAuthPolicyGuard(app);
   app.register(fastifyCookie);
-  // Collector VOR den BFF-Routen — der onRoute-Kollektor von @fastify/swagger sieht
-  // nur später registrierte Routen (Reihenfolge-Vertrag, openapi.test.ts im Paket).
   registerOpenApiCollector(app);
   registerAuthRoutes(app, {
     authStore: stores.authStore,
@@ -107,6 +98,7 @@ function registerAppRoutes(
     auditStore: stores.auditStore,
     bootstrapToken: policy.bootstrapToken,
     registrationMode: policy.registrationMode,
+    demoMode: policy.demoMode,
   });
   registerBoardRoutes(app, stores);
   registerUserRoutes(app, stores);
@@ -152,11 +144,9 @@ export function buildPublicServer({
       registerAppRoutes(
         app,
         { authStore, kanbanStore, auditStore },
-        { bootstrapToken, registrationMode },
+        { bootstrapToken, registrationMode, demoMode: config.demoMode },
         {
           appStore,
-          // Default: der ECHTE Cookie/AuthStore-Flow (deny-by-default) — Tests
-          // injizieren Stubs über den Parameter.
           sessionResolver:
             sessionResolver ?? createCookieSessionResolver(authStore),
           auditSink,
@@ -172,8 +162,6 @@ export function buildInternalServer({
 }: {
   config?: RuntimeConfig;
   metrics?: RuntimeMetrics;
-  /** Mit Referenz auf den public Server liefert der interne Port zusätzlich
-   *  GET /internal/openapi.json (dort gesammeltes Dokument) aus. */
   publicServer?: FastifyInstance;
 } = {}): FastifyInstance {
   return buildRuntimeInternalServer({
@@ -191,13 +179,17 @@ export function buildInternalServer({
 export async function startRuntime(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<RunningRuntime> {
+  // Parse exactly once: runtime JSON, auth-status mirror and demo seeding receive
+  // the same authoritative deployment value.
+  const config = readRuntimeConfig(env);
   const authStore = createAuthStoreFromEnv(env);
   const kanbanStore = createKanbanStoreFromEnv(env);
   const auditStore = createAuditStoreFromEnv(env);
   const stores = { authStore, kanbanStore, auditStore };
-  const policy = {
+  const policy: AppPolicy = {
     bootstrapToken: env["BOOTSTRAP_TOKEN"],
     registrationMode: parseRegistrationMode(env["AUTH_REGISTRATION_MODE"]),
+    demoMode: config.demoMode,
   };
   const bff: BffWiring = {
     appStore: createAppStoreFromEnv(env),
@@ -206,18 +198,17 @@ export async function startRuntime(
   };
   return startRuntimeBase({
     env,
-    configOverrides: APP_IDENTITY,
+    config,
     registerPublicRoutes: (app) => registerAppRoutes(app, stores, policy, bff),
     registerInternalRoutes: (app, context) =>
       registerOpenApiRoute(app, context.publicServer),
-    // Fresh-Deployment-Akzeptanz: mit AUTH_BOOTSTRAP_ADMIN_* entsteht der Admin samt
-    // Team-Discovery-Board beim Start — idempotent, wirft nie (Fehler landen im Log).
     beforeListen: async () => {
       await autoBootstrapAdminFromEnv({
         authStore,
         kanbanStore,
         auditStore,
         env,
+        demoMode: config.demoMode,
         log: (level, event, fields) =>
           level === "error" ? logError(event, fields) : logInfo(event, fields),
       });

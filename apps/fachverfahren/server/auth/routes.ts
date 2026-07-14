@@ -62,6 +62,8 @@ export interface AuthRouteDeps {
   /** Self-Signup-Politik: Default AUS. `open_unverified` heißt ehrlich so, bis
    *  E-Mail-Verifikation existiert (capability:notification, PLAN in rbac.md). */
   registrationMode?: RegistrationMode;
+  /** Deployment-level mirror; runtime-config remains authoritative for UI banners. */
+  demoMode?: boolean;
   registrationContextResolver?: RegistrationContextResolver;
   /** Drossel für Registrierung/Login/Passwort — Default: In-Memory (Single-Process). */
   rateLimiter?: RateLimiter;
@@ -147,6 +149,7 @@ export function registerAuthRoutes(
     sessionSchemaVersion: 2,
     capabilities: { userPersonas: true },
     registration: deps.registrationMode ?? "disabled",
+    demoMode: deps.demoMode === true,
   };
 
   app.get("/auth/status", publicRoute, async () => {

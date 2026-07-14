@@ -8,6 +8,7 @@ import {
   type RegistrationMode,
   type SessionCapabilities,
   type SessionPrincipal,
+  type SessionSnapshot,
   type SessionStatus,
 } from "./session-state.js";
 
@@ -25,6 +26,7 @@ interface SessionState {
   apiAvailable: boolean;
   registration: RegistrationMode;
   capabilities: SessionCapabilities;
+  demoMode: boolean;
 }
 
 interface SessionContextValue extends SessionState {
@@ -36,25 +38,32 @@ const SessionContext = React.createContext<SessionContextValue | null>(null);
 
 export function SessionProvider({
   children,
+  fetchImpl = fetch,
+  initialSnapshot,
 }: {
   children: React.ReactNode;
+  fetchImpl?: typeof fetch;
+  initialSnapshot?: SessionSnapshot;
 }): React.ReactElement {
-  const [state, setState] = React.useState<SessionState>({
-    status: "loading",
-    principal: null,
-    bootstrapped: false,
-    apiAvailable: true,
-    registration: "disabled",
-    capabilities: {},
-  });
+  const [state, setState] = React.useState<SessionState>(
+    initialSnapshot ?? {
+      status: "loading",
+      principal: null,
+      bootstrapped: false,
+      apiAvailable: true,
+      registration: "disabled",
+      capabilities: {},
+      demoMode: false,
+    },
+  );
 
   const refresh = React.useCallback(async () => {
-    setState(await fetchSessionState());
-  }, []);
+    setState(await fetchSessionState(fetchImpl));
+  }, [fetchImpl]);
 
   const logout = React.useCallback(async () => {
     try {
-      await fetch(apiPath("/auth/logout"), {
+      await fetchImpl(apiPath("/auth/logout"), {
         method: "POST",
         credentials: "include",
       });
@@ -62,11 +71,12 @@ export function SessionProvider({
       // API weg (Netzfehler): refresh() unten stellt den Zustand ehrlich dar.
     }
     await refresh();
-  }, [refresh]);
+  }, [fetchImpl, refresh]);
 
   React.useEffect(() => {
+    if (initialSnapshot) return;
     void refresh();
-  }, [refresh]);
+  }, [initialSnapshot, refresh]);
 
   const value = React.useMemo<SessionContextValue>(
     () => ({ ...state, refresh, logout }),
