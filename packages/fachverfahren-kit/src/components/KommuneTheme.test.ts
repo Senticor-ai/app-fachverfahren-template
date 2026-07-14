@@ -15,6 +15,12 @@ describe("KommuneTheme — kontrast-sichere Vordergrund-Ableitung (BITV-AA)", ()
     expect(pickForeground("hsl(50 100% 80%)")).toBe("#0b0b0b");
   });
 
+  it("waehlt am korrekten WCAG-Uebergang: mittelhelle Farbe -> Schwarz (nicht Weiss)", () => {
+    // Die im Dark-Mode aufgehellte Marken-Primary (L~43%, Luminanz ~0.34) MUSS Schwarz bekommen
+    // (7.8:1) — mit der alten Schwelle 0.4 kam faelschlich Weiss (2.76:1). Regressionsschutz.
+    expect(pickForeground("hsl(174 62% 43%)")).toBe("#0b0b0b");
+  });
+
   it("akzeptiert hsl mit Kommas ebenso", () => {
     expect(pickForeground("hsl(174, 62%, 26%)")).toBe("#ffffff");
   });
