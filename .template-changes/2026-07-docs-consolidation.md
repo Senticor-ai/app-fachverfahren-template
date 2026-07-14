@@ -10,8 +10,8 @@ migration: 2026-07-docs-consolidation
 - bündelt drei UX/UI-Audits in einem aktuellen Konformitätsnachweis
 - ersetzt vendor-spezifische Agenten-Handbücher durch einen vendor-neutralen
   Bootstrap
-- aktualisiert Backend-, E2E-, Datenbank- und Runtime-Dokumentation auf den
-  realen Implementierungsstand
+- aktualisiert Querverweise und bündelt die Runtime-Dokumentation unter
+  `docs/reference/`
 - entfernt unveränderte, abgeschlossene Upgrade-Pläne und verschobene
   Einzeldokumente über eine sichere Review-Migration
 - bewahrt angepasste Altdateien in Konsumenten und meldet sie zur manuellen

@@ -1,9 +1,11 @@
 # Datenbankmigrationen
 
 > **Für Agenten: Quellen & Pflicht-Lektüre.**
-> Status: IST für Migrator, `dev/postgres.yaml`, Domain-API und
-> PostgreSQL-E2E-Verträge; PLAN für die Komfortskripte `dev:postgres` und
-> `dev:all`.
+> Status: IST für den Migrator (`packages/app-store-postgres`,
+> `pnpm run db:migrate`, `dev/postgres.yaml`); PLAN für alles, was den
+> BFF/Server voraussetzt (`dev:postgres`, `dev:all`, `test:e2e:postgres`) —
+> diese Scripts existieren noch nicht, siehe
+> `docs/reference/backend-fastify.md`.
 > Quellen: `packages/app-store-postgres`, `AGENTS.md`.
 > Pflicht-Lektüre vorher: `AGENTS.md`.
 
@@ -77,24 +79,9 @@ Neue Tabellen müssen mandantenfähig bleiben: `tenant_id`, `authority_id` und
 `jurisdiction_id` sind getrennte Konzepte und dürfen nicht in einem losen
 Gemeindeschlüssel zusammenfallen.
 
-## PostgreSQL-E2E
+## PostgreSQL-E2E (PLAN)
 
-`pnpm run test:e2e:postgres` führt denselben CaseStore- und Domain-API-Vertrag
-gegen `InMemoryAppStore` sowie – bei gesetztem `APP_PG_URL` oder
-`APP_PG_DIRECT_URL` – gegen PostgreSQL aus. Die Migrationen müssen vorher mit
-`pnpm run db:migrate` angewendet sein.
-
-`pnpm run test:e2e:server` ist die attended Stufe: Sie startet den gebauten
-Server, fährt reale HTTP-Aufrufe und prüft anschließend den Datenbankzustand.
-Sie benötigt `APP_PG_DIRECT_URL`, `psql` und `curl`.
-
-## Babelfish als Migrationsbrücke
-
-Babelfish ist kein Greenfield-Default. Jede Nutzung braucht
-T-SQL-Kompatibilitätsanalyse, ein Inventar von Stored Procedures, Jobs und
-Integrationen, einen Portability Score, eine Zielarchitektur für natives
-PostgreSQL, ein Sunset-Datum sowie Reconciliation- und Rollback-Tests.
-
-Die Migration muss beweisen, dass die Legacy-Anwendung während der
-Übergangsphase läuft und die Daten später exportiert und nativ in PostgreSQL
-betrieben werden können.
+Zielbild: ein schneller E2E-Test mit `InMemoryAppStore` und ein
+servicebasierter E2E-Test (`test:e2e:postgres` mit `APP_E2E_PG_URL` und
+optional `APP_E2E_PG_DIRECT_URL`) gegen denselben Server-Pfad. Beides setzt
+die Backend-Stufe voraus und existiert im Scaffold noch nicht.

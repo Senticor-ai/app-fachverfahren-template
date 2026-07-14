@@ -1,10 +1,11 @@
 # Test Driven Development
 
 > **Für Agenten: Quellen & Pflicht-Lektüre.**
-> Status: IST für Vitest, Storybook, Screen Contracts, Domain-API, E2E,
-> Web-Delivery, Kubernetes und Evidence; PLAN für MSW.
-> Quellen: `package.json`, `vitest.config.ts`, `vitest.e2e.config.ts`,
-> `tests/e2e/`, `apps/fachverfahren/server/*.test.ts`, `AGENTS.md`.
+> Status: IST für Vitest-Tests, Storybook, Screen Contracts,
+> Web-Delivery-/Fastify-Runtime-Tests und Kubernetes-/Evidence-Checks; PLAN für
+> fachliche Backend-API-, MSW- und E2E-Ebenen (die Scripts
+> `test:e2e`/`test:e2e:postgres` existieren noch nicht).
+> Quellen: `package.json`-Scripts, `vitest.config.ts`, `AGENTS.md`.
 > Pflicht-Lektüre vorher: `AGENTS.md`.
 
 Dieses Repository soll Fachverfahren testgetrieben ermöglichen. TDD heißt hier
@@ -28,12 +29,11 @@ Capabilities, API, UI, Accessibility und Evidence.
 - Platform Contracts: Contract-Tests für Ports und Adapter.
 - Fastify-Runtime: `inject`-Tests für Delivery-Header, Health, Runtime-Config,
   interne Endpunkte und Shutdown-Semantik.
-- Fachliche Backend-API: Fastify-`inject`-Tests für Route-Schemas,
-  Fehlerpfade, Mandanten-Scope, Autorisierung, Vier-Augen-Prüfung,
-  optimistisches Locking und append-only Audit.
-- E2E: `test:e2e` prüft das reale SPA-Bundle, `test:e2e:postgres` die
-  Domain-/Store-Verträge mit optionalem PostgreSQL-Backend und
-  `test:e2e:server` den attended HTTP-Roundtrip gegen den gebauten Server.
+- Fachliche Backend-API (PLAN): Fastify `inject`-Tests für Routen,
+  OpenAPI-Schemas, Fehlerpfade und Autorisierung.
+- E2E (PLAN): eine vertikale Strecke aus Login, Rollen,
+  Benutzereinstellungen, Posteingang/Ausgang und RBAC; die Scripts
+  `test:e2e`/`test:e2e:postgres` existieren noch nicht.
 - Mocking (PLAN): MSW-Handler, siehe `docs/reference/mock-data-msw.md`.
 - Datenbank: Migrationstests, Checksum-Drift, Rollback- und Restore-Szenarien
   (`packages/app-store-postgres`, `packages/migration-kit`).
@@ -161,18 +161,8 @@ pnpm run check:domain-contracts
 pnpm run check:storybook
 pnpm run typecheck
 pnpm run test
-pnpm run test:e2e
 pnpm run test:k8s:render
 pnpm run evidence:build
-```
-
-Mit migriertem PostgreSQL und gesetztem `APP_PG_DIRECT_URL` zusätzlich:
-
-```bash
-pnpm run test:e2e:postgres
-pnpm run build:app
-pnpm run build:server
-pnpm run test:e2e:server
 ```
 
 Wenn neue Storybook-Abdeckung hinzukommt:
