@@ -23,6 +23,7 @@ COPY packages/migration-kit/package.json packages/migration-kit/package.json
 COPY packages/app-store-postgres/package.json packages/app-store-postgres/package.json
 COPY packages/app-runtime-fastify/package.json packages/app-runtime-fastify/package.json
 COPY packages/app-bff-contracts/package.json packages/app-bff-contracts/package.json
+COPY packages/app-bff-fastify/package.json packages/app-bff-fastify/package.json
 COPY jurisdictions/eu/package.json jurisdictions/eu/package.json
 COPY jurisdictions/de/package.json jurisdictions/de/package.json
 
