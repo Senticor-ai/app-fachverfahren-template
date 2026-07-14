@@ -29,6 +29,7 @@ pnpm run build:packages
 pnpm run build:app
 pnpm run build:server
 pnpm run check:web-delivery
+pnpm run check:openapi
 
 if [ "$CI_PROFILE" = "full" ]; then
   pnpm run test:k8s:render
