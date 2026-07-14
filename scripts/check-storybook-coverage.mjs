@@ -82,9 +82,7 @@ for (const component of publicComponents) {
 }
 
 if (!/<WissensPanel[\s/>]/.test(storyText)) {
-  failures.push(
-    "Kit-Komponente ohne echte Storybook-Abdeckung: WissensPanel",
-  );
+  failures.push("Kit-Komponente ohne echte Storybook-Abdeckung: WissensPanel");
 }
 
 if (!storyText.includes("Screen Contract")) {
