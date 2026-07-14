@@ -4,7 +4,7 @@
 // ImageCropper). GENERISCH & vendor-/domänen-neutral: konsumiert nur durchgereichte Inhalte, KEINE
 // verfahrensspezifischen Literale.
 //
-// Setzt DESIGN-UPGRADE-SPEC um:
+// Setzt den kanonischen UX/UI-Vertrag um:
 // - Typo-Skala (Abschnitt 2): Label = `text-sm font-medium text-foreground` (volle Tinte, primäre
 //   Information), Wert = `text-sm text-foreground`; Meta/Label-Variante `compact` = `text-xs`
 //   (12px Minimum) statt roher Ad-hoc-Größen.

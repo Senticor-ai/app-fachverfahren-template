@@ -48,7 +48,7 @@ copying it.
   user task.
 - The source method prefers a collapsible sidebar, mobile right drawer and no
   desktop topbar. If the template uses another shell, document the deviation as
-  an RC-Gap in `docs/ux-ui/ux-methodik-public-sector-audit.md` and Storybook.
+  an RC-Gap in `docs/ux-ui/template-review-gaps.md` and Storybook.
 
 ## Tables And Forms
 

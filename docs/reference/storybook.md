@@ -1,5 +1,12 @@
 # Storybook für Designer und Entwickler
 
+> **Für Agenten: Quellen & Pflicht-Lektüre.**
+> Status: IST — beschreibt die vorhandene Storybook-Konfiguration und Gates.
+> Quellen: `.storybook/`, `packages/fachverfahren-kit/src/stories/`,
+> `packages/public-sector-ui/src/`, `scripts/check-storybook-coverage.mjs`.
+> Pflicht-Lektüre vorher: `AGENTS.md`, `.agents/skills/ux-ui/SKILL.md`,
+> `docs/ux-ui/fachverfahren-ux-contract.md`.
+
 Storybook ist die gemeinsame Arbeitsfläche für Designer, Fachseite,
 Accessibility-Review und Coding Agents. Es dokumentiert den UI-Vertrag, nicht
 nur einzelne Komponenten.
@@ -78,14 +85,12 @@ Symbolleiste ersetzt keine manuelle Tastatur-/Screenreader-Prüfung).
 - Bei neuer UI zuerst Screen Contract und Story anlegen.
 - Stories folgen der Persona-Dichte aus
   `docs/ux-ui/fachverfahren-ux-contract.md`.
-- Bei UI- oder Screen-Contract-Änderungen den Audit aus
-  `docs/ux-ui/ux-methodik-public-sector-audit.md` prüfen und die Story
-  `UX-Methodik/Public Sector` aktualisieren.
-- Bei Sachbearbeitung, Bürgerportal, Zuständen oder App-Shell zusätzlich
-  `docs/ux-ui/fachverfahren-design-manual-audit.md` prüfen und
+- Bei UI- oder Screen-Contract-Änderungen die offenen Review-Punkte in
+  `docs/ux-ui/template-review-gaps.md` prüfen und die betroffenen Stories
+  aktualisieren.
+- Bei Sachbearbeitung, Bürgerportal, Zuständen oder App-Shell die Story
   `Design Manual/Fachverfahren` aktualisieren.
-- Bei Token-, `public-sector-ui`- oder Build-Console-Änderungen zusätzlich
-  `docs/ux-ui/source-set-template-audit.md` prüfen und
+- Bei Token-, `public-sector-ui`- oder Build-Console-Änderungen die Story
   `UX-Methodik/Source Set` aktualisieren.
 - Keine Rohfarben oder Einmal-Komponenten.
 - Keine direkte Nutzung von HSL-Komponententokens wie `var(--foreground)`;

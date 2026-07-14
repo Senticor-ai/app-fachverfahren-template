@@ -1,5 +1,13 @@
 # Runtime-Konfiguration
 
+> **Für Agenten: Quellen & Pflicht-Lektüre.**
+> Status: IST — beschreibt öffentliche und interne Runtime-Konfiguration der
+> Fastify-Web-Runtime.
+> Quellen: `apps/fachverfahren/server/index.ts`,
+> `packages/public-sector-sdk`, `docs/reference/web-delivery.md`.
+> Pflicht-Lektüre vorher: `AGENTS.md`,
+> `.agents/skills/backend-fastify/SKILL.md`.
+
 `/runtime-config.json` enthält nur öffentliche Informationen:
 Anwendungsname, Behörde, Rechtsraum, Tenant-Hinweis, Lokalisierung,
 Feature-Hinweise und sichtbare Capability-Beschreibungen.
@@ -10,7 +18,8 @@ Geheimnisse, interne Upstreams und Provider-Bindings bleiben serverseitig im
 Regeln:
 
 - Konfiguration hat eine Schema-Version.
-- Unbekannte oder widersprüchliche Kombinationen müssen beim Start fehlschlagen.
+- Unbekannte oder widersprüchliche Kombinationen müssen beim Start
+  fehlschlagen.
 - Logs dürfen Konfigurationswerte nur nach Klassifikation ausgeben.
 - Feature Flags sind keine Autorisierung.
 - Umgebungsvariablen dürfen Konfiguration befüllen, sind aber nicht der

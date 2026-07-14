@@ -52,14 +52,14 @@
   },
   "requiredFiles": [
     "AGENTS.md",
+    "docs/README.md",
     "docs/agents/bootstrap.md",
-    "docs/agents/codex.md",
-    "docs/agents/gemini.md",
     "docs/reference/template-lifecycle.md",
     "docs/reference/test-driven-development.md",
     "docs/reference/fachverfahren-kit-components.md",
     "docs/reference/storybook.md",
     "docs/ux-ui/fachverfahren-ux-contract.md",
+    "docs/ux-ui/template-review-gaps.md",
     "platform/capabilities.json",
     "sources/registry.yaml"
   ],
