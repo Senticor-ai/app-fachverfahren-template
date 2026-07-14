@@ -75,6 +75,21 @@ export type {
   TenantScope,
   VersionedMutation,
 } from "./kanban-store.js";
+export {
+  CaseNotFoundError,
+  CaseVersionConflictError,
+  createCaseStoreFromEnv,
+  InMemoryCaseStore,
+  PostgresCaseStore,
+  UnavailableCaseStore,
+} from "./case-store.js";
+export type {
+  AppAuditEvent,
+  AppCase,
+  CaseStore,
+  ListCasesQuery,
+  PatchCaseStateInput,
+} from "./case-store.js";
 export { nextPositionKey } from "./position.js";
 export {
   defaultMigrationOptionsFromEnv,
