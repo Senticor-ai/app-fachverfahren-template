@@ -163,27 +163,27 @@ werden NIE als Fakt behauptet. Konvention:
 
 Jede Zeile beschreibt den IST-Stand. Zeilen mit `(PLAN)` existieren noch nicht.
 
-| Pfad                                                              | Rolle                                                    | Agenten-Regel                                      |
-| ----------------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------- |
-| `apps/fachverfahren/src/leistung.config.ts`                       | DIE EINE Austausch-Naht (`LeistungConfig`)               | Einzige Datei eines Fachverfahren-Builds           |
-| `apps/fachverfahren/leistung.contract.json`                       | Generierter Vertrags-Snapshot                            | Nur via `emit:contract`                            |
-| `apps/fachverfahren/src/`                                         | Dünne Komposition (Routing, Store, Shell)                | Für Verfahrens-Builds nicht ändern                 |
-| `packages/fachverfahren-kit/src/types.ts`                         | Naht-Vertrag (`LeistungConfig`, `Berechnung`, `Vorgang`) | Lesen; Änderungen sind Plattformarbeit             |
-| `packages/fachverfahren-kit/src/components/`                      | Fertige Fachverfahren-Bausteine                          | Importieren, nie kopieren                          |
-| `packages/fachverfahren-kit/src/ui/`                              | shadcn/Radix/Tailwind-Primitive                          | Nur nutzen, wenn kein Baustein passt               |
-| `packages/fachverfahren-kit/src/stories/`                         | Storybook-Review-Fläche                                  | Stories bei Kit-Änderungen pflegen                 |
-| `packages/public-sector-ui/src/`                                  | Public-Sector-UI-Fassade + Stories                       | UI-Vertrag; ShadCN bleibt Implementierungsdetail   |
-| `packages/platform-contracts/`                                    | Capability-Ports                                         | Fachlogik nutzt Ports, nie Provider direkt         |
-| `packages/public-sector-sdk/`                                     | Authorization, RBAC, Audit, Domain-Kernel                | Rollen über RBAC-Registry erweitern                |
-| `packages/app-store-postgres/`                                    | PostgreSQL-Migrator + Plattformtabellen                  | Migrationen über `db:migrate`                      |
-| `jurisdictions/de`, `jurisdictions/eu`                            | Rechtsraum-Packs                                         | Keine `country === "DE"`-Logik in der App          |
-| `modules/`                                                        | Leerer Zielort des Generator-Pfads                       | `modules/README.md` lesen; keine Instanz (PLAN)    |
-| `docs/examples/hundesteuer/`                                      | Externes Beispiel (Spec + Prompt)                        | Nie in Runtime-Code kopieren                       |
-| `tooling/template/cli.ts`                                         | Template-Lifecycle- und Agent-CLI                        | Verhalten nur hier, hinter `pnpm run template`     |
-| `scripts/`                                                        | Deterministische Checks und Werkzeuge                    | Checks sind die Wahrheit, kein LLM-Urteil          |
-| `schemas/`, `platform/capabilities.json`, `sources/registry.yaml` | Maschinenlesbare Verträge und Kataloge                   | Über `check:*`-Scripts validiert                   |
-| `agent.discovery.json`                                            | Öffentliche Discovery-API für Agenten                    | Muss `check:agent-discovery` bestehen              |
-| `apps/fachverfahren/server/`                                      | Fastify-Web-Runtime                                      | Plattform-/Delivery-Arbeit; keine Fachlogik direkt |
+| Pfad                                                              | Rolle                                                      | Agenten-Regel                                                     |
+| ----------------------------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------- |
+| `apps/fachverfahren/src/leistung.config.ts`                       | DIE EINE Austausch-Naht (`LeistungConfig`)                 | Einzige Datei eines Fachverfahren-Builds                          |
+| `apps/fachverfahren/leistung.contract.json`                       | Generierter Vertrags-Snapshot                              | Nur via `emit:contract`                                           |
+| `apps/fachverfahren/src/`                                         | Dünne Komposition (Routing, Store, Shell)                  | Für Verfahrens-Builds nicht ändern                                |
+| `packages/fachverfahren-kit/src/types.ts`                         | Naht-Vertrag (`LeistungConfig`, `Berechnung`, `Vorgang`)   | Lesen; Änderungen sind Plattformarbeit                            |
+| `packages/fachverfahren-kit/src/components/`                      | Fertige Fachverfahren-Bausteine                            | Importieren, nie kopieren                                         |
+| `packages/fachverfahren-kit/src/ui/`                              | shadcn/Radix/Tailwind-Primitive                            | Nur nutzen, wenn kein Baustein passt                              |
+| `packages/fachverfahren-kit/src/stories/`                         | Storybook-Review-Fläche                                    | Stories bei Kit-Änderungen pflegen                                |
+| `packages/public-sector-ui/src/`                                  | Public-Sector-UI-Fassade + Stories                         | UI-Vertrag; ShadCN bleibt Implementierungsdetail                  |
+| `packages/platform-contracts/`                                    | Capability-Ports                                           | Fachlogik nutzt Ports, nie Provider direkt                        |
+| `packages/public-sector-sdk/`                                     | Authorization, RBAC, Audit, Domain-Kernel                  | Rollen über RBAC-Registry erweitern                               |
+| `packages/app-store-postgres/`                                    | PostgreSQL-Migrator + Plattformtabellen                    | Migrationen über `db:migrate`                                     |
+| `jurisdictions/de`, `jurisdictions/eu`                            | Rechtsraum-Packs                                           | Keine `country === "DE"`-Logik in der App                         |
+| `modules/`                                                        | Zielort generierter Domänen-Module; ModuleHost mountet sie | `modules/README.md` lesen; echte Instanz `_backends/notification` |
+| `docs/examples/hundesteuer/`                                      | Externes Beispiel (Spec + Prompt)                          | Nie in Runtime-Code kopieren                                      |
+| `tooling/template/cli.ts`                                         | Template-Lifecycle- und Agent-CLI                          | Verhalten nur hier, hinter `pnpm run template`                    |
+| `scripts/`                                                        | Deterministische Checks und Werkzeuge                      | Checks sind die Wahrheit, kein LLM-Urteil                         |
+| `schemas/`, `platform/capabilities.json`, `sources/registry.yaml` | Maschinenlesbare Verträge und Kataloge                     | Über `check:*`-Scripts validiert                                  |
+| `agent.discovery.json`                                            | Öffentliche Discovery-API für Agenten                      | Muss `check:agent-discovery` bestehen                             |
+| `apps/fachverfahren/server/`                                      | Fastify-Web-Runtime                                        | Plattform-/Delivery-Arbeit; keine Fachlogik direkt                |
 
 ## Sprache und Benennung
 
@@ -316,8 +316,10 @@ pnpm --filter "./packages/**" run --if-present build
 
 Rollen in der UI sind keine Autorisierung. Entscheidungen gehören serverseitig
 in Policy-Checks; kritische Übergänge tragen `vierAugen: true` in der
-`statusMachine` und werden in der Zielarchitektur serverseitig erzwungen
-(PLAN). Fachliche Audit-Historie (`Vorgang.history`) ist append-only.
+`statusMachine` und werden serverseitig erzwungen (`executeCaseTransition` +
+`DefaultDenyPolicyEngine`; Vorbereiter ≠ Freigeber, Service-Akteure als
+Vorbereiter ausgeschlossen). Fachliche Audit-Historie (`Vorgang.history`) ist
+append-only.
 Eingebaute Rollen sind `citizen` und `caseworker`; neue Rollen laufen über die
 RBAC-Registry in `@senticor/public-sector-sdk`, nicht über verstreute
 UI-Bedingungen.
