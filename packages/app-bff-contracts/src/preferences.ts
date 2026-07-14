@@ -2,7 +2,8 @@
 // UserPreferences/UserPreferencesUpdate aus @senticor/app-store-postgres
 // (Kompatibilität wird dort typseitig gegengeprüft, store-compat.test.ts im
 // BFF-Paket). tenantId/actorId kommen IMMER aus der Sitzung — das Update-Schema
-// akzeptiert sie deshalb nicht (additionalProperties: false).
+// akzeptiert sie deshalb nicht (additionalProperties: false; Fastifys Ajv strippt
+// unbekannte Felder, Value.Check weist sie ab).
 import { Type, type Static } from "@sinclair/typebox";
 
 export const ColorSchemeSchema = Type.Union([

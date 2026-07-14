@@ -1,8 +1,9 @@
 // mailbox — DTOs für GET/POST /api/mailbox. scope=own|authority wählt die Permission
 // (mailbox.own.* vs. mailbox.authority.*) und die Store-Query (owner/authority).
 // Mandant/Behörde/Actor kommen IMMER aus der Sitzung, NIE aus Body oder Query
-// (additionalProperties: false weist Override-Versuche mit 400 ab); die Message-DTO
-// exponiert die Server-Topologie (tenantId/authorityId/jurisdictionId) bewusst nicht.
+// (additionalProperties: false — Fastifys Ajv strippt unbekannte Felder, Value.Check
+// weist sie ab); die Message-DTO exponiert die Server-Topologie
+// (tenantId/authorityId/jurisdictionId) bewusst nicht.
 import { Type, type Static } from "@sinclair/typebox";
 
 export const MailboxBoxSchema = Type.Union([

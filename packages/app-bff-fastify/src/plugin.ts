@@ -11,6 +11,7 @@ import type { RbacRegistry } from "@senticor/public-sector-sdk";
 import type { BffDeps } from "./deps.js";
 import { requestIdOf } from "./route-auth.js";
 import { registerCapabilitiesRoute } from "./routes/capabilities.js";
+import { registerPreferencesRoutes } from "./routes/preferences.js";
 import { registerSessionRoute } from "./routes/session.js";
 
 export interface AppBffOptions {
@@ -50,4 +51,5 @@ export async function appBff(
   });
   registerSessionRoute(app, deps);
   registerCapabilitiesRoute(app, deps);
+  registerPreferencesRoutes(app, deps);
 }
