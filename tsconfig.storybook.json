@@ -3,7 +3,7 @@
   "compilerOptions": {
     "jsx": "react-jsx",
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node", "react", "react-dom", "vite/client"]
   },
   "references": [
     { "path": "packages/public-sector-sdk" },
@@ -13,6 +13,8 @@
   ],
   "include": [
     ".storybook/**/*.ts",
+    "apps/fachverfahren/src/**/*.stories.ts",
+    "apps/fachverfahren/src/**/*.stories.tsx",
     "modules/**/ui/**/*.stories.ts",
     "modules/**/ui/**/*.stories.tsx",
     "modules/**/ui/**/screens.tsx",

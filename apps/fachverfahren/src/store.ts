@@ -12,7 +12,7 @@ import {
 // Die Config kommt aus DER EINEN Austausch-Naht (./leistung.config) — Default = ein NEUTRALES Demo-Verfahren,
 // von einem generierenden Build überschrieben mit der aus dem Fachkonzept generierten Config. Die Composition-App bleibt
 // VERFAHRENS-AGNOSTISCH: sie reicht eine beliebige LeistungConfig an dieselben Kit-Bausteine.
-import { leistungConfig } from "./leistung.config";
+import { leistungConfig } from "./leistung.config.js";
 
 export const store: FachverfahrenStore<Record<string, unknown>> =
   createFachverfahrenStore(leistungConfig);

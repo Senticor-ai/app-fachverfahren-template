@@ -14,6 +14,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  storybook-a11y:
+    name: Storybook accessibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NODE_ENV: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Setup CI tools
+        run: |
+          export CI_PROJECT_DIR="$GITHUB_WORKSPACE"
+          export TMPDIR="$RUNNER_TEMP/app-fachverfahren-template"
+          scripts/ci-setup-node.sh
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium system dependencies
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Test Storybook accessibility
+        run: pnpm run test:storybook
+
   build:
     name: Validate
     runs-on: ubuntu-latest
