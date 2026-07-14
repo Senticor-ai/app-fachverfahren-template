@@ -58,8 +58,11 @@ Capability-Ports modelliert.
   `fachverfahren-kit` und der Public-Sector-UI-Fassade.
 - Datenbank: PostgreSQL-Migrator und Plattformtabellen in
   `@senticor/app-store-postgres` (`pnpm run db:migrate`).
-- Backend/BFF: (PLAN) Zielarchitektur Fastify mit OpenAPI, beschrieben in
-  `docs/reference/backend-fastify.md`; im Scaffold existiert noch kein Server.
+- Backend/BFF: (IST) Fastify-Web-Delivery-Runtime unter
+  `apps/fachverfahren/server/` (Health, Security-Header, Metrics, Auth- und
+  Workspace-Routen), beschrieben in `docs/reference/backend-fastify.md`;
+  fachliche API-, OpenAPI- und Postgres-E2E-Routen sind explizite
+  Ausbauschritte.
 - Design/TDD: Storybook, Screen Contracts, semantische Tokens.
 
 ## Erste Schritte
