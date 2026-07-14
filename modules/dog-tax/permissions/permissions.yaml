@@ -1,7 +1,0 @@
-permissions:
-  - id: dog-tax.citizen
-    role: citizen
-  - id: dog-tax.caseworker
-    role: caseworker
-  - id: dog-tax.auditor
-    role: auditor
