@@ -88,7 +88,10 @@ function Calendar({
           "rounded-md border border-border",
           "[&>button]:font-semibold",
         ),
-        outside: "text-muted-foreground opacity-50 aria-selected:opacity-30",
+        // Nachbarmonats-Tage: allein per text-muted-foreground de-emphasized (5.31:1,
+        // WCAG 2.1 AA). KEIN opacity auf dem Text — das zog interaktive Tag-Buttons auf
+        // 2.1:1. (disabled-Tage sind als deaktivierte Bedienelemente kontrast-ausgenommen.)
+        outside: "text-muted-foreground",
         disabled: "text-muted-foreground opacity-40",
         hidden: "invisible",
         week_number: "w-9 text-center text-xs text-muted-foreground",
