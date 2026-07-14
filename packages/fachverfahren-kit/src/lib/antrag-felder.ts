@@ -246,6 +246,16 @@ export function feldFehler(feld: FeldDef, wert: unknown): string | null {
     } catch {
       // Defekte Pattern dürfen den Antrag nicht blockieren.
     }
+  } else {
+    // OHNE explizites `pattern`: intrinsische Formatprüfung je Feldtyp, damit ein nicht-leeres PFLICHT-Feld auch
+    // WOHLGEFORMT sein muss — sonst passierte z. B. „12" als PLZ oder „keinemail" den Schritt und würde abgesendet
+    // (`required` prüft nur „nicht leer"). Ein explizites `feld.pattern` (oben) überschreibt diese Defaults.
+    if (feld.typ === "plz" && !/^\d{5}$/.test(s))
+      return "Bitte eine gültige Postleitzahl (5 Ziffern) eingeben.";
+    if (feld.typ === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s))
+      return "Bitte eine gültige E-Mail-Adresse eingeben.";
+    if (feld.typ === "tel" && !/^[+()/\d\s-]{3,}$/.test(s))
+      return "Bitte eine gültige Telefonnummer eingeben.";
   }
   if (feld.typ === "number") {
     const n = Number(s.replace(",", "."));

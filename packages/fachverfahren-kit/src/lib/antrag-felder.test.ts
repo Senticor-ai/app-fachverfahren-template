@@ -221,6 +221,54 @@ describe("feldFehler — required-Semantik je FeldTyp", () => {
     );
     expect(feldFehler(f, "12345")).toBeNull();
   });
+
+  // Regression: OHNE explizites `pattern` prüften plz/email/tel früher NUR „nicht leer" — „12" als PLZ oder
+  // „keinemail" passierte den Schritt und wurde abgesendet. Intrinsische Formatprüfung je Typ schliesst das.
+  it("plz OHNE pattern: verlangt 5 Ziffern (leerer required-Fall zuerst)", () => {
+    const f = feld({ name: "plz", typ: "plz", required: true });
+    expect(feldFehler(f, "")).toBe("Pflichtangabe — bitte ausfüllen.");
+    expect(feldFehler(f, "12")).toBe(
+      "Bitte eine gültige Postleitzahl (5 Ziffern) eingeben.",
+    );
+    expect(feldFehler(f, "1234a")).toBe(
+      "Bitte eine gültige Postleitzahl (5 Ziffern) eingeben.",
+    );
+    expect(feldFehler(f, "12345")).toBeNull();
+  });
+
+  it("email OHNE pattern: verlangt ein wohlgeformtes @-Format", () => {
+    const f = feld({ name: "email", typ: "email", required: true });
+    expect(feldFehler(f, "keinemail")).toBe(
+      "Bitte eine gültige E-Mail-Adresse eingeben.",
+    );
+    expect(feldFehler(f, "a@b")).toBe(
+      "Bitte eine gültige E-Mail-Adresse eingeben.",
+    );
+    expect(feldFehler(f, "muster@amt.de")).toBeNull();
+  });
+
+  it("tel OHNE pattern: verlangt eine plausible Telefonnummer", () => {
+    const f = feld({ name: "tel", typ: "tel", required: true });
+    expect(feldFehler(f, "ab")).toBe(
+      "Bitte eine gültige Telefonnummer eingeben.",
+    );
+    expect(feldFehler(f, "+49 30 123456")).toBeNull();
+  });
+
+  it("plz/email/tel OPTIONAL + leer: gültig (kein erzwungenes Format auf Leerwert)", () => {
+    expect(feldFehler(feld({ name: "plz", typ: "plz" }), "")).toBeNull();
+    expect(feldFehler(feld({ name: "email", typ: "email" }), "")).toBeNull();
+    expect(feldFehler(feld({ name: "tel", typ: "tel" }), "")).toBeNull();
+  });
+
+  it("explizites pattern hat Vorrang vor der intrinsischen Typprüfung", () => {
+    // Ein 4-stelliges Auslands-PLZ-Pattern soll die 5-Ziffern-Default-Regel überschreiben.
+    const f = feld({ name: "plz", typ: "plz", pattern: "^\\d{4}$" });
+    expect(feldFehler(f, "1234")).toBeNull();
+    expect(feldFehler(f, "12345")).toBe(
+      "Eingabe entspricht nicht dem erwarteten Format.",
+    );
+  });
 });
 
 describe("stepGueltig — Schritt gilt, wenn kein Feld einen Fehler meldet", () => {
