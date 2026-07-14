@@ -12,6 +12,7 @@
     { "path": "packages/migration-kit" },
     { "path": "packages/app-store-postgres" },
     { "path": "packages/app-runtime-fastify" },
+    { "path": "packages/app-bff-contracts" },
     { "path": "jurisdictions/eu" },
     { "path": "jurisdictions/de" }
   ]

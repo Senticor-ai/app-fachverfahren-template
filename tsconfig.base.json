@@ -44,6 +44,9 @@
       "@senticor/app-runtime-fastify": [
         "packages/app-runtime-fastify/src/index.ts"
       ],
+      "@senticor/app-bff-contracts": [
+        "packages/app-bff-contracts/src/index.ts"
+      ],
       "@senticor/jurisdiction-eu": ["jurisdictions/eu/src/index.ts"],
       "@senticor/jurisdiction-de": ["jurisdictions/de/src/index.ts"]
     }
