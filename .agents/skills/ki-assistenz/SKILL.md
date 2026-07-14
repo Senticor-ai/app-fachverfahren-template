@@ -72,6 +72,31 @@ steckt generisch in `AiSuggestion.value`, das die Route projiziert.
    (`{ vorschlag, konfidenz, begruendung, quellen, marking, reviewRequired, euAiActClass }`).
    Der Build-Agent füllt die Naht, nicht die UI.
 
+## chos-Anbindung (Cognitive Hive OS) — OSS-Core-Naht, IP bleibt hinter der API
+
+chos (Cognitive Hive OS) ist eine evidenz-gebundene Wissens-/Fall-Management-Plattform
+mit einer eigenen **Assist-API**. Weil `AiAssistPort` vendor-neutral ist, dockt chos wie
+jeder andere Provider an — ein CHOS-Adapter implementiert `suggest` und ruft die
+chos-Assist-API, ohne dass Route/Client/Kit sich ändern:
+
+- `POST /api/assist/turn` — Body `{ missionId, query, cellIds?, options? }` → mission-
+  scoped Antwort (der One-Shot-Pfad, passend zu `suggest`). Für Chat/Multi-Turn:
+  `POST /api/conversations/:id/turns`.
+- Angebunden über den chos-**Client-App-Vertrag**: OIDC (Keycloak) Service-Account-Token
+  (Backend→chos) + Header `X-Hive-Tenant: <displayKey>`, Basis `HIVE_API_URL`.
+
+**OSS-/IP-Grenze (unverhandelbar).** chos' IP-Komponenten — Cognitive Firewall
+(inputScanner/piiGuard), Lens-Bindung, **Subsumption**, der chos-interne Inference-Router
+(diverse LLM-Provider) und `outputGuard` + `AGENT_RUN`-Audit — laufen AUSSCHLIESSLICH
+HINTER chos' API. Das Template (OSS) spricht NUR das OSS-Core-Protokoll und bettet KEINE
+chos-IP ein. Der Adapter mappt die chos-Antwort auf `AiSuggestion.value` und setzt
+`marking`/`reviewRequired`/`euAiActClass` wie immer serverseitig — dieselben Leitplanken,
+fail-closed bei Fehler/Timeout.
+
+Status: forward-looking — die chos-Agenten wandern erst nach chos-code; der konkrete
+CHOS-Adapter folgt, sobald die Naht dort steht. Der kanonische `AiAssistPort` ist bereits
+der austauschbare Andockpunkt (heute OSS-OpenAI-kompatibel, morgen zusätzlich chos).
+
 ## Vertrag & Leitplanken
 
 Vertrag (`packages/platform-contracts/src/ports.ts` +
