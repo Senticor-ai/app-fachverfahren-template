@@ -261,6 +261,9 @@ importers:
       '@fastify/static':
         specifier: 'catalog:'
         version: 9.3.0
+      '@senticor/public-sector-sdk':
+        specifier: workspace:*
+        version: link:../public-sector-sdk
       fastify:
         specifier: 'catalog:'
         version: 5.10.0

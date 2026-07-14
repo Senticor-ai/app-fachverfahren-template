@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@fastify/static": "catalog:",
+    "@senticor/public-sector-sdk": "workspace:*",
     "fastify": "catalog:"
   },
   "devDependencies": {

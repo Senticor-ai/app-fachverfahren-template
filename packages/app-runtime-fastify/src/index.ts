@@ -3,6 +3,14 @@
 // Metrics, Logging und Graceful Shutdown. Apps komponieren ihre BFF-Routen über die
 // Registrar-Nähte (RouteRegistrar/InternalRouteRegistrar) — das Paket bleibt domainfrei.
 export {
+  ConsoleAuditSink,
+  createAuditSinkFromEnv,
+  MemoryAuditSink,
+  NoopAuditSink,
+  type AuditSink,
+  type AuditSinkEvent,
+} from "./audit-sink.js";
+export {
   DEFAULT_MAX_BODY_BYTES,
   DEFAULT_SHUTDOWN_TIMEOUT_MS,
   readRuntimeConfig,
@@ -12,6 +20,12 @@ export {
   type RuntimeConfig,
   type RuntimeConfigOverrides,
 } from "./config.js";
+export {
+  createDevSessionResolverFromEnv,
+  NoSessionResolver,
+  type ResolvedSession,
+  type SessionResolver,
+} from "./session-resolver.js";
 export { IMMUTABLE, NO_STORE } from "./constants.js";
 export {
   assertStaticDir,
