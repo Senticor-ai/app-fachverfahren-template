@@ -1,6 +1,6 @@
 # Fachverfahren App Platform Template
 
-[![CI pipeline](https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-platform/govtech-ai/govtech-ai-app-fachverfahren-template/badges/main/pipeline.svg)](https://gitlab.opencode.de/govtech-deutschland/platform-instances/deutschland-platform/govtech-ai/govtech-ai-app-fachverfahren-template/-/pipelines)
+[![CI](https://github.com/Senticor-ai/app-fachverfahren-template/actions/workflows/ci.yml/badge.svg)](https://github.com/Senticor-ai/app-fachverfahren-template/actions/workflows/ci.yml)
 [![License: EUPL-1.2](https://img.shields.io/badge/license-EUPL--1.2-blue)](LICENSE)
 
 **English summary:** This repository provides a reusable public-sector
@@ -199,8 +199,18 @@ Reimplementierungen stehen in `platform/capabilities.json`.
 
 - Sicherheitsmeldungen: `SECURITY.md`
 - Verhaltenskodex: `CODE_OF_CONDUCT.md`
+- Beitragen: `CONTRIBUTING.md`
 - Änderungen und Release-Hinweise: `CHANGELOG.md`
 - Öffentliche Adopter und Evaluierungen: `ADOPTERS.md`
+
+## Lizenz und Owner
+
+Dieses Repository ist Open Source unter der **European Union Public Licence v. 1.2 (EUPL-1.2)** —
+siehe [`LICENSE`](LICENSE). Copyright © 2024–2026 **Senticor GmbH** (Produkt: **Senticor AI**), die
+das Projekt betreut. Beiträge werden unter derselben Lizenz (EUPL-1.2) eingebracht.
+
+Mitgelieferte Open-Source-Komponenten und ihre Lizenzen sind in
+[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) aufgeführt.
 
 ## Wichtige Regeln
 

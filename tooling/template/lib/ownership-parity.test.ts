@@ -51,6 +51,9 @@ const updateUnmanagedPaths: string[] = [
   ".storybook/**",
   // Konsumenten-CI und -Git-Hooks: laufen im Konsumenten-Repo, dessen Entwickler entscheiden.
   ".github/workflows/**",
+  ".github/ISSUE_TEMPLATE/**",
+  ".github/PULL_REQUEST_TEMPLATE.md",
+  ".github/dependabot.yml",
   ".husky/**",
   "scripts/git-hooks/**",
   "scripts/setup-husky.mjs",
@@ -65,6 +68,7 @@ const updateUnmanagedPaths: string[] = [
   "CLAUDE.md",
   "CONTRIBUTING.md",
   "LICENSE",
+  "THIRD-PARTY-NOTICES.md",
   // App-Hülle außerhalb der verwalteten server/public/deploy-Bäume: Frontend/Config, die
   // Konsumenten an ihre Domäne anpassen. Achtung: Vorlagen-PRs, die Frontend UND Server ändern,
   // erreichen Konsumenten hier NICHT über template:update — bekannte Lücke, Produktentscheidung.
