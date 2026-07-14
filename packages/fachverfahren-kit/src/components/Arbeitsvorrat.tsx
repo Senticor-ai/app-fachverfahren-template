@@ -80,11 +80,7 @@ export interface ArbeitsvorratBulkAction {
 // ── Sort-State (inlined, generisch — keine externe Util-Abhängigkeit) ────────
 type SortDir = "asc" | "desc" | null;
 type ColKey =
-  | "vorgang"
-  | "eingang"
-  | "berechnung"
-  | "status"
-  | `feld:${string}`;
+  "vorgang" | "eingang" | "berechnung" | "status" | `feld:${string}`;
 
 /** Eingang stabil-absolut rendern (kein Date.now() → keine Hydration-Diskrepanz). */
 function eingangText(iso: string): string {

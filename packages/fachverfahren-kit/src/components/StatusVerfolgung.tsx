@@ -355,7 +355,7 @@ export function StatusVerfolgung<T = Record<string, unknown>>({
                     </p>
                   )}
                   {h.rolle && (
-                    <p className="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground/80">
+                    <p className="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground">
                       {h.rolle}
                     </p>
                   )}

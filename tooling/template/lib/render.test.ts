@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -65,7 +65,6 @@ describe("domain app rendering", () => {
 
       // OSS-Isolation: INTERNE Maintainer-Skills werden NICHT in einen gescaffoldeten Konsumenten kopiert;
       // die konsumierbaren Skills schon.
-      const { access } = await import("node:fs/promises");
       const fehlt = (p: string) =>
         access(join(first, p)).then(
           () => false,
@@ -81,6 +80,21 @@ describe("domain app rendering", () => {
         await fehlt(".claude/skills/deutschland-plattform-anforderungen"),
       ).toBe(true);
       expect(await fehlt(".claude/skills/fachverfahren-app")).toBe(false);
+      // Template-Repo-interne Workflows (repositoryOnlyPaths) dürfen NICHT im Konsumenten landen;
+      // die generische CI und der (substituierte) GitLab-Mirror schon.
+      for (const consumerWorkflow of ["ci.yml", "mirror-gitlab.yml"]) {
+        await expect(
+          access(join(first, ".github", "workflows", consumerWorkflow)),
+        ).resolves.toBeUndefined();
+      }
+      for (const repositoryOnlyWorkflow of [
+        "scaffold-nightly.yml",
+        "deploy-demo-consumer.yml",
+      ]) {
+        await expect(
+          access(join(first, ".github", "workflows", repositoryOnlyWorkflow)),
+        ).rejects.toThrow();
+      }
     } finally {
       await rm(root, { recursive: true, force: true });
     }

@@ -1,10 +1,7 @@
 import { type ReactNode, useId } from "react";
 
 export type EvidenceReviewStatus =
-  | "pending"
-  | "accepted"
-  | "rejected"
-  | "missing";
+  "pending" | "accepted" | "rejected" | "missing";
 
 export interface EvidenceReviewItem {
   id: string;

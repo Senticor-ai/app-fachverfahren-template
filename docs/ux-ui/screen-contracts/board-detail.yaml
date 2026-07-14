@@ -1,0 +1,62 @@
+id: board-detail
+route: /boards/:boardId
+owner: packages/fachverfahren-kit (KanbanBoard)
+persona: caseworker
+inputs:
+  - runtimeConfig
+  - activeSession
+  - boardId
+outputs:
+  - card.created
+  - card.moved
+  - card.archived
+states:
+  - loading
+  - empty
+  - error
+  - ready
+  - conflict
+ia:
+  pattern: master-detail
+  navigation:
+    - role-gated navigation is visible before screen actions
+  profile:
+    - profile and settings remain reachable from the persistent shell
+  scroll:
+    - board columns scroll independently from the page shell
+content:
+  language:
+    - German UI text fits the caseworker persona
+  architectureTerms:
+    - no basis-service, port or adapter wording in primary user navigation
+hcai:
+  mode: none
+  controls: []
+a11y:
+  landmarks:
+    - main
+  labels:
+    - all controls have visible labels, including drag handles
+  keyboard:
+    - Tab reaches every column, card, and the "Verschieben" action
+    - card move is fully operable without a pointer via the "Verschieben" dialog
+  focusOrder:
+    - board title and filter bar
+    - column headers with quick-add
+    - cards within each column
+  zoom:
+    - 400 percent zoom reflows without function loss; columns become vertically stacked
+  statusSemantics:
+    - card kind/priority use text or icon plus color, never color alone
+tests:
+  unit:
+    - archiving a column with active cards is refused client-side too
+  integration:
+    - a stale card write (412) shows a non-destructive conflict notice
+  storybook:
+    - default
+    - loading
+    - empty
+    - error
+    - conflict
+    - keyboard focus

@@ -824,11 +824,7 @@ export interface LabelDef {
 /** Der TRIAGE-Status eines Eingangs (verfahrensübergreifende Inbox): offen, zurückgestellt, angenommen (→ Vorgang),
  *  abgelehnt oder als Dublette markiert. */
 export type TriageStatus =
-  | "pending"
-  | "snoozed"
-  | "accepted"
-  | "declined"
-  | "duplicate";
+  "pending" | "snoozed" | "accepted" | "declined" | "duplicate";
 
 /** Ein EINGANG in der verfahrensübergreifenden Inbox — VOR der Annahme als fachlicher `Vorgang`. `rohdaten` trägt
  *  die noch nicht subsumierten Antragsdaten; `aufgabeId`/`vorgangId` werden bei Annahme (`triage`) gesetzt. */
@@ -906,11 +902,7 @@ export interface AufgabeAktivitaet {
 
 /** Beziehungstyp zwischen zwei Aufgaben (Plane-Parität). */
 export type BeziehungsTyp =
-  | "blocks"
-  | "blocked-by"
-  | "duplicate"
-  | "relates"
-  | "widerspruch-zu";
+  "blocks" | "blocked-by" | "duplicate" | "relates" | "widerspruch-zu";
 
 /** Gerichtete Beziehung zwischen zwei Aufgaben — ↔ `AppTaskRelation`. */
 export interface AufgabeBeziehung {

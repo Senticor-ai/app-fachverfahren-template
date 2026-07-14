@@ -246,17 +246,21 @@ export function AuditDashboard({
         />
       ) : null}
 
-      <div
-        className="ps-dashboard__kpis"
-        role="list"
-        aria-label="Kennzahlen der Übersicht"
-      >
-        {metrics.length === 0 ? (
+      {metrics.length === 0 ? (
+        // Ohne Kennzahlen KEIN role="list": eine Liste ohne listitem-Kinder verletzt
+        // aria-required-children — der Ladehinweis ist eine Statusmeldung, kein Listeneintrag.
+        <div className="ps-dashboard__kpis">
           <p className="ps-dashboard__kpis-empty ps-muted" role="status">
             Kennzahlen werden geladen …
           </p>
-        ) : (
-          metrics.map((metric) => (
+        </div>
+      ) : (
+        <div
+          className="ps-dashboard__kpis"
+          role="list"
+          aria-label="Kennzahlen der Übersicht"
+        >
+          {metrics.map((metric) => (
             <div
               className="ps-dashboard__kpi-slot"
               role="listitem"
@@ -264,9 +268,9 @@ export function AuditDashboard({
             >
               <MetricCard metric={metric} />
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
 
       <AuditTrail trail={trail} />
     </section>

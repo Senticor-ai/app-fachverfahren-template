@@ -1,4 +1,7 @@
+import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
+import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
 // Workspace-Pakete sind nur in apps/* als node_modules verlinkt. Domain-Modul-Tests laufen aber vom
@@ -11,6 +14,11 @@ const kitSrc = fileURLToPath(
   new URL("./packages/fachverfahren-kit/src/index.ts", import.meta.url),
 );
 
+const dirname =
+  typeof __dirname !== "undefined"
+    ? __dirname
+    : path.dirname(fileURLToPath(import.meta.url));
+
 const sharedExclude = [
   "**/.{git,cache,output,temp}/**",
   "**/coverage/**",
@@ -19,6 +27,8 @@ const sharedExclude = [
   "**/node_modules/**",
   // E2E baut das reale Bundle (Full-Build-Kosten) — läuft separat via `test:e2e` (vitest.e2e.config.ts).
   "tests/e2e/**",
+  // Echte Browser-Tests (Playwright) laufen separat via `test:browser` (vitest.browser.config.ts).
+  "**/*.browser.test.{ts,tsx}",
 ];
 
 export default defineConfig({
@@ -86,6 +96,29 @@ export default defineConfig({
           exclude: [...sharedExclude, "tooling/template/**"],
           testTimeout: 20000,
           hookTimeout: 20000,
+        },
+      },
+      {
+        extends: true,
+        plugins: [
+          // Führt alle Stories aus .storybook/main.ts als Component-Tests aus (Smoke-Render +
+          // play-Interactions + Axe-A11y-Checks). Preview-Annotationen lädt das Plugin selbst.
+          storybookTest({
+            configDir: path.join(dirname, ".storybook"),
+          }),
+        ],
+        test: {
+          // Bewusst NICHT Teil des schnellen `test`-Laufs (Browser-Start ist teurer) — läuft
+          // separat via `test:storybook`, analog zu test:browser (vitest.browser.config.ts).
+          name: "storybook",
+          testTimeout: 30_000,
+          hookTimeout: 30_000,
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright(),
+            instances: [{ browser: "chromium" }],
+          },
         },
       },
     ],

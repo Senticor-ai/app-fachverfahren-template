@@ -34,6 +34,9 @@ interface RenderDomainAppOptions {
 const ignoredNames = new Set([
   ".git",
   ".agent",
+  // Codesphere-Workspace-Toolchain (ci.yml installiert Node 24 + pnpm nach <app>/.local):
+  // Laufzeitartefakt, nie mitscaffolden/scannen.
+  ".local",
   ".pnpm",
   ".pnpm-tools",
   ".pnpm-store",
@@ -50,7 +53,17 @@ const ignoredNames = new Set([
   "tmp",
 ]);
 
-const repositoryOnlyPaths = new Set([".gitlab/CODEOWNERS"]);
+// Template-only GitHub-Workflows werden NIE in Konsumenten kopiert: die Text-Substitution
+// schriebe sonst z.B. den repository-Guard des Deploy-Workflows auf den Konsumenten-Namen um
+// (live verifiziert: `app-fachverfahren-template` → `app-beispiel`), womit die Konsumenten-Kopie
+// nach jedem Konsumenten-CI liefe und — mit gesetztem Secret — einen "Enkel"-Scaffold erzeugte;
+// scaffold-nightly liefe nächtlich im Konsumenten. mirror-gitlab.yml bleibt absichtlich drin:
+// Konsumenten sollen ihren eigenen (substituierten) GitLab-Mirror bekommen.
+const repositoryOnlyPaths = new Set([
+  ".gitlab/CODEOWNERS",
+  ".github/workflows/deploy-demo-consumer.yml",
+  ".github/workflows/scaffold-nightly.yml",
+]);
 
 // INTERNE MAINTAINER-Skills bleiben im Template-Repo (für dessen eigene Pflege/Publish-Workflow), werden aber NIE in
 // einen gescaffoldeten/konsumierbaren App-Baum kopiert — sonst leckt Maintainer-Internes (SDK-Publish-Interna,
@@ -446,6 +459,16 @@ function shouldCopy(path: string, sourceRoot: string) {
   if (relativePath === "") {
     return true;
   }
+  return isRenderedRepoPath(relativePath);
+}
+
+/** Landet dieser repo-relative Pfad beim Scaffold im Konsumenten? Exportiert, damit der
+ *  Ownership-Paritäts-Test (manifest.test.ts) exakt dieselben Skip-Regeln nutzt wie der
+ *  Scaffold selbst — eine zweite, driftende Kopie der Regeln wäre genau die Lücke,
+ *  die der Test verhindern soll. Enthält AUCH unsere Prefix-Ausschlüsse
+ *  (repositoryOnlyPrefixes) — z. B. interne Maintainer-Skill-Verzeichnisse, die nie in
+ *  einen Konsumenten kopiert werden dürfen. */
+export function isRenderedRepoPath(relativePath: string): boolean {
   if (
     repositoryOnlyPaths.has(relativePath) ||
     repositoryOnlyPrefixes.some(

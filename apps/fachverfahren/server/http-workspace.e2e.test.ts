@@ -588,8 +588,7 @@ describe("HttpWorkspacePort e2e — Antragsdaten über HTTP (portFor lazy single
     // Der Zugriff triggert den Lazy-Load; nach der Ankunft sind die Antragsdaten angereichert.
     await warteBis(() => {
       const a = port.portFor("leistung")?.get(c.caseId)?.antragsdaten as
-        | Record<string, unknown>
-        | undefined;
+        Record<string, unknown> | undefined;
       return a !== undefined && "antragsteller" in a;
     });
     const antrag = port.portFor("leistung")?.get(c.caseId)?.antragsdaten as {

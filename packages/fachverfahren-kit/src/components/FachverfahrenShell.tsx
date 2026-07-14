@@ -16,6 +16,7 @@ import {
   FileText,
   Home,
   Inbox,
+  LayoutGrid,
   LineChart,
   Menu,
   ShieldCheck,
@@ -47,8 +48,10 @@ export interface ShellNavItem {
 export interface FachverfahrenShellProps<T = Record<string, unknown>> {
   /** Der Leistungs-Vertrag — liefert Branding + leitet die Navigation ab. */
   config: LeistungConfig<T>;
-  /** Aktive Rolle (kontrolliert). */
-  persona: Persona;
+  /** Aktiver Arbeitsbereich (kontrolliert). OPTIONAL: der Team-Workspace (Boards) ist
+   *  Workspace-Navigation ohne aktive Persona — die Shell zeigt dann eine neutrale
+   *  Workspace-Nav statt eine Rolle vorzutäuschen. */
+  persona?: Persona;
   /** Rollen-Wechsel. */
   onPersonaChange: (persona: Persona) => void;
   /** Seiten-Inhalt (die persona-spezifische Sicht). */
@@ -59,6 +62,21 @@ export interface FachverfahrenShellProps<T = Record<string, unknown>> {
   onNavigate?: (item: ShellNavItem) => void;
   /** Rollen-Beschreibungen für den Switcher (Default: generische DEFAULT_PERSONAS). */
   personas?: readonly PersonaDescriptor[];
+  /** ZUSÄTZLICHE Sidebar-Sektionen unter der Persona-Nav — z.B. „Verwaltung" (role-gated) im
+   *  Team-Workspace. Additiv: ohne Prop ändert sich nichts (Personas, Previews, Bestands-Apps). */
+  extraNavSections?: readonly ShellNavSection[];
+  /** Konto-Bereich rechts im Header (E-Mail, Passwort ändern, Abmelden) — Screen-Contract
+   *  boards-list: „profile and settings remain reachable from the persistent shell". */
+  accountSlot?: React.ReactNode;
+  /** „Demo · synthetische Daten"-Badge (Default true, die Persona-Sichten sind Demos). Der
+   *  Team-Workspace zeigt ECHTE Arbeitsdaten — dort wäre das Badge irreführend → false. */
+  showDemoBadge?: boolean;
+}
+
+/** Eine zusätzliche, benannte Nav-Sektion der Sidebar (siehe extraNavSections). */
+export interface ShellNavSection {
+  label: string;
+  items: readonly ShellNavItem[];
 }
 
 /** Kurz-Marke (Initialen) aus dem Leistungs-Label ableiten — z.B. „Gewerbeanmeldung"→„GE". */
@@ -78,9 +96,14 @@ function brandInitials(label: string): string {
  * Labels sind generische Verwaltungs-Begriffe; das konkrete Verfahren steckt im Branding, nicht in der Nav.
  */
 function navFor<T>(
-  persona: Persona,
+  persona: Persona | undefined,
   config: LeistungConfig<T>,
 ): ShellNavItem[] {
+  // Workspace-Modus (keine aktive Persona): nur der Team-Workspace-Einstieg — die
+  // Persona-Sichten erreicht man über den Arbeitsbereichs-Wechsler.
+  if (persona === undefined) {
+    return [boardsNavItem()];
+  }
   switch (persona) {
     case "buerger": {
       const items: ShellNavItem[] = [
@@ -98,6 +121,7 @@ function navFor<T>(
           href: "/buerger/anmelden",
         });
       }
+      items.push(boardsNavItem());
       return items;
     }
     case "sachbearbeitung": {
@@ -114,6 +138,7 @@ function navFor<T>(
           href: "/amt",
         });
       }
+      items.push(boardsNavItem());
       return items;
     }
     case "aufsicht":
@@ -126,10 +151,18 @@ function navFor<T>(
           // die Aufsicht-Persona (ihr EINZIGES Nav-Item) via *-Fallback auf /buerger (Audit D3-1, schlimmster Fall).
           href: "/aufsicht",
         },
+        boardsNavItem(),
       ];
     default:
       return [];
   }
+}
+
+/** Cross-cutting Workspace-Einstieg in JEDER Persona: /boards ist eine echte App-Route
+ *  (Audit D3-1) und session-guarded — ohne Anmeldung landet man auf /login, was für
+ *  Mitarbeitende genau der gewollte Einstieg in den Team-Workspace ist. */
+function boardsNavItem(): ShellNavItem {
+  return { key: "boards", label: "Boards", icon: LayoutGrid, href: "/boards" };
 }
 
 /** Generische, verfahrens-neutrale Rollen-Überschrift in der Sidebar. */
@@ -138,6 +171,11 @@ const ROLLEN_LABEL: Record<Persona, string> = {
   sachbearbeitung: "Sachbearbeitung",
   aufsicht: "Aufsicht",
 };
+
+/** Überschrift/Badge-Text: aktive Persona oder der neutrale Workspace-Kontext. */
+function kontextLabel(persona: Persona | undefined): string {
+  return persona ? ROLLEN_LABEL[persona] : "Team-Workspace";
+}
 
 const MAIN_ID = "main-content";
 
@@ -150,18 +188,30 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
   activeNavKey,
   onNavigate,
   personas,
+  extraNavSections,
+  accountSlot,
+  showDemoBadge = true,
 }: FachverfahrenShellProps<T>): React.JSX.Element {
   // DATA-DRIVEN Rollen: explizite Prop > verfahrensspezifische Rollen aus dem Vertrag (config.personas, aus dem
   // Fachkonzept) > generische DEFAULT_PERSONAS. So spiegeln die 3 Sichten das jeweilige Verfahren, ohne Hardcode.
   const personaList = personas ?? config.personas ?? DEFAULT_PERSONAS;
-  // DEEP-LINK: ?persona=buerger|sachbearbeitung|aufsicht (aus der Governance-UI / geteilte Links) setzt die Rolle
-  // initial. GENERISCH für JEDE generierte App (alle rendern diese Shell); die App bleibt Quelle der Wahrheit
+  // Wechsler nur zeigen, wenn es etwas zu wechseln gibt: mehr als ein Arbeitsbereich —
+  // oder Workspace-Modus (keine aktive Persona) mit mindestens einem Einstieg.
+  const showSwitcher =
+    personaList.length > 1 ||
+    (personaList.length >= 1 && persona === undefined);
+  // DEEP-LINK: ?persona=… setzt die Rolle initial — validiert gegen die ZUGEWIESENEN
+  // Arbeitsbereiche (personaList), nicht gegen das hartkodierte Tripel: ein geteilter
+  // Link darf keine fremde Sicht aufrufen. Die App bleibt Quelle der Wahrheit
   // (onPersonaChange), wir stoßen nur den initialen Wechsel an.
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     const raw = new URLSearchParams(window.location.search).get("persona");
-    const valid: Persona[] = ["buerger", "sachbearbeitung", "aufsicht"];
-    if (raw && (valid as string[]).includes(raw) && raw !== persona)
+    if (
+      raw &&
+      personaList.some((entry) => entry.key === raw) &&
+      raw !== persona
+    )
       onPersonaChange(raw as Persona);
   }, []);
   const nav = navFor(persona, config);
@@ -197,6 +247,7 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
         }}
         className={cn(
           "flex min-h-11 items-center gap-2.5 rounded-md px-2.5 text-sm",
+          // Kanonisches Fokus-Rezept (Spec 3.2): weicher 3px-Ring, EIN Rezept kit-weit.
           "transition-colors ease-out motion-reduce:transition-none",
           "outline-none focus-visible:ring-ring/50 focus-visible:ring-[3px]",
           isActive
@@ -208,6 +259,12 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
         <span className="truncate">{item.label}</span>
       </a>
     );
+  };
+
+  // EIN <li>-umschlossenes Rezept für Sidebar-Einträge (Persona-Nav + extraNavSections) — nutzt
+  // DIESELBE Markup-Quelle renderNavLink (eine Wahrheit für den Nav-Link).
+  const renderNavItem = (item: ShellNavItem) => {
+    return <li key={item.key}>{renderNavLink(item)}</li>;
   };
 
   return (
@@ -252,28 +309,36 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
         {/* Persona-spezifische Navigation (data-driven). */}
         <nav
           className="flex-1 overflow-y-auto px-2 py-3"
-          aria-label={`Navigation — ${ROLLEN_LABEL[persona]}`}
+          aria-label={`Navigation — ${kontextLabel(persona)}`}
         >
           <div className="mb-4">
             <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-sidebar-muted">
-              {ROLLEN_LABEL[persona]}
+              {kontextLabel(persona)}
             </div>
-            <ul className="flex flex-col gap-0.5">
-              {nav.map((item) => (
-                <li key={item.key}>{renderNavLink(item)}</li>
-              ))}
-            </ul>
+            <ul className="flex flex-col gap-0.5">{nav.map(renderNavItem)}</ul>
           </div>
+          {extraNavSections?.map((section) => (
+            <div key={section.label} className="mb-4">
+              <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-sidebar-muted">
+                {section.label}
+              </div>
+              <ul className="flex flex-col gap-0.5">
+                {section.items.map(renderNavItem)}
+              </ul>
+            </div>
+          ))}
         </nav>
 
-        {/* Rollen-Wechsler (umschaltbar). */}
-        <div className="relative border-t border-sidebar-border p-2">
-          <PersonaSwitcher
-            persona={persona}
-            onPersonaChange={onPersonaChange}
-            personas={personaList}
-          />
-        </div>
+        {/* Arbeitsbereichs-Wechsler — nur wenn es etwas zu wechseln gibt. */}
+        {showSwitcher && (
+          <div className="relative border-t border-sidebar-border p-2">
+            <PersonaSwitcher
+              persona={persona}
+              onPersonaChange={onPersonaChange}
+              personas={personaList}
+            />
+          </div>
+        )}
       </aside>
 
       {/* ── Inhalts-Spalte: Header + Main ───────────────────────────────────── */}
@@ -286,7 +351,7 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
             <SheetTrigger asChild>
               <button
                 type="button"
-                aria-label={`Navigation öffnen — ${ROLLEN_LABEL[persona]}`}
+                aria-label={`Navigation öffnen — ${kontextLabel(persona)}`}
                 className="grid h-10 w-10 shrink-0 place-items-center rounded-md text-muted-foreground outline-none hover:bg-muted focus-visible:ring-ring/50 focus-visible:ring-[3px] md:hidden"
               >
                 <Menu className="h-5 w-5" aria-hidden="true" />
@@ -297,14 +362,14 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
               className="w-[280px] border-sidebar-border bg-sidebar p-0 text-sidebar-foreground"
             >
               <SheetTitle className="sr-only">
-                Navigation — {ROLLEN_LABEL[persona]}
+                Navigation — {kontextLabel(persona)}
               </SheetTitle>
               <nav
                 className="px-2 py-4"
-                aria-label={`Navigation — ${ROLLEN_LABEL[persona]}`}
+                aria-label={`Navigation — ${kontextLabel(persona)}`}
               >
                 <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-sidebar-muted">
-                  {ROLLEN_LABEL[persona]}
+                  {kontextLabel(persona)}
                 </div>
                 <ul className="flex flex-col gap-0.5">
                   {nav.map((item) => (
@@ -338,21 +403,28 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
             {/* Aktive Rolle als ruhiger Kontext-Hinweis. */}
             <Badge tone="info" className="hidden sm:inline-flex">
               <ShieldCheck className="h-3 w-3" aria-hidden="true" />
-              {ROLLEN_LABEL[persona]}
+              {kontextLabel(persona)}
             </Badge>
-            {/* Demo-/Datenschutz-Transparenz (synthetische Daten — keine Echtdaten). */}
-            <Badge tone="neu">Demo · synthetische Daten</Badge>
+            {/* Demo-/Datenschutz-Transparenz (synthetische Daten — keine Echtdaten).
+                Im Team-Workspace (echte Arbeitsdaten) via showDemoBadge=false abgeschaltet. */}
+            {showDemoBadge && (
+              <Badge tone="neu">Demo · synthetische Daten</Badge>
+            )}
+            {/* Konto-Bereich (persistent shell: Profil/Einstellungen erreichbar). */}
+            {accountSlot}
           </div>
         </header>
 
-        {/* Persona-Wechsler auch im Header (mobil, wo die Sidebar verborgen ist). */}
-        <div className="border-b border-sidebar-border bg-sidebar px-2 py-1.5 md:hidden">
-          <PersonaSwitcher
-            persona={persona}
-            onPersonaChange={onPersonaChange}
-            personas={personaList}
-          />
-        </div>
+        {/* Arbeitsbereichs-Wechsler auch im Header (mobil, wo die Sidebar verborgen ist). */}
+        {showSwitcher && (
+          <div className="border-b border-sidebar-border bg-sidebar px-2 py-1.5 md:hidden">
+            <PersonaSwitcher
+              persona={persona}
+              onPersonaChange={onPersonaChange}
+              personas={personaList}
+            />
+          </div>
+        )}
 
         {/* Haupt-Inhalt (main-Landmark, Sprungziel des Skip-Links). */}
         <main

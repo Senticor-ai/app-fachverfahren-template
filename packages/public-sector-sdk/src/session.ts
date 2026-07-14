@@ -113,8 +113,7 @@ export function headerSessionResolver(
       ...new Set([...rollenPermissions, ...explizitePermissions]),
     ];
     const assuranceLevel = headerWert(h["x-assurance-level"]) as
-      | AssuranceLevel
-      | undefined;
+      AssuranceLevel | undefined;
     return claimsToSession({
       subject,
       tenantId,

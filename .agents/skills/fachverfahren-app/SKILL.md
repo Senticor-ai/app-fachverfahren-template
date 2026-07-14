@@ -363,6 +363,23 @@ die produkt-Gates fangen sie, aber der Agent soll sie gar nicht erst erzeugen:
   Fachkonzept-Tarife hat. → Verfahrensspezifisches `berechne` schreiben.
 - **Werte erfinden** statt aus dem Fachkonzept ziehen. → Nur belegte Werte;
   Unbekanntes als markierte Annahme, nie als Fakt.
+  Die Landing (`/`) ist die einzige Route ohne Anmeldung; alle Persona-
+  und Workspace-Sichten (`/buerger*`, `/amt*`, `/aufsicht`, `/boards`,
+  Benutzerverwaltung) liegen hinter dem Session-Gate und brauchen die
+  lokale App-Runtime — der Vite-Dev-Server proxied `/auth` + `/api` an sie
+  (`apps/fachverfahren/dev-proxy.ts`, Default `http://127.0.0.1:8080`):
+
+  ```bash
+  pnpm run dev:api
+  ```
+
+  `dev:api` baut Store und Server, fährt die Migrationen und startet die
+  Runtime. Voraussetzung ist ein erreichbares Postgres samt Datenbank (Default
+  `postgres://app:app@127.0.0.1:5432/app`, übersteuerbar via `APP_PG_URL`;
+  abweichendes Proxy-Ziel via `VITE_DEV_API_PROXY_TARGET`). Beim ersten
+  Start den Admin auf der Landing (`/`) mit dem Bootstrap-Token einrichten
+  (Default `dev-setup`, nur lokal). Die login-freie Sichtprüfung der
+  Bausteine läuft über `pnpm run storybook`.
 
 ## Bürger-Sprache: Leichte Sprache und Fachbegriffe
 

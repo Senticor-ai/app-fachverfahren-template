@@ -22,7 +22,9 @@ export function ResponsiveWorkspaceShell({
   actions,
   status,
   listLabel = "Vorgangsliste",
-  detailLabel = "Vorgangsdetails",
+  // Bewusst NICHT "Vorgangsdetails": CaseDetailPanel trägt dieses Label bereits selbst —
+  // zwei gleichnamige, verschachtelte Landmarks verletzen axe landmark-unique.
+  detailLabel = "Detailbereich",
   density = "comfortable",
 }: ResponsiveWorkspaceShellProps) {
   return (

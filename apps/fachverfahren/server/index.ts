@@ -3,6 +3,15 @@ import { constants } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
+import fastifyCookie from "@fastify/cookie";
+import {
+  createAuditStoreFromEnv,
+  createAuthStoreFromEnv,
+  createKanbanStoreFromEnv,
+  type AuditStore,
+  type AuthStore,
+  type KanbanStore,
+} from "@senticor/app-store-postgres";
 import fastify, {
   type FastifyInstance,
   type FastifyReply,
@@ -56,6 +65,27 @@ import {
 } from "./automation-engine.js";
 import { HeuristicKiAssist } from "./ai-assist.js";
 import { createAiAssistFromEnv } from "./ai-openai-adapter.js";
+import { registerAuditRoutes } from "./audit/routes.js";
+import { autoBootstrapAdminFromEnv } from "./auth/auto-bootstrap.js";
+import { registerAuthPolicyGuard } from "./auth/authorization.js";
+import { registerAuthRoutes, type RegistrationMode } from "./auth/routes.js";
+
+/** Self-Signup-Politik aus der Env: default AUS; `open_unverified` heißt ehrlich so,
+ *  bis E-Mail-Verifikation existiert. Unbekannte Werte fallen GESCHLOSSEN zurück. */
+function parseRegistrationMode(value: string | undefined): RegistrationMode {
+  if (value === "open_unverified") {
+    // Der Default-Rate-Limiter zählt im Prozess: bei mehreren App-Instanzen drosselt
+    // jede für sich — für Multi-Instanz-Deployments einen verteilten RateLimiter
+    // konfigurieren (auth/rate-limit.ts).
+    console.warn(
+      "[auth] AUTH_REGISTRATION_MODE=open_unverified: Registrierung ist OFFEN (ohne E-Mail-Verifikation); In-Memory-Rate-Limiter trägt nur Single-Process-Deployments.",
+    );
+    return "open_unverified";
+  }
+  return "disabled";
+}
+import { registerBoardRoutes } from "./kanban/routes.js";
+import { registerUserRoutes } from "./users/routes.js";
 
 const NO_STORE = "no-store";
 const IMMUTABLE = "public, max-age=31536000, immutable";
@@ -250,6 +280,13 @@ export function buildPublicServer({
   domainApi,
   modules,
   moduleHostDeps,
+  authStore = createAuthStoreFromEnv(),
+  kanbanStore = createKanbanStoreFromEnv(),
+  auditStore = createAuditStoreFromEnv(),
+  bootstrapToken = process.env["BOOTSTRAP_TOKEN"],
+  registrationMode = parseRegistrationMode(
+    process.env["AUTH_REGISTRATION_MODE"],
+  ),
 }: {
   config?: RuntimeConfig;
   state?: RuntimeState;
@@ -260,6 +297,11 @@ export function buildPublicServer({
    *  werden. `moduleHostDeps` (mit den Stores) ist dann PFLICHT — sonst fail-closed. */
   modules?: readonly ModuleServer[];
   moduleHostDeps?: ModuleHostDeps;
+  authStore?: AuthStore;
+  kanbanStore?: KanbanStore;
+  auditStore?: AuditStore;
+  bootstrapToken?: string | undefined;
+  registrationMode?: RegistrationMode;
 } = {}): FastifyInstance {
   const app = fastify({
     logger: false,
@@ -285,6 +327,19 @@ export function buildPublicServer({
       );
     mountModules(app, modules, moduleHostDeps);
   }
+  // K2: /auth-/api-Route ohne Autorisierungs-Policy = Boot-Fehler, nicht erst Test-Rot.
+  registerAuthPolicyGuard(app);
+  app.register(fastifyCookie);
+  registerAuthRoutes(app, {
+    authStore,
+    kanbanStore,
+    auditStore,
+    bootstrapToken,
+    registrationMode,
+  });
+  registerBoardRoutes(app, { authStore, kanbanStore, auditStore });
+  registerUserRoutes(app, { authStore, kanbanStore, auditStore });
+  registerAuditRoutes(app, { authStore, auditStore });
   app.get("/livez", async (_request, reply) => {
     return reply.header("Cache-Control", NO_STORE).send({ status: "ok" });
   });
@@ -592,6 +647,9 @@ export async function startRuntime(env: NodeJS.ProcessEnv = process.env) {
   const domainApiForRoutes = domainApi
     ? stripModuleOwnedStores(domainApi, modules)
     : domainApi;
+  const authStore = createAuthStoreFromEnv(env);
+  const kanbanStore = createKanbanStoreFromEnv(env);
+  const auditStore = createAuditStoreFromEnv(env);
   const publicServer = buildPublicServer({
     config,
     state,
@@ -600,6 +658,9 @@ export async function startRuntime(env: NodeJS.ProcessEnv = process.env) {
     ...(modules.length > 0 && domainApi
       ? { modules, moduleHostDeps: domainApi }
       : {}),
+    authStore,
+    kanbanStore,
+    auditStore,
   });
   // Rückstau-Gauge (#10) am /internal/metrics, sobald ein Automations-Store da ist (der In-Process-Poller ist der
   // Default, wenn KEIN separater Worker läuft) — dann ist die Skalierungs-Kennzahl auch ohne Worker-Deployment sichtbar.
@@ -614,6 +675,16 @@ export async function startRuntime(env: NodeJS.ProcessEnv = process.env) {
     config,
     metrics,
     ...(backlogQuelle ? { backlog: backlogQuelle } : {}),
+  });
+  // Fresh-Deployment-Akzeptanz: mit AUTH_BOOTSTRAP_ADMIN_* entsteht der Admin samt
+  // Team-Discovery-Board beim Start — idempotent, wirft nie (Fehler landen im Log).
+  await autoBootstrapAdminFromEnv({
+    authStore,
+    kanbanStore,
+    auditStore,
+    env,
+    log: (level, event, fields) =>
+      level === "error" ? logError(event, fields) : logInfo(event, fields),
   });
   // Bindet nur EINER der beiden Server (z. B. internalPort belegt/kollidiert), MUSS der bereits gebundene wieder
   // geschlossen werden — sonst bliebe der Public-Port (inkl. gemounteter /api/*) offen + traffic-bedienend, während

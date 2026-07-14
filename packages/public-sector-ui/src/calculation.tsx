@@ -3,10 +3,7 @@ import { useId } from "react";
 export type CalculationResultStatus = "final" | "provisional" | "blocked";
 
 export type CalculationStepStatus =
-  | "applied"
-  | "skipped"
-  | "assumption"
-  | "blocked";
+  "applied" | "skipped" | "assumption" | "blocked";
 
 export interface CalculationInput {
   id: string;

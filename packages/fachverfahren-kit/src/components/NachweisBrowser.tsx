@@ -51,10 +51,7 @@ import { useStatusRegion } from "./StatusRegion.js";
 
 /** Bearbeitungsstand eines einzelnen Nachweises. */
 export type NachweisStatus =
-  | "eingereicht"
-  | "geprueft"
-  | "fehlend"
-  | "abgelehnt";
+  "eingereicht" | "geprueft" | "fehlend" | "abgelehnt";
 
 /** Ein einzelner Nachweis in der Dokumentenmappe. Vollständig props-getrieben. */
 export interface NachweisEintrag {

@@ -1,4 +1,4 @@
-// shadcn/ui Calendar — react-day-picker v9 DayPicker, token-getrieben.
+// shadcn/ui Calendar — react-day-picker v10 DayPicker, token-getrieben.
 // Generisch: keine Domänen-Literale; deutsche Locale via date-fns/locale/de.
 // Tastatur/aria/Fokus liefert DayPicker selbst (WCAG 2.2 AA, BITV).
 "use client";

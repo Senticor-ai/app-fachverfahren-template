@@ -163,6 +163,69 @@ describe("postgres migration runner", () => {
     );
   });
 
+  it("ships the workspace foundation migration (roles, identity links, audit, board metadata)", async () => {
+    const migrations = await loadMigrations(
+      "packages/app-store-postgres/migrations",
+    );
+    const sql = migrations.map((migration) => migration.sql).join("\n");
+
+    expect(sql).toContain("role text NOT NULL DEFAULT 'member'");
+    expect(sql).toContain("CREATE TABLE IF NOT EXISTS app_identity_links");
+    // Bestands-Konten bekommen ihren lokalen Identity-Link per Backfill (idempotent).
+    expect(sql).toContain(
+      "INSERT INTO app_identity_links (tenant_id, provider, subject, actor_id)",
+    );
+    expect(sql).toContain(
+      "ON CONFLICT (tenant_id, provider, subject) DO NOTHING",
+    );
+    expect(sql).toContain(
+      "CREATE TABLE IF NOT EXISTS app_workspace_audit_events",
+    );
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS purpose text NULL");
+    // Kompensations-Löschung: owner-FK muss cascaden, sonst bleibt bei Seed-Teilfehlern
+    // ein Zombie-Konto mit gültigem Initialpasswort zurück (Codex-Review PR #27).
+    expect(sql).toContain(
+      "FOREIGN KEY (owner_actor_id) REFERENCES app_users (actor_id) ON DELETE CASCADE",
+    );
+    // Backfills: frühester Benutzer je Tenant wird Admin; Discovery-Boards werden team-sichtbar.
+    expect(sql).toContain("UPDATE app_users SET role = 'admin'");
+    expect(sql).toContain("SET visibility = 'team'");
+    expect(sql).toContain("'Fachverfahren Discovery Board'");
+  });
+
+  it("ships the user-personas migration (NULL-Legacy-Marker, fail-closed defaults, citizen role)", async () => {
+    const migrations = await loadMigrations(
+      "packages/app-store-postgres/migrations",
+    );
+    const sql = migrations.map((migration) => migration.sql).join("\n");
+
+    // B1 replay-sicher: Spalte NULLABLE anlegen, NUR IS-NULL-Zeilen (= Bestand von VOR der
+    // Einführung) backfillen, danach leerer Default + NOT NULL. Ein bewusst leeres Konto
+    // ('{}') wird bei erneutem SQL-Lauf NICHT erneut befüllt.
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS local_personas text[];");
+    expect(sql).toContain("WHERE local_personas IS NULL");
+    expect(sql).toContain(
+      "ALTER COLUMN local_personas SET DEFAULT ARRAY[]::text[]",
+    );
+    expect(sql).toContain("ALTER COLUMN local_personas SET NOT NULL");
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS oidc_personas text[];");
+    expect(sql).toContain(
+      "ADD COLUMN IF NOT EXISTS persona_management_mode text NOT NULL DEFAULT 'local'",
+    );
+    expect(sql).toContain(
+      "ADD COLUMN IF NOT EXISTS principal_version bigint NOT NULL DEFAULT 1",
+    );
+    // Kanonische Wertebereiche als benannte CHECKs (inkl. Verbot von NULL-Elementen und >3).
+    expect(sql).toContain("app_users_local_personas_allowed");
+    expect(sql).toContain("app_users_oidc_personas_allowed");
+    expect(sql).toContain("app_users_persona_mode_allowed");
+    expect(sql).toContain("array_position(local_personas, NULL) IS NULL");
+    expect(sql).toContain("cardinality(local_personas) <= 3");
+    // Workspace-Rolle citizen (Self-Signup) — inline-CHECK aus workspace_foundation ersetzt.
+    expect(sql).toContain("app_users_role_check");
+    expect(sql).toContain("role IN ('admin', 'member', 'citizen')");
+  });
+
   it("keeps preference and mailbox semantics testable without a database", async () => {
     const messages: MailboxMessage[] = [
       {

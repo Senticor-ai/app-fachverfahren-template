@@ -1,11 +1,13 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
+import { StatusRegionProvider } from "@senticor/fachverfahren-kit";
 import { App } from "./App.js";
 import { AppErrorBoundary } from "./AppErrorBoundary.js";
 import { KommuneBranding, RuntimeConfigProvider } from "./runtime-config.js";
 import { aktivesPortal } from "./portale.js";
 import { portalMarke } from "./verfahren.registry.js";
+import { SessionProvider } from "./session.js";
 import "./styles.css";
 
 const el = document.getElementById("root");
@@ -22,16 +24,22 @@ const routerBase = import.meta.env.BASE_URL.replace(/\/+$/, "") || "/";
 createRoot(el).render(
   <StrictMode>
     <AppErrorBoundary>
-      <BrowserRouter basename={routerBase}>
-        {/* RuntimeConfigProvider lädt `/runtime-config.json` EINMAL (application/tenant/branding/delivery + SW);
-            KommuneBranding speist deren `branding` (bzw. die Marke des AKTIVEN Portals als Build-Zeit-Fallback) in den
-            KommuneThemeProvider → Wappen + Markenfarben. Ohne VITE_PORTAL_ID ist das die Default-`portalMarke`. */}
-        <RuntimeConfigProvider>
-          <KommuneBranding fallback={aktivesPortal.marke ?? portalMarke}>
-            <App />
-          </KommuneBranding>
-        </RuntimeConfigProvider>
-      </BrowserRouter>
+      {/* Auth/Status (origin/main) AUSSEN, Theming/Runtime-Config (unsere) INNEN um die App:
+          StatusRegion + Session tragen die Sitzung/Ansage; RuntimeConfigProvider lädt
+          `/runtime-config.json` EINMAL (application/tenant/branding/delivery + SW) und KommuneBranding
+          speist dessen `branding` (bzw. die Marke des AKTIVEN Portals als Fallback) in den
+          KommuneThemeProvider → Wappen + Markenfarben. */}
+      <StatusRegionProvider>
+        <SessionProvider>
+          <BrowserRouter basename={routerBase}>
+            <RuntimeConfigProvider>
+              <KommuneBranding fallback={aktivesPortal.marke ?? portalMarke}>
+                <App />
+              </KommuneBranding>
+            </RuntimeConfigProvider>
+          </BrowserRouter>
+        </SessionProvider>
+      </StatusRegionProvider>
     </AppErrorBoundary>
   </StrictMode>,
 );

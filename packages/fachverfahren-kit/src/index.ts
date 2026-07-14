@@ -6,6 +6,15 @@ export * from "./store.js";
 // Umgebungs-Naht (In-Memory-DEV ↔ HTTP-PROD).
 export * from "./http-workspace.js";
 export * from "./lib/http-mappers.js";
+// Board/Kanban-Workspace (aus origin/main).
+export * from "./board-types.js";
+export * from "./board-store.js";
+// Namens-Kollision aufloesen: `BoardColumn` existiert in BEIDEN — types.ts (unsere Arbeitsvorrat-
+// Spalten-Config: key/label/tone/gruppe) UND board-types.ts (ihre Kanban-Spalten-Entity:
+// columnId/boardId/title/...). Beide sind fachlich verschieden. Der Barrel exportiert die
+// Kanban-Variante (board-client/KanbanBoard brauchen sie); die Arbeitsvorrat-Config bleibt intern
+// in types.ts bzw. per Direktimport aus "../types.js" verfuegbar.
+export type { BoardColumn } from "./board-types.js";
 export * from "./contract-snapshot.js";
 export * from "./format.js";
 // Business-Logik als DATEN: Feldwert-/Options-Auflösung + der generische reine Interpreter (Tarif/Regeln/Codelisten).
@@ -77,6 +86,14 @@ export * from "./components/ConsentBanner.js";
 export * from "./components/KommandoPalette.js";
 export * from "./components/StatCard.js";
 export * from "./components/ErrorSummary.js";
+export * from "./components/KanbanCard.js";
+export * from "./components/MoveCardMenu.js";
+export * from "./components/KanbanColumn.js";
+export * from "./components/KanbanBoard.js";
+export * from "./components/CreateBoardDialog.js";
+export * from "./components/BoardList.js";
+export * from "./components/BoardCardDetail.js";
+export * from "./components/ArchivedCardsPanel.js";
 
 // ── Standardisierungs-Layer (M0/M1): der EINE Zustands-/Ansage-/Theming-Vertrag, auf den alle ──
 // ── Komponenten zurückgreifen (shadcn/ui + Tailwind-Token). Eine Wahrheit pro Belang. ──

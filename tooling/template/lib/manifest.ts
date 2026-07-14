@@ -1,5 +1,6 @@
 import { access, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { readJson, writeFileAtomic, writeJson } from "./structured-edit.ts";
 
 export const templateDirectory = ".template";
@@ -39,6 +40,8 @@ export const defaultOwnership: TemplateOwnership = {
     "CODE_OF_CONDUCT.md": "replace",
     "ADOPTERS.md": "consumer",
     ".gitlab-ci.yml": "replace",
+    "ci.yml": "replace",
+    "scripts/codesphere-toolchain.sh": "replace",
     ".gitlab/CODEOWNERS": "consumer",
     ".gitlab/issue_templates/**": "replace",
     ".gitlab/merge_request_templates/**": "replace",
@@ -74,6 +77,11 @@ export const defaultOwnership: TemplateOwnership = {
     "apps/*/deploy/helm/**": "replace",
     "apps/*/public/**": "replace",
     "apps/*/server/**": "replace",
+    // Die geteilten Runtime-Pakete sind Vorlagen-Fundament, kein Konsumenten-Code: Vorlagen-PRs
+    // ändern Server-Code und Paket-API im Gleichschritt (z.B. app-store-postgres). Ohne diesen
+    // Eintrag aktualisierte template:update nur apps/*/server/** und ließ die Pakete stehen —
+    // der Konsument brach mit TS-Fehlern gegen die alte Paket-API (Deploy-Run 29241279544).
+    "packages/*/**": "replace",
     "apps/*/src/domain/**": "consumer",
     "docs/domain/**": "consumer",
     "modules/*/**": "consumer",
@@ -184,6 +192,9 @@ export async function writeTemplateMetadata(
       "- `answers.json` enthält stabile Scaffold-Eingaben.",
       "- `lock.json` enthält Template-Version, Commit und angewandte Migrationen.",
       "- `ownership.yaml` steuert, welche Pfade vom Template aktualisiert werden.",
+      "  Neue Template-Defaults werden bei `template:update` automatisch ergänzt",
+      "  (eigene Einträge gewinnen); Opt-out = Strategie `consumer` setzen statt",
+      "  die Zeile zu löschen.",
       "",
       "Diese Dateien enthalten keine Zeitstempel oder lokalen Maschinenpfade.",
       "",
@@ -220,6 +231,120 @@ export function formatOwnershipYaml(ownership: TemplateOwnership): string {
   ].join("\n");
 }
 
+/** Ergänzt Default-Einträge, die im persistierten ownership.yaml eines Konsumenten fehlen (Set-Differenz,
+ *  neue Keys hinten angehängt → append-only-Diff). Persistierte Einträge gewinnen IMMER: Konsumenten-Overrides
+ *  werden nie zurückgesetzt, und Strategie-ÄNDERUNGEN an bestehenden Defaults propagieren bewusst nicht
+ *  (dafür gibt es Template-Migrationen — es existiert keine Provenienz, um Override von veraltetem Snapshot
+ *  zu unterscheiden). Das gilt auch für BREITERE persistierte Muster: deckt z.B. `docs/**: consumer` einen
+ *  neuen, spezifischeren Default `docs/reference/**` ab, wird dieser NICHT ergänzt — sonst gewönne er als
+ *  spezifischeres Pattern in explainOwnership und hebelte das Konsumenten-Opt-out aus (Codex-Review PR #26).
+ *  Umgekehrt werden BREITERE Defaults trotz engerer persistierter Muster ergänzt (verschachtelte Pfade
+ *  brauchen Verwaltung); für die vom engeren Muster gematchten Pfade behält dieses Vorrang, weil
+ *  explainOwnership nach Spezifizität statt roher Länge entscheidet (isMoreSpecificOwnershipPattern).
+ *  Gelöschte Einträge werden beim nächsten Update wieder ergänzt; dauerhaftes Opt-out = Strategie auf
+ *  `consumer` setzen statt die Zeile zu löschen. */
+export function mergeOwnershipDefaults(
+  persisted: TemplateOwnership,
+  defaults: TemplateOwnership = defaultOwnership,
+): {
+  ownership: TemplateOwnership;
+  added: Array<{ path: string; strategy: TemplateOwnership["paths"][string] }>;
+} {
+  const persistedPaths = persisted.paths ?? {};
+  const persistedPatterns = Object.keys(persistedPaths);
+  const added = Object.entries(defaults.paths ?? {})
+    .filter(
+      ([path]) =>
+        !persistedPatterns.some((pattern) =>
+          ownershipPatternCovers(pattern, path),
+        ),
+    )
+    .map(([path, strategy]) => ({ path, strategy }));
+  return {
+    ownership: {
+      paths: {
+        ...persistedPaths,
+        ...Object.fromEntries(
+          added.map(({ path, strategy }) => [path, strategy]),
+        ),
+      },
+    },
+    added,
+  };
+}
+
+/** Deckt das persistierte Muster den (ggf. selbst wildcard-haltigen) Default-Pfad vollständig ab?
+ *  Ein naives matchesOwnershipPattern(persistiert, defaultKey) prüft den Default-Key als LITERALEN
+ *  Text: `apps/{star}/server/{star}` matchte so den Key `apps/{star}/server/{star}{star}`, deckt
+ *  verschachtelte Pfade aber nicht ab (Codex-Review PR #26, Runde 2). Stattdessen wird der
+ *  Default-Pfad zu konkreten Beispielpfaden expandiert (ein Stern → ein Segment; Doppelstern →
+ *  ein UND zwei Segmente) — nur ein Muster, das ALLE Beispiele matcht, gilt als deckend.
+ *  Das Sample-Segment `~cov~` kommt in echten Mustern nicht vor (keine False-Positives). */
+export function ownershipPatternCovers(
+  pattern: string,
+  defaultPath: string,
+): boolean {
+  if (pattern === defaultPath) {
+    return true;
+  }
+  return expandOwnershipPatternSamples(defaultPath).every((sample) =>
+    matchesOwnershipPattern(pattern, sample),
+  );
+}
+
+function expandOwnershipPatternSamples(pattern: string): string[] {
+  let variants = [pattern];
+  while (variants.some((variant) => variant.includes("**"))) {
+    variants = variants.flatMap((variant) => {
+      const index = variant.indexOf("**");
+      if (index === -1) {
+        return [variant];
+      }
+      const prefix = variant.slice(0, index);
+      const suffix = variant.slice(index + 2);
+      return [`${prefix}~cov~${suffix}`, `${prefix}~cov~/~cov~${suffix}`];
+    });
+  }
+  return variants.map((variant) => variant.replaceAll("*", "~cov~"));
+}
+
+/** Lädt die `defaultOwnership` der ZIEL-Template-Quelle (per dynamischem Import ihres manifest.ts).
+ *  Nötig, weil beim Update eines Konsumenten dessen INSTALLIERTE (ältere) CLI läuft: ein Default,
+ *  den erst die neuere Quelle kennt, fehlt sowohl im persistierten ownership.yaml als auch in der
+ *  kompilierten defaultOwnership der laufenden CLI — der Merge bliebe leer und die Datei fiele
+ *  weiter auf merge/Konflikt zurück (Codex-Review PR #26). Vertrauensmodell wie bei Migrationen:
+ *  template:update führt ohnehin Code aus der Quelle aus. Fallback auf die eigenen Defaults, wenn
+ *  die Quelle kein importierbares Manifest trägt. */
+export async function loadSourceOwnershipDefaults(
+  sourceRoot: string,
+): Promise<TemplateOwnership> {
+  const manifestPath = join(
+    sourceRoot,
+    "tooling",
+    "template",
+    "lib",
+    "manifest.ts",
+  );
+  try {
+    await access(manifestPath);
+    const module = await import(
+      /* @vite-ignore */ pathToFileURL(manifestPath).href
+    );
+    const sourceDefaults = module.defaultOwnership as
+      TemplateOwnership | undefined;
+    if (
+      sourceDefaults &&
+      Object.keys(sourceDefaults.paths ?? {}).length > 0 &&
+      validateOwnership(sourceDefaults).length === 0
+    ) {
+      return sourceDefaults;
+    }
+  } catch {
+    // Quelle ohne (importierbares) Manifest → Defaults der laufenden CLI.
+  }
+  return defaultOwnership;
+}
+
 export function validateOwnership(ownership: TemplateOwnership): string[] {
   const allowed = new Set(["replace", "merge", "structured-merge", "consumer"]);
   const failures = [];
@@ -238,7 +363,10 @@ export function explainOwnership(
   let bestMatch = undefined;
   for (const [pattern, strategy] of Object.entries(ownership.paths ?? {})) {
     if (matchesOwnershipPattern(pattern, path)) {
-      if (!bestMatch || pattern.length > bestMatch.pattern.length) {
+      if (
+        !bestMatch ||
+        isMoreSpecificOwnershipPattern(pattern, bestMatch.pattern)
+      ) {
         bestMatch = { pattern, strategy };
       }
     }
@@ -249,6 +377,25 @@ export function explainOwnership(
       strategy: "merge" as const,
     }
   );
+}
+
+/** Spezifizität statt roher Länge: erst mehr LITERALE Zeichen, dann weniger `**`-Wildcards,
+ *  dann Länge (bisheriger Tie-Break). Reine Längenwertung ließe einen ergänzten breiteren
+ *  Default (`apps/{star}/server/{star}{star}`, 16 Zeichen) das engere persistierte
+ *  Konsumenten-Muster (`apps/{star}/server/{star}`, 15 Zeichen) auch für dessen EIGENE
+ *  Pfade schlagen — "persistiert gewinnt" gilt aber pro Pfad (Codex-Review PR #26, Runde 3). */
+function isMoreSpecificOwnershipPattern(a: string, b: string): boolean {
+  const literalsA = a.replaceAll("*", "").length;
+  const literalsB = b.replaceAll("*", "").length;
+  if (literalsA !== literalsB) {
+    return literalsA > literalsB;
+  }
+  const doubleStarsA = (a.match(/\*\*/g) ?? []).length;
+  const doubleStarsB = (b.match(/\*\*/g) ?? []).length;
+  if (doubleStarsA !== doubleStarsB) {
+    return doubleStarsA < doubleStarsB;
+  }
+  return a.length > b.length;
 }
 
 export function matchesOwnershipPattern(

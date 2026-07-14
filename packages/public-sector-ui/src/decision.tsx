@@ -1,10 +1,7 @@
 import { type ReactNode, useId } from "react";
 
 export type DecisionOutcome =
-  | "approved"
-  | "partially-approved"
-  | "rejected"
-  | "deferred";
+  "approved" | "partially-approved" | "rejected" | "deferred";
 
 export type DecisionRequirementStatus = "met" | "open" | "blocked";
 

@@ -213,7 +213,7 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
       </div>
 
       {/* Resizable Master-Detail-Evidence-Layout — Referenz: ResizablePanelGroup (links Daten, rechts Belege). */}
-      <ResizablePanelGroup direction="horizontal" className="flex-1">
+      <ResizablePanelGroup orientation="horizontal" className="flex-1">
         {/* LINKS: Antragsdaten + KI-Vorschlag + Audit-Trail (aus VorgangDetail, config-getrieben). */}
         <ResizablePanel defaultSize={55} minSize={35}>
           <div className="h-full overflow-auto p-6">

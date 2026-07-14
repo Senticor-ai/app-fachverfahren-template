@@ -1574,7 +1574,7 @@ function ReviewRow({
       <dt className="text-sm text-muted-foreground">
         {label}
         {labelFachlich ? (
-          <span className="ml-2 text-xs text-muted-foreground/80">
+          <span className="ml-2 text-xs text-muted-foreground">
             <span className="sr-only">Fachbegriff: </span>
             <span aria-hidden="true">· </span>
             {labelFachlich}

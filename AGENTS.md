@@ -22,12 +22,18 @@ Plattformpakete:
   `app-store-postgres`, `jurisdictions/*`) sind die wiederverwendbare
   Plattformbasis.
 
-Das Template baut und läuft ohne jedes externe Werkzeug:
+Das Template baut ohne jedes externe Werkzeug; die klickbaren Sichten sind
+seit dem Session-Gate anmeldepflichtig:
 
 ```bash
 pnpm install
 pnpm run dev
 ```
+
+`pnpm run dev` allein zeigt die Landing mit „Server nicht erreichbar" — für
+die klickbaren Personas braucht es zusätzlich `pnpm run dev:api` (Postgres
+vorausgesetzt) und eine Anmeldung. Die login-freie Demo der Bausteine ist
+`pnpm run storybook`.
 
 Ein neues Fachverfahren entsteht, indem GENAU EINE Datei mit Fachdaten gefüllt
 wird — die Austausch-Naht (nächster Abschnitt). Es wird nichts neu gebaut, was
@@ -98,12 +104,22 @@ pnpm --filter @senticor/fachverfahren emit:contract
 Der Snapshot `apps/fachverfahren/leistung.contract.json` ist GENERIERT und
 wird nie von Hand editiert.
 
-Die realen Routen der App (`apps/fachverfahren/src/App.tsx`):
+Die realen Routen der App (`apps/fachverfahren/src/App.tsx`). `/` ist die
+Landing mit der Anmeldung für alle Rollen und die EINZIGE unauthentifizierte
+Route (`/login` bleibt nur als Alias auf `/`; `/auth/register` existiert nur
+bei `AUTH_REGISTRATION_MODE=open_unverified`). Alle Persona- und
+Workspace-Routen sind session-pflichtig; Persona-Routen setzen zusätzlich den
+ZUGEWIESENEN Arbeitsbereich voraus (`RequirePersonaExperience` — Navigation,
+keine Autorisierung), `/boards*` verlangt die Permission `boards.collaborate`
+(Details: `docs/reference/rbac.md`):
 
 ```text
-/buerger · /buerger/anmelden · /buerger/bestaetigung/:id
-/amt · /amt/vorgang/:id
-/aufsicht
+/  (Landing/Anmeldung)
+/buerger · /buerger/anmelden · /buerger/bestaetigung/:id   (Arbeitsbereich buerger)
+/amt · /amt/vorgang/:id                                    (Arbeitsbereich sachbearbeitung)
+/aufsicht                                                  (Arbeitsbereich aufsicht)
+/boards · /boards/:boardId   (Permission boards.collaborate)
+/admin/users   (Permission users.manage) · /konto/passwort
 ```
 
 ## Was Agenten NIE anfassen

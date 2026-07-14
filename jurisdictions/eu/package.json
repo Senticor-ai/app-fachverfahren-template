@@ -31,6 +31,6 @@
     "@senticor/public-sector-sdk": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "catalog:"
+    "typescript": "6.0.3"
   }
 }

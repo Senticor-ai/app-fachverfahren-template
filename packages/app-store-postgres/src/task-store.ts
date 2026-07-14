@@ -48,11 +48,7 @@ export interface AppTask {
 
 export type IntakeSource = "antrag" | "email" | "formular" | "register";
 export type IntakeTriageStatus =
-  | "pending"
-  | "snoozed"
-  | "accepted"
-  | "declined"
-  | "duplicate";
+  "pending" | "snoozed" | "accepted" | "declined" | "duplicate";
 
 export interface AppIntakeItem {
   intakeId: string;
@@ -141,11 +137,7 @@ export interface AppSavedView {
 }
 
 export type TaskRelationType =
-  | "blocks"
-  | "blocked-by"
-  | "duplicate"
-  | "relates"
-  | "widerspruch-zu";
+  "blocks" | "blocked-by" | "duplicate" | "relates" | "widerspruch-zu";
 
 /** Eine gerichtete Beziehung zwischen zwei Aufgaben (Plane-Parität). Löschbar; Selbstreferenz ist unzulässig. */
 export interface AppTaskRelation {
@@ -322,9 +314,7 @@ export class IntakeNotFoundError extends Error {
 export class DossierActivityInvalidError extends Error {
   constructor(
     readonly grund:
-      | "missing-authority"
-      | "task-mismatch"
-      | "authority-mismatch",
+      "missing-authority" | "task-mismatch" | "authority-mismatch",
   ) {
     super(`invalid dossier activity: ${grund}`);
     this.name = "DossierActivityInvalidError";

@@ -51,6 +51,16 @@ Erklärung für einen Pfad:
 pnpm run template:explain -- apps/fachverfahren/src/domain/example.ts
 ```
 
+`template:update` ergänzt neue Standard-Einträge der Ziel-Template-Quelle
+automatisch in `.template/ownership.yaml` (sichtbar in der Report-Sektion
+„Ownership Updates"); bestehende Einträge des Konsumenten gewinnen dabei
+immer — auch breitere Muster: deckt z. B. ein persistiertes `docs/**:
+consumer` einen neuen, spezifischeren Standard-Eintrag ab, wird dieser nicht
+ergänzt. Wer einen Pfad dauerhaft vom Template ausnehmen will, setzt die
+Strategie auf `consumer`, statt die Zeile zu löschen — gelöschte Einträge
+werden beim nächsten Update wieder ergänzt. Strategie-Änderungen an
+bestehenden Einträgen propagiert das Template nur über Migrationen.
+
 ## Update-Workflow
 
 Status und Prüfung:

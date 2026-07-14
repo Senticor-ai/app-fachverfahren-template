@@ -11,10 +11,7 @@ import type { AutomationAktion, Aufgabe, WorkspacePort } from "../types.js";
 import { findeUebergang } from "./status-machine.js";
 
 export type EffektStatus =
-  | "angewendet"
-  | "blockiert"
-  | "fehler"
-  | "nicht-unterstuetzt";
+  "angewendet" | "blockiert" | "fehler" | "nicht-unterstuetzt";
 
 export interface AutomationEffektErgebnis {
   aktion: AutomationAktion;

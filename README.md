@@ -66,21 +66,51 @@ Capability-Ports modelliert.
 
 ## Erste Schritte
 
+Designer und Fachseite erkunden die Bausteine login-frei im Storybook:
+
+```bash
+pnpm install
+pnpm run storybook
+```
+
+Neue Fachverfahren-Repositories entstehen über die Scaffold-CLI — siehe
+„Verwendung als Template" weiter unten. Wer am Template selbst mitarbeitet,
+findet die Entwickler-Anleitung (Frontend aus dem Template-Checkout starten,
+Troubleshooting) in `CONTRIBUTING.md`.
+
+### Lokal starten
+
+Die Web-App ist anmeldepflichtig: die Landing (`/`) ist die einzige Route ohne
+Anmeldung, alle Persona- und Workspace-Sichten liegen hinter dem Login. Für
+den lokalen Start braucht es ein erreichbares Postgres — ein
+Kubernetes-Manifest liegt unter `dev/postgres.yaml` (funktioniert mit Rancher
+Desktop und Docker Desktop, wenn Kubernetes aktiviert ist):
+
 ```bash
 mise install
 pnpm install
-pnpm run check:esm
-pnpm run check:typescript-policy
-pnpm run check:storybook
-pnpm run typecheck
-pnpm run test
+pnpm run dev:api
+```
+
+`dev:api` baut Store und Server, fährt die Migrationen und startet die
+App-Runtime auf `127.0.0.1:8080`. In einem zweiten Terminal den
+Vite-Dev-Server starten; er proxied `/auth` + `/api` an die Runtime:
+
+```bash
 pnpm run dev
 ```
 
-Die App läuft lokal als vollständige, klickbare 3-Personas-Oberfläche
-(Bürger:in, Sachbearbeitung, Aufsicht). Ein konkretes Fachverfahren entsteht,
-indem die EINE Austausch-Naht `apps/fachverfahren/src/leistung.config.ts`
-mit Fachdaten gefüllt wird; danach den Vertrags-Snapshot aktualisieren:
+Beim ersten Start den Administrationszugang auf der Landing (`/`) mit dem
+Bootstrap-Token `dev-setup` einrichten (Default nur für lokale Entwicklung).
+Migrationen lassen sich separat fahren über:
+
+```bash
+pnpm run db:migrate
+```
+
+Ein konkretes Fachverfahren entsteht, indem die EINE Austausch-Naht
+`apps/fachverfahren/src/leistung.config.ts` mit Fachdaten gefüllt wird;
+danach den Vertrags-Snapshot aktualisieren:
 
 ```bash
 pnpm --filter @senticor/fachverfahren emit:contract
@@ -88,17 +118,8 @@ pnpm --filter @senticor/fachverfahren emit:contract
 
 Die verbindliche Arbeitsanweisung für Menschen und Coding Agents steht in
 `AGENTS.md` (inklusive kanonischer Pfad-Karte und PLAN-vs-IST-Markierungen).
-
-`pnpm install` richtet in Git-Checkouts Husky ein. Der Pre-Commit-Hook
-regeneriert zuerst den Vertrags-Snapshot (`emit:contract`) und startet danach
-`pnpm run check:precommit`; vor Pushes laeuft `pnpm run check:push`. Details
-stehen in `docs/reference/precommit-hooks.md`.
-
-Designer und Fachseite starten mit:
-
-```bash
-pnpm run storybook
-```
+`pnpm install` richtet in Git-Checkouts Husky ein; die Hook-Details stehen in
+`CONTRIBUTING.md` und `docs/reference/precommit-hooks.md`.
 
 Die UX/UI-Regeln stehen in `docs/ux-ui/fachverfahren-ux-contract.md`, die
 TDD-Regeln in `docs/reference/test-driven-development.md` und die
@@ -208,22 +229,5 @@ kein starkes Copyleft und damit keinen Lizenzkonflikt mit der EUPL-1.2.
 - Barrierefreiheit, Authorization, Audit, Mandate, Retention und Evidence sind
   Plattformfähigkeiten, keine späteren Add-ons.
 
-## Troubleshooting
-
-Wenn `pnpm run dev` wegen eines fehlenden Binaries wie `vite` abbricht, fehlen
-die lokalen Workspace-Abhängigkeiten. In diesem Fall im Repository-Root erneut
-installieren:
-
-```bash
-pnpm install
-pnpm run dev
-```
-
-Das passiert auch, wenn zuvor production-only installiert wurde.
-
-Der Vite-Dev-Server bindet lokal standardmäßig an `127.0.0.1:5173`. Für
-Container- oder LAN-Zugriff kann der Host explizit geöffnet werden:
-
-```bash
-VITE_DEV_HOST=0.0.0.0 pnpm run dev
-```
+Troubleshooting für die lokale Entwicklung (fehlendes `vite`-Binary,
+Container-/LAN-Zugriff auf den Dev-Server) steht in `CONTRIBUTING.md`.

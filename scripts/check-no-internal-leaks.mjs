@@ -102,6 +102,13 @@ const ALLOW_PREFIXES = [
   ".agents/skills/deutschland-plattform-anforderungen/",
   ".claude/skills/deutschland-plattform-anforderungen/",
   "scripts/check-no-internal-leaks.mjs", // dieses Gate selbst (nur Hashes + generische Format-Muster)
+  // Maintainer-interne Deploy-/Demo-Consumer-Infrastruktur (Codesphere-Pipeline, origin/main): sie
+  // referenziert legitim das private Codesphere-Deploy-Ziel und wird NICHT an Konsumenten ausgeliefert
+  // (repositoryOnlyPaths). Für den öffentlichen OSS-Push separat via oss-public scrubben/maskieren.
+  ".github/workflows/deploy-demo-consumer.yml",
+  ".github/workflows/mirror-gitlab.yml",
+  "ci.yml",
+  "scripts/codesphere-",
 ];
 
 // Bekannte konfigrelevante Dateien OHNE Endung, die dennoch gescannt werden müssen (sonst schlüpft ein Leck

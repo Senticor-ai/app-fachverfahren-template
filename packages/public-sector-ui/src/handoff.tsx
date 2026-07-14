@@ -1,11 +1,7 @@
 import { type ReactNode, useId } from "react";
 
 export type HandoffStatus =
-  | "draft"
-  | "requested"
-  | "accepted"
-  | "returned"
-  | "blocked";
+  "draft" | "requested" | "accepted" | "returned" | "blocked";
 
 export type HandoffStepStatus = "done" | "current" | "open" | "blocked";
 

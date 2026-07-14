@@ -33,8 +33,7 @@ const portalConfig = waehleVerfahren(workspaceConfig, enabledProcedures);
 // das async `/runtime-config.json`) — passend zum modul-globalen `workspace`-Export.
 // Exportiert, damit weitere PROD-Nähte (z. B. der Notification-Client #18) DIESELBE API-Basis + Auth-Naht nutzen.
 export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL as
-  | string
-  | undefined;
+  string | undefined;
 
 // OPTIONAL für lokale Full-Stack-Tests mit Header-Auth (DEV): setzt man `VITE_DEV_ACTOR`, gehen die `x-*`-Header des
 // Header-Session-Resolvers mit. In echtem PROD bleibt das leer — die Session kommt aus dem Cookie/OIDC (credentials).

@@ -12,6 +12,11 @@
     "baseUrl": ".",
     "paths": {}
   },
+  "references": [
+    { "path": "../../packages/app-store-postgres" },
+    { "path": "../../packages/platform-contracts" },
+    { "path": "../../packages/provider-local-auth" }
+  ],
   "include": ["server/**/*.ts"],
   // `*.e2e.test.ts` kreuzt die UI/Server-Grenze: es importiert den `fachverfahren-kit` (jsx/DOM), den diese jsx-freie
   // node-Config nicht bauen kann. Diese Tests werden durch ihre AUSFÜHRUNG in vitest (esbuild) validiert, nicht durch

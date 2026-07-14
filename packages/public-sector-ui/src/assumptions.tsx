@@ -1,10 +1,7 @@
 import { type ReactNode, useId } from "react";
 
 export type AssumptionValidationStatus =
-  | "unverified"
-  | "in-review"
-  | "validated"
-  | "invalid";
+  "unverified" | "in-review" | "validated" | "invalid";
 
 export type AssumptionImpact = "info" | "decision" | "blocking";
 
