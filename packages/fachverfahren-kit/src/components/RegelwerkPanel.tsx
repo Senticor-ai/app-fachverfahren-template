@@ -191,7 +191,10 @@ export function RegelwerkPanel<T = Record<string, unknown>>({
                 key={r.id}
                 className={cn(
                   "rounded-lg border border-border bg-card p-4 shadow-sm",
-                  inaktiv && "opacity-70",
+                  // Inaktive Regeln per Rahmen-Stil de-emphasizen, NICHT per opacity:
+                  // opacity dimmt auch den Text unter den WCAG-2.1-AA-Kontrast (dt/mono
+                  // fielen auf 3.06/3.35:1). Der Zustand wird ohnehin per Badge "inaktiv" getragen.
+                  inaktiv && "border-dashed",
                 )}
               >
                 <div className="flex flex-wrap items-center gap-2">
