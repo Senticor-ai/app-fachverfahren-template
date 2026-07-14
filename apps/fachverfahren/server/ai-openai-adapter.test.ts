@@ -4,16 +4,15 @@ import {
   createOpenAiAssist,
   createAiAssistFromEnv,
 } from "./ai-openai-adapter.js";
-import type { AiAssistContext } from "./ai-assist.js";
+import type { VorgangKiVorschlag } from "./ai-assist.js";
 
-const ctx: AiAssistContext = {
+const CTX = {
+  requestId: "r1",
   tenantId: "t1",
   authorityId: "b1",
-  procedureId: "leistung",
-  taskId: "task-1",
-  faelligIso: "2026-07-12T00:00:00.000Z",
-  labels: [],
+  jurisdictionId: "b1",
 };
+const REQ = { task: "vorgang-assist", input: { faelligIso: "2026-07-12" } };
 
 function stubFetch(
   payload: unknown,
@@ -35,7 +34,7 @@ const modelReply = (content: string) => ({
   choices: [{ message: { content } }],
 });
 
-describe("createOpenAiAssist — OSS-KI-Adapter (assistiv + fail-closed)", () => {
+describe("createOpenAiAssist — kanonischer AiAssistPort (assistiv + fail-closed)", () => {
   it("mappt eine gültige Modell-Antwort in einen Vorschlag", async () => {
     const ki = createOpenAiAssist({
       baseUrl: "http://x/v1",
@@ -51,18 +50,21 @@ describe("createOpenAiAssist — OSS-KI-Adapter (assistiv + fail-closed)", () =>
         ),
       ),
     });
-    const s = await ki.suggest(ctx, {});
-    expect(s.vorschlag.prioritaet).toBe("hoch");
-    expect(s.vorschlag.labels).toEqual(["eilig"]);
-    expect(s.konfidenz).toBe(0.9);
-    expect(s.begruendung).toContain("Frist");
-    expect(s.marking).toBe("ki-vorschlag");
-    expect(s.reviewRequired).toBe(true);
-    expect(s.euAiActClass).toBe("limited-risk");
+    const r = await ki.suggest(CTX, REQ);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const v = r.value.value as VorgangKiVorschlag;
+    expect(v.prioritaet).toBe("hoch");
+    expect(v.labels).toEqual(["eilig"]);
+    expect(r.value.confidence).toBe(0.9);
+    expect(r.value.rationale).toContain("Frist");
+    expect(r.value.modelId).toBe("openai-compatible:m");
+    expect(r.value.marking).toBe("ki-vorschlag");
+    expect(r.value.reviewRequired).toBe(true);
+    expect(r.value.euAiActClass).toBe("limited-risk");
   });
 
   it("erzwingt Transparenz/HITL serverseitig — das Modell kann sie NICHT abschalten", async () => {
-    // Boesartige/fehlerhafte Modell-Antwort, die die Pflicht-Transparenz kippen will.
     const ki = createOpenAiAssist({
       baseUrl: "http://x/v1",
       model: "m",
@@ -77,23 +79,36 @@ describe("createOpenAiAssist — OSS-KI-Adapter (assistiv + fail-closed)", () =>
         ),
       ),
     });
-    const s = await ki.suggest(ctx, {});
-    expect(s.marking).toBe("ki-vorschlag");
-    expect(s.reviewRequired).toBe(true);
-    expect(s.euAiActClass).toBe("limited-risk");
+    const r = await ki.suggest(CTX, REQ);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.value.marking).toBe("ki-vorschlag");
+    expect(r.value.reviewRequired).toBe(true);
+    expect(r.value.euAiActClass).toBe("limited-risk");
   });
 
-  it("fail-closed bei Netzfehler/Timeout -> nicht verfügbar (Konfidenz 0, HITL bleibt)", async () => {
+  it("lehnt high-risk-Aufgaben ab (capabilityFailure)", async () => {
+    const ki = createOpenAiAssist({
+      baseUrl: "http://x/v1",
+      model: "m",
+      fetchImpl: stubFetch(modelReply("{}")),
+    });
+    const r = await ki.suggest(CTX, { ...REQ, maxClass: "high-risk" });
+    expect(r.ok).toBe(false);
+  });
+
+  it("fail-closed bei Netzfehler/Timeout -> capabilityFailure (retryable)", async () => {
     const ki = createOpenAiAssist({
       baseUrl: "http://x/v1",
       model: "m",
       fetchImpl: throwingFetch,
     });
-    const s = await ki.suggest(ctx, {});
-    expect(s.konfidenz).toBe(0);
-    expect(s.begruendung).toContain("nicht verfügbar");
-    expect(s.marking).toBe("ki-vorschlag");
-    expect(s.reviewRequired).toBe(true);
+    const r = await ki.suggest(CTX, REQ);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error.retryable).toBe(true);
+      expect(r.error.message).toContain("nicht verfuegbar");
+    }
   });
 
   it("fail-closed bei HTTP-Fehler", async () => {
@@ -102,7 +117,7 @@ describe("createOpenAiAssist — OSS-KI-Adapter (assistiv + fail-closed)", () =>
       model: "m",
       fetchImpl: stubFetch({}, { ok: false, status: 500 }),
     });
-    expect((await ki.suggest(ctx, {})).konfidenz).toBe(0);
+    expect((await ki.suggest(CTX, REQ)).ok).toBe(false);
   });
 
   it("fail-closed bei unverwertbarer Modell-Antwort (kein JSON)", async () => {
@@ -111,7 +126,7 @@ describe("createOpenAiAssist — OSS-KI-Adapter (assistiv + fail-closed)", () =>
       model: "m",
       fetchImpl: stubFetch(modelReply("das ist kein json")),
     });
-    expect((await ki.suggest(ctx, {})).konfidenz).toBe(0);
+    expect((await ki.suggest(CTX, REQ)).ok).toBe(false);
   });
 });
 
@@ -124,12 +139,13 @@ describe("createAiAssistFromEnv — fail-closed Default", () => {
     expect(createAiAssistFromEnv({ AI_ASSIST_MODEL: "m" })).toBeNull();
   });
 
-  it("mit Endpunkt+Modell -> ein Port", () => {
+  it("mit Endpunkt+Modell -> ein Port mit descriptor + suggest", () => {
     const ki = createAiAssistFromEnv({
       AI_ASSIST_BASE_URL: "http://x/v1",
       AI_ASSIST_MODEL: "m",
     });
     expect(ki).not.toBeNull();
+    expect(ki?.descriptor.id).toBe("ai-assist");
     expect(typeof ki?.suggest).toBe("function");
   });
 });

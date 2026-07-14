@@ -22,7 +22,8 @@ import {
   evalBedingungNodeSafe,
 } from "./automation-eval.js";
 import { forbidden, NO_STORE, requireSession } from "./http-guards.js";
-import type { KiAssistPort } from "./ai-assist.js";
+import type { VorgangKiVorschlag } from "./ai-assist.js";
+import type { AiAssistPort } from "@senticor/platform-contracts";
 import {
   DefaultDenyPolicyEngine,
   executeCaseTransition,
@@ -60,8 +61,8 @@ export interface DomainApiDeps {
   /** OPTIONAL — die versionierte Wissensbasis/Wiki (#20). Fehlt sie, gibt es keine /api/wiki-Routen (der Client
    *  fällt auf das statische Config-Wissen `WorkspaceConfig.wissen` zurück). */
   wikiStore?: WikiStore;
-  /** OPTIONAL — die KI-Assistenz-Naht. Fehlt sie, gibt es keine /api/tasks/:id/ai-Routen. */
-  aiAssist?: KiAssistPort;
+  /** OPTIONAL — die KI-Assistenz-Naht (kanonischer platform-contracts AiAssistPort). Fehlt sie, gibt es keine /api/tasks/:id/ai-Routen. */
+  aiAssist?: AiAssistPort;
   /** OPTIONAL — der Zuständigkeits-Lesepfad (app_actor_roles). Für die KI-Zuweisungsprüfung. */
   actorRoleStore?: ActorRoleStore;
   /** Initialzustand eines Verfahrens (aus der StatusMachine) — für `acceptIntake`. */
@@ -1514,20 +1515,50 @@ export function registerDomainApi(
             .code(404)
             .header("Cache-Control", NO_STORE)
             .send({ error: "not-found" });
-        // PII-armer Kontext: nur Metadaten, kein Freitext/Name.
-        const vorschlag = await aiAssist.suggest(
+        // Kanonischer Aufruf: generischer PortCallContext (Identitaet/Mandant) + AiSuggestRequest mit
+        // PII-armen Domaenensignalen in `input`. jurisdictionId defaultet auf authorityId, bis ein
+        // echtes Jurisdiktions-Modell existiert (Heuristik/Adapter nutzen es nicht).
+        const result = await aiAssist.suggest(
           {
+            requestId: reply.request.id ?? "req",
             tenantId: session.tenantId,
             authorityId: session.authorityId,
-            procedureId: task.procedureId,
-            taskId: task.taskId,
-            ...(task.caseId ? { caseId: task.caseId } : {}),
-            prioritaet: task.priorityKey,
-            faelligIso: task.dueAt,
-            labels: task.labels,
+            jurisdictionId: session.authorityId,
           },
-          { ...(request.body.daten ? { daten: request.body.daten } : {}) },
+          {
+            task: "vorgang-assist",
+            input: {
+              procedureId: task.procedureId,
+              taskId: task.taskId,
+              ...(task.caseId ? { caseId: task.caseId } : {}),
+              prioritaet: task.priorityKey,
+              faelligIso: task.dueAt,
+              labels: task.labels,
+              ...(request.body.daten ? { daten: request.body.daten } : {}),
+            },
+          },
         );
+        // Kanonische AiSuggestion -> heutige wire-Form projizieren (Client unveraendert). Fail-closed:
+        // eine capabilityFailure wird zu einem „KI nicht verfuegbar"-Hinweis (Konfidenz 0), HITL bleibt.
+        const vorschlag = result.ok
+          ? {
+              vorschlag: result.value.value as VorgangKiVorschlag,
+              konfidenz: result.value.confidence,
+              begruendung: result.value.rationale,
+              quellen: result.value.sources,
+              marking: result.value.marking,
+              reviewRequired: result.value.reviewRequired,
+              euAiActClass: result.value.euAiActClass,
+            }
+          : {
+              vorschlag: {} as VorgangKiVorschlag,
+              konfidenz: 0,
+              begruendung: `KI nicht verfuegbar: ${result.error.message}`,
+              quellen: [] as string[],
+              marking: "ki-vorschlag" as const,
+              reviewRequired: true as const,
+              euAiActClass: "limited-risk" as const,
+            };
         return reply.header("Cache-Control", NO_STORE).send({ vorschlag });
       },
     );

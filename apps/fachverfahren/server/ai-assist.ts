@@ -1,52 +1,55 @@
-// server/ai-assist — die austauschbare KI-Assistenz-Naht (VORBEREITUNG für einen echten LLM-Adapter).
+// server/ai-assist — KI-Assistenz auf dem KANONISCHEN platform-contracts `AiAssistPort` (EINE Wahrheit).
 //
-// Die KI ist AUSSCHLIESSLICH assistierend/vorschlagend — NIE autoritativ und NIE eines der zwei Augen (EU-AI-Act
-// Art. 50; Gleichbehandlung Art. 3 GG). Ein Vorschlag trägt immer `marking:"ki-vorschlag"` + `reviewRequired:true`,
-// eine Begründung und Quellen. Die Naht ist framework-neutral: ein `KiAssistPort` bekommt einen PII-armen Kontext und
-// liefert einen Vorschlag. Im Test/DEV liefert `HeuristicKiAssist` einen ERKLÄRBAREN, deterministischen Vorschlag
-// (kein Netz, aus Frist/Betrag abgeleitet); in PROD wird der Port durch einen echten LLM-Adapter ersetzt.
+// Die KI ist AUSSCHLIESSLICH assistierend/vorschlagend — NIE autoritativ und NIE eines der zwei Augen
+// (EU-AI-Act Art. 50; Gleichbehandlung Art. 3 GG). Jeder Vorschlag traegt `marking:"ki-vorschlag"` +
+// `reviewRequired:true`, eine Begruendung und Quellen. Frueher fuehrte der Server einen EIGENEN,
+// duplizierten `KiAssistPort` + `AiSuggestion`/`EuAiActClass` — das war eine zweite Wahrheit neben dem
+// kanonischen Vertrag. Jetzt implementiert `HeuristicKiAssist` direkt den kanonischen `AiAssistPort`;
+// der fachliche Vorschlag steckt in `AiSuggestion.value` (das Verfahren castet zu `VorgangKiVorschlag`).
+// `HeuristicKiAssist` liefert im DEV/Test einen ERKLAERBAREN, deterministischen Vorschlag aus Frist +
+// Betrag (kein Netz, kein Zufall); in PROD dockt ein echter LLM-Adapter an DENSELBEN Port an.
+import {
+  capabilityFailure,
+  capabilityOk,
+  defaultSemantics,
+  type AiAssistPort,
+  type AiSuggestion,
+  type AiSuggestRequest,
+  type CapabilityDescriptor,
+  type CapabilityResponse,
+  type PortCallContext,
+} from "@senticor/platform-contracts";
 
-/** EU-AI-Act-Risikoklasse eines Assistenz-Aufrufs. Assistenz bleibt „limited-risk". */
-export type EuAiActClass = "minimal-risk" | "limited-risk";
-
-/** Ein KI-VORSCHLAG — nie ein Effekt. Der Mensch bestätigt (oder verwirft) ihn im Client. */
-export interface AiSuggestion {
-  vorschlag: {
-    prioritaet?: string;
-    zuweisenAn?: string;
-    labels?: string[];
-    /** Entscheidungs-ENTWURF (Text) — nie final, nur Vorlage für den Menschen. */
-    entscheidungsentwurf?: string;
-  };
-  /** 0..1 — Selbsteinschätzung der Zuverlässigkeit. */
-  konfidenz: number;
-  begruendung: string;
-  quellen: string[];
-  marking: "ki-vorschlag";
-  reviewRequired: true;
-  euAiActClass: EuAiActClass;
+/** Der fachliche Vorschlagswert (`AiSuggestion.value`) — NIE eine Entscheidung, nur Vorlage. */
+export interface VorgangKiVorschlag {
+  prioritaet?: string;
+  zuweisenAn?: string;
+  labels?: string[];
+  /** Entscheidungs-ENTWURF (Text) — nie final, nur Vorlage fuer den Menschen. */
+  entscheidungsentwurf?: string;
 }
 
-/** PII-armer Kontext — bewusst nur Metadaten + neutralisierte Felder, kein Freitext/Name. */
-export interface AiAssistContext {
-  tenantId: string;
-  authorityId: string;
-  procedureId: string;
-  taskId: string;
+/** PII-arme Domaenensignale, die die Route in `AiSuggestRequest.input` legt (kein Freitext/Name). */
+export interface VorgangAssistInput {
+  procedureId?: string;
+  taskId?: string;
   caseId?: string;
   prioritaet?: string | null;
   faelligIso?: string | null;
   labels?: string[];
-}
-
-/** Zusätzliche, vom Client gelieferte (PII-arme) Auswertungsdaten (z. B. Betrag/Kategorie). */
-export interface AiAssistInput {
   daten?: Record<string, unknown>;
 }
 
-export interface KiAssistPort {
-  suggest(ctx: AiAssistContext, input: AiAssistInput): Promise<AiSuggestion>;
-}
+/** Der Capability-Deskriptor der KI-Assistenz-Naht (kanonisch). */
+export const AI_ASSIST_DESCRIPTOR: CapabilityDescriptor = {
+  id: "ai-assist",
+  name: "Heuristik-KI-Assistenz (erklaerbar, deterministisch)",
+  version: "0.1.0",
+  provider: "heuristic",
+  dataClassification: "internal",
+  schemas: [],
+  semantics: defaultSemantics,
+};
 
 /** Runde auf 2 Stellen (deterministisch, ohne Zufall). */
 function conf(x: number): number {
@@ -63,27 +66,39 @@ function alsZahl(v: unknown): number | undefined {
 }
 
 /**
- * DEV/Test-Assistenz: ein ERKLÄRBARER, deterministischer Vorschlag aus Frist + Betrag — KEIN Netz, KEIN Zufall.
- * Priorität primär aus der Restfrist (erklärbar), ein „eilig"-Label bei knapper Frist, ein Entscheidungs-Entwurf bei
- * hohem Betrag. Ersetzt in PROD ein echter LLM-Adapter (derselbe Port).
+ * DEV/Test-Assistenz auf dem kanonischen Port: ein ERKLAERBARER, deterministischer Vorschlag aus Frist +
+ * Betrag — KEIN Netz, KEIN Zufall. Prioritaet primaer aus der Restfrist (erklaerbar), ein „eilig"-Label
+ * bei knapper Frist, ein Entscheidungs-Entwurf bei hohem Betrag. Ersetzt in PROD ein echter LLM-Adapter
+ * (derselbe Port). Rechtsnahe (high-risk) Aufgaben werden abgelehnt — die KI entscheidet nie autonom.
  */
-export class HeuristicKiAssist implements KiAssistPort {
+export class HeuristicKiAssist implements AiAssistPort {
+  readonly descriptor = AI_ASSIST_DESCRIPTOR;
+
   constructor(
     private readonly now: () => string = () => new Date().toISOString(),
   ) {}
 
   async suggest(
-    ctx: AiAssistContext,
-    input: AiAssistInput,
-  ): Promise<AiSuggestion> {
+    _context: PortCallContext,
+    request: AiSuggestRequest,
+  ): Promise<CapabilityResponse<AiSuggestion>> {
+    if (request.maxClass === "high-risk") {
+      return capabilityFailure(
+        "ai-assist/high-risk-refused",
+        "KI darf rechtsnahe Entscheidungen nicht autonom treffen (assistiv/limited-risk).",
+        { retryable: false, classification: "internal" },
+      );
+    }
+
+    const inp = request.input as VorgangAssistInput;
     const quellen: string[] = [];
-    const vorschlag: AiSuggestion["vorschlag"] = {};
+    const vorschlag: VorgangKiVorschlag = {};
     let konfidenz = 0.4;
 
-    // Priorität aus der Restfrist (erklärbar).
-    if (ctx.faelligIso) {
+    // Prioritaet aus der Restfrist (erklaerbar).
+    if (typeof inp.faelligIso === "string") {
       const restTage =
-        (Date.parse(ctx.faelligIso) - Date.parse(this.now())) / 86_400_000;
+        (Date.parse(inp.faelligIso) - Date.parse(this.now())) / 86_400_000;
       quellen.push(`Restfrist ≈ ${Math.round(restTage)} Tage`);
       if (restTage <= 3) {
         vorschlag.prioritaet = "hoch";
@@ -99,29 +114,31 @@ export class HeuristicKiAssist implements KiAssistPort {
     }
 
     // Entscheidungs-ENTWURF bei hohem Betrag (nur Vorlage, nie final).
-    const betrag = alsZahl(input.daten?.["betrag"]);
+    const betrag = alsZahl(inp.daten?.["betrag"]);
     if (betrag !== undefined) {
       quellen.push(`Betrag = ${betrag}`);
       if (betrag >= 1000) {
         vorschlag.entscheidungsentwurf =
-          "Prüfvorschlag: Nachweis der Anspruchsvoraussetzungen anfordern (Betrag über der Bagatellgrenze).";
+          "Pruefvorschlag: Nachweis der Anspruchsvoraussetzungen anfordern (Betrag ueber der Bagatellgrenze).";
         konfidenz = conf(konfidenz + 0.05);
       }
     }
 
-    const begruendung =
+    const rationale =
       quellen.length > 0
         ? `Abgeleitet aus: ${quellen.join("; ")}.`
         : "Keine ableitbaren Signale (Frist/Betrag fehlen) — nur schwacher Vorschlag.";
 
-    return {
-      vorschlag,
-      konfidenz: conf(konfidenz),
-      begruendung,
-      quellen,
+    const suggestion: AiSuggestion = {
+      value: vorschlag,
+      confidence: conf(konfidenz),
+      modelId: "heuristik:frist-betrag",
+      rationale,
+      sources: quellen,
       marking: "ki-vorschlag",
-      reviewRequired: true,
       euAiActClass: "limited-risk",
+      reviewRequired: true,
     };
+    return capabilityOk(suggestion);
   }
 }

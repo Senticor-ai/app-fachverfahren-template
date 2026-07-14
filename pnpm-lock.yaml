@@ -131,6 +131,9 @@ importers:
       '@senticor/fachverfahren-kit':
         specifier: workspace:*
         version: link:../../packages/fachverfahren-kit
+      '@senticor/platform-contracts':
+        specifier: workspace:*
+        version: link:../../packages/platform-contracts
       '@senticor/public-sector-sdk':
         specifier: workspace:*
         version: link:../../packages/public-sector-sdk
