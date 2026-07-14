@@ -62,6 +62,7 @@ export const defaultOwnership: TemplateOwnership = {
     "tooling/template/**": "replace",
     "scripts/check-template-*.mjs": "replace",
     "scripts/check-openapi.mjs": "replace",
+    "scripts/check-package-licenses.mjs": "replace",
     "scripts/smoke-runtime.mjs": "replace",
     "scripts/check-web-delivery.mjs": "replace",
     "scripts/check-k8s-delivery.mjs": "replace",
