@@ -55,6 +55,7 @@ import {
   type AutomationEngineDeps,
 } from "./automation-engine.js";
 import { HeuristicKiAssist } from "./ai-assist.js";
+import { createAiAssistFromEnv } from "./ai-openai-adapter.js";
 
 const NO_STORE = "no-store";
 const IMMUTABLE = "public, max-age=31536000, immutable";
@@ -489,7 +490,11 @@ export async function buildDomainApiFromEnv(
   // Wissensbasis/Wiki (#20): versionierte Handbücher/Arbeitshilfen, von /api/wiki gelesen. In-Memory-Default teilt
   // den Prozess; PROD nutzt den geteilten Postgres-Store.
   const wikiStore = createWikiStoreFromEnv(env) ?? new InMemoryWikiStore();
-  const aiAssist = new HeuristicKiAssist();
+  // OSS-first, vendor-neutral: mit AI_ASSIST_BASE_URL+MODEL greift ein echter OpenAI-kompatibler
+  // Adapter (Ollama/vLLM/LocalAI/OpenAI), sonst fail-closed die lokale Heuristik (kein Netz, heutiges
+  // Verhalten). Beide erfüllen denselben Port und sind strikt assistiv (marking/reviewRequired fix).
+  const aiAssist =
+    createAiAssistFromEnv(process.env) ?? new HeuristicKiAssist();
   // Mandanten-Allowlist dieses Deployments (komma-separiert). Gesetzt ⇒ Tenant-Pinning (fail-closed, 403 bei
   // fremdem tenantId); leer/unset ⇒ keine Einschränkung (rückwärtskompatibel).
   const allowedTenants = (env["APP_ALLOWED_TENANTS"] ?? "")
