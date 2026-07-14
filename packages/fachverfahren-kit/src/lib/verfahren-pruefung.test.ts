@@ -107,7 +107,9 @@ describe("pruefeLeistungConfig", () => {
 
     expect(pruefeLeistungConfig(kaputt)).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ meldung: expect.stringContaining("doppelt") }),
+        expect.objectContaining({
+          meldung: expect.stringContaining("doppelt"),
+        }),
         expect.objectContaining({
           meldung: expect.stringContaining("unbekannten Status"),
         }),

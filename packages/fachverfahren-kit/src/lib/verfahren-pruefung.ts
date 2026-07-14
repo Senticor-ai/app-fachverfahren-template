@@ -78,7 +78,9 @@ function validiereStatusMachine(
 
   for (const state of statusMachine.states) {
     if (stateKeys.has(state.key)) {
-      probleme.push({ meldung: `Status "${state.key}" ist doppelt definiert.` });
+      probleme.push({
+        meldung: `Status "${state.key}" ist doppelt definiert.`,
+      });
     }
     stateKeys.add(state.key);
   }
