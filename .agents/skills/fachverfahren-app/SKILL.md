@@ -260,8 +260,12 @@ function berechneHundesteuer(a: HundesteuerAntrag): Berechnung {
     label: "Hundesteuer",
     begruendung:
       `Jahressteuer ${jahresbetrag} € für ${anzahl} Hund(e)` +
-      (a?.hunde?.ausTierheim ? " abzüglich 50 % Tierheim-Ermäßigung (§ 7 HStS)" : "") +
-      (monate < 12 ? `, anteilig für ${monate} von 12 Monaten (§ 4 HStS)` : "") +
+      (a?.hunde?.ausTierheim
+        ? " abzüglich 50 % Tierheim-Ermäßigung (§ 7 HStS)"
+        : "") +
+      (monate < 12
+        ? `, anteilig für ${monate} von 12 Monaten (§ 4 HStS)`
+        : "") +
       ".",
     begruendungRecht:
       `Festsetzung nach §§ 4–7 HStS: Staffeltarif (${anzahl} Hund(e))` +
