@@ -105,16 +105,17 @@ Der Snapshot `apps/fachverfahren/leistung.contract.json` ist GENERIERT und
 wird nie von Hand editiert.
 
 Die realen Routen der App (`apps/fachverfahren/src/App.tsx`). `/` ist die
-Landing mit der Anmeldung für alle Rollen und die EINZIGE unauthentifizierte
-Route (`/login` bleibt nur als Alias auf `/`; `/auth/register` existiert nur
-bei `AUTH_REGISTRATION_MODE=open_unverified`). Alle Persona- und
+Landing mit der Anmeldung für alle Rollen; `/barrierefreiheit` ist die zweite
+unauthentifizierte Route und auch vor dem Einmal-Setup erreichbar (`/login`
+bleibt nur als Alias auf `/`; `/auth/register` existiert nur bei
+`AUTH_REGISTRATION_MODE=open_unverified`). Alle Persona- und
 Workspace-Routen sind session-pflichtig; Persona-Routen setzen zusätzlich den
 ZUGEWIESENEN Arbeitsbereich voraus (`RequirePersonaExperience` — Navigation,
 keine Autorisierung), `/boards*` verlangt die Permission `boards.collaborate`
 (Details: `docs/reference/rbac.md`):
 
 ```text
-/  (Landing/Anmeldung)
+/  (Landing/Anmeldung) · /barrierefreiheit  (öffentliche Erklärung)
 /buerger · /buerger/anmelden · /buerger/bestaetigung/:id   (Arbeitsbereich buerger)
 /amt · /amt/vorgang/:id                                    (Arbeitsbereich sachbearbeitung)
 /aufsicht                                                  (Arbeitsbereich aufsicht)
@@ -360,6 +361,7 @@ pnpm run check:agent-discovery
 pnpm run check:domain-contracts
 pnpm run build:server
 pnpm run check:web-delivery
+pnpm run check:accessibility-declaration
 pnpm run test:k8s:render
 pnpm run check:k8s-delivery
 pnpm run test:supply-chain
