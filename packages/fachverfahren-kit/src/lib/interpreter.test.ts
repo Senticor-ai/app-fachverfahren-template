@@ -98,6 +98,48 @@ describe("evalBedingung — generische, typ-tolerante Subsumtion", () => {
     ).toBe(true);
   });
 
+  it("== gegen amtliche Code-Strings mit führender Null kollabiert NICHT numerisch (01 ≠ 1)", () => {
+    // Regression: gleich koerzierte „1"/„01" beide zu 1 → fail-open. Amtliche Schlüssel (Bundesland 01–16, AGS)
+    // müssen strikt als String verglichen werden — konsistent zu interpretNachweise/feldAnzeige.
+    expect(
+      evalBedingung({ feld: "land", op: "==", wert: "01" }, { land: "1" }),
+    ).toBe(false);
+    expect(
+      evalBedingung({ feld: "land", op: "==", wert: "01" }, { land: "01" }),
+    ).toBe(true);
+    expect(
+      evalBedingung(
+        { feld: "land", op: "in", wert: ["01", "02"] },
+        { land: "1" },
+      ),
+    ).toBe(false);
+    // Echte Quantitäten bleiben typ-tolerant (String-Formularwert gegen Zahl-Ziel).
+    expect(evalBedingung({ feld: "n", op: "==", wert: 2 }, { n: "2" })).toBe(
+      true,
+    );
+    expect(
+      evalBedingung({ feld: "n", op: "==", wert: 1.5 }, { n: "1,5" }),
+    ).toBe(true);
+  });
+
+  it("== false trifft NICHT auf ein fehlendes/unbeantwortetes Feld (undefined ≠ false)", () => {
+    // Regression: gleich(undefined,false) war true → ein unbeantworteter Tatbestand erfüllte „== false" und
+    // erzeugte ein verfrühtes „final"/0-€-Ergebnis. Ein fehlendes Feld ist weder Ja noch Nein.
+    expect(
+      evalBedingung({ feld: "objekt.gewerblich", op: "==", wert: false }, {}),
+    ).toBe(false);
+    expect(
+      evalBedingung({ feld: "objekt.gewerblich", op: "==", wert: true }, {}),
+    ).toBe(false);
+    // Ein ANWESENDES false erfüllt „== false" weiterhin korrekt.
+    expect(
+      evalBedingung(
+        { feld: "objekt.aktiv", op: "==", wert: false },
+        { objekt: { aktiv: false } },
+      ),
+    ).toBe(true);
+  });
+
   it("Boolean-Vergleich koerziert false/true korrekt", () => {
     expect(
       evalBedingung({ feld: "objekt.aktiv", op: "==", wert: false }, daten),

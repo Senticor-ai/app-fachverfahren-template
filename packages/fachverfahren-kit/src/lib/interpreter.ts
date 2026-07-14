@@ -88,14 +88,38 @@ function alsMenge(wert: FeldBedingung["wert"]): (string | number | boolean)[] {
   return Array.isArray(wert) ? wert : wert === undefined ? [] : [wert];
 }
 
-/** Gleichheit typ-tolerant: Boolean gegen Boolean, sonst numerisch wenn beide zu Zahlen werden, sonst String. */
+/** True, wenn `v` ein String ist, der zwar als Zahl parst, dessen getrimmte Form aber NICHT der kanonischen
+ *  Zahldarstellung entspricht — führende Null („01"), „1.0", „+1" etc. Solche amtlichen Schlüssel (Bundesland
+ *  01–16, AGS, Gemeindeschlüssel) sind KEINE Quantitäten und dürfen nicht numerisch kollabiert werden; sie werden
+ *  strikt als String verglichen — konsistent zu interpretNachweise/abgeleiteteFelder/feldAnzeige (`e.value === wert`). */
+function istCodeString(v: unknown): boolean {
+  if (typeof v !== "string") return false;
+  const s = v.trim().replace(",", ".");
+  if (s === "") return false;
+  const n = Number(s);
+  if (Number.isNaN(n)) return false; // gar keine Zahl → String-Vergleich greift ohnehin
+  return String(n) !== s;
+}
+
+/** Gleichheit typ-tolerant: Boolean gegen Boolean, sonst numerisch wenn beide ECHTE Zahlen sind, sonst String. */
 function gleich(a: unknown, b: unknown): boolean {
   if (typeof a === "boolean" || typeof b === "boolean") {
+    // Ein FEHLENDER Wert (undefined/null) ist weder true noch false — er darf `== false` NICHT erfüllen, sonst gälte
+    // ein UNBEANTWORTETER Tatbestand als „mit Nein beantwortet" und erzeugte ein verfrühtes „final"/0-€-Ergebnis.
+    if (a === undefined || a === null || b === undefined || b === null)
+      return false;
     return alsBool(a) === alsBool(b);
   }
   const na = alsZahl(a);
   const nb = alsZahl(b);
-  if (na !== undefined && nb !== undefined) return na === nb;
+  // Numerisch NUR, wenn keine Seite ein Code-String mit nicht-kanonischer Zahlform ist (sonst „1" == „01").
+  if (
+    na !== undefined &&
+    nb !== undefined &&
+    !istCodeString(a) &&
+    !istCodeString(b)
+  )
+    return na === nb;
   return asString(a) === asString(b);
 }
 
