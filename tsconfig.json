@@ -11,6 +11,9 @@
     { "path": "packages/conformance-kit" },
     { "path": "packages/migration-kit" },
     { "path": "packages/app-store-postgres" },
+    { "path": "packages/app-runtime-fastify" },
+    { "path": "packages/app-bff-contracts" },
+    { "path": "packages/app-bff-fastify" },
     { "path": "jurisdictions/eu" },
     { "path": "jurisdictions/de" }
   ]

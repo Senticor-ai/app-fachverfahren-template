@@ -13,20 +13,26 @@ Nutze diese Anleitung, wenn ein Agent den **Web-Delivery-Server** unter
 
 ## Was der Server liefert (IST)
 
-Ein TypeScript-Fastify-Server als neutrale Web-Delivery-Runtime: SPA-Auslieferung
-(inkl. History-Fallback → `index.html`), Health/Readiness, Runtime-Konfiguration,
-Security- und Cache-Header, interne Metrics/Build-Info.
+Die neutrale Web-Delivery-Runtime lebt im Paket **`@senticor/app-runtime-fastify`**
+(`packages/app-runtime-fastify/`): SPA-Auslieferung (inkl. History-Fallback →
+`index.html`), Health/Readiness, Runtime-Konfiguration, Security- und Cache-Header,
+interne Metrics/Build-Info, Graceful Shutdown. `apps/fachverfahren/server/index.ts`
+ist nur noch die dünne KOMPOSITION: App-Identität (`RuntimeConfigOverrides`),
+Store-Konstruktion und Registrierung der App-Routen über die Registrar-Naht.
 
-Öffentliche Bau-Funktionen (`apps/fachverfahren/server/index.ts`):
+Öffentliche Bau-Funktionen (Paket; die App re-exportiert Wrapper mit App-Identität):
 
-- `readRuntimeConfig(env)` — liest `STATIC_DIR`, Header-/Timeout-/Host-Politik aus der Umgebung.
-- `buildPublicServer({ config, state })` — SPA + `GET /livez` · `/readyz` · `/startupz` · `/runtime-config.json`.
-- `buildInternalServer({ config, metrics })` — `GET /internal/metrics` · `/internal/build-info` (NIE öffentlich routen).
+- `readRuntimeConfig(env, overrides)` — liest `STATIC_DIR`, Header-/Timeout-/Host-Politik aus der Umgebung; `overrides` trägt App-Identität (applicationId, displayName, Static-Dir-Fallback).
+- `buildPublicServer({ config, state, metrics, registerRoutes })` — SPA + `GET /livez` · `/readyz` · `/startupz` · `/runtime-config.json`; `registerRoutes(app, context)` ist DIE Naht für App-Routen/Plugins/Guards.
+- `buildInternalServer({ config, metrics, registerRoutes })` — `GET /internal/metrics` · `/internal/build-info` (NIE öffentlich routen).
+- `startRuntime({ env, configOverrides, registerPublicRoutes, registerInternalRoutes, beforeListen })` — Dual-Port-Bootstrap + Shutdown; `beforeListen` = Platz für idempotente Startarbeit (z.B. Auto-Bootstrap).
 
 Der Server-Build ist bewusst eng: `apps/fachverfahren/tsconfig.server.json` umfasst
-nur `server/`. Server-Code importiert daher **nicht** direkt aus `modules/` — gemeinsame
-DTOs laufen über einen expliziten Shared-/Paketvertrag, fachliche Serverlogik bleibt im
-Domain-Modul und wird über einen expliziten Registrierungs-/Exportpfad angebunden.
+nur `server/` (+ Paket-Referenzen). Server-Code importiert daher **nicht** direkt aus
+`modules/` — gemeinsame DTOs laufen über einen expliziten Shared-/Paketvertrag, fachliche
+Serverlogik bleibt im Domain-Modul und wird über einen expliziten Registrierungs-/Exportpfad
+angebunden. Nach Änderungen am Runtime-Paket vor App-Tests IMMER
+`pnpm --filter @senticor/app-runtime-fastify build` (vitest löst `@senticor/*` auf `dist/` auf).
 
 ## App-Daten
 
@@ -37,7 +43,8 @@ Sitzung `401` (schema-gültiger Body zuerst, sonst `400`). RBAC serverseitig.
 
 ## Testen
 
-- Unit gegen synthetisches `STATIC_DIR` + `app.inject()`: `apps/fachverfahren/server/index.test.ts`.
+- Runtime-Verhalten (Header, Static, Readiness, Nähte): `packages/app-runtime-fastify/src/servers.test.ts`.
+- Kompositions-Test der App (Naht-Verdrahtung, App-Identität): `apps/fachverfahren/server/index.test.ts`.
 - End-to-End gegen das **reale** Bundle (baut in `beforeAll`, prüft Persona-Routen + Liveness):
   `tests/e2e/personas.e2e.test.ts` via `vitest.e2e.config.ts`:
 

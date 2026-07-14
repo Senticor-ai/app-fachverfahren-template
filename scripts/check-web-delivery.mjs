@@ -113,8 +113,16 @@ if (serviceWorker) {
   }
 }
 
-const server = read(join(appRoot, "server/index.ts"));
-if (server) {
+// Der Web-Delivery-Vertrag lebt im Runtime-Quelltext: App-Komposition PLUS die
+// extrahierten Pakete (@senticor/app-runtime-fastify, @senticor/app-bff-fastify).
+// Die Literale müssen IRGENDWO in dieser Quellmenge stehen — egal, wie weit die
+// Extraktion fortgeschritten ist.
+const server = [
+  read(join(appRoot, "server/index.ts")),
+  ...runtimePackageSources(join(root, "packages/app-runtime-fastify/src")),
+  ...runtimePackageSources(join(root, "packages/app-bff-fastify/src")),
+].join("\n");
+if (server.trim()) {
   for (const required of [
     "Content-Security-Policy",
     "Content-Security-Policy-Report-Only",
@@ -127,10 +135,16 @@ if (server) {
     "no-store",
     "/internal/build-info",
     "/internal/metrics",
+    "/internal/openapi.json",
   ]) {
     if (!server.includes(required)) {
       failures.push(`server runtime missing ${required}`);
     }
+  }
+  // Die Doku-UI hat auf keinem Port etwas verloren: das Dokument wird intern
+  // ausgeliefert, eine UI wäre eine neue öffentliche Angriffsfläche.
+  if (server.includes("@fastify/swagger-ui")) {
+    failures.push("server runtime must not use @fastify/swagger-ui");
   }
 }
 
@@ -175,6 +189,18 @@ function read(path) {
     return "";
   }
   return readFileSync(path, "utf8");
+}
+
+function runtimePackageSources(srcDir) {
+  if (!existsSync(srcDir)) {
+    failures.push(`missing ${display(srcDir)}`);
+    return [];
+  }
+  return readdirSync(srcDir, { recursive: true })
+    .map(String)
+    .filter((file) => file.endsWith(".ts") && !file.endsWith(".test.ts"))
+    .sort()
+    .map((file) => readFileSync(join(srcDir, file), "utf8"));
 }
 
 function display(path) {

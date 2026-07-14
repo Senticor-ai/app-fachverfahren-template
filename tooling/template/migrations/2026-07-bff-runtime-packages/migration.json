@@ -1,0 +1,38 @@
+{
+  "id": "2026-07-bff-runtime-packages",
+  "from": ">=0.1.0-rc.1",
+  "to": "0.1.0-rc.1",
+  "mode": "review",
+  "touches": [
+    "package.json",
+    "tsconfig.json",
+    "tsconfig.base.json",
+    "vitest.config.ts",
+    "Dockerfile",
+    "pnpm-workspace.yaml",
+    "scripts/ci-validate.sh",
+    "scripts/dev-api.mjs",
+    "scripts/check-web-delivery.mjs",
+    "scripts/check-openapi.mjs",
+    "scripts/smoke-runtime.mjs",
+    "schemas/openapi.internal.json",
+    "packages/app-runtime-fastify/**",
+    "packages/app-bff-contracts/**",
+    "packages/app-bff-fastify/**",
+    "apps/*/package.json",
+    "apps/*/tsconfig.server.json",
+    "apps/*/server/**",
+    ".env.example",
+    "docs/reference/backend-fastify.md",
+    "docs/reference/rbac.md"
+  ],
+  "checks": [
+    "build:packages",
+    "build:server",
+    "check:web-delivery",
+    "check:openapi",
+    "smoke:runtime",
+    "check:template-invariants",
+    "check:scaffold"
+  ]
+}

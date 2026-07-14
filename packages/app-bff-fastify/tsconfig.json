@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.strict.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "types": ["node"],
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "references": [
+    { "path": "../app-bff-contracts" },
+    { "path": "../app-runtime-fastify" },
+    { "path": "../app-store-postgres" },
+    { "path": "../public-sector-sdk" }
+  ],
+  "include": ["src/**/*.ts"]
+}

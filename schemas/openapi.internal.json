@@ -1,0 +1,755 @@
+{
+  "components": { "schemas": {} },
+  "info": {
+    "description": "Fachliche BFF-Endpunkte der App-Runtime: Sitzung, Capabilities, Benutzereinstellungen und Postfach. Autorisierung über SDK-RBAC-Permissions (deny-by-default), Fehler im einheitlichen Envelope { error, requestId? }.",
+    "title": "App-BFF-API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.0.3",
+  "paths": {
+    "/api/capabilities": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "permissions": {
+                      "items": { "minLength": 1, "type": "string" },
+                      "type": "array"
+                    },
+                    "rbacRoles": {
+                      "items": { "minLength": 1, "type": "string" },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["rbacRoles", "permissions"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Aufgelöste Berechtigungen der Sitzung lesen",
+        "tags": ["session"]
+      }
+    },
+    "/api/mailbox": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "box",
+            "required": true,
+            "schema": {
+              "anyOf": [
+                { "enum": ["inbox"], "type": "string" },
+                { "enum": ["outbox"], "type": "string" }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                { "enum": ["own"], "type": "string" },
+                { "enum": ["authority"], "type": "string" }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": { "maximum": 200, "minimum": 1, "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "messages": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bodyPreview": { "type": "string" },
+                          "box": {
+                            "anyOf": [
+                              { "enum": ["inbox"], "type": "string" },
+                              { "enum": ["outbox"], "type": "string" }
+                            ]
+                          },
+                          "caseId": {
+                            "anyOf": [
+                              { "minLength": 1, "type": "string" },
+                              { "type": "null" }
+                            ]
+                          },
+                          "createdAt": { "minLength": 1, "type": "string" },
+                          "messageId": { "minLength": 1, "type": "string" },
+                          "ownerActorId": { "minLength": 1, "type": "string" },
+                          "scope": {
+                            "anyOf": [
+                              { "enum": ["own"], "type": "string" },
+                              { "enum": ["authority"], "type": "string" }
+                            ]
+                          },
+                          "status": {
+                            "anyOf": [
+                              { "enum": ["unread"], "type": "string" },
+                              { "enum": ["read"], "type": "string" },
+                              { "enum": ["sent"], "type": "string" },
+                              { "enum": ["archived"], "type": "string" }
+                            ]
+                          },
+                          "subject": { "type": "string" }
+                        },
+                        "required": [
+                          "messageId",
+                          "box",
+                          "scope",
+                          "ownerActorId",
+                          "caseId",
+                          "subject",
+                          "bodyPreview",
+                          "status",
+                          "createdAt"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["messages"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Postfach lesen (scope: own oder authority)",
+        "tags": ["mailbox"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "bodyPreview": { "maxLength": 2000, "type": "string" },
+                  "box": {
+                    "anyOf": [
+                      { "enum": ["inbox"], "type": "string" },
+                      { "enum": ["outbox"], "type": "string" }
+                    ]
+                  },
+                  "caseId": {
+                    "anyOf": [
+                      { "minLength": 1, "type": "string" },
+                      { "type": "null" }
+                    ]
+                  },
+                  "scope": {
+                    "anyOf": [
+                      { "enum": ["own"], "type": "string" },
+                      { "enum": ["authority"], "type": "string" }
+                    ]
+                  },
+                  "subject": {
+                    "maxLength": 500,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": ["box", "subject", "bodyPreview"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "bodyPreview": { "type": "string" },
+                    "box": {
+                      "anyOf": [
+                        { "enum": ["inbox"], "type": "string" },
+                        { "enum": ["outbox"], "type": "string" }
+                      ]
+                    },
+                    "caseId": {
+                      "anyOf": [
+                        { "minLength": 1, "type": "string" },
+                        { "type": "null" }
+                      ]
+                    },
+                    "createdAt": { "minLength": 1, "type": "string" },
+                    "messageId": { "minLength": 1, "type": "string" },
+                    "ownerActorId": { "minLength": 1, "type": "string" },
+                    "scope": {
+                      "anyOf": [
+                        { "enum": ["own"], "type": "string" },
+                        { "enum": ["authority"], "type": "string" }
+                      ]
+                    },
+                    "status": {
+                      "anyOf": [
+                        { "enum": ["unread"], "type": "string" },
+                        { "enum": ["read"], "type": "string" },
+                        { "enum": ["sent"], "type": "string" },
+                        { "enum": ["archived"], "type": "string" }
+                      ]
+                    },
+                    "subject": { "type": "string" }
+                  },
+                  "required": [
+                    "messageId",
+                    "box",
+                    "scope",
+                    "ownerActorId",
+                    "caseId",
+                    "subject",
+                    "bodyPreview",
+                    "status",
+                    "createdAt"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Nachricht verfassen (scope: own oder authority)",
+        "tags": ["mailbox"]
+      }
+    },
+    "/api/preferences": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "accessibility": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "highContrast": { "type": "boolean" },
+                        "largeText": { "type": "boolean" },
+                        "reducedDensity": { "type": "boolean" },
+                        "reducedMotion": { "type": "boolean" }
+                      },
+                      "required": [
+                        "highContrast",
+                        "largeText",
+                        "reducedMotion",
+                        "reducedDensity"
+                      ],
+                      "type": "object"
+                    },
+                    "actorId": { "minLength": 1, "type": "string" },
+                    "colorScheme": {
+                      "anyOf": [
+                        { "enum": ["light"], "type": "string" },
+                        { "enum": ["dark"], "type": "string" },
+                        { "enum": ["system"], "type": "string" }
+                      ]
+                    },
+                    "navigation": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "sidebarAutoExpand": { "type": "boolean" }
+                      },
+                      "required": ["sidebarAutoExpand"],
+                      "type": "object"
+                    },
+                    "tenantId": { "minLength": 1, "type": "string" },
+                    "updatedAt": { "minLength": 1, "type": "string" }
+                  },
+                  "required": [
+                    "actorId",
+                    "tenantId",
+                    "colorScheme",
+                    "accessibility",
+                    "navigation",
+                    "updatedAt"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Eigene Benutzereinstellungen lesen",
+        "tags": ["preferences"]
+      },
+      "put": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "accessibility": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "highContrast": { "type": "boolean" },
+                      "largeText": { "type": "boolean" },
+                      "reducedDensity": { "type": "boolean" },
+                      "reducedMotion": { "type": "boolean" }
+                    },
+                    "type": "object"
+                  },
+                  "colorScheme": {
+                    "anyOf": [
+                      { "enum": ["light"], "type": "string" },
+                      { "enum": ["dark"], "type": "string" },
+                      { "enum": ["system"], "type": "string" }
+                    ]
+                  },
+                  "navigation": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "sidebarAutoExpand": { "type": "boolean" }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "accessibility": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "highContrast": { "type": "boolean" },
+                        "largeText": { "type": "boolean" },
+                        "reducedDensity": { "type": "boolean" },
+                        "reducedMotion": { "type": "boolean" }
+                      },
+                      "required": [
+                        "highContrast",
+                        "largeText",
+                        "reducedMotion",
+                        "reducedDensity"
+                      ],
+                      "type": "object"
+                    },
+                    "actorId": { "minLength": 1, "type": "string" },
+                    "colorScheme": {
+                      "anyOf": [
+                        { "enum": ["light"], "type": "string" },
+                        { "enum": ["dark"], "type": "string" },
+                        { "enum": ["system"], "type": "string" }
+                      ]
+                    },
+                    "navigation": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "sidebarAutoExpand": { "type": "boolean" }
+                      },
+                      "required": ["sidebarAutoExpand"],
+                      "type": "object"
+                    },
+                    "tenantId": { "minLength": 1, "type": "string" },
+                    "updatedAt": { "minLength": 1, "type": "string" }
+                  },
+                  "required": [
+                    "actorId",
+                    "tenantId",
+                    "colorScheme",
+                    "accessibility",
+                    "navigation",
+                    "updatedAt"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Eigene Benutzereinstellungen ändern (partiell)",
+        "tags": ["preferences"]
+      }
+    },
+    "/api/session": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "actorId": { "minLength": 1, "type": "string" },
+                    "authorityId": { "minLength": 1, "type": "string" },
+                    "jurisdictionId": { "minLength": 1, "type": "string" },
+                    "rbacRoles": {
+                      "items": { "minLength": 1, "type": "string" },
+                      "type": "array"
+                    },
+                    "tenantId": { "minLength": 1, "type": "string" }
+                  },
+                  "required": [
+                    "actorId",
+                    "tenantId",
+                    "authorityId",
+                    "jurisdictionId",
+                    "rbacRoles"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Aufgelöste Sitzung (SDK-RBAC-Sicht) lesen",
+        "tags": ["session"]
+      }
+    }
+  },
+  "tags": [
+    {
+      "description": "Sitzung und aufgelöste Berechtigungen",
+      "name": "session"
+    },
+    {
+      "description": "Benutzereinstellungen (eigenes Konto)",
+      "name": "preferences"
+    },
+    { "description": "Postfach (eigenes bzw. behördliches)", "name": "mailbox" }
+  ]
+}

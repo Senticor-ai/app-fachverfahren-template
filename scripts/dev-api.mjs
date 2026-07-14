@@ -53,9 +53,15 @@ function run(label, command, args, env) {
 function main() {
   const env = resolveDevApiEnv();
   run(
-    "Store-Paket bauen (@senticor/app-store-postgres)",
+    "Server-Pakete bauen (@senticor/app-store-postgres, @senticor/app-runtime-fastify)",
     "pnpm",
-    ["--filter", "@senticor/app-store-postgres", "build"],
+    [
+      "--filter",
+      "@senticor/app-store-postgres",
+      "--filter",
+      "@senticor/app-runtime-fastify",
+      "build",
+    ],
     env,
   );
   run(

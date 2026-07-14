@@ -34,9 +34,17 @@ export const builtInPermissions = {
     permission: "mailbox.own.read",
     description: "Eigenen Posteingang und Ausgang lesen",
   },
+  mailboxOwnWrite: {
+    permission: "mailbox.own.write",
+    description: "Nachrichten im eigenen Postfach verfassen",
+  },
   mailboxAuthorityRead: {
     permission: "mailbox.authority.read",
     description: "Behördlichen Posteingang und Ausgang lesen",
+  },
+  mailboxAuthorityWrite: {
+    permission: "mailbox.authority.write",
+    description: "Nachrichten im behördlichen Postfach verfassen",
   },
   caseRead: {
     permission: "case.read",
@@ -60,6 +68,7 @@ export const builtInRbacRegistry = {
         builtInPermissions.preferencesRead,
         builtInPermissions.preferencesWrite,
         builtInPermissions.mailboxOwnRead,
+        builtInPermissions.mailboxOwnWrite,
       ],
       builtIn: true,
     },
@@ -73,6 +82,7 @@ export const builtInRbacRegistry = {
         builtInPermissions.preferencesRead,
         builtInPermissions.preferencesWrite,
         builtInPermissions.mailboxAuthorityRead,
+        builtInPermissions.mailboxAuthorityWrite,
         builtInPermissions.caseRead,
         builtInPermissions.casePrepareDecision,
       ],

@@ -61,6 +61,8 @@ export const defaultOwnership: TemplateOwnership = {
     "sources/source-lock.json": "structured-merge",
     "tooling/template/**": "replace",
     "scripts/check-template-*.mjs": "replace",
+    "scripts/check-openapi.mjs": "replace",
+    "scripts/smoke-runtime.mjs": "replace",
     "scripts/check-web-delivery.mjs": "replace",
     "scripts/check-k8s-delivery.mjs": "replace",
     "scripts/check-supply-chain.sh": "replace",

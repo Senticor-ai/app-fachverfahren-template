@@ -11,6 +11,9 @@
     "tsBuildInfoFile": "dist-server/.tsbuildinfo"
   },
   "references": [
+    { "path": "../../packages/app-bff-contracts" },
+    { "path": "../../packages/app-bff-fastify" },
+    { "path": "../../packages/app-runtime-fastify" },
     { "path": "../../packages/app-store-postgres" },
     { "path": "../../packages/provider-local-auth" }
   ],
