@@ -7,21 +7,31 @@ import { pathToFileURL } from "node:url";
 import path from "node:path";
 import fastifyCookie from "@fastify/cookie";
 import {
+  appBff,
+  registerOpenApiCollector,
+  registerOpenApiRoute,
+} from "@senticor/app-bff-fastify";
+import {
   buildInternalServer as buildRuntimeInternalServer,
   buildPublicServer as buildRuntimePublicServer,
+  createAuditSinkFromEnv,
   logError,
   logInfo,
   readRuntimeConfig as readRuntimeConfigBase,
   startRuntime as startRuntimeBase,
+  type AuditSink,
   type RunningRuntime,
   type RuntimeConfig,
   type RuntimeMetrics,
   type RuntimeState,
+  type SessionResolver,
 } from "@senticor/app-runtime-fastify";
 import {
+  createAppStoreFromEnv,
   createAuditStoreFromEnv,
   createAuthStoreFromEnv,
   createKanbanStoreFromEnv,
+  type AppStore,
   type AuditStore,
   type AuthStore,
   type KanbanStore,
@@ -31,6 +41,7 @@ import { registerAuditRoutes } from "./audit/routes.js";
 import { autoBootstrapAdminFromEnv } from "./auth/auto-bootstrap.js";
 import { registerAuthPolicyGuard } from "./auth/authorization.js";
 import { registerAuthRoutes, type RegistrationMode } from "./auth/routes.js";
+import { createCookieSessionResolver } from "./auth/session-resolver.js";
 import { registerBoardRoutes } from "./kanban/routes.js";
 import { registerUserRoutes } from "./users/routes.js";
 
@@ -69,6 +80,12 @@ interface AppStores {
   auditStore: AuditStore;
 }
 
+interface BffWiring {
+  appStore: AppStore;
+  sessionResolver: SessionResolver;
+  auditSink: AuditSink;
+}
+
 function registerAppRoutes(
   app: FastifyInstance,
   stores: AppStores,
@@ -76,10 +93,14 @@ function registerAppRoutes(
     bootstrapToken: string | undefined;
     registrationMode: RegistrationMode;
   },
+  bff: BffWiring,
 ): void {
   // K2: /auth-/api-Route ohne Autorisierungs-Policy = Boot-Fehler, nicht erst Test-Rot.
   registerAuthPolicyGuard(app);
   app.register(fastifyCookie);
+  // Collector VOR den BFF-Routen — der onRoute-Kollektor von @fastify/swagger sieht
+  // nur später registrierte Routen (Reihenfolge-Vertrag, openapi.test.ts im Paket).
+  registerOpenApiCollector(app);
   registerAuthRoutes(app, {
     authStore: stores.authStore,
     kanbanStore: stores.kanbanStore,
@@ -93,6 +114,7 @@ function registerAppRoutes(
     authStore: stores.authStore,
     auditStore: stores.auditStore,
   });
+  app.register(appBff, bff);
 }
 
 export function buildPublicServer({
@@ -102,6 +124,9 @@ export function buildPublicServer({
   authStore = createAuthStoreFromEnv(),
   kanbanStore = createKanbanStoreFromEnv(),
   auditStore = createAuditStoreFromEnv(),
+  appStore = createAppStoreFromEnv(),
+  sessionResolver,
+  auditSink = createAuditSinkFromEnv(),
   bootstrapToken = process.env["BOOTSTRAP_TOKEN"],
   registrationMode = parseRegistrationMode(
     process.env["AUTH_REGISTRATION_MODE"],
@@ -113,6 +138,9 @@ export function buildPublicServer({
   authStore?: AuthStore;
   kanbanStore?: KanbanStore;
   auditStore?: AuditStore;
+  appStore?: AppStore;
+  sessionResolver?: SessionResolver;
+  auditSink?: AuditSink;
   bootstrapToken?: string | undefined;
   registrationMode?: RegistrationMode;
 } = {}): FastifyInstance {
@@ -125,6 +153,14 @@ export function buildPublicServer({
         app,
         { authStore, kanbanStore, auditStore },
         { bootstrapToken, registrationMode },
+        {
+          appStore,
+          // Default: der ECHTE Cookie/AuthStore-Flow (deny-by-default) — Tests
+          // injizieren Stubs über den Parameter.
+          sessionResolver:
+            sessionResolver ?? createCookieSessionResolver(authStore),
+          auditSink,
+        },
       ),
   });
 }
@@ -132,13 +168,23 @@ export function buildPublicServer({
 export function buildInternalServer({
   config = readRuntimeConfig(),
   metrics,
+  publicServer,
 }: {
   config?: RuntimeConfig;
   metrics?: RuntimeMetrics;
+  /** Mit Referenz auf den public Server liefert der interne Port zusätzlich
+   *  GET /internal/openapi.json (dort gesammeltes Dokument) aus. */
+  publicServer?: FastifyInstance;
 } = {}): FastifyInstance {
   return buildRuntimeInternalServer({
     config,
     ...(metrics ? { metrics } : {}),
+    ...(publicServer
+      ? {
+          registerRoutes: (app: FastifyInstance) =>
+            registerOpenApiRoute(app, publicServer),
+        }
+      : {}),
   });
 }
 
@@ -153,10 +199,17 @@ export async function startRuntime(
     bootstrapToken: env["BOOTSTRAP_TOKEN"],
     registrationMode: parseRegistrationMode(env["AUTH_REGISTRATION_MODE"]),
   };
+  const bff: BffWiring = {
+    appStore: createAppStoreFromEnv(env),
+    sessionResolver: createCookieSessionResolver(authStore),
+    auditSink: createAuditSinkFromEnv(env),
+  };
   return startRuntimeBase({
     env,
     configOverrides: APP_IDENTITY,
-    registerPublicRoutes: (app) => registerAppRoutes(app, stores, policy),
+    registerPublicRoutes: (app) => registerAppRoutes(app, stores, policy, bff),
+    registerInternalRoutes: (app, context) =>
+      registerOpenApiRoute(app, context.publicServer),
     // Fresh-Deployment-Akzeptanz: mit AUTH_BOOTSTRAP_ADMIN_* entsteht der Admin samt
     // Team-Discovery-Board beim Start — idempotent, wirft nie (Fehler landen im Log).
     beforeListen: async () => {

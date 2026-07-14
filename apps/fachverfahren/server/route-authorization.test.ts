@@ -4,6 +4,16 @@
 // Route ganz ohne Policy bricht schon den Server-Start (registerAuthPolicyGuard).
 import fastifyCookie from "@fastify/cookie";
 import {
+  appBff,
+  bffRouteAuthLabel,
+  type BffRouteAuth,
+} from "@senticor/app-bff-fastify";
+import {
+  MemoryAuditSink,
+  NoSessionResolver,
+} from "@senticor/app-runtime-fastify";
+import {
+  InMemoryAppStore,
   InMemoryAuditStore,
   InMemoryAuthStore,
   InMemoryKanbanStore,
@@ -25,8 +35,13 @@ interface CollectedRoute {
   policy: string;
 }
 
-function policyLabel(policy: RouteAuthPolicy | undefined): string {
+function policyLabel(
+  policy: RouteAuthPolicy | BffRouteAuth | undefined,
+): string {
   if (!policy) return "(none)";
+  if (policy.kind === "rbac" || policy.kind === "rbac-scoped") {
+    return bffRouteAuthLabel(policy);
+  }
   return policy.kind === "permission"
     ? `permission:${policy.action}`
     : policy.kind;
@@ -47,7 +62,9 @@ async function buildAppAndCollect(): Promise<CollectedRoute[]> {
     if (!route.url.startsWith("/auth") && !route.url.startsWith("/api/")) {
       return;
     }
-    const auth = (route.config as { auth?: RouteAuthPolicy } | undefined)?.auth;
+    const auth = (
+      route.config as { auth?: RouteAuthPolicy | BffRouteAuth } | undefined
+    )?.auth;
     collected.push({
       method: String(route.method),
       url: route.url,
@@ -64,6 +81,11 @@ async function buildAppAndCollect(): Promise<CollectedRoute[]> {
   registerBoardRoutes(app, { authStore, kanbanStore, auditStore });
   registerUserRoutes(app, { authStore, kanbanStore, auditStore });
   registerAuditRoutes(app, { authStore, auditStore });
+  await app.register(appBff, {
+    appStore: new InMemoryAppStore(),
+    sessionResolver: new NoSessionResolver(),
+    auditSink: new MemoryAuditSink(),
+  });
   await app.ready();
   await app.close();
   return collected.sort(
@@ -91,6 +113,36 @@ describe("Routen-Klassifizierung (config.auth)", () => {
         // Nur-authentifiziert (bewusst OHNE Permission): eigenes Konto.
         { method: "GET", url: "/auth/session", policy: "authenticated" },
         { method: "POST", url: "/auth/password", policy: "authenticated" },
+        // BFF-Routen (Paket @senticor/app-bff-fastify): SDK-RBAC-Permissions,
+        // deny-by-default; Mailbox mit scope-getrennten Lese-/Schreibrechten.
+        {
+          method: "GET",
+          url: "/api/capabilities",
+          policy: "rbac:session.read",
+        },
+        {
+          method: "GET",
+          url: "/api/mailbox",
+          policy:
+            "rbac-scoped:own=mailbox.own.read,authority=mailbox.authority.read",
+        },
+        {
+          method: "POST",
+          url: "/api/mailbox",
+          policy:
+            "rbac-scoped:own=mailbox.own.write,authority=mailbox.authority.write",
+        },
+        {
+          method: "GET",
+          url: "/api/preferences",
+          policy: "rbac:preferences.read",
+        },
+        {
+          method: "PUT",
+          url: "/api/preferences",
+          policy: "rbac:preferences.write",
+        },
+        { method: "GET", url: "/api/session", policy: "rbac:session.read" },
         // Workspace-APIs brauchen Permissions — nie nur „eingeloggt".
         {
           method: "GET",

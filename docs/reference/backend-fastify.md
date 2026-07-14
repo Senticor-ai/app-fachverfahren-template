@@ -30,9 +30,29 @@ registerInternalRoutes, beforeListen })`).
 - `GET /runtime-config.json`
 - `GET /internal/metrics`
 - `GET /internal/build-info`
+- `GET /internal/openapi.json`
 
-`/internal/metrics` darf nicht öffentlich geroutet werden. Readiness darf
+`/internal/*` darf nicht öffentlich geroutet werden. Readiness darf
 kritische Abhängigkeiten prüfen; Liveness darf das nicht.
+
+### Fachliche BFF-Routen (`@senticor/app-bff-fastify`, public Port)
+
+- `GET /api/session` — SDK-RBAC-Sicht der Sitzung (`session.read`)
+- `GET /api/capabilities` — aufgelöste Permissions (`session.read`)
+- `GET /api/preferences` / `PUT /api/preferences` —
+  `preferences.read` / `preferences.write`
+- `GET /api/mailbox?box=inbox|outbox&scope=own|authority` —
+  `mailbox.own.read` bzw. `mailbox.authority.read`
+- `POST /api/mailbox` — `mailbox.own.write` bzw. `mailbox.authority.write`
+
+Verträge (TypeBox-DTOs, Fehler-Envelope `{ error, requestId? }`) liegen in
+`@senticor/app-bff-contracts`; Statuscodes: 401 ohne Sitzung, 403 bei
+verweigerter Permission (beides mit `SecurityEvent` über die `AuditSink`),
+400 bei ungültiger Eingabe, 503 ohne erreichbaren `AppStore`. Schreibpfade
+emittieren `AppDataAuditEvent`s. Das OpenAPI-Dokument wird auf dem public
+Server gesammelt (Collector VOR den BFF-Routen registrieren!) und NUR intern
+ausgeliefert; `scripts/check-openapi.mjs` hält den Snapshot
+(`schemas/openapi.internal.json`) im Gleichschritt.
 
 ## Plattform- und Domain-Routen
 

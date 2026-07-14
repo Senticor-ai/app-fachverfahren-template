@@ -36,11 +36,37 @@ abgeleitet; eine `/auth`-/`/api`-Route ohne Policy bricht den Server-Start):
 In API-Antworten heißt das Feld `workspaceRole` (`role` bleibt EIN Release
 als deprecated Alias). Feinere Rollen (Sachbearbeiter, Teamleiter,
 Fachadministrator, Revision) entstehen später ausschließlich durch
-Erweiterung dieses Mappings — ohne Routen-Refactoring. Abgrenzung: die
-SDK-RBAC-Registry unten (citizen/ caseworker + `app_rbac_*`-Tabellen) ist der
-Vertrag für fachliche Domain-Permissions und bewusst noch nicht mit dem
-Workspace verdrahtet; `app_users.role` ist die heutige Wahrheit für
-Workspace-Zugriffe.
+Erweiterung dieses Mappings — ohne Routen-Refactoring.
+
+## Zwei Pipelines, eine Sitzung
+
+Seit den BFF-Routen sind BEIDE Berechtigungsmodelle verdrahtet — mit klarer
+Zuständigkeit und derselben Cookie-Session als Quelle:
+
+- **Workspace-Permissions** (`workspace-permissions.ts`, Pipeline
+  `auth/authorization.ts`): autorisieren `/auth/*` und `/api/v1/*`
+  (Boards, Benutzerverwaltung, Audit, Export).
+- **SDK-RBAC** (`@senticor/public-sector-sdk`, Pipeline `bffRouteAuth` in
+  `@senticor/app-bff-fastify`): autorisiert die fachlichen BFF-Routen
+  `/api/session`, `/api/capabilities`, `/api/preferences`, `/api/mailbox`
+  (deny-by-default; Denials emittieren `SecurityEvent`s über die
+  `AuditSink`-Naht der Runtime — nicht zu verwechseln mit dem
+  Workspace-`AuditStore` in `@senticor/app-store-postgres`).
+
+Die Brücke ist der Cookie-SessionResolver
+(`apps/fachverfahren/server/auth/session-resolver.ts`): Session-Cookie →
+AuthStore-Session → Konto (live pro Request) → SDK-RBAC-Rollen über dieses
+V1-Mapping:
+
+| Workspace-Rolle (`app_users.role`) | SDK-RBAC-Rollen  |
+| ---------------------------------- | ---------------- |
+| `citizen`                          | `["citizen"]`    |
+| `member`                           | `["caseworker"]` |
+| `admin`                            | `["caseworker"]` |
+
+Feinere fachliche Rollen entstehen später über die `app_rbac_*`-Tabellen
+(siehe „Neue Rollen ergänzen"); bis dahin ist dieses Mapping die einzige
+Quelle der SDK-RBAC-Rollen.
 
 `principal_version` (`app_users`) zählt JEDE principal-relevante Mutation
 (Status, Rolle, Arbeitsbereiche, Modus) — Anker für optimistische

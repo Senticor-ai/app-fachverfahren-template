@@ -22,6 +22,7 @@
     "@radix-ui/react-separator": "^1.1.11",
     "@radix-ui/react-slot": "^1.3.0",
     "@radix-ui/react-tabs": "^1.1.17",
+    "@senticor/app-bff-fastify": "workspace:*",
     "@senticor/app-runtime-fastify": "workspace:*",
     "@senticor/app-store-postgres": "workspace:*",
     "@senticor/fachverfahren-kit": "workspace:*",
