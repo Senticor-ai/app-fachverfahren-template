@@ -9,6 +9,8 @@ export * from "./format.js";
 // Business-Logik als DATEN: Feldwert-/Options-Auflösung + der generische reine Interpreter (Tarif/Regeln/Codelisten).
 export * from "./lib/antrag-felder.js";
 export * from "./lib/interpreter.js";
+// Builder-Aspekt: reine strukturelle Prüfung + Kennzahlen einer `LeistungConfig` (Verfahren-Inspektor).
+export * from "./lib/verfahren-pruefung.js";
 // KI-Extraktions-PORT (Dokument → Feld-Vorschläge mit Konfidenz) — vendor-neutral, Stub-Default.
 export * from "./lib/dokument-extraktion.js";
 // Nachweis-Upload-Regeln als DATEN: accept-Attribut, Einschränkungs-Text + reine Fail-Fast-Vorprüfung (Typ/Größe).
@@ -38,6 +40,7 @@ export * from "./components/HilfePanel.js";
 export * from "./components/BundIDLoginForm.js";
 export * from "./components/BescheidView.js";
 export * from "./components/AuditTimeline.js";
+export * from "./components/VerfahrenInspektor.js";
 export * from "./components/ReportingPanel.js";
 export * from "./components/DateiUpload.js";
 export * from "./components/NachweisAutorisierung.js";
