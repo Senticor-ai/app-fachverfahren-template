@@ -90,6 +90,22 @@ export type {
   ListCasesQuery,
   PatchCaseStateInput,
 } from "./case-store.js";
+export {
+  createTaskStoreFromEnv,
+  InMemoryTaskStore,
+  PostgresTaskStore,
+  TaskNotFoundError,
+  TaskVersionConflictError,
+  UnavailableTaskStore,
+} from "./task-store.js";
+export type {
+  AppTask,
+  ChildFlagAggregate,
+  ListTasksQuery,
+  TaskPatch,
+  TaskState,
+  TaskStore,
+} from "./task-store.js";
 export { nextPositionKey } from "./position.js";
 export {
   defaultMigrationOptionsFromEnv,
