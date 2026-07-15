@@ -1,9 +1,18 @@
 // case-client — die produktive `CasePort`-Implementierung gegen die Fall/Dossier-BFF-Routen
 // (/api/cases*). DIESELBE Konvention wie board-client: Session-Cookie (credentials: "include")
 // + BASE_URL-Präfix (die App wird ggf. hinter einem Preview-Proxy unter einem Präfix
-// ausgeliefert — root-absolute Pfade gingen daran vorbei). Rein lesend; Schreibpfade folgen bei
-// Bedarf. Die Server-Topologie (tenant/authority/jurisdiction) bleibt bewusst verborgen — sie
-// kommt IMMER aus der Sitzung, nie aus dem Client.
+// ausgeliefert — root-absolute Pfade gingen daran vorbei). Lese- UND Schreibpfade; die Wire-
+// Verträge (Request-/Antwort-DTOs) stammen aus @senticor/app-bff-contracts, werden NICHT dupliziert.
+// Die Server-Topologie (tenant/authority/jurisdiction) bleibt bewusst verborgen — sie kommt IMMER
+// aus der Sitzung, nie aus dem Client.
+import type {
+  CaseCreateRequestDto,
+  CaseDto,
+  CaseTransitionRequestDto,
+  TaskCreateRequestDto,
+  TaskDto,
+  TaskPatchRequestDto,
+} from "@senticor/app-bff-contracts";
 
 /** Fall/Dossier-Zusammenfassung — 1:1 zur BFF-`CaseDto`. */
 export interface CaseSummary {
@@ -64,6 +73,15 @@ export interface CasePort {
   getCase(caseId: string): Promise<CaseSummary | undefined>;
   listTasks(caseId: string, query?: TaskListQuery): Promise<CaseTask[]>;
   getProgress(caseId: string): Promise<CaseZielFortschritt[]>;
+  // Schreibpfade — Request-/Antwort-Formen aus den BFF-Wire-Verträgen. Nicht-2xx (400/403/404/409/503)
+  // wirft `CaseRequestError` mit Statuscode; der Aufrufer entscheidet fachlich (Konflikt/verwehrt/…).
+  createCase(req: CaseCreateRequestDto): Promise<CaseDto>;
+  transitionCase(
+    caseId: string,
+    req: CaseTransitionRequestDto,
+  ): Promise<CaseDto>;
+  createTask(caseId: string, req: TaskCreateRequestDto): Promise<TaskDto>;
+  patchTask(taskId: string, req: TaskPatchRequestDto): Promise<TaskDto>;
 }
 
 /** Nicht-OK-Antworten mit Status — `getCase` unterscheidet damit 404 (Akte existiert nicht bzw.
@@ -99,10 +117,11 @@ function queryString(
   return rendered ? `?${rendered}` : "";
 }
 
-async function request<T>(path: string): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(apiPath(path), {
+    ...init,
     credentials: "include",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...(init.headers ?? {}) },
   });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
@@ -167,6 +186,34 @@ export function createHttpCasePort(): CasePort {
         `/api/cases/${encodeURIComponent(caseId)}/progress`,
       );
       return body.ziele;
+    },
+
+    async createCase(req) {
+      return await request<CaseDto>(`/api/cases`, {
+        method: "POST",
+        body: JSON.stringify(req),
+      });
+    },
+
+    async transitionCase(caseId, req) {
+      return await request<CaseDto>(
+        `/api/cases/${encodeURIComponent(caseId)}/transitions`,
+        { method: "POST", body: JSON.stringify(req) },
+      );
+    },
+
+    async createTask(caseId, req) {
+      return await request<TaskDto>(
+        `/api/cases/${encodeURIComponent(caseId)}/tasks`,
+        { method: "POST", body: JSON.stringify(req) },
+      );
+    },
+
+    async patchTask(taskId, req) {
+      return await request<TaskDto>(
+        `/api/tasks/${encodeURIComponent(taskId)}`,
+        { method: "PATCH", body: JSON.stringify(req) },
+      );
     },
   };
 }
