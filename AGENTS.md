@@ -251,9 +251,15 @@ pnpm run agent:context -- --task <app-spec> --paths <pfad>
 `agent.discovery.json` ist die öffentliche Discovery-API. `agent:context`
 liefert `nextCommands`, `validationProfiles` und `writeBoundaries`;
 `agent:verify` validiert einen Abschlussbericht mit echten
-`commandsExecuted`. Kurzskills liegen kanonisch unter `.agents/skills/`;
-Startpunkt für Fachverfahren-Builds ist
-`.agents/skills/fachverfahren-app/SKILL.md`.
+`commandsExecuted`. Kurzskills liegen kanonisch unter `.agents/skills/`.
+
+Zuerst den Verfahrenstyp wählen: `docs/agents/fachverfahren-typen.md` ist der
+Wegweiser (Antrag/Vorgang vs. Fall/Dossier/Case-Management) mit den passenden
+Skills und Paket-Ankern. Startpunkt für Antrag/Vorgang-Builds ist
+`.agents/skills/fachverfahren-app/SKILL.md`; für Fall/Dossier-Verfahren
+`.agents/skills/dossier-fallmanagement/SKILL.md` (mit BPMN
+`.agents/skills/bpmn-prozess-workflow/SKILL.md` und Governance
+`.agents/skills/governance-vier-augen/SKILL.md`).
 
 Gouvernierte Webquellen stehen in `sources/registry.yaml`; für registrierte
 Quellen `source:fetch` statt beliebiger Netzwerkzugriffe verwenden.
