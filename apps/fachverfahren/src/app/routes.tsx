@@ -4,6 +4,8 @@
 import { Navigate } from "react-router-dom";
 import { LandingPage } from "../LandingPage.js";
 import { AdminUsersRoute } from "../pages/admin-users.js";
+import { AmtAktePage } from "../pages/amt-akte.js";
+import { AmtAktenPage } from "../pages/amt-akten.js";
 import { AmtEingangPage } from "../pages/amt-eingang.js";
 import { AmtVorgangPage } from "../pages/amt-vorgang.js";
 import { AufsichtPage } from "../pages/aufsicht.js";
@@ -24,6 +26,8 @@ const routeElements: Record<AppRoutePath, React.JSX.Element> = {
   "/buerger/bestaetigung/:id": <BuergerBestaetigungPage />,
   "/amt": <AmtEingangPage />,
   "/amt/vorgang/:id": <AmtVorgangPage />,
+  "/amt/akten": <AmtAktenPage />,
+  "/amt/akte/:id": <AmtAktePage />,
   "/aufsicht": <AufsichtPage />,
   "/boards": <BoardsListPage />,
   "/boards/:boardId": <BoardDetailPage />,

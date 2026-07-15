@@ -21,6 +21,9 @@ export const routeGates = {
   "/buerger/bestaetigung/:id": personaGate("buerger"),
   "/amt": personaGate("sachbearbeitung"),
   "/amt/vorgang/:id": personaGate("sachbearbeitung"),
+  // Fall/Dossier-Sicht (ADR-0001): Akten-Liste + 360°-Detail über der Fall/Task-API.
+  "/amt/akten": personaGate("sachbearbeitung"),
+  "/amt/akte/:id": personaGate("sachbearbeitung"),
   "/aufsicht": personaGate("aufsicht"),
   // Team-Workspace: echte Autorisierung (Permission), Redirect-Ziel "/" —
   // /boards als Fallback ergäbe hier eine Schleife.
