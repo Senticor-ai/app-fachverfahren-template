@@ -133,7 +133,9 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
 
   // Roving-Tabindex für die Tabellen-Navigation: nur die aktive Zeile ist im Tab-Fokus,
   // Pfeiltasten/Home/End wandern durch die Liste (WAI-ARIA Grid-Muster).
-  const rowRefs = React.useRef<Array<HTMLTableRowElement | null>>([]);
+  // Roving-Fokusziel ist der Öffnen-Button in der ersten Zelle jeder Zeile (nicht mehr der <tr> — der behält so
+  // seine native row-Semantik, 1.3.1/4.1.2).
+  const rowRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
   const [activeRow, setActiveRow] = React.useState(0);
 
   // Schlüssel-Antragsfelder: 1–2 Felder aus der ersten Detail-Sektion (generisch, ohne Domänen-Literal).
@@ -324,18 +326,10 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
     announce(`${rows.length} von ${alle.length} Vorgängen angezeigt`, "polite");
   }, [loading, rows.length, alle.length, announce]);
 
-  // Pfeiltasten-Navigation der Tabellenzeilen (Roving-Tabindex). Enter/Space öffnen bleiben erhalten.
+  // Pfeiltasten-Navigation zwischen den Zeilen-Buttons (Roving-Tabindex). Enter/Space aktiviert der NATIVE Button
+  // selbst (onClick) — hier NICHT zusätzlich onOpen rufen, sonst doppelte Auslösung (Kritik-Fund).
   const handleRowKeyDown = React.useCallback(
-    (
-      event: React.KeyboardEvent<HTMLTableRowElement>,
-      index: number,
-      id: string,
-    ) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        onOpen(id);
-        return;
-      }
+    (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
       let next: number;
       const pageEnd = pageStart + pageRows.length - 1;
       switch (event.key) {
@@ -358,7 +352,7 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
       setActiveRow(next);
       rowRefs.current[next]?.focus();
     },
-    [onOpen, pageRows.length, pageStart],
+    [pageRows.length, pageStart],
   );
 
   const allActive = active.size === alleStatusKeys.length;
@@ -631,7 +625,7 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                   <TableHeader className="sticky top-0 z-20 bg-secondary text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <TableRow>
                       {selectionEnabled ? (
-                        <TableHead className="w-14 px-4 py-2">
+                        <TableHead scope="col" className="w-14 px-4 py-2">
                           <label className="ps-inbox__select ps-inbox__select--head">
                             <input
                               type="checkbox"
@@ -702,22 +696,16 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                       return (
                         <TableRow
                           key={v.id}
-                          ref={(el: HTMLTableRowElement | null) => {
-                            rowRefs.current[rowIndex] = el;
-                          }}
-                          // Roving-Tabindex: nur die aktive Zeile ist im Tab-Fokus; Pfeiltasten wandern
-                          // (statt jede Zeile einzeln in die Tab-Reihenfolge zu legen).
-                          tabIndex={rowIndex === activeRow ? 0 : -1}
-                          role="link"
-                          aria-label={`Vorgang ${v.vorgangsnummer} öffnen`}
+                          // 1.3.1/4.1.2: KEIN role/tabindex am <tr> mehr (das löschte die row-Semantik) — die
+                          // Zeile bleibt eine echte Tabellenzeile. Der Maus-Zeilenklick bleibt als Komfort erhalten;
+                          // die tastatur-/AT-fähige Aktion trägt der Öffnen-Button in der ersten Zelle. focus-within
+                          // hebt die Zeile hervor, wenn ihr Button fokussiert ist.
                           onClick={() => {
                             setActiveRow(rowIndex);
                             onOpen(v.id);
                           }}
-                          onFocus={() => setActiveRow(rowIndex)}
-                          onKeyDown={(e) => handleRowKeyDown(e, rowIndex, v.id)}
                           className={cn(
-                            "group cursor-pointer border-t border-border outline-none transition-colors ease-out hover:bg-secondary/40 focus:bg-secondary/40 focus-visible:ring-inset focus-visible:ring-ring/50 focus-visible:ring-[3px] motion-reduce:transition-none",
+                            "group cursor-pointer border-t border-border transition-colors ease-out hover:bg-secondary/40 focus-within:bg-secondary/40 motion-reduce:transition-none",
                             checked && "bg-secondary/30",
                           )}
                         >
@@ -741,9 +729,27 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                             </TableCell>
                           ) : null}
                           <TableCell className="align-top">
-                            <span className="font-mono text-xs font-medium text-primary group-hover:underline">
+                            {/* Echtes fokussierbares Bedienelement (statt role am <tr>): trägt Roving-Tabindex,
+                                Pfeiltasten-Navigation und die Öffnen-Aktion. Enter/Space aktiviert der Button nativ;
+                                stopPropagation verhindert das zusätzliche Auslösen des <tr>-onClick. */}
+                            <button
+                              type="button"
+                              ref={(el) => {
+                                rowRefs.current[rowIndex] = el;
+                              }}
+                              tabIndex={rowIndex === activeRow ? 0 : -1}
+                              aria-label={`Vorgang ${v.vorgangsnummer} öffnen`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveRow(rowIndex);
+                                onOpen(v.id);
+                              }}
+                              onFocus={() => setActiveRow(rowIndex)}
+                              onKeyDown={(e) => handleRowKeyDown(e, rowIndex)}
+                              className="rounded-sm font-mono text-xs font-medium text-primary underline-offset-2 outline-none group-hover:underline hover:underline focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                            >
                               {v.vorgangsnummer}
-                            </span>
+                            </button>
                             {v.ki.flags.length > 0 && (
                               <div className="mt-1 flex flex-wrap gap-1.5">
                                 {v.ki.flags.map((flag) => (
@@ -1049,7 +1055,11 @@ function Th({
       : "descending"
     : "none";
   return (
-    <TableHead aria-sort={ariaSort} className="px-4 py-2 font-medium">
+    <TableHead
+      scope="col"
+      aria-sort={ariaSort}
+      className="px-4 py-2 font-medium"
+    >
       <button
         type="button"
         onClick={() => onSort(cKey)}

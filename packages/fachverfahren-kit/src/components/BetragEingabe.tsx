@@ -105,7 +105,8 @@ export function BetragEingabe({
       ? "Pflichtfeld."
       : null
     : geparst === null
-      ? "Bitte einen gültigen Betrag eingeben."
+      ? // 3.3.3 — die Meldung nennt einen KONKRETEN Korrekturvorschlag (de-DE-Format), nicht nur „ungültig".
+        "Bitte einen gültigen Betrag eingeben, z. B. 1.234,56."
       : null;
   const sichtbarerFehler = fehler ?? (beruehrt ? lokalerFehler : null);
   const invalid = sichtbarerFehler != null;

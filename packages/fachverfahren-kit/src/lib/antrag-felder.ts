@@ -306,3 +306,57 @@ export function feldHint(
 export function feldLabelFachlich(feld: FeldDef): string | undefined {
   return feld.labelFachlich;
 }
+
+/** Stämme, die eindeutig eine Angabe zur antragstellenden PERSON bezeichnen → ihr WCAG-`autocomplete`-Token.
+ *  Bewusst KONSERVATIV: „name" allein fehlt (mehrdeutig — z. B. Antragsobjekt oder Organisation), „ort"/„strasse"
+ *  nur als Anschrift der Person (siehe ORT_EREIGNIS_AUSNAHME). Alles Übrige ⇒ kein Token (statt eines falschen). */
+const PERSONEN_AUTOCOMPLETE: Record<string, string> = {
+  vorname: "given-name",
+  rufname: "given-name",
+  nachname: "family-name",
+  familienname: "family-name",
+  geburtsname: "family-name",
+  geburtsdatum: "bday",
+  geburtstag: "bday",
+  strasse: "street-address",
+  straße: "street-address",
+  strassenname: "street-address",
+  wohnort: "address-level2",
+  ort: "address-level2",
+  stadt: "address-level2",
+  plz: "postal-code",
+  postleitzahl: "postal-code",
+  email: "email",
+  mail: "email",
+  telefon: "tel",
+  telefonnummer: "tel",
+  mobil: "tel",
+  mobilnummer: "tel",
+};
+
+/** Präfixe, die „ort"/„strasse" als EREIGNIS-Ort ausweisen (Fund-, Tat-, Geburtsort …) — dann ist es NICHT die
+ *  Anschrift der Person und bekommt bewusst KEIN address-Token. */
+const ORT_EREIGNIS_AUSNAHME =
+  /(fund|tat|geburts|unfall|ereignis|vorfall|schaden|arbeits|dienst|liege|lager|abhol|liefer)/;
+
+/** WCAG 2.2 SC 1.3.5 (Eingabezweck / Identify Input Purpose): der HTML-`autocomplete`-Token für ein Feld.
+ *  EINE Wahrheit für die Zweck-Bestimmung: EXPLIZIT gesetztes `feld.autoComplete` gewinnt (der Zweck als DATEN — ""
+ *  unterdrückt bewusst); sonst typ-getrieben (plz→postal-code, email→email, tel→tel); sonst KONSERVATIV aus dem
+ *  letzten Segment des Feldnamens abgeleitet. Kein Treffer ⇒ `undefined` (kein Token). GENERISCH + anti-overfit:
+ *  ein Feld ohne Personenbezug (z. B. „objekt.name", „ereignis.ort") erhält KEINEN Token. */
+export function feldAutoComplete(feld: FeldDef): string | undefined {
+  if (feld.autoComplete !== undefined) return feld.autoComplete || undefined; // explizit (leer ⇒ bewusst keiner)
+  if (feld.typ === "plz") return "postal-code";
+  if (feld.typ === "email") return "email";
+  if (feld.typ === "tel") return "tel";
+  const segment = feld.name.split(".").pop()?.toLowerCase() ?? "";
+  const token = PERSONEN_AUTOCOMPLETE[segment];
+  if (!token) return undefined;
+  if (
+    (token === "address-level2" || token === "street-address") &&
+    ORT_EREIGNIS_AUSNAHME.test(feld.name.toLowerCase())
+  ) {
+    return undefined; // Ereignis-Ort (Fund-/Tat-/Geburtsort), nicht die Anschrift der Person
+  }
+  return token;
+}

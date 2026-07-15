@@ -620,7 +620,9 @@ export const WorkflowKeyboardMove: Story = {
     // Escape-Handler in dieser Umgebung reagiert nur auf VERTRAUENSWÜRDIGE (echte) Tastaturereignisse
     // — `userEvent.keyboard("{Escape}")` (untrusted, per JS ausgelöst) ließ den Dialog real
     // beobachtet logisch offen (`data-state="open"`), während ein Klick zuverlässig schließt.
-    await userEvent.click(within(sheet).getByRole("button", { name: "Close" }));
+    await userEvent.click(
+      within(sheet).getByRole("button", { name: "Schließen" }),
+    );
     // Radix animiert das Schließen (200ms) und hält `aria-hidden` auf dem Board darunter bis zum
     // Ende der Exit-Transition — `findByRole` pollt, bis das Board wieder abfragbar ist.
     const targetColumn = await canvas.findByRole("region", {
