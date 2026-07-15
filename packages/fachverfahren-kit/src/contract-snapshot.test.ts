@@ -113,6 +113,29 @@ describe("toContractSnapshot — Business-Logik als ECHTE Zeilen, nicht '[functi
     expect(snap.codelisten).toBeUndefined();
   });
 
+  it("projiziert deklarative Automationsregeln ohne Laufzeitverhalten", () => {
+    const snap = toContractSnapshot({
+      ...basis,
+      automationsregeln: [
+        {
+          id: "prioritaet-bei-eingang",
+          trigger: { art: "beim-eingang" },
+          wenn: { feld: "antrag.dringend", op: "==", wert: true },
+          dann: [{ art: "setze-prioritaet", wert: "hoch" }],
+        },
+      ],
+    });
+
+    expect(snap.automationsregeln).toEqual([
+      {
+        id: "prioritaet-bei-eingang",
+        trigger: { art: "beim-eingang" },
+        wenn: { feld: "antrag.dringend", op: "==", wert: true },
+        dann: [{ art: "setze-prioritaet", wert: "hoch" }],
+      },
+    ]);
+  });
+
   it("bleibt für bestehende Configs (nur berechne) unverändert kompatibel", () => {
     const snap = toContractSnapshot({
       ...basis,
