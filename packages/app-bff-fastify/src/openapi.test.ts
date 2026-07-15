@@ -11,6 +11,7 @@ import {
 import {
   InMemoryAppStore,
   InMemoryCaseStore,
+  InMemoryTaskStore,
 } from "@senticor/app-store-postgres";
 import { createInMemoryProcedureRegistry } from "@senticor/public-sector-sdk";
 import { registerOpenApiCollector, registerOpenApiRoute } from "./openapi.js";
@@ -33,6 +34,7 @@ async function buildPair({ collectorFirst = true } = {}): Promise<{
   const bffOptions = {
     appStore: new InMemoryAppStore(),
     caseStore: new InMemoryCaseStore(),
+    taskStore: new InMemoryTaskStore(),
     procedureRegistry: createInMemoryProcedureRegistry([]),
     sessionResolver: new NoSessionResolver(),
     auditSink: new MemoryAuditSink(),
@@ -49,7 +51,7 @@ async function buildPair({ collectorFirst = true } = {}): Promise<{
 }
 
 describe("OpenAPI intern-only", () => {
-  it("liefert intern ein Dokument mit ALLEN zehn BFF-Operationen", async () => {
+  it("liefert intern ein Dokument mit ALLEN vierzehn BFF-Operationen", async () => {
     const { internalApp } = await buildPair();
     const response = await internalApp.inject({
       method: "GET",
@@ -63,10 +65,13 @@ describe("OpenAPI intern-only", () => {
       "/api/capabilities",
       "/api/cases",
       "/api/cases/{id}",
+      "/api/cases/{id}/progress",
+      "/api/cases/{id}/tasks",
       "/api/cases/{id}/transitions",
       "/api/mailbox",
       "/api/preferences",
       "/api/session",
+      "/api/tasks/{id}",
     ]);
     const operations = Object.values(
       doc.paths as Record<string, Record<string, unknown>>,
@@ -78,6 +83,10 @@ describe("OpenAPI intern-only", () => {
       "get",
       "get",
       "get",
+      "get",
+      "get",
+      "patch",
+      "post",
       "post",
       "post",
       "post",

@@ -32,11 +32,13 @@ import {
   createAuthStoreFromEnv,
   createCaseStoreFromEnv,
   createKanbanStoreFromEnv,
+  createTaskStoreFromEnv,
   type AppStore,
   type AuditStore,
   type AuthStore,
   type CaseStore,
   type KanbanStore,
+  type TaskStore,
 } from "@senticor/app-store-postgres";
 import {
   createInMemoryProcedureRegistry,
@@ -89,6 +91,7 @@ interface AppStores {
 interface BffWiring {
   appStore: AppStore;
   caseStore: CaseStore;
+  taskStore: TaskStore;
   procedureRegistry: ProcedureRegistry;
   sessionResolver: SessionResolver;
   auditSink: AuditSink;
@@ -134,6 +137,7 @@ export function buildPublicServer({
   auditStore = createAuditStoreFromEnv(),
   appStore = createAppStoreFromEnv(),
   caseStore = createCaseStoreFromEnv(),
+  taskStore = createTaskStoreFromEnv(),
   // Verfahren-Registry: DEFAULT LEER (fail-closed — ohne Verfahren kein Fall). Der Consumer/Generator
   // (leistung.config → ProcedureVersion, ADR-0002) füllt sie; in PROD kann chos sie hinter der Naht liefern.
   procedureRegistry = createInMemoryProcedureRegistry([]),
@@ -152,6 +156,7 @@ export function buildPublicServer({
   auditStore?: AuditStore;
   appStore?: AppStore;
   caseStore?: CaseStore;
+  taskStore?: TaskStore;
   procedureRegistry?: ProcedureRegistry;
   sessionResolver?: SessionResolver;
   auditSink?: AuditSink;
@@ -170,6 +175,7 @@ export function buildPublicServer({
         {
           appStore,
           caseStore,
+          taskStore,
           procedureRegistry,
           // Default: der ECHTE Cookie/AuthStore-Flow (deny-by-default) — Tests
           // injizieren Stubs über den Parameter.
@@ -218,6 +224,7 @@ export async function startRuntime(
   const bff: BffWiring = {
     appStore: createAppStoreFromEnv(env),
     caseStore: createCaseStoreFromEnv(env),
+    taskStore: createTaskStoreFromEnv(env),
     procedureRegistry: createInMemoryProcedureRegistry([]),
     sessionResolver: createCookieSessionResolver(authStore),
     auditSink: createAuditSinkFromEnv(env),

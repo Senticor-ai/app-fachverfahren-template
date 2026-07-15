@@ -11,8 +11,10 @@ import {
 import {
   InMemoryAppStore,
   InMemoryCaseStore,
+  InMemoryTaskStore,
   type AppStore,
   type CaseStore,
+  type TaskStore,
 } from "@senticor/app-store-postgres";
 import {
   createInMemoryProcedureRegistry,
@@ -51,26 +53,30 @@ export async function buildBffApp({
   session,
   appStore = new InMemoryAppStore(),
   caseStore = new InMemoryCaseStore(),
+  taskStore = new InMemoryTaskStore(),
   procedureRegistry = createInMemoryProcedureRegistry([]),
 }: {
   session?: ResolvedSession;
   appStore?: AppStore;
   caseStore?: CaseStore;
+  taskStore?: TaskStore;
   procedureRegistry?: ProcedureRegistry;
 } = {}): Promise<{
   app: FastifyInstance;
   auditSink: MemoryAuditSink;
   appStore: AppStore;
   caseStore: CaseStore;
+  taskStore: TaskStore;
 }> {
   const auditSink = new MemoryAuditSink();
   const app = fastify({ logger: false });
   await app.register(appBff, {
     appStore,
     caseStore,
+    taskStore,
     procedureRegistry,
     sessionResolver: session ? stubResolver(session) : new NoSessionResolver(),
     auditSink,
   });
-  return { app, auditSink, appStore, caseStore };
+  return { app, auditSink, appStore, caseStore, taskStore };
 }

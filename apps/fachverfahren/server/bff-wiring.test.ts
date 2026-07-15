@@ -203,10 +203,13 @@ describe("BFF-Verdrahtung im App-Server", () => {
         "/api/capabilities",
         "/api/cases",
         "/api/cases/{id}",
+        "/api/cases/{id}/progress",
+        "/api/cases/{id}/tasks",
         "/api/cases/{id}/transitions",
         "/api/mailbox",
         "/api/preferences",
         "/api/session",
+        "/api/tasks/{id}",
       ]);
     } finally {
       await publicApp.close();

@@ -18,6 +18,7 @@ import {
   InMemoryAuthStore,
   InMemoryCaseStore,
   InMemoryKanbanStore,
+  InMemoryTaskStore,
 } from "@senticor/app-store-postgres";
 import { createInMemoryProcedureRegistry } from "@senticor/public-sector-sdk";
 import fastify, { type FastifyInstance } from "fastify";
@@ -86,6 +87,7 @@ async function buildAppAndCollect(): Promise<CollectedRoute[]> {
   await app.register(appBff, {
     appStore: new InMemoryAppStore(),
     caseStore: new InMemoryCaseStore(),
+    taskStore: new InMemoryTaskStore(),
     procedureRegistry: createInMemoryProcedureRegistry([]),
     sessionResolver: new NoSessionResolver(),
     auditSink: new MemoryAuditSink(),
@@ -132,8 +134,28 @@ describe("Routen-Klassifizierung (config.auth)", () => {
         },
         { method: "GET", url: "/api/cases/:id", policy: "rbac:case.read" },
         {
+          method: "GET",
+          url: "/api/cases/:id/progress",
+          policy: "rbac:case.read",
+        },
+        {
+          method: "GET",
+          url: "/api/cases/:id/tasks",
+          policy: "rbac:case.read",
+        },
+        {
+          method: "POST",
+          url: "/api/cases/:id/tasks",
+          policy: "rbac:case.decision.prepare",
+        },
+        {
           method: "POST",
           url: "/api/cases/:id/transitions",
+          policy: "rbac:case.decision.prepare",
+        },
+        {
+          method: "PATCH",
+          url: "/api/tasks/:id",
           policy: "rbac:case.decision.prepare",
         },
         {

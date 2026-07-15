@@ -510,6 +510,501 @@
         "tags": ["cases"]
       }
     },
+    "/api/cases/{id}/progress": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "ziele": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "done": { "minimum": 0, "type": "integer" },
+                          "percent": {
+                            "maximum": 100,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "taskId": { "minLength": 1, "type": "string" },
+                          "title": { "minLength": 1, "type": "string" },
+                          "total": { "minimum": 0, "type": "integer" }
+                        },
+                        "required": [
+                          "taskId",
+                          "title",
+                          "total",
+                          "done",
+                          "percent"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["ziele"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Fortschritt je Ziel (compute-on-read aus den checkliste-item-Schritten)",
+        "tags": ["tasks"]
+      }
+    },
+    "/api/cases/{id}/tasks": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "taskKind",
+            "required": false,
+            "schema": { "minLength": 1, "type": "string" }
+          },
+          {
+            "in": "query",
+            "name": "parentTaskId",
+            "required": false,
+            "schema": { "minLength": 1, "type": "string" }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": { "maximum": 500, "minimum": 1, "type": "integer" }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "tasks": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "assignedTo": {
+                            "anyOf": [
+                              { "minLength": 1, "type": "string" },
+                              { "type": "null" }
+                            ]
+                          },
+                          "caseId": { "minLength": 1, "type": "string" },
+                          "data": {
+                            "additionalProperties": {},
+                            "type": "object"
+                          },
+                          "dueAt": {
+                            "anyOf": [
+                              { "minLength": 1, "type": "string" },
+                              { "type": "null" }
+                            ]
+                          },
+                          "parentTaskId": {
+                            "anyOf": [
+                              { "minLength": 1, "type": "string" },
+                              { "type": "null" }
+                            ]
+                          },
+                          "sortRank": { "type": "string" },
+                          "state": {
+                            "anyOf": [
+                              { "enum": ["open"], "type": "string" },
+                              { "enum": ["claimed"], "type": "string" },
+                              { "enum": ["completed"], "type": "string" },
+                              { "enum": ["cancelled"], "type": "string" }
+                            ]
+                          },
+                          "taskId": { "minLength": 1, "type": "string" },
+                          "taskKind": { "minLength": 1, "type": "string" },
+                          "title": { "minLength": 1, "type": "string" },
+                          "version": { "minimum": 1, "type": "integer" }
+                        },
+                        "required": [
+                          "taskId",
+                          "caseId",
+                          "title",
+                          "state",
+                          "assignedTo",
+                          "dueAt",
+                          "taskKind",
+                          "parentTaskId",
+                          "data",
+                          "sortRank",
+                          "version"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["tasks"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Aufgaben/Ziele/Schritte/Termine einer Akte lesen",
+        "tags": ["tasks"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "assignedTo": { "minLength": 1, "type": "string" },
+                  "data": { "additionalProperties": {}, "type": "object" },
+                  "dueAt": { "minLength": 1, "type": "string" },
+                  "parentTaskId": { "minLength": 1, "type": "string" },
+                  "sortRank": { "type": "string" },
+                  "taskKind": { "minLength": 1, "type": "string" },
+                  "title": { "minLength": 1, "type": "string" }
+                },
+                "required": ["title"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "assignedTo": {
+                      "anyOf": [
+                        { "minLength": 1, "type": "string" },
+                        { "type": "null" }
+                      ]
+                    },
+                    "caseId": { "minLength": 1, "type": "string" },
+                    "data": { "additionalProperties": {}, "type": "object" },
+                    "dueAt": {
+                      "anyOf": [
+                        { "minLength": 1, "type": "string" },
+                        { "type": "null" }
+                      ]
+                    },
+                    "parentTaskId": {
+                      "anyOf": [
+                        { "minLength": 1, "type": "string" },
+                        { "type": "null" }
+                      ]
+                    },
+                    "sortRank": { "type": "string" },
+                    "state": {
+                      "anyOf": [
+                        { "enum": ["open"], "type": "string" },
+                        { "enum": ["claimed"], "type": "string" },
+                        { "enum": ["completed"], "type": "string" },
+                        { "enum": ["cancelled"], "type": "string" }
+                      ]
+                    },
+                    "taskId": { "minLength": 1, "type": "string" },
+                    "taskKind": { "minLength": 1, "type": "string" },
+                    "title": { "minLength": 1, "type": "string" },
+                    "version": { "minimum": 1, "type": "integer" }
+                  },
+                  "required": [
+                    "taskId",
+                    "caseId",
+                    "title",
+                    "state",
+                    "assignedTo",
+                    "dueAt",
+                    "taskKind",
+                    "parentTaskId",
+                    "data",
+                    "sortRank",
+                    "version"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Aufgabe/Ziel/Schritt/Termin einer Akte anlegen",
+        "tags": ["tasks"]
+      }
+    },
     "/api/cases/{id}/transitions": {
       "post": {
         "parameters": [
@@ -1331,6 +1826,198 @@
         },
         "summary": "Aufgelöste Sitzung (SDK-RBAC-Sicht) lesen",
         "tags": ["session"]
+      }
+    },
+    "/api/tasks/{id}": {
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "assignedTo": {
+                    "anyOf": [
+                      { "minLength": 1, "type": "string" },
+                      { "type": "null" }
+                    ]
+                  },
+                  "dataPatch": { "additionalProperties": {}, "type": "object" },
+                  "dueAt": {
+                    "anyOf": [
+                      { "minLength": 1, "type": "string" },
+                      { "type": "null" }
+                    ]
+                  },
+                  "expectedVersion": { "minimum": 1, "type": "integer" },
+                  "sortRank": { "type": "string" },
+                  "state": {
+                    "anyOf": [
+                      { "enum": ["open"], "type": "string" },
+                      { "enum": ["claimed"], "type": "string" },
+                      { "enum": ["completed"], "type": "string" },
+                      { "enum": ["cancelled"], "type": "string" }
+                    ]
+                  },
+                  "title": { "minLength": 1, "type": "string" }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "assignedTo": {
+                      "anyOf": [
+                        { "minLength": 1, "type": "string" },
+                        { "type": "null" }
+                      ]
+                    },
+                    "caseId": { "minLength": 1, "type": "string" },
+                    "data": { "additionalProperties": {}, "type": "object" },
+                    "dueAt": {
+                      "anyOf": [
+                        { "minLength": 1, "type": "string" },
+                        { "type": "null" }
+                      ]
+                    },
+                    "parentTaskId": {
+                      "anyOf": [
+                        { "minLength": 1, "type": "string" },
+                        { "type": "null" }
+                      ]
+                    },
+                    "sortRank": { "type": "string" },
+                    "state": {
+                      "anyOf": [
+                        { "enum": ["open"], "type": "string" },
+                        { "enum": ["claimed"], "type": "string" },
+                        { "enum": ["completed"], "type": "string" },
+                        { "enum": ["cancelled"], "type": "string" }
+                      ]
+                    },
+                    "taskId": { "minLength": 1, "type": "string" },
+                    "taskKind": { "minLength": 1, "type": "string" },
+                    "title": { "minLength": 1, "type": "string" },
+                    "version": { "minimum": 1, "type": "integer" }
+                  },
+                  "required": [
+                    "taskId",
+                    "caseId",
+                    "title",
+                    "state",
+                    "assignedTo",
+                    "dueAt",
+                    "taskKind",
+                    "parentTaskId",
+                    "data",
+                    "sortRank",
+                    "version"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Aufgabe patchen (Metadaten + data-Merge, Optimistic-Locking)",
+        "tags": ["tasks"]
       }
     }
   },

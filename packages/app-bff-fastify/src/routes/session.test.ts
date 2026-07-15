@@ -6,6 +6,7 @@ import { MemoryAuditSink } from "@senticor/app-runtime-fastify";
 import {
   InMemoryAppStore,
   InMemoryCaseStore,
+  InMemoryTaskStore,
 } from "@senticor/app-store-postgres";
 import { createInMemoryProcedureRegistry } from "@senticor/public-sector-sdk";
 import { appBff } from "../plugin.js";
@@ -130,6 +131,7 @@ describe("ErrorHandler-Kapselung", () => {
     await app.register(appBff, {
       appStore: new InMemoryAppStore(),
       caseStore: new InMemoryCaseStore(),
+      taskStore: new InMemoryTaskStore(),
       procedureRegistry: createInMemoryProcedureRegistry([]),
       sessionResolver: stubResolver(citizenSession()),
       auditSink,

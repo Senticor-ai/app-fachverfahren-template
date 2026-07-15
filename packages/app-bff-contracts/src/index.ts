@@ -45,4 +45,22 @@ export {
   type CaseListQueryDto,
   type CaseTransitionRequestDto,
 } from "./cases.js";
+export {
+  ProgressDtoSchema,
+  TaskCreateRequestSchema,
+  TaskDtoSchema,
+  TaskIdParamsSchema,
+  TaskListDtoSchema,
+  TaskListQuerySchema,
+  TaskPatchRequestSchema,
+  TaskStateSchema,
+  type ProgressDto,
+  type TaskCreateRequestDto,
+  type TaskDto,
+  type TaskIdParamsDto,
+  type TaskListDto,
+  type TaskListQueryDto,
+  type TaskPatchRequestDto,
+  type TaskStateDto,
+} from "./tasks.js";
 export { openApiInfo, openApiTags } from "./openapi.js";
