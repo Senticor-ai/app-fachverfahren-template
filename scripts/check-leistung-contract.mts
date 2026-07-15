@@ -16,6 +16,7 @@ import {
   toContractSnapshot,
   type LeistungContractSnapshot,
 } from "../packages/fachverfahren-kit/src/contract-snapshot.ts";
+import { validateProzessGraph } from "../packages/fachverfahren-kit/src/lib/process-graph.ts";
 import { leistungConfig } from "../apps/fachverfahren/src/leistung.config.ts";
 
 const CONTRACT_URL = new URL(
@@ -130,6 +131,18 @@ if (!sm || !Array.isArray(sm.states) || sm.states.length < 1) {
     if (!gesehen.has(s.key))
       fail(`Zustand "${s.key}" ist vom Initialzustand aus nicht erreichbar.`);
   }
+}
+
+// WORKFLOW (additiv, fail-closed): jede Prozess-Definition MUSS gegen die StatusMachine deploy-validieren. Fehlt
+// `prozesse` (bestehende Verfahren), läuft die Schleife nicht — Verhalten unverändert.
+for (const prozess of snap.prozesse ?? []) {
+  const pfehler = validateProzessGraph(prozess, snap.statusMachine);
+  for (const pf of pfehler)
+    fail(
+      `Prozess "${prozess.id}": ${pf.code}${pf.knotenId ? ` (Knoten ${pf.knotenId})` : ""}${
+        pf.kanteId ? ` (Kante ${pf.kanteId})` : ""
+      } — ${pf.detail}`,
+    );
 }
 
 if (!Array.isArray(snap.detailSektionen) || snap.detailSektionen.length < 1)

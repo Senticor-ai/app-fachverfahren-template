@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://senticor.local/schemas/process-definition.schema.json",
+  "title": "ProzessDefinition (Workflow-IR)",
+  "description": "Begrenzte, BPMN-inspirierte Prozess-Definition als Daten. Kein BPMN-Vollstandard, kein XML-Import oder -Export und keine Prozess-Engine. Der Graph kann gegen die StatusMachine des Verfahrens validiert und formularbasiert bearbeitet werden.",
+  "type": "object",
+  "required": ["id", "version", "knoten", "kanten"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "version": { "type": "integer", "minimum": 1 },
+    "label": { "type": "string" },
+    "knoten": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/knoten" }
+    },
+    "kanten": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/kante" }
+    }
+  },
+  "$defs": {
+    "knoten": {
+      "type": "object",
+      "required": ["id", "typ"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "typ": {
+          "description": "In dieser Version validierbar: start|ende|userTask|serviceTask|exclusiveGateway. Weitere typisierte Werte werden vom Graph-Validator abgelehnt.",
+          "enum": [
+            "start",
+            "ende",
+            "userTask",
+            "serviceTask",
+            "exclusiveGateway",
+            "parallelGateway",
+            "timerEvent",
+            "messageEvent",
+            "signalEvent",
+            "boundaryEvent",
+            "subprozess"
+          ]
+        },
+        "label": { "type": "string" },
+        "rollen": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "userTask: zustaendige Rollen (Teilmenge der Rollen der gemappten Transition)."
+        },
+        "catalogAction": {
+          "type": "string",
+          "description": "userTask/serviceTask: Referenz auf den Ziel-Status einer StatusMachine-Transition."
+        },
+        "vierAugen": {
+          "type": "boolean",
+          "description": "MUSS bijektiv zur vierAugen-Angabe der gemappten Transition sein."
+        }
+      },
+      "additionalProperties": false
+    },
+    "kante": {
+      "type": "object",
+      "required": ["id", "von", "nach"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "von": { "type": "string", "minLength": 1 },
+        "nach": { "type": "string", "minLength": 1 },
+        "guard": {
+          "description": "Waechter (Bedingung) — nur an Nicht-Default-Zweigen eines exclusiveGateway; dort Pflicht.",
+          "type": "object"
+        },
+        "default": {
+          "type": "boolean",
+          "description": "Markiert den Default-Flow eines exclusiveGateway (genau EINER je Gateway)."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
