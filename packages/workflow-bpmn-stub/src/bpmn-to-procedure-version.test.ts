@@ -277,3 +277,131 @@ describe("bpmnToProcedureVersion", () => {
     expect(looped.version).toBe(5);
   });
 });
+
+// ── Akzeptanz für die synthetische Beispiel-BPMN (docs/examples/integrationsberatung) ──
+// Belegt „generierbar / eine Wahrheit": dieser <process> ist der Kern der ausgelieferten
+// docs/examples/integrationsberatung/integrationsmanagement.bpmn und muss die in
+// integrationsmanagement.config.yaml dokumentierte ProcedureVersion ergeben. Deckt den wiederaufnehmbaren,
+// ZYKLISCHEN Fall (pausiert->aktiv, abgeschlossen->aktiv) sowie einen Vier-Augen-Übergang via
+// Extension-Attribut ab. Rechtsgrundlagen kommen aus der Konfiguration, NICHT aus der BPMN.
+const EXAMPLE_BPMN = `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions
+  xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:senticor="https://senticor.ai/schema/bpmn-ext"
+  id="integrationsmanagement-definitions"
+  targetNamespace="https://senticor.ai/example/integrationsmanagement">
+  <bpmn:process id="integrationsmanagement" name="Integrationsmanagement" isExecutable="true">
+    <bpmn:startEvent id="s_aufgenommen" name="aufgenommen" />
+    <bpmn:userTask id="s_aktiv" name="aktiv" />
+    <bpmn:userTask id="s_pausiert" name="pausiert" />
+    <bpmn:userTask id="s_abgeschlossen" name="abgeschlossen" />
+
+    <bpmn:sequenceFlow id="f_aktivieren" name="aktivieren" sourceRef="s_aufgenommen" targetRef="s_aktiv" />
+    <bpmn:sequenceFlow id="f_pausieren" name="pausieren" sourceRef="s_aktiv" targetRef="s_pausiert" />
+    <bpmn:sequenceFlow id="f_fortsetzen" name="fortsetzen" sourceRef="s_pausiert" targetRef="s_aktiv" />
+    <bpmn:sequenceFlow id="f_abschliessen" name="abschließen" sourceRef="s_aktiv" targetRef="s_abgeschlossen" senticor:requiresFourEyes="true" />
+    <bpmn:sequenceFlow id="f_wiederaufnehmen" name="wiederaufnehmen" sourceRef="s_abgeschlossen" targetRef="s_aktiv" />
+  </bpmn:process>
+</bpmn:definitions>`;
+const EXAMPLE_LEGAL_BASIS_IDS = [
+  "de-aufenthg-43",
+  "de-aufenthg-44",
+  "de-aufenthg-44a",
+  "de-aufenthg-45a",
+  "de-vwv-integrationsmanagement-2023",
+  "de-flueag-17",
+  "de-flueag-18",
+];
+
+describe("integrationsmanagement-Beispiel (docs/examples)", () => {
+  it("leitet die dokumentierte, wiederaufnehmbare Zustandsmaschine aus der versendeten BPMN ab", () => {
+    const procedureVersion = bpmnToProcedureVersion(EXAMPLE_BPMN, {
+      procedureId: "integrationsmanagement",
+      version: "2026.1",
+      legalBasisIds: EXAMPLE_LEGAL_BASIS_IDS,
+    });
+
+    expect(procedureVersion.effectiveFrom).toBe(DEFAULT_EFFECTIVE_FROM);
+    expect(procedureVersion.legalBasisIds).toEqual(EXAMPLE_LEGAL_BASIS_IDS);
+    expect(procedureVersion.allowedStates).toEqual([
+      "aufgenommen",
+      "aktiv",
+      "pausiert",
+      "abgeschlossen",
+    ]);
+    expect(procedureVersion.allowedTransitions).toEqual([
+      {
+        from: "aufgenommen",
+        to: "aktiv",
+        action: "aktivieren",
+        requiredPermission: "case.decision.prepare",
+      },
+      {
+        from: "aktiv",
+        to: "pausiert",
+        action: "pausieren",
+        requiredPermission: "case.decision.prepare",
+      },
+      // Fall-Abschluss ist ein Vier-Augen-Übergang (senticor:requiresFourEyes="true").
+      {
+        from: "aktiv",
+        to: "abgeschlossen",
+        action: "abschließen",
+        requiredPermission: "case.decision.prepare",
+        requiresFourEyes: true,
+      },
+      {
+        from: "pausiert",
+        to: "aktiv",
+        action: "fortsetzen",
+        requiredPermission: "case.decision.prepare",
+      },
+      {
+        from: "abgeschlossen",
+        to: "aktiv",
+        action: "wiederaufnehmen",
+        requiredPermission: "case.decision.prepare",
+      },
+    ]);
+  });
+
+  it("treibt den vollständigen Lebenszyklus inkl. Pause und Wiederaufnahme über transitionCase", () => {
+    const procedureVersion = bpmnToProcedureVersion(EXAMPLE_BPMN, {
+      procedureId: "integrationsmanagement",
+      version: "2026.1",
+      legalBasisIds: EXAMPLE_LEGAL_BASIS_IDS,
+    });
+
+    let current: Case = {
+      caseId: "case.integration.1",
+      procedureId: "integrationsmanagement",
+      procedureVersion: "2026.1",
+      tenantId: "tenant.example",
+      authorityId: "authority.example",
+      jurisdictionId: "de",
+      state: "aufgenommen",
+      version: 0,
+      subjectIds: ["subject.1"],
+      openedAt: "2026-06-01T00:00:00.000Z",
+    };
+
+    const lifecycle: Array<[string, string]> = [
+      ["aktivieren", "aktiv"],
+      ["pausieren", "pausiert"],
+      ["fortsetzen", "aktiv"],
+      ["abschließen", "abgeschlossen"],
+      ["wiederaufnehmen", "aktiv"],
+    ];
+    for (const [action, expectedState] of lifecycle) {
+      const expectedVersion = current.version;
+      current = transitionCase(
+        current,
+        procedureVersion,
+        action,
+        expectedVersion,
+      );
+      expect(current.state).toBe(expectedState);
+      expect(current.version).toBe(expectedVersion + 1);
+    }
+  });
+});

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Synthetisches BPMN-Beispiel: die Fall-Zustandsmaschine des Integrationsmanagements.
+
+  Deckt das ausführbare BPMN-Kern-Subset der Template-Stub-Engine ab
+  (packages/workflow-bpmn-stub · bpmnToProcedureVersion, ADR-0002). Aus dieser Datei leitet der Stub
+  DETERMINISTISCH eine SDK-`ProcedureVersion` (allowedStates + allowedTransitions) ab — es entsteht KEIN
+  zweites, konkurrierendes Prozessmodell. Rechtsgrundlagen (legalBasisIds) werden NICHT aus der BPMN
+  erfunden, sondern kommen aus der Verfahrenskonfiguration (siehe integrationsmanagement.config.yaml).
+
+  Zustandsmaschine (wiederaufnehmbar):
+    aufgenommen --aktivieren--> aktiv
+    aktiv       --pausieren--> pausiert
+    pausiert    --fortsetzen--> aktiv        (Wiederaufnahme aus Pause)
+    aktiv       --abschließen--> abgeschlossen   (Vier-Augen: senticor:requiresFourEyes="true")
+    abgeschlossen --wiederaufnehmen--> aktiv  (Wiederaufnahme eines abgeschlossenen Falls)
+
+  Alles synthetisch — keine echten Personen/PII, keine IP.
+-->
+<bpmn:definitions
+  xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:senticor="https://senticor.ai/schema/bpmn-ext"
+  id="integrationsmanagement-definitions"
+  targetNamespace="https://senticor.ai/example/integrationsmanagement">
+  <bpmn:process id="integrationsmanagement" name="Integrationsmanagement" isExecutable="true">
+    <bpmn:startEvent id="s_aufgenommen" name="aufgenommen" />
+    <bpmn:userTask id="s_aktiv" name="aktiv" />
+    <bpmn:userTask id="s_pausiert" name="pausiert" />
+    <bpmn:userTask id="s_abgeschlossen" name="abgeschlossen" />
+
+    <bpmn:sequenceFlow id="f_aktivieren" name="aktivieren" sourceRef="s_aufgenommen" targetRef="s_aktiv" />
+    <bpmn:sequenceFlow id="f_pausieren" name="pausieren" sourceRef="s_aktiv" targetRef="s_pausiert" />
+    <bpmn:sequenceFlow id="f_fortsetzen" name="fortsetzen" sourceRef="s_pausiert" targetRef="s_aktiv" />
+    <bpmn:sequenceFlow id="f_abschliessen" name="abschließen" sourceRef="s_aktiv" targetRef="s_abgeschlossen" senticor:requiresFourEyes="true" />
+    <bpmn:sequenceFlow id="f_wiederaufnehmen" name="wiederaufnehmen" sourceRef="s_abgeschlossen" targetRef="s_aktiv" />
+  </bpmn:process>
+</bpmn:definitions>

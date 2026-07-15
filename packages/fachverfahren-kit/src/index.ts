@@ -147,6 +147,8 @@ export * from "./components/DescriptionList.js";
 export * from "./components/SummaryList.js";
 export * from "./components/Timeline.js";
 export * from "./components/Callout.js";
+// ── Dossier/Fallakte (Case-Management): die generische 360°-Sicht (Stammdaten · Ziele · Termine · Notizen · Verlauf). ──
+export * from "./components/DossierAkte360.js";
 
 // ── KI-Anbindung (Port-only, EU-AI-Act): transparente Assistenz + Chat-Port + Agenten-UX-Primitives ──
 // Vendor-neutral, kein Netz/Modell im Kit — echte Modelle docken an die Ports an. Mensch entscheidet (reviewErforderlich).
