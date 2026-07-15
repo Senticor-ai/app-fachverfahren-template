@@ -39,7 +39,7 @@
     "test:storybook:coverage": "vitest run --project storybook --coverage",
     "test:platform-contracts": "vitest run packages/platform-contracts",
     "test:provider-codesphere": "vitest run packages/provider-codesphere",
-    "test:service-portability": "vitest run packages/provider-local packages/provider-codesphere packages/provider-dvc-generic",
+    "test:service-portability": "vitest run packages/provider-local packages/provider-openai-compatible packages/provider-codesphere packages/provider-dvc-generic",
     "test:api-compatibility": "vitest run packages/platform-contracts",
     "test:event-compatibility": "vitest run packages/public-sector-sdk",
     "test:authorization": "vitest run packages/public-sector-sdk",
