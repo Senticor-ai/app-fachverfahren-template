@@ -47,6 +47,37 @@ export class AppErrorBoundary extends Component<
   render(): ReactNode {
     const { error } = this.state;
     if (!error) return this.props.children;
+    // Token-frei (das CSS kann kaputt sein), aber theme-bewusst: die App schaltet Dark über die `.dark`-Klasse am
+    // <html>; die lesen wir direkt, sonst leuchtet der Crash-Screen im Dark-Modus weiß. Fallback bei fehlender Klasse
+    // = System-Präferenz. So bleibt der Auffang in BEIDEN Themes lesbar (Nutzer-Direktive „immer light UND dark").
+    const dark =
+      typeof document !== "undefined" &&
+      (document.documentElement.classList.contains("dark") ||
+        (!document.documentElement.classList.contains("light") &&
+          typeof window !== "undefined" &&
+          !!window.matchMedia?.("(prefers-color-scheme: dark)").matches));
+    const c = dark
+      ? {
+          fg: "#e2e8f0",
+          bg: "#0f172a",
+          muted: "#94a3b8",
+          codeBg: "#334155",
+          preBg: "#020617",
+          preBorder: "#1e293b",
+        }
+      : {
+          fg: "#1e293b",
+          bg: "#f8fafc",
+          muted: "#475569",
+          codeBg: "#e2e8f0",
+          preBg: "#0f172a",
+          preBorder: "#0f172a",
+        };
+    const codeStyle = {
+      background: c.codeBg,
+      padding: "0 0.25rem",
+      borderRadius: 3,
+    };
     return (
       <div
         role="alert"
@@ -59,8 +90,8 @@ export class AppErrorBoundary extends Component<
           gap: "0.75rem",
           padding: "2rem",
           fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
-          color: "#1e293b",
-          background: "#f8fafc",
+          color: c.fg,
+          background: c.bg,
           textAlign: "center",
         }}
       >
@@ -72,49 +103,23 @@ export class AppErrorBoundary extends Component<
             maxWidth: "40rem",
             fontSize: "0.875rem",
             lineHeight: 1.6,
-            color: "#475569",
+            color: c.muted,
           }}
         >
           Ein Baustein ist beim Rendern auf einen Fehler gelaufen — häufig, weil
-          die generierte{" "}
-          <code
-            style={{
-              background: "#e2e8f0",
-              padding: "0 0.25rem",
-              borderRadius: 3,
-            }}
-          >
-            leistung.config.ts
-          </code>{" "}
-          nicht zum Kit-Vertrag passt (z. B. fehlt{" "}
-          <code
-            style={{
-              background: "#e2e8f0",
-              padding: "0 0.25rem",
-              borderRadius: 3,
-            }}
-          >
-            antrag.steps
-          </code>{" "}
-          oder{" "}
-          <code
-            style={{
-              background: "#e2e8f0",
-              padding: "0 0.25rem",
-              borderRadius: 3,
-            }}
-          >
-            register
-          </code>
-          ).
+          die generierte <code style={codeStyle}>leistung.config.ts</code> nicht
+          zum Kit-Vertrag passt (z. B. fehlt{" "}
+          <code style={codeStyle}>antrag.steps</code> oder{" "}
+          <code style={codeStyle}>register</code>).
         </div>
         <pre
           style={{
             maxWidth: "40rem",
             maxHeight: "12rem",
             overflow: "auto",
-            background: "#0f172a",
+            background: c.preBg,
             color: "#e2e8f0",
+            border: `1px solid ${c.preBorder}`,
             padding: "0.75rem 1rem",
             borderRadius: 8,
             fontSize: "0.75rem",
@@ -124,7 +129,7 @@ export class AppErrorBoundary extends Component<
         >
           {error.message}
         </pre>
-        <div style={{ fontSize: "0.8125rem", color: "#475569" }}>
+        <div style={{ fontSize: "0.8125rem", color: c.muted }}>
           In der Builder-Konsole „Problem melden" wählen → die Agenten beheben
           die generierte App.
         </div>

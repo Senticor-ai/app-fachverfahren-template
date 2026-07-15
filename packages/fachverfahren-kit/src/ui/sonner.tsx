@@ -7,7 +7,12 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       className="toaster group"
+      // WCAG 2.2.1 (Anpassbare Zeitvorgaben): ein sichtbarer Schließen-Button (manuelle Kontrolle) + eine großzügigere
+      // Default-Dauer als sonners 4 s; sonner pausiert den Timer zusätzlich bei Hover/Fokus. Essenzielle Toasts können
+      // je Aufruf `duration: Infinity` setzen. Beides VOR {...props}, damit die App es überschreiben kann.
+      closeButton
       toastOptions={{
+        duration: 6000,
         classNames: {
           toast:
             "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",

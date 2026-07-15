@@ -179,13 +179,15 @@ export function FristenKalender({
       )}
     >
       <header className="px-4 py-3">
-        <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
+        {/* Seiten-H1 der Vollbild-Kalender-Sicht (page-has-heading-one / BITV); die Tages-Ueberschrift
+            darunter ist entsprechend h2, damit die Ordnung h1->h2 ohne Sprung bleibt. */}
+        <h1 className="flex items-center gap-2 text-base font-semibold text-foreground">
           <CalendarDays
             className="size-5 text-muted-foreground"
             aria-hidden="true"
           />
           {titel}
-        </h2>
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">{beschreibung}</p>
       </header>
 
@@ -221,11 +223,11 @@ export function FristenKalender({
         >
           {gewaehlt ? (
             <>
-              <h3 className="text-sm font-semibold text-foreground">
+              <h2 className="text-sm font-semibold text-foreground">
                 <time dateTime={lokalerTagKey(gewaehlt)}>
                   {langesDatumFmt.format(gewaehlt)}
                 </time>
-              </h3>
+              </h2>
               {gewaehlteEintraege.length === 0 ? (
                 <p className="mt-2 text-sm text-muted-foreground">
                   Keine Einträge an diesem Tag.

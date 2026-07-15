@@ -88,6 +88,18 @@ export function BundIDLoginForm({
     };
   }, []);
 
+  // 2.4.3 Fokus-Reihenfolge: Beim Aufklappen des Demo-Formulars wird der auslösende Button aus dem DOM ersetzt —
+  // der Fokus MUSS aktiv auf das erste Feld wandern; beim Abbrechen zurück auf den (wieder erscheinenden) Trigger.
+  const demoTriggerRef = useRef<HTMLButtonElement>(null);
+  const vornameRef = useRef<HTMLInputElement>(null);
+  const demoWarOffen = useRef(false);
+  useEffect(() => {
+    if (demoOffen && !demoWarOffen.current) vornameRef.current?.focus();
+    else if (!demoOffen && demoWarOffen.current)
+      demoTriggerRef.current?.focus();
+    demoWarOffen.current = demoOffen;
+  }, [demoOffen]);
+
   const beschaeftigt = phase !== "idle";
 
   /** Simuliert den OIDC-Redirect → Callback und liefert am Ende ein synthetisches Profil an `onLogin`.
@@ -214,6 +226,7 @@ export function BundIDLoginForm({
 
             {!demoOffen ? (
               <Button
+                ref={demoTriggerRef}
                 type="button"
                 variant="outline"
                 className="w-full"
@@ -246,6 +259,7 @@ export function BundIDLoginForm({
                       Vorname
                     </Label>
                     <Input
+                      ref={vornameRef}
                       id={vornameId}
                       value={vorname}
                       onChange={(e) => setVorname(e.target.value)}
