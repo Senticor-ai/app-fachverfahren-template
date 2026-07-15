@@ -9,6 +9,10 @@
 // Architektur: DEV-Datenschicht = Zustand-Store im Browser (end-to-end klickbar). PROD = dieselbe
 // `VorgangPort`-Schnittstelle gegen das SDK/Fastify-Backend. EINE Schnittstelle, zwei Laufzeiten.
 
+// WORKFLOW-IR: die Prozess-Definition lebt in `lib/process-ir` (co-located mit Graph-Gate + Planer). Nur-Typ-Import
+// (voll erased unter verbatimModuleSyntax → der Typ-Zyklus process-ir<->types ist unschädlich).
+import type { ProzessDefinition } from "./lib/process-ir.js";
+
 /** Audit-/Historien-Eintrag eines Vorgangs (revisionssicher, append-only). */
 export interface VorgangHistorie {
   ts: string;
@@ -682,6 +686,10 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   termin?: TerminConfig | undefined;
   /** `enabled` ⇒ AdressValidierung (deterministischer Registerabgleich) im Bürger-Antrag. */
   adressValidierung?: AdressValidierungConfig | undefined;
+  /** WORKFLOW (additiv) — BPMN-inspirierte Prozess-Definitionen dieses Verfahrens als DATEN (IR), statisch durch
+   *  `validateProzessGraph` gegen `statusMachine` prüfbar. Fehlt das Feld, bleibt das Verhalten unverändert.
+   *  Persistenz und autorisierte Ausführung sind nicht Teil dieses Vertrags. */
+  prozesse?: ProzessDefinition[] | undefined;
   /** Seed-Fälle (Demo-Arbeitsvorrat), damit die SB-Sicht sofort echte Vorgänge zeigt. */
   seed?: (helpers: {
     vorgangsnummer: () => string;

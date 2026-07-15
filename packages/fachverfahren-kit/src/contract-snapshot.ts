@@ -26,6 +26,8 @@ export interface LeistungContractSnapshot {
   fimRefs?: LeistungConfig["fimRefs"];
   /** FRISTEN-TYPEN als echte Zeilen. */
   fristenTypen?: LeistungConfig["fristenTypen"];
+  /** BPMN-inspirierte Prozess-Definitionen (IR) als statisch prüfbare Vertragszeilen; keine Laufzeitausführung. */
+  prozesse?: LeistungConfig["prozesse"];
   statusMachine: LeistungConfig["statusMachine"];
   register: LeistungConfig["register"];
   detailSektionen: LeistungConfig["detailSektionen"];
@@ -68,6 +70,7 @@ export function toContractSnapshot<T = Record<string, unknown>>(
     ...(config.registerRefs ? { registerRefs: config.registerRefs } : {}),
     ...(config.fimRefs ? { fimRefs: config.fimRefs } : {}),
     ...(config.fristenTypen ? { fristenTypen: config.fristenTypen } : {}),
+    ...(config.prozesse ? { prozesse: config.prozesse } : {}),
     statusMachine: config.statusMachine,
     register: config.register,
     detailSektionen: config.detailSektionen,

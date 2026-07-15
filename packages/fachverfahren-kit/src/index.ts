@@ -139,6 +139,7 @@ export * from "./components/SignaturePad.js";
 export * from "./components/pwa.js";
 export * from "./components/MarkdownView.js";
 export * from "./components/MermaidView.js";
+export * from "./components/ProzessEditor.js";
 export * from "./components/MarkdownEditor.js";
 export * from "./components/FileBrowser.js";
 // ── Generische Struktur-/Anzeige-Bausteine (Formular-Fortschritt, Fakten-Listen, Verlauf, Hinweise) ──

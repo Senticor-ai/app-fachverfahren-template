@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { LeistungConfig } from "./types.js";
+import type { ProzessDefinition } from "./lib/process-ir.js";
 import {
   diffNurEinfacheSprache,
   toContractSnapshot,
@@ -129,6 +130,24 @@ describe("toContractSnapshot — Business-Logik als ECHTE Zeilen, nicht '[functi
     expect(snap.nachweise).toBeUndefined();
     expect(snap.id).toBe("leistung");
     expect(snap._snapshot).toBe(true);
+  });
+
+  it("nimmt WORKFLOW-Prozesse als echte Zeilen in den Vertrag auf (nur wenn gesetzt — additiv)", () => {
+    // Ohne `prozesse`: der Schlüssel fehlt (bestehende Verträge bleiben byte-gleich).
+    expect(toContractSnapshot(basis).prozesse).toBeUndefined();
+    const prozess: ProzessDefinition = {
+      id: "p1",
+      version: 1,
+      knoten: [
+        { id: "s", typ: "start" },
+        { id: "e", typ: "ende" },
+      ],
+      kanten: [{ id: "k", von: "s", nach: "e" }],
+    };
+    const snap = toContractSnapshot({ ...basis, prozesse: [prozess] });
+    expect(snap.prozesse).toEqual([prozess]);
+    // Vollständig JSON-serialisierbar (die IR ist DATEN, keine Funktion).
+    expect(() => JSON.stringify(snap)).not.toThrow();
   });
 });
 
