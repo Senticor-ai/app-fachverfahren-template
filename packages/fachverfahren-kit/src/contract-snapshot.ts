@@ -13,6 +13,8 @@ export interface LeistungContractSnapshot {
   kommune: string;
   rechtsgrundlagen: LeistungConfig["rechtsgrundlagen"];
   fimLeistung?: LeistungConfig["fimLeistung"];
+  /** Optionaler Verfahrens-Diskriminator; nur vorhanden, wenn die Config ihn explizit setzt. */
+  kind?: LeistungConfig["kind"];
   antrag: { steps: LeistungConfig["antrag"]["steps"]; einleitung?: string };
   /** Benannte Auswahl-Listen (schlank, value/label) — als echte Zeilen. */
   datenlisten?: LeistungConfig["datenlisten"];
@@ -55,6 +57,8 @@ export function toContractSnapshot<T = Record<string, unknown>>(
     kommune: config.kommune,
     rechtsgrundlagen: config.rechtsgrundlagen,
     ...(config.fimLeistung ? { fimLeistung: config.fimLeistung } : {}),
+    // Nur explizit gesetzte Werte projizieren; bestehende Configs erhalten keine neue Snapshot-Zeile.
+    ...(config.kind ? { kind: config.kind } : {}),
     antrag: {
       steps: config.antrag.steps,
       ...(config.antrag.einleitung
