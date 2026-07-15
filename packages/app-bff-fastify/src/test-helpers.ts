@@ -8,7 +8,16 @@ import {
   type ResolvedSession,
   type SessionResolver,
 } from "@senticor/app-runtime-fastify";
-import { InMemoryAppStore, type AppStore } from "@senticor/app-store-postgres";
+import {
+  InMemoryAppStore,
+  InMemoryCaseStore,
+  type AppStore,
+  type CaseStore,
+} from "@senticor/app-store-postgres";
+import {
+  createInMemoryProcedureRegistry,
+  type ProcedureRegistry,
+} from "@senticor/public-sector-sdk";
 import { appBff } from "./plugin.js";
 
 export function stubResolver(session: ResolvedSession): SessionResolver {
@@ -41,20 +50,27 @@ export function caseworkerSession(
 export async function buildBffApp({
   session,
   appStore = new InMemoryAppStore(),
+  caseStore = new InMemoryCaseStore(),
+  procedureRegistry = createInMemoryProcedureRegistry([]),
 }: {
   session?: ResolvedSession;
   appStore?: AppStore;
+  caseStore?: CaseStore;
+  procedureRegistry?: ProcedureRegistry;
 } = {}): Promise<{
   app: FastifyInstance;
   auditSink: MemoryAuditSink;
   appStore: AppStore;
+  caseStore: CaseStore;
 }> {
   const auditSink = new MemoryAuditSink();
   const app = fastify({ logger: false });
   await app.register(appBff, {
     appStore,
+    caseStore,
+    procedureRegistry,
     sessionResolver: session ? stubResolver(session) : new NoSessionResolver(),
     auditSink,
   });
-  return { app, auditSink, appStore };
+  return { app, auditSink, appStore, caseStore };
 }

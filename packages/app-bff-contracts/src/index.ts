@@ -31,4 +31,16 @@ export {
   type MailboxListQueryDto,
   type MailboxMessageDto,
 } from "./mailbox.js";
+export {
+  CaseCreateRequestSchema,
+  CaseDtoSchema,
+  CaseIdParamsSchema,
+  CaseListDtoSchema,
+  CaseListQuerySchema,
+  type CaseCreateRequestDto,
+  type CaseDto,
+  type CaseIdParamsDto,
+  type CaseListDto,
+  type CaseListQueryDto,
+} from "./cases.js";
 export { openApiInfo, openApiTags } from "./openapi.js";

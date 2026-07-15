@@ -69,6 +69,447 @@
         "tags": ["session"]
       }
     },
+    "/api/cases": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": { "minLength": 1, "type": "string" }
+          },
+          {
+            "in": "query",
+            "name": "procedureId",
+            "required": false,
+            "schema": { "minLength": 1, "type": "string" }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": { "maximum": 500, "minimum": 1, "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "cases": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "caseId": { "minLength": 1, "type": "string" },
+                          "closedAt": {
+                            "anyOf": [
+                              { "minLength": 1, "type": "string" },
+                              { "type": "null" }
+                            ]
+                          },
+                          "openedAt": { "minLength": 1, "type": "string" },
+                          "procedureId": { "minLength": 1, "type": "string" },
+                          "procedureVersion": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "state": { "minLength": 1, "type": "string" },
+                          "subjectIds": {
+                            "items": { "minLength": 1, "type": "string" },
+                            "type": "array"
+                          },
+                          "version": { "minimum": 1, "type": "integer" }
+                        },
+                        "required": [
+                          "caseId",
+                          "procedureId",
+                          "procedureVersion",
+                          "state",
+                          "version",
+                          "subjectIds",
+                          "openedAt",
+                          "closedAt"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["cases"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Fälle der Behörde lesen (Filter Status/Verfahren)",
+        "tags": ["cases"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "procedureId": { "minLength": 1, "type": "string" },
+                  "procedureVersion": { "minLength": 1, "type": "string" },
+                  "state": { "minLength": 1, "type": "string" },
+                  "subjectIds": {
+                    "items": { "minLength": 1, "type": "string" },
+                    "type": "array"
+                  }
+                },
+                "required": ["procedureId", "procedureVersion", "state"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "caseId": { "minLength": 1, "type": "string" },
+                    "closedAt": {
+                      "anyOf": [
+                        { "minLength": 1, "type": "string" },
+                        { "type": "null" }
+                      ]
+                    },
+                    "openedAt": { "minLength": 1, "type": "string" },
+                    "procedureId": { "minLength": 1, "type": "string" },
+                    "procedureVersion": { "minLength": 1, "type": "string" },
+                    "state": { "minLength": 1, "type": "string" },
+                    "subjectIds": {
+                      "items": { "minLength": 1, "type": "string" },
+                      "type": "array"
+                    },
+                    "version": { "minimum": 1, "type": "integer" }
+                  },
+                  "required": [
+                    "caseId",
+                    "procedureId",
+                    "procedureVersion",
+                    "state",
+                    "version",
+                    "subjectIds",
+                    "openedAt",
+                    "closedAt"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Fall/Akte anlegen (Initialzustand + Rechtsgrundlage aus dem Verfahren)",
+        "tags": ["cases"]
+      }
+    },
+    "/api/cases/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "caseId": { "minLength": 1, "type": "string" },
+                    "closedAt": {
+                      "anyOf": [
+                        { "minLength": 1, "type": "string" },
+                        { "type": "null" }
+                      ]
+                    },
+                    "openedAt": { "minLength": 1, "type": "string" },
+                    "procedureId": { "minLength": 1, "type": "string" },
+                    "procedureVersion": { "minLength": 1, "type": "string" },
+                    "state": { "minLength": 1, "type": "string" },
+                    "subjectIds": {
+                      "items": { "minLength": 1, "type": "string" },
+                      "type": "array"
+                    },
+                    "version": { "minimum": 1, "type": "integer" }
+                  },
+                  "required": [
+                    "caseId",
+                    "procedureId",
+                    "procedureVersion",
+                    "state",
+                    "version",
+                    "subjectIds",
+                    "openedAt",
+                    "closedAt"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Einen Fall lesen",
+        "tags": ["cases"]
+      }
+    },
     "/api/mailbox": {
       "get": {
         "parameters": [

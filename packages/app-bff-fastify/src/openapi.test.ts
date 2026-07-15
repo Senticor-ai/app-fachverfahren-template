@@ -8,7 +8,11 @@ import {
   MemoryAuditSink,
   NoSessionResolver,
 } from "@senticor/app-runtime-fastify";
-import { InMemoryAppStore } from "@senticor/app-store-postgres";
+import {
+  InMemoryAppStore,
+  InMemoryCaseStore,
+} from "@senticor/app-store-postgres";
+import { createInMemoryProcedureRegistry } from "@senticor/public-sector-sdk";
 import { registerOpenApiCollector, registerOpenApiRoute } from "./openapi.js";
 import { appBff } from "./plugin.js";
 
@@ -28,6 +32,8 @@ async function buildPair({ collectorFirst = true } = {}): Promise<{
   apps.push(publicApp, internalApp);
   const bffOptions = {
     appStore: new InMemoryAppStore(),
+    caseStore: new InMemoryCaseStore(),
+    procedureRegistry: createInMemoryProcedureRegistry([]),
     sessionResolver: new NoSessionResolver(),
     auditSink: new MemoryAuditSink(),
   };
@@ -43,7 +49,7 @@ async function buildPair({ collectorFirst = true } = {}): Promise<{
 }
 
 describe("OpenAPI intern-only", () => {
-  it("liefert intern ein Dokument mit ALLEN sechs BFF-Operationen", async () => {
+  it("liefert intern ein Dokument mit ALLEN neun BFF-Operationen", async () => {
     const { internalApp } = await buildPair();
     const response = await internalApp.inject({
       method: "GET",
@@ -55,6 +61,8 @@ describe("OpenAPI intern-only", () => {
     expect(doc.info.title).toBe("App-BFF-API");
     expect(Object.keys(doc.paths).sort()).toEqual([
       "/api/capabilities",
+      "/api/cases",
+      "/api/cases/{id}",
       "/api/mailbox",
       "/api/preferences",
       "/api/session",
@@ -67,6 +75,9 @@ describe("OpenAPI intern-only", () => {
       "get",
       "get",
       "get",
+      "get",
+      "get",
+      "post",
       "post",
       "put",
     ]);

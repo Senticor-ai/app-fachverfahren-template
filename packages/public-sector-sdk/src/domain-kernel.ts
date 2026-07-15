@@ -179,3 +179,26 @@ export function transitionCase(
       : {}),
   };
 }
+
+/** Nachschlage-Naht über die VerfahrensVersionen (die Prozess-/Zustandsmaschine + Rechtsgrundlagen als DATEN). Der
+ *  Server (BFF) löst zu einer Akte ihre `ProcedureVersion` auf, um `allowedStates`/`allowedTransitions` und
+ *  `legalBasisIds` NICHT zu erfinden — eine Rechtsgrundlage wird nie gefaked. Gefüttert aus der `leistung.config`/
+ *  BPMN-Ableitung (ADR-0002); in Produktion kann chos die Registry hinter derselben Naht liefern. */
+export interface ProcedureRegistry {
+  get(procedureId: string, version: string): ProcedureVersion | undefined;
+}
+
+/** Baut eine In-Memory-`ProcedureRegistry` aus einer Liste von VerfahrensVersionen (Template-Stub/Standalone). */
+export function createInMemoryProcedureRegistry(
+  versions: readonly ProcedureVersion[],
+): ProcedureRegistry {
+  const byKey = new Map(
+    versions.map((version) => [
+      `${version.procedureId}:${version.version}`,
+      version,
+    ]),
+  );
+  return {
+    get: (procedureId, version) => byKey.get(`${procedureId}:${version}`),
+  };
+}

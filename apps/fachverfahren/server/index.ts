@@ -30,12 +30,18 @@ import {
   createAppStoreFromEnv,
   createAuditStoreFromEnv,
   createAuthStoreFromEnv,
+  createCaseStoreFromEnv,
   createKanbanStoreFromEnv,
   type AppStore,
   type AuditStore,
   type AuthStore,
+  type CaseStore,
   type KanbanStore,
 } from "@senticor/app-store-postgres";
+import {
+  createInMemoryProcedureRegistry,
+  type ProcedureRegistry,
+} from "@senticor/public-sector-sdk";
 import type { FastifyInstance } from "fastify";
 import { registerAuditRoutes } from "./audit/routes.js";
 import { autoBootstrapAdminFromEnv } from "./auth/auto-bootstrap.js";
@@ -82,6 +88,8 @@ interface AppStores {
 
 interface BffWiring {
   appStore: AppStore;
+  caseStore: CaseStore;
+  procedureRegistry: ProcedureRegistry;
   sessionResolver: SessionResolver;
   auditSink: AuditSink;
 }
@@ -125,6 +133,10 @@ export function buildPublicServer({
   kanbanStore = createKanbanStoreFromEnv(),
   auditStore = createAuditStoreFromEnv(),
   appStore = createAppStoreFromEnv(),
+  caseStore = createCaseStoreFromEnv(),
+  // Verfahren-Registry: DEFAULT LEER (fail-closed — ohne Verfahren kein Fall). Der Consumer/Generator
+  // (leistung.config → ProcedureVersion, ADR-0002) füllt sie; in PROD kann chos sie hinter der Naht liefern.
+  procedureRegistry = createInMemoryProcedureRegistry([]),
   sessionResolver,
   auditSink = createAuditSinkFromEnv(),
   bootstrapToken = process.env["BOOTSTRAP_TOKEN"],
@@ -139,6 +151,8 @@ export function buildPublicServer({
   kanbanStore?: KanbanStore;
   auditStore?: AuditStore;
   appStore?: AppStore;
+  caseStore?: CaseStore;
+  procedureRegistry?: ProcedureRegistry;
   sessionResolver?: SessionResolver;
   auditSink?: AuditSink;
   bootstrapToken?: string | undefined;
@@ -155,6 +169,8 @@ export function buildPublicServer({
         { bootstrapToken, registrationMode },
         {
           appStore,
+          caseStore,
+          procedureRegistry,
           // Default: der ECHTE Cookie/AuthStore-Flow (deny-by-default) — Tests
           // injizieren Stubs über den Parameter.
           sessionResolver:
@@ -201,6 +217,8 @@ export async function startRuntime(
   };
   const bff: BffWiring = {
     appStore: createAppStoreFromEnv(env),
+    caseStore: createCaseStoreFromEnv(env),
+    procedureRegistry: createInMemoryProcedureRegistry([]),
     sessionResolver: createCookieSessionResolver(authStore),
     auditSink: createAuditSinkFromEnv(env),
   };

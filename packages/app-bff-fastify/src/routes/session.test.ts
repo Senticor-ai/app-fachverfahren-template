@@ -3,7 +3,11 @@
 import fastify, { type FastifyInstance } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 import { MemoryAuditSink } from "@senticor/app-runtime-fastify";
-import { InMemoryAppStore } from "@senticor/app-store-postgres";
+import {
+  InMemoryAppStore,
+  InMemoryCaseStore,
+} from "@senticor/app-store-postgres";
+import { createInMemoryProcedureRegistry } from "@senticor/public-sector-sdk";
 import { appBff } from "../plugin.js";
 import { buildBffApp, citizenSession, stubResolver } from "../test-helpers.js";
 
@@ -125,6 +129,8 @@ describe("ErrorHandler-Kapselung", () => {
     app = fastify({ logger: false });
     await app.register(appBff, {
       appStore: new InMemoryAppStore(),
+      caseStore: new InMemoryCaseStore(),
+      procedureRegistry: createInMemoryProcedureRegistry([]),
       sessionResolver: stubResolver(citizenSession()),
       auditSink,
     });

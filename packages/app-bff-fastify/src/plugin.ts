@@ -6,17 +6,23 @@
 import type { FastifyError, FastifyInstance } from "fastify";
 import { builtInRbacRegistry } from "@senticor/public-sector-sdk";
 import type { AuditSink, SessionResolver } from "@senticor/app-runtime-fastify";
-import type { AppStore } from "@senticor/app-store-postgres";
-import type { RbacRegistry } from "@senticor/public-sector-sdk";
+import type { AppStore, CaseStore } from "@senticor/app-store-postgres";
+import type {
+  ProcedureRegistry,
+  RbacRegistry,
+} from "@senticor/public-sector-sdk";
 import type { BffDeps } from "./deps.js";
 import { requestIdOf } from "./route-auth.js";
 import { registerCapabilitiesRoute } from "./routes/capabilities.js";
+import { registerCaseRoutes } from "./routes/cases.js";
 import { registerMailboxRoutes } from "./routes/mailbox.js";
 import { registerPreferencesRoutes } from "./routes/preferences.js";
 import { registerSessionRoute } from "./routes/session.js";
 
 export interface AppBffOptions {
   appStore: AppStore;
+  caseStore: CaseStore;
+  procedureRegistry: ProcedureRegistry;
   sessionResolver: SessionResolver;
   auditSink: AuditSink;
   rbacRegistry?: RbacRegistry;
@@ -28,6 +34,8 @@ export async function appBff(
 ): Promise<void> {
   const deps: BffDeps = {
     appStore: opts.appStore,
+    caseStore: opts.caseStore,
+    procedureRegistry: opts.procedureRegistry,
     sessionResolver: opts.sessionResolver,
     auditSink: opts.auditSink,
     rbacRegistry: opts.rbacRegistry ?? builtInRbacRegistry,
@@ -54,4 +62,5 @@ export async function appBff(
   registerCapabilitiesRoute(app, deps);
   registerPreferencesRoutes(app, deps);
   registerMailboxRoutes(app, deps);
+  registerCaseRoutes(app, deps);
 }

@@ -201,6 +201,8 @@ describe("BFF-Verdrahtung im App-Server", () => {
       expect(internal.statusCode).toBe(200);
       expect(Object.keys(internal.json().paths).sort()).toEqual([
         "/api/capabilities",
+        "/api/cases",
+        "/api/cases/{id}",
         "/api/mailbox",
         "/api/preferences",
         "/api/session",
