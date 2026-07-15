@@ -26,6 +26,8 @@ export interface LeistungContractSnapshot {
   fimRefs?: LeistungConfig["fimRefs"];
   /** FRISTEN-TYPEN als echte Zeilen. */
   fristenTypen?: LeistungConfig["fristenTypen"];
+  /** Deklarative Automationsregeln als echte Zeilen; keine Laufzeitausführung. */
+  automationsregeln?: LeistungConfig["automationsregeln"];
   statusMachine: LeistungConfig["statusMachine"];
   register: LeistungConfig["register"];
   detailSektionen: LeistungConfig["detailSektionen"];
@@ -68,6 +70,9 @@ export function toContractSnapshot<T = Record<string, unknown>>(
     ...(config.registerRefs ? { registerRefs: config.registerRefs } : {}),
     ...(config.fimRefs ? { fimRefs: config.fimRefs } : {}),
     ...(config.fristenTypen ? { fristenTypen: config.fristenTypen } : {}),
+    ...(config.automationsregeln
+      ? { automationsregeln: config.automationsregeln }
+      : {}),
     statusMachine: config.statusMachine,
     register: config.register,
     detailSektionen: config.detailSektionen,

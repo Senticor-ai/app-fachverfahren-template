@@ -399,6 +399,35 @@ export interface BedingungGruppe {
 /** Generische, verfahrensfreie Bedingung — Blatt (`FeldBedingung`) oder Gruppe. Vom Interpreter ausgewertet. */
 export type Bedingung = FeldBedingung | BedingungGruppe;
 
+/** Auslöser einer deklarativen Automationsregel. Diese Typen beschreiben Absichten; sie starten selbst keine Jobs. */
+export type AutomationTrigger =
+  | { art: "beim-eingang" }
+  | { art: "beim-uebergang"; von?: string; nach?: string }
+  | { art: "frist-erreicht"; fristTyp: string }
+  | { art: "nachweis-eingegangen"; nachweisId?: string }
+  | { art: "feld-geaendert"; feld: string }
+  | { art: "manuell"; label: string };
+
+/** Deklarative Folgeaktion. Die Auswertung liefert sie nur als Intention; ein autorisierter Adapter muss sie ausführen. */
+export type AutomationAction =
+  | { art: "benachrichtigen"; kanal: string; template: string }
+  | { art: "setze-feld"; feld: string; wert: unknown }
+  | { art: "setze-prioritaet"; wert: string }
+  | { art: "zuweisen"; an: string | { rolle: string } }
+  | { art: "label-hinzufuegen"; label: string }
+  | { art: "status-uebergang"; nach: string; detail?: string }
+  | { art: "aufgabe-erstellen"; titel: string }
+  | { art: "audit"; aktion: string; detail?: string };
+
+/** Eine reine Regel aus Auslöser, optionaler Bedingung und auszugebenden Aktions-Intentionen. */
+export interface AutomationRule {
+  id: string;
+  trigger: AutomationTrigger;
+  wenn?: Bedingung;
+  dann: AutomationAction[];
+  aktiv?: boolean;
+}
+
 /** Eine Staffel/Stufe einer Gebühren-/Tariftabelle. Greift, wenn `bedingung` über die Antragsdaten erfüllt ist;
  *  fehlt `bedingung`, ist die Staffel der Auffang/Default. `betrag` in der NATÜRLICHEN Haupteinheit (kein Cent). */
 export interface TarifStaffel {
@@ -652,6 +681,9 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   fimRefs?: FimRef[];
   /** FRISTEN-TYPEN als DATEN (Norm-Regel „X ab Ankerdatum") — unabhängig von konkreten Frist-Instanzen. */
   fristenTypen?: FristTyp[];
+  /** Deklarative Automationsregeln als DATEN. Das Kit wertet sie rein aus und erzeugt Aktions-Intentionen; Scheduler,
+   *  Persistenz, Autorisierung, Audit-Schreiben und Seiteneffekte sind ausdrücklich nicht Teil dieses Vertrags. */
+  automationsregeln?: AutomationRule[];
   statusMachine: StatusMachine;
   /** ESCAPE-HATCH für nicht-tabellarische Subsumtion (Tatbestand→Rechtsfolge): reine, testbare, deterministische
    *  Berechnung (kein Datum/Random). OPTIONAL — fehlt sie, ist die Daten-Auswertung von `tarif` durch den reinen
