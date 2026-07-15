@@ -57,3 +57,19 @@ export const CaseIdParamsSchema = Type.Object(
 );
 
 export type CaseIdParamsDto = Static<typeof CaseIdParamsSchema>;
+
+// Zustandswechsel eines Falls: `action` wählt den Übergang (from=aktueller Zustand) aus der ProcedureVersion,
+// `expectedVersion` erzwingt Optimistic-Locking. Der Zielzustand + die Rechtsgrundlage werden NIE aus dem Body
+// gelesen — sie stammen aus dem Verfahren (DATEN). `detail` ist ein optionaler fachlicher Vermerk fürs Audit.
+export const CaseTransitionRequestSchema = Type.Object(
+  {
+    action: Type.String({ minLength: 1 }),
+    expectedVersion: Type.Integer({ minimum: 1 }),
+    detail: Type.Optional(Type.String({ minLength: 1 })),
+  },
+  { additionalProperties: false },
+);
+
+export type CaseTransitionRequestDto = Static<
+  typeof CaseTransitionRequestSchema
+>;

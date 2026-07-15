@@ -11,13 +11,21 @@ import {
   CaseIdParamsSchema,
   CaseListDtoSchema,
   CaseListQuerySchema,
+  CaseTransitionRequestSchema,
   ErrorEnvelopeSchema,
   type CaseDto,
 } from "@senticor/app-bff-contracts";
-import type { AppCase } from "@senticor/app-store-postgres";
+import {
+  CaseNotFoundError,
+  CaseVersionConflictError,
+  type AppAuditEvent,
+  type AppCase,
+} from "@senticor/app-store-postgres";
 import {
   builtInPermissions,
   createFachlicheAuditEvent,
+  transitionCase,
+  type Case as DomainCase,
 } from "@senticor/public-sector-sdk";
 import type { BffDeps } from "../deps.js";
 import { bffRouteAuth, requestIdOf, sessionOf } from "../route-auth.js";
@@ -34,6 +42,24 @@ function toCaseDto(c: AppCase): CaseDto {
     subjectIds: c.subjectIds,
     openedAt: c.openedAt,
     closedAt: c.closedAt,
+  };
+}
+
+/** AppCase → SDK-`Case` für den reinen `transitionCase`-Reducer (Guards/Vier-Augen leben im SDK, nicht im Store).
+ *  `closedAt` ist im Store `null`, in der Domäne optional → per Conditional-Spread weglassen (exactOptionalPropertyTypes). */
+function toDomainCase(c: AppCase): DomainCase {
+  return {
+    caseId: c.caseId,
+    procedureId: c.procedureId,
+    procedureVersion: c.procedureVersion,
+    tenantId: c.tenantId,
+    authorityId: c.authorityId,
+    jurisdictionId: c.jurisdictionId,
+    state: c.state,
+    version: c.version,
+    subjectIds: c.subjectIds,
+    openedAt: c.openedAt,
+    ...(c.closedAt !== null ? { closedAt: c.closedAt } : {}),
   };
 }
 
@@ -219,6 +245,152 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
         return storeUnavailable(request, reply);
       }
       return reply.code(201).send(toCaseDto(created));
+    },
+  );
+
+  typed.post(
+    "/api/cases/:id/transitions",
+    {
+      config: writeAuth.config,
+      preHandler: writeAuth.preHandler,
+      schema: {
+        tags: ["cases"],
+        summary:
+          "Zustandswechsel eines Falls (Übergang aus dem Verfahren, atomar + Vier-Augen)",
+        params: CaseIdParamsSchema,
+        body: CaseTransitionRequestSchema,
+        response: { 200: CaseDtoSchema, ...errorResponses },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      const body = request.body;
+
+      let found: AppCase | undefined;
+      try {
+        found = await deps.caseStore.getCase({
+          tenantId: session.tenantId,
+          caseId: request.params.id,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      // Behörden-Scope: eine Fremd-Behörde im selben Mandanten wird als 404 behandelt (keine Existenz-Leaks).
+      if (!found || found.authorityId !== session.authorityId)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+      const appCase = found;
+
+      // Verfahren (Zustandsmaschine + Rechtsgrundlagen als DATEN) auflösen — fail-closed, wenn unbekannt.
+      const procedure = deps.procedureRegistry.get(
+        appCase.procedureId,
+        appCase.procedureVersion,
+      );
+      if (!procedure)
+        return badRequest(
+          reply,
+          request,
+          `unknown procedure ${appCase.procedureId}@${appCase.procedureVersion}`,
+        );
+      const legalBasisId = procedure.legalBasisIds[0];
+      if (legalBasisId === undefined)
+        return badRequest(reply, request, "procedure has no legal basis");
+
+      // Passenden Übergang finden (from=aktueller Zustand & action) — der Zielzustand wird NIE aus dem Body gelesen.
+      const transition = procedure.allowedTransitions.find(
+        (candidate) =>
+          candidate.from === appCase.state && candidate.action === body.action,
+      );
+      if (!transition)
+        return badRequest(
+          reply,
+          request,
+          `invalid case transition: ${appCase.state}/${body.action}`,
+        );
+
+      // Vier-Augen (root-cause: zwei verschiedene Personen): der Akteur des jüngsten Audit-Eintrags darf einen
+      // requiresFourEyes-Übergang nicht selbst auslösen. listAuditEvents ist aufsteigend nach occurredAt sortiert.
+      if (transition.requiresFourEyes) {
+        let events: AppAuditEvent[];
+        try {
+          events = await deps.caseStore.listAuditEvents({
+            tenantId: session.tenantId,
+            caseId: appCase.caseId,
+          });
+        } catch {
+          return storeUnavailable(request, reply);
+        }
+        const latest = events[events.length - 1];
+        if (latest && latest.actorId === session.actorId)
+          return reply.code(403).send({
+            error: "four-eyes: der auslösende Akteur muss ein anderer sein",
+            requestId: requestIdOf(request),
+          });
+      }
+
+      // Zielzustand über den reinen SDK-Reducer rechnen (Guards + Optimistic-Locking). Konflikt → 409, sonst 400.
+      let reduced: DomainCase;
+      try {
+        reduced = transitionCase(
+          toDomainCase(appCase),
+          procedure,
+          body.action,
+          body.expectedVersion,
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message === "case version conflict")
+          return reply
+            .code(409)
+            .send({ error: message, requestId: requestIdOf(request) });
+        return badRequest(reply, request, message);
+      }
+
+      const auditEvent: AppAuditEvent = {
+        auditEventId: `audit.${randomUUID()}`,
+        caseId: appCase.caseId,
+        tenantId: session.tenantId,
+        authorityId: session.authorityId,
+        jurisdictionId: session.jurisdictionId,
+        actorId: session.actorId,
+        eventType: "case.transitioned",
+        purpose: "case-management",
+        legalBasisId,
+        requestId: requestIdOf(request),
+        payload: {
+          previousState: appCase.state,
+          newState: reduced.state,
+          ...(body.detail !== undefined ? { detail: body.detail } : {}),
+        },
+        occurredAt: new Date().toISOString(),
+      };
+
+      let updated: AppCase;
+      try {
+        updated = await deps.caseStore.patchCaseState({
+          tenantId: session.tenantId,
+          caseId: appCase.caseId,
+          expectedVersion: body.expectedVersion,
+          newState: reduced.state,
+          ...(reduced.closedAt !== undefined
+            ? { closedAt: reduced.closedAt }
+            : {}),
+          auditEvent,
+        });
+      } catch (error) {
+        if (error instanceof CaseVersionConflictError)
+          return reply.code(409).send({
+            error: "case version conflict",
+            requestId: requestIdOf(request),
+          });
+        if (error instanceof CaseNotFoundError)
+          return reply
+            .code(404)
+            .send({ error: "not found", requestId: requestIdOf(request) });
+        return storeUnavailable(request, reply);
+      }
+      return reply.send(toCaseDto(updated));
     },
   );
 }

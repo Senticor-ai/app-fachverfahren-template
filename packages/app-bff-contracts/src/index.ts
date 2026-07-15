@@ -37,10 +37,12 @@ export {
   CaseIdParamsSchema,
   CaseListDtoSchema,
   CaseListQuerySchema,
+  CaseTransitionRequestSchema,
   type CaseCreateRequestDto,
   type CaseDto,
   type CaseIdParamsDto,
   type CaseListDto,
   type CaseListQueryDto,
+  type CaseTransitionRequestDto,
 } from "./cases.js";
 export { openApiInfo, openApiTags } from "./openapi.js";
