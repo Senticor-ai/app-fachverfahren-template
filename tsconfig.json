@@ -14,6 +14,7 @@
     { "path": "packages/app-runtime-fastify" },
     { "path": "packages/app-bff-contracts" },
     { "path": "packages/app-bff-fastify" },
+    { "path": "packages/workflow-bpmn-stub" },
     { "path": "jurisdictions/eu" },
     { "path": "jurisdictions/de" }
   ]
