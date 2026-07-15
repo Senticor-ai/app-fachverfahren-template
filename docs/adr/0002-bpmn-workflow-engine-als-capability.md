@@ -45,12 +45,12 @@ BPMN-Definition-Handling), mit vier Bausteinen:
 
 ## Alternativen
 
-| Alternative | Vorteile | Nachteile | Warum verworfen |
-| --- | --- | --- | --- |
-| **B — nur Config-Zustandsmaschine** (`allowedTransitions`, kein BPMN) | einfach, kein Parser | Kunden können ihre FIM/KGSt-BPMN nicht direkt nutzen/anpassen | verworfen — Kern-Anforderung ist BPMN |
-| **C — Fremd-Engine (Camunda/Zeebe) einbetten** | mächtig, standardkonform | schwere Runtime/Betriebslast, Lizenz/IP, überzeichnet Template-Reife | nicht als Template-Default; als Provider-Adapter-Option offen |
-| **D — nur chos-Engine, kein Stub** | wenig Template-Code | Template nicht standalone lauffähig | verletzt „Stub + Doku ohne chos" (ADR-0001-Prinzip) |
-| **E — eigene, BPMN-freie DSL** | maßgeschneidert | präzedenzlos, weg vom FIM/KGSt-Standard, Lock-in | verworfen — BPMN ist der Kunden-Standard |
+| Alternative                                                           | Vorteile                 | Nachteile                                                            | Warum verworfen                                               |
+| --------------------------------------------------------------------- | ------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------------- |
+| **B — nur Config-Zustandsmaschine** (`allowedTransitions`, kein BPMN) | einfach, kein Parser     | Kunden können ihre FIM/KGSt-BPMN nicht direkt nutzen/anpassen        | verworfen — Kern-Anforderung ist BPMN                         |
+| **C — Fremd-Engine (Camunda/Zeebe) einbetten**                        | mächtig, standardkonform | schwere Runtime/Betriebslast, Lizenz/IP, überzeichnet Template-Reife | nicht als Template-Default; als Provider-Adapter-Option offen |
+| **D — nur chos-Engine, kein Stub**                                    | wenig Template-Code      | Template nicht standalone lauffähig                                  | verletzt „Stub + Doku ohne chos" (ADR-0001-Prinzip)           |
+| **E — eigene, BPMN-freie DSL**                                        | maßgeschneidert          | präzedenzlos, weg vom FIM/KGSt-Standard, Lock-in                     | verworfen — BPMN ist der Kunden-Standard                      |
 
 ## Konsequenzen
 

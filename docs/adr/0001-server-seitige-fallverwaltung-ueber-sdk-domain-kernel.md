@@ -72,12 +72,12 @@ Multi-Verfahren-Registry, „dual-mode auf EINER `LeistungConfig`".
 
 ## Alternativen
 
-| Alternative | Vorteile | Nachteile | Warum verworfen |
-| --- | --- | --- | --- |
-| **B — app-lokaler Domain-Server** (`apps/.../server/domain-api.ts`) | schnell, alles an einem Ort | genau das vom Maintainer verworfene Muster; verletzt thin-app/versioned-package-Schichtung; keine Wiederverwendung | abgelehnt (Feedback zu PR #37) |
-| **C — `modules/<domain>/`-Runtime-Mount** | der vorgesehene Generator-Pfad | `modules/` ist explizit PLAN/nicht-gemountet; präzedenzlos; bräuchte eigenes ADR | verfrüht — erst nach stabiler Store/BFF-Naht |
-| **D — nur In-Browser-Zustand-Store** | kein Backend nötig | nur DEV; nicht revisions-/mandantensicher; für Sozialdaten (Art. 9 DSGVO) untragbar | abgelehnt für ein echtes Verfahren |
-| **E — neue eigenständige `case-management`-Capability** statt Wiederverwendung records/workflow/audit | klarer Port | mehr Capability-Catalog-Fläche; evtl. Doppelung mit records/workflow | zurückgestellt → ADR-0004 |
+| Alternative                                                                                           | Vorteile                       | Nachteile                                                                                                          | Warum verworfen                              |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------- |
+| **B — app-lokaler Domain-Server** (`apps/.../server/domain-api.ts`)                                   | schnell, alles an einem Ort    | genau das vom Maintainer verworfene Muster; verletzt thin-app/versioned-package-Schichtung; keine Wiederverwendung | abgelehnt (Feedback zu PR #37)               |
+| **C — `modules/<domain>/`-Runtime-Mount**                                                             | der vorgesehene Generator-Pfad | `modules/` ist explizit PLAN/nicht-gemountet; präzedenzlos; bräuchte eigenes ADR                                   | verfrüht — erst nach stabiler Store/BFF-Naht |
+| **D — nur In-Browser-Zustand-Store**                                                                  | kein Backend nötig             | nur DEV; nicht revisions-/mandantensicher; für Sozialdaten (Art. 9 DSGVO) untragbar                                | abgelehnt für ein echtes Verfahren           |
+| **E — neue eigenständige `case-management`-Capability** statt Wiederverwendung records/workflow/audit | klarer Port                    | mehr Capability-Catalog-Fläche; evtl. Doppelung mit records/workflow                                               | zurückgestellt → ADR-0004                    |
 
 ## Konsequenzen
 
@@ -87,7 +87,8 @@ bleibt generierbar-fähig (die `leistung.config`-Naht steuert die UI, nicht der 
 
 **Schwerer / Folgekosten:** neue `app_tasks`-Migration + `CaseStore`/`TaskStore`-Impls (Postgres+
 InMemory-Parität + Contract-Tests + `e2e:postgres`); neue BFF-DTOs + Routen; ein async `CasePort`
-+ HTTP-Adapter (der synchrone `VorgangPort` bleibt für Antrag-Verfahren unangetastet).
+
+- HTTP-Adapter (der synchrone `VorgangPort` bleibt für Antrag-Verfahren unangetastet).
 
 **Neue Pflichten:** append-only-Audit-Riegel (`REVOKE UPDATE/DELETE` + Trigger) auf
 `app_audit_events`; DSGVO-Feld-Klassifikation (Art. 9 / Sozialdaten) am Fach-Datenmodell;
