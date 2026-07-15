@@ -30,6 +30,9 @@
       ],
       "@senticor/public-sector-ui": ["packages/public-sector-ui/src/index.ts"],
       "@senticor/provider-local": ["packages/provider-local/src/index.ts"],
+      "@senticor/provider-openai-compatible": [
+        "packages/provider-openai-compatible/src/index.ts"
+      ],
       "@senticor/provider-codesphere": [
         "packages/provider-codesphere/src/index.ts"
       ],

@@ -5,6 +5,7 @@
     { "path": "packages/public-sector-sdk" },
     { "path": "packages/public-sector-ui" },
     { "path": "packages/provider-local" },
+    { "path": "packages/provider-openai-compatible" },
     { "path": "packages/provider-local-auth" },
     { "path": "packages/provider-codesphere" },
     { "path": "packages/provider-dvc-generic" },
