@@ -12,8 +12,14 @@
     aufgenommen --aktivieren--> aktiv
     aktiv       --pausieren--> pausiert
     pausiert    --fortsetzen--> aktiv        (Wiederaufnahme aus Pause)
-    aktiv       --abschließen--> abgeschlossen   (Vier-Augen: senticor:requiresFourEyes="true")
+    aktiv       --abschließen--> abgeschlossen   (Vier-Augen: senticor:requiresFourEyes="true";
+                                                 schliesst den Fall: senticor:closesCase="true")
     abgeschlossen --wiederaufnehmen--> aktiv  (Wiederaufnahme eines abgeschlossenen Falls)
+
+  Warum ist "abgeschlossen" ein userTask und KEIN <endEvent>? Weil der Fall WIEDERAUFNEHMBAR ist: der
+  Abschluss-Zustand hat einen ausgehenden Fluss ("wiederaufnehmen"), ein BPMN-Endereignis hat aber
+  definitionsgemäß keine ausgehenden Flüsse. Der Abschluss wird deshalb explizit über das
+  Extension-Attribut senticor:closesCase="true" angesagt (gleichwertig zum <endEvent>-Auslöser).
 
   Alles synthetisch — keine echten Personen/PII, keine IP.
 -->
@@ -31,7 +37,7 @@
     <bpmn:sequenceFlow id="f_aktivieren" name="aktivieren" sourceRef="s_aufgenommen" targetRef="s_aktiv" />
     <bpmn:sequenceFlow id="f_pausieren" name="pausieren" sourceRef="s_aktiv" targetRef="s_pausiert" />
     <bpmn:sequenceFlow id="f_fortsetzen" name="fortsetzen" sourceRef="s_pausiert" targetRef="s_aktiv" />
-    <bpmn:sequenceFlow id="f_abschliessen" name="abschließen" sourceRef="s_aktiv" targetRef="s_abgeschlossen" senticor:requiresFourEyes="true" />
+    <bpmn:sequenceFlow id="f_abschliessen" name="abschließen" sourceRef="s_aktiv" targetRef="s_abgeschlossen" senticor:requiresFourEyes="true" senticor:closesCase="true" />
     <bpmn:sequenceFlow id="f_wiederaufnehmen" name="wiederaufnehmen" sourceRef="s_abgeschlossen" targetRef="s_aktiv" />
   </bpmn:process>
 </bpmn:definitions>

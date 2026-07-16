@@ -38,11 +38,15 @@ stateMachine:
     - { from: aufgenommen, to: aktiv, action: aktivieren }
     - { from: aktiv, to: pausiert, action: pausieren }
     - { from: pausiert, to: aktiv, action: fortsetzen } # Wiederaufnahme aus Pause
+    # closesCase: der Reducer stempelt closedAt. Abgeleitet aus senticor:closesCase="true" am Flow — NICHT aus
+    # einem <endEvent>, weil der Abschluss-Zustand wiederaufnehmbar ist (ein Endereignis hätte keine
+    # ausgehenden Flüsse).
     - {
         from: aktiv,
         to: abgeschlossen,
         action: abschließen,
         requiresFourEyes: true,
+        closesCase: true,
       }
     - { from: abgeschlossen, to: aktiv, action: wiederaufnehmen } # abgeschlossenen Fall wiederaufnehmen
 

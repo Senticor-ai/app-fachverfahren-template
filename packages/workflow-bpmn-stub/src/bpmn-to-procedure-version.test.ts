@@ -113,11 +113,14 @@ describe("bpmnToProcedureVersion", () => {
         action: "Re-Assessment",
         requiredPermission: "case.decision.prepare",
       },
+      // Ziel ist das <endEvent> „Abgeschlossen" → closesCase (Auslöser (a) der Konvention): der Reducer
+      // stempelt bei diesem Übergang closedAt.
       {
         from: "Abschluss",
         to: "Abgeschlossen",
         action: "abschliessen",
         requiredPermission: "case.decision.prepare",
+        closesCase: true,
       },
     ]);
   });
@@ -299,7 +302,7 @@ const EXAMPLE_BPMN = `<?xml version="1.0" encoding="UTF-8"?>
     <bpmn:sequenceFlow id="f_aktivieren" name="aktivieren" sourceRef="s_aufgenommen" targetRef="s_aktiv" />
     <bpmn:sequenceFlow id="f_pausieren" name="pausieren" sourceRef="s_aktiv" targetRef="s_pausiert" />
     <bpmn:sequenceFlow id="f_fortsetzen" name="fortsetzen" sourceRef="s_pausiert" targetRef="s_aktiv" />
-    <bpmn:sequenceFlow id="f_abschliessen" name="abschließen" sourceRef="s_aktiv" targetRef="s_abgeschlossen" senticor:requiresFourEyes="true" />
+    <bpmn:sequenceFlow id="f_abschliessen" name="abschließen" sourceRef="s_aktiv" targetRef="s_abgeschlossen" senticor:requiresFourEyes="true" senticor:closesCase="true" />
     <bpmn:sequenceFlow id="f_wiederaufnehmen" name="wiederaufnehmen" sourceRef="s_abgeschlossen" targetRef="s_aktiv" />
   </bpmn:process>
 </bpmn:definitions>`;
@@ -312,6 +315,59 @@ const EXAMPLE_LEGAL_BASIS_IDS = [
   "de-flueag-17",
   "de-flueag-18",
 ];
+
+describe("closesCase-Konvention", () => {
+  it("leitet closesCase NICHT ab, wenn weder <endEvent>-Ziel noch closesCase-Attribut vorliegen", () => {
+    const xml = `<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL">
+      <bpmn:process id="p">
+        <bpmn:userTask id="a" name="a" />
+        <bpmn:userTask id="b" name="b" />
+        <bpmn:sequenceFlow id="f" name="weiter" sourceRef="a" targetRef="b" />
+      </bpmn:process>
+    </bpmn:definitions>`;
+    const pv = bpmnToProcedureVersion(xml, {
+      procedureId: "p",
+      version: "1",
+      legalBasisIds: ["x"],
+    });
+    expect(pv.allowedTransitions[0]?.closesCase).toBeUndefined();
+  });
+
+  it("treibt den WIEDERAUFNEHMBAREN Abschluss durch den echten Reducer: closesCase stempelt closedAt, die Wiederaufnahme räumt es ab", () => {
+    const procedureVersion = bpmnToProcedureVersion(EXAMPLE_BPMN, {
+      procedureId: "integrationsmanagement",
+      version: "2026.1",
+      legalBasisIds: EXAMPLE_LEGAL_BASIS_IDS,
+    });
+    const registry = createInMemoryProcedureRegistry([procedureVersion]);
+    const geladen = registry.get("integrationsmanagement", "2026.1");
+    expect(geladen).toBeDefined();
+    if (geladen === undefined) return;
+
+    const akte: Case = {
+      caseId: "case.1",
+      procedureId: "integrationsmanagement",
+      procedureVersion: "2026.1",
+      tenantId: "t",
+      authorityId: "a",
+      jurisdictionId: "de",
+      state: "aktiv",
+      version: 1,
+      subjectIds: ["s"],
+      openedAt: "2026-01-02T00:00:00.000Z",
+    };
+
+    // Abschluss (aus der BPMN abgeleitet: requiresFourEyes + closesCase) → closedAt gestempelt.
+    const geschlossen = transitionCase(akte, geladen, "abschließen", 1);
+    expect(geschlossen.state).toBe("abgeschlossen");
+    expect(typeof geschlossen.closedAt).toBe("string");
+
+    // Wiederaufnahme (nicht-schließender Übergang) → closedAt wieder entfernt.
+    const wieder = transitionCase(geschlossen, geladen, "wiederaufnehmen", 2);
+    expect(wieder.state).toBe("aktiv");
+    expect(wieder.closedAt).toBeUndefined();
+  });
+});
 
 describe("integrationsmanagement-Beispiel (docs/examples)", () => {
   it("leitet die dokumentierte, wiederaufnehmbare Zustandsmaschine aus der versendeten BPMN ab", () => {
@@ -349,6 +405,9 @@ describe("integrationsmanagement-Beispiel (docs/examples)", () => {
         action: "abschließen",
         requiredPermission: "case.decision.prepare",
         requiresFourEyes: true,
+        // Auslöser (b): der Abschluss-Zustand ist wiederaufnehmbar (hat einen ausgehenden Fluss) und darf
+        // daher kein <endEvent> sein — das Modell sagt den Abschluss via senticor:closesCase="true" an.
+        closesCase: true,
       },
       {
         from: "pausiert",

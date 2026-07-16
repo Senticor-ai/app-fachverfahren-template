@@ -79,7 +79,8 @@ Ableitungsregeln:
   `action` = `@name` des ersten benannten Flows auf dem Pfad, sonst
   `${from}->${to}`; `requiredPermission` = Konstante `"case.decision.prepare"`;
   `requiresFourEyes: true`, wenn ein Flow auf dem Pfad die Vier-Augen-Konvention
-  erfüllt (sonst weggelassen).
+  erfüllt (sonst weggelassen); `closesCase: true`, wenn der Übergang den Fall
+  schließt (closesCase-Konvention, siehe unten; sonst weggelassen).
 
 Bewusste Grenzen (fail-honest — das ist NICHT volle BPMN-2.0-/Camunda-Parität):
 
@@ -111,6 +112,29 @@ Zwei-Akteure-Erzwingung passiert **server-seitig**: `POST
 `requiresFourEyes`-Übergang mit `403` ab, wenn der Akteur des jüngsten
 Audit-Eintrags derselbe ist wie der aktuelle (Vorbereiter darf nicht selbst
 freigeben).
+
+## closesCase-Konvention (Abschluss des Falls)
+
+Ein Übergang löst `closesCase` aus, wenn EINER von zwei gleichwertigen Auslösern
+greift:
+
+1. der **Ziel-Knoten ist ein `<endEvent>`** — die BPMN-Semantik des Endereignisses
+   IST „der Fall wird geschlossen"; ODER
+2. ein Flow auf dem Pfad trägt ein Extension-Attribut mit Local-Name
+   `closesCase="true"` (Präfix egal, z. B. `senticor:closesCase`).
+
+**Auslöser 2 trägt den wiederaufnehmbaren Fall** — das Case-Management-Kernmuster:
+ein reopenbarer Abschluss-Zustand hat einen ausgehenden Fluss (z. B.
+`wiederaufnehmen`) und darf deshalb **kein `<endEvent>`** sein (ein Endereignis hat
+definitionsgemäß keine ausgehenden Flüsse). Modelliere ihn als `userTask` und sage
+den Abschluss explizit an. Vorlage:
+`docs/examples/integrationsberatung/integrationsmanagement.bpmn`.
+
+Wirkung: der reine Reducer `transitionCase` stempelt bei `closesCase`-Übergängen
+`closedAt` und **entfernt es bei nicht-schließenden Übergängen wieder** (die
+Wiederaufnahme räumt die Schließzeit ab). `closesCase` ist data-driven — es gibt
+KEINEN hart kodierten Endzustand-Namen. Das Gate `check:procedure-contract`
+verlangt **mindestens einen** schließenden Übergang je Verfahren.
 
 ## Die Kette: BPMN → Fall-Zustandswechsel
 

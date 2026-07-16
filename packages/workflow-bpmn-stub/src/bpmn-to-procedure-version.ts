@@ -23,6 +23,8 @@
 //                         requiredPermission = "case.decision.prepare" (Konstante)
 //                         requiresFourEyes   = true, wenn IRGENDEIN Flow auf dem Pfad die Vier-Augen-Konvention
 //                                              erfüllt (siehe unten); sonst weggelassen.
+//                         closesCase         = true, wenn der Übergang den Fall schliesst (siehe Konvention
+//                                              unten); der Reducer `transitionCase` stempelt dann `closedAt`.
 //
 // ── VIER-AUGEN-KONVENTION (dokumentiert, zwei gleichwertige Auslöser) ────────────────────────────────────
 //   (a) Flow-@name beginnt (case-insensitiv) mit „entscheiden"; ODER
@@ -30,6 +32,15 @@
 //       `senticor:requiresFourEyes`).
 //   Die eigentliche Zwei-Akteure-Erzwingung passiert server-seitig (BFF/Governance) — hier wird NUR das Flag
 //   aus dem Modell abgeleitet.
+//
+// ── CLOSES-CASE-KONVENTION (dokumentiert, zwei gleichwertige Auslöser) ───────────────────────────────────
+//   (a) der ZIEL-Knoten des Übergangs ist ein `<endEvent>` (die BPMN-Semantik des Endereignisses IST
+//       „der Fall wird geschlossen"); ODER
+//   (b) ein Flow auf dem Pfad trägt ein Extension-Attribut mit Local-Name `closesCase="true"` (Präfix egal,
+//       z. B. `senticor:closesCase`).
+//   (b) trägt den WIEDERAUFNEHMBAREN Fall (Case-Management-Kernmuster): ein reopenbarer Abschluss-Zustand hat
+//   ausgehende Flüsse (z. B. „wiederaufnehmen") und darf deshalb KEIN `<endEvent>` sein — ein Endereignis hat
+//   definitionsgemäß keine ausgehenden Flüsse. Das Modell sagt den Abschluss dann explizit an.
 //
 // ── BEWUSSTE GRENZEN (fail-honest) ───────────────────────────────────────────────────────────────────────
 //   * Gateway-SEMANTIK wird NICHT unterschieden: exclusive (XOR) und parallel (AND) werden identisch als
@@ -71,6 +82,8 @@ interface FlowNode {
   id: string;
   name?: string;
   type: FlowNodeType;
+  /** `<endEvent>`: das Erreichen dieses Knotens SCHLIESST den Fall (→ `CaseTransition.closesCase`). */
+  isEnd: boolean;
 }
 
 interface SequenceFlow {
@@ -78,6 +91,7 @@ interface SequenceFlow {
   targetRef: string;
   name?: string;
   requiresFourEyesAttr: boolean;
+  closesCaseAttr: boolean;
 }
 
 /** BPMN-Element-Tag (ohne Namespace-Präfix) → Rolle im abgeleiteten Zustandsmodell. */
@@ -200,6 +214,7 @@ export function bpmnToProcedureVersion(
     const node: FlowNode = {
       id,
       type,
+      isEnd: tag === "endEvent",
       ...(name !== undefined ? { name } : {}),
     };
     nodes.push(node);
@@ -244,10 +259,14 @@ export function bpmnToProcedureVersion(
       ([key, value]) =>
         localName(key) === "requiresFourEyes" && value === "true",
     );
+    const closesCaseAttr = Object.entries(attrs).some(
+      ([key, value]) => localName(key) === "closesCase" && value === "true",
+    );
     const flow: SequenceFlow = {
       sourceRef,
       targetRef,
       requiresFourEyesAttr,
+      closesCaseAttr,
       ...(name !== undefined ? { name } : {}),
     };
     const bucket = flowsBySource.get(sourceRef);
@@ -271,13 +290,19 @@ export function bpmnToProcedureVersion(
     const namedFlow = path.find((flow) => flow.name !== undefined);
     const action = namedFlow?.name ?? `${fromLabel}->${toLabel}`;
     const requiresFourEyes = path.some(isFourEyesFlow);
+    // Schließt dieser Übergang den Fall? ZWEI gleichwertige Auslöser (siehe Modul-Kommentar): das Ziel ist ein
+    // endEvent ODER ein Flow auf dem Pfad trägt closesCase="true". Letzteres trägt den WIEDERAUFNEHMBAREN Fall:
+    // ein reopenbarer Abschluss-Zustand hat ausgehende Flüsse und darf daher kein endEvent sein (ein
+    // Endereignis hat definitionsgemäß keine ausgehenden Flüsse) — das Modell sagt es dann explizit an.
+    const closesCase = target.isEnd || path.some((flow) => flow.closesCaseAttr);
     const key = `${fromLabel} ${toLabel} ${action}`;
     const existing = transitions.get(key);
     if (existing !== undefined) {
       // Zusammenlaufende Pfade mit gleicher Aktion: Vier-Augen ist die ODER-Verknüpfung.
-      if (requiresFourEyes && existing.requiresFourEyes !== true) {
-        transitions.set(key, { ...existing, requiresFourEyes: true });
-      }
+      const merged: CaseTransition = { ...existing };
+      if (requiresFourEyes) merged.requiresFourEyes = true;
+      if (closesCase) merged.closesCase = true;
+      transitions.set(key, merged);
       return;
     }
     transitions.set(key, {
@@ -286,6 +311,7 @@ export function bpmnToProcedureVersion(
       action,
       requiredPermission: REQUIRED_PERMISSION,
       ...(requiresFourEyes ? { requiresFourEyes: true } : {}),
+      ...(closesCase ? { closesCase: true } : {}),
     });
   };
 
