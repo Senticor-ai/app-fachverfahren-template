@@ -23,7 +23,7 @@ Wenn dies dein einziger Startprompt ist:
 4. Lies die dort ausgewählten Pflichtdateien vor Änderungen.
 5. Nutze Package-Script `app:new` mit
    `docs/examples/hundesteuer/app.spec.yaml` nur, wenn zusätzlich das
-   Modul-Gerüst `modules/dog-tax/` erzeugt werden soll (Generator-Pfad, PLAN
+   Modul-Gerüst `modules/hundesteuer/` erzeugt werden soll (Generator-Pfad, PLAN
    für die App-Einbindung — siehe `modules/README.md`).
 
 ## Aufgabe
@@ -104,7 +104,7 @@ bleiben separat zu validieren.
   `vorschlag`); Entscheidungen bleiben menschlich bestätigt.
 - Kein Hundesteuer-Code landet außerhalb der Naht oder dieses
   Beispielverzeichnisses.
-- Beim optionalen Generator-Pfad zusätzlich: `modules/dog-tax/` mit
+- Beim optionalen Generator-Pfad zusätzlich: `modules/hundesteuer/` mit
   Manifest, Screen Contracts, Permissions, Events, Compliance-Profil und
   grünem `check:domain-contracts`.
 

@@ -342,13 +342,13 @@ describe("template CLI", () => {
       "--task",
       "docs/examples/hundesteuer/app.spec.yaml",
       "--paths",
-      "modules/dog-tax",
+      "modules/hundesteuer",
       "--json",
     ]);
     const report = JSON.parse(output);
     expect(report.status).toBe("ok");
     expect(report.context.selectedSources).toEqual(["fimportal"]);
-    expect(report.context.writeBoundaries).toContain("modules/dog-tax");
+    expect(report.context.writeBoundaries).toContain("modules/hundesteuer");
     expect(report.context.nextCommands.map((command) => command.id)).toContain(
       "generate-domain-module",
     );

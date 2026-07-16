@@ -25,6 +25,18 @@ Komponenten-Bibliothek gebaut — die neutrale Fastify-Web-Runtime existiert in
 `apps/fachverfahren/server`, die Bausteine existieren in
 `packages/fachverfahren-kit`.
 
+## Golden Example (kanonische Referenz)
+
+`docs/examples/hundesteuer/app.spec.yaml` (+ `agent-prompt.md`,
+`gtc-builder-vorhaben.md`) ist das vollständig durchdeklinierte Referenz-
+Fachverfahren dieses Kits — der Default von `app:new` und die Grundlage der
+Scaffold-Selbsttests (`agent-platform.test.ts`, Agent-Readiness, Golden-
+Generated-App). Orientiere jedes neue Verfahren daran (Bürger-/Sachbearbeitungs-/
+Aufsichts-Surface, `berechne()`-Fachlogik, Contracts, Migrationen). Der Domänen-
+Slug ist durchgehend `hundesteuer` (kanonisch, deutsch) — NIE eine englische
+oder erfundene Variante (`dog-tax` o. Ä.); ein abweichender Slug driftet den Build
+(alle `modules/<domain>/`-Pfade MÜSSEN exakt diesen einen Slug tragen).
+
 ## Workflow (Naht füllen)
 
 1. `AGENTS.md` lesen: Naht-Vertrag, Annahme-DATEN-Konvention, Pfad-Karte.

@@ -195,6 +195,18 @@ Generator `pnpm run app:new` erzeugt daraus ein Modul-Gerüst unter
 (PLAN, siehe `modules/README.md`). Capability-IDs und verbotene
 Reimplementierungen stehen in `platform/capabilities.json`.
 
+**Golden Example — Hundesteuer.** `docs/examples/hundesteuer/app.spec.yaml`
+(mit `agent-prompt.md` + `gtc-builder-vorhaben.md`) ist das kanonische
+Referenz-Verfahren dieses Kits: ein vollständig durchdekliniertes,
+komplettes Fachverfahren-Beispiel (Bürger-/Sachbearbeitungs-/Aufsichts-Surface,
+`berechne()`-Fachlogik, Contracts, Migrationen). Es ist der Default von
+`app:new`, die Grundlage der Scaffold-Selbsttests (`agent-platform.test.ts`,
+Agent-Readiness, Golden-Generated-App) und die empfohlene Vorlage, an der sich
+jedes neue Verfahren orientiert. Der Domänen-Slug ist durchgehend `hundesteuer`
+(kanonisch, deutsch) — **niemals eine englische/erfundene Variante** wie
+`dog-tax`; abweichende Slugs driften den Build (die generierende Instanz muss
+GENAU diesen Slug für alle `modules/<domain>/`-Pfade verwenden).
+
 ## Projekt und Community
 
 - Sicherheitsmeldungen: `SECURITY.md`

@@ -31,12 +31,12 @@ describe("agent platform contract", () => {
   it("selects minimal task context for the Hundesteuer spec", async () => {
     const context = await buildAgentContext(root, {
       taskPath: "docs/examples/hundesteuer/app.spec.yaml",
-      paths: ["modules/dog-tax"],
+      paths: ["modules/hundesteuer"],
     });
     expect(context.taskId).toBe("hundesteuer");
     expect(context.selectedCapabilities).toContain("identity-and-trust");
     expect(context.selectedSources).toEqual(["fimportal"]);
-    expect(context.writeBoundaries).toContain("modules/dog-tax");
+    expect(context.writeBoundaries).toContain("modules/hundesteuer");
     expect(context.writeBoundaries).toContain(".agent/sources/");
     expect(context.nextCommands.map((command) => command.id)).toContain(
       "fetch-governed-source:fimportal",
@@ -58,10 +58,10 @@ describe("agent platform contract", () => {
       join(root, "docs/examples/hundesteuer/app.spec.yaml"),
     );
     const contract = deriveModuleContract(spec);
-    expect(contract.moduleId).toBe("dog-tax");
+    expect(contract.moduleId).toBe("hundesteuer");
     expect(contract.consumedCapabilities).toContain("payment");
-    expect(contract.allowedDomainPaths).toContain("modules/dog-tax");
-    expect(contract.permissions).toContain("dog-tax.auditor");
+    expect(contract.allowedDomainPaths).toContain("modules/hundesteuer");
+    expect(contract.permissions).toContain("hundesteuer.auditor");
     expect(JSON.stringify(contract)).toContain("AuditPort");
   });
 
@@ -81,19 +81,19 @@ describe("agent platform contract", () => {
       });
       expect(first.status).toBe("ok");
       expect(first.generated).toContain(
-        "modules/dog-tax/contracts/audit-workspace.screen.yaml",
+        "modules/hundesteuer/contracts/audit-workspace.screen.yaml",
       );
       expect(first.generated).toContain(
-        "modules/dog-tax/ui/DogTaxScreens.stories.tsx",
+        "modules/hundesteuer/ui/HundesteuerScreens.stories.tsx",
       );
       expect(first.generated).toContain(
-        "modules/dog-tax/migrations/database/0001_create_dog_tax_cases.sql",
+        "modules/hundesteuer/migrations/database/0001_create_hundesteuer_cases.sql",
       );
       expect(first.generated).toContain(
-        "modules/dog-tax/compliance/profile.example.json",
+        "modules/hundesteuer/compliance/profile.example.json",
       );
       expect(second.status).toBe("ok");
-      expect(second.preserved).toContain("modules/dog-tax");
+      expect(second.preserved).toContain("modules/hundesteuer");
     } finally {
       await rm(temp, { recursive: true, force: true });
     }
