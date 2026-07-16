@@ -25,6 +25,12 @@
       "@senticor/platform-contracts": [
         "packages/platform-contracts/src/index.ts"
       ],
+      "@senticor/app-store-contracts": [
+        "packages/app-store-contracts/src/index.ts"
+      ],
+      "@senticor/fachverfahren-domain": [
+        "packages/fachverfahren-domain/src/index.ts"
+      ],
       "@senticor/public-sector-sdk": [
         "packages/public-sector-sdk/src/index.ts"
       ],

@@ -75,6 +75,25 @@ export type {
   TenantScope,
   VersionedMutation,
 } from "./kanban-store.js";
+export {
+  createCaseStoreFromEnv,
+  InMemoryCaseStore,
+  PostgresCaseStore,
+  UnavailableCaseStore,
+} from "./case-store.js";
+export {
+  createAttachmentStoreFromEnv,
+  InMemoryAttachmentStore,
+  LocalFsAttachmentStore,
+  UnavailableAttachmentStore,
+} from "./attachment-store.js";
+export type {
+  AttachmentStore,
+  CaseStore,
+  CaseScope,
+  CaseListQuery,
+  VersionedCaseRecord,
+} from "@senticor/app-store-contracts";
 export { nextPositionKey } from "./position.js";
 export {
   defaultMigrationOptionsFromEnv,

@@ -32,6 +32,8 @@ export default defineConfig({
     alias: {
       "@senticor/public-sector-sdk": pkg("public-sector-sdk"),
       "@senticor/platform-contracts": pkg("platform-contracts"),
+      "@senticor/app-store-contracts": pkg("app-store-contracts"),
+      "@senticor/fachverfahren-domain": pkg("fachverfahren-domain"),
       "@senticor/conformance-kit": pkg("conformance-kit"),
       "@senticor/app-store-postgres": pkg("app-store-postgres"),
       "@senticor/app-runtime-fastify": pkg("app-runtime-fastify"),

@@ -2,6 +2,8 @@
   "files": [],
   "references": [
     { "path": "packages/platform-contracts" },
+    { "path": "packages/app-store-contracts" },
+    { "path": "packages/fachverfahren-domain" },
     { "path": "packages/public-sector-sdk" },
     { "path": "packages/public-sector-ui" },
     { "path": "packages/provider-local" },

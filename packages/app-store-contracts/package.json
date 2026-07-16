@@ -1,5 +1,5 @@
 {
-  "name": "@senticor/app-store-postgres",
+  "name": "@senticor/app-store-contracts",
   "version": "0.1.0-rc.1",
   "type": "module",
   "main": "./dist/index.js",
@@ -10,23 +10,12 @@
       "default": "./dist/index.js"
     }
   },
-  "bin": {
-    "senticor-db-migrate": "./dist/migrate.js"
-  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "db:migrate": "node dist/migrate.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run"
   },
-  "dependencies": {
-    "fractional-indexing": "^4.0.0",
-    "pg": "catalog:",
-    "@senticor/app-store-contracts": "workspace:*"
-  },
   "devDependencies": {
-    "@types/node": "catalog:",
-    "@types/pg": "catalog:",
     "typescript": "6.0.3",
     "vitest": "catalog:"
   }
