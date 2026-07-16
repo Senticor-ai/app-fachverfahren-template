@@ -118,9 +118,16 @@ export interface CardScope extends BoardScope {
 }
 
 /**
- * Provider-neutral Kanban persistence. Boards are independent collaboration
- * objects — not projections of case status. Implementations: Postgres,
- * InMemory, Unavailable; later CHOS.
+ * Materialised Kanban cache / view persistence.
+ *
+ * System of record for work is ActionStore (+ ThingStore for objects).
+ * Kanban columns/cards are a UX projection of Actions (see
+ * `projectActionsToBoardView` in `@senticor/fachverfahren-domain`).
+ * Prefer `sourceKey = action:<actionId>` and CardReference rows of kinds
+ * `Action` / `Thing`. Do not dual-write domain rules into this store.
+ *
+ * Implementations: Postgres, InMemory, Unavailable; later CHOS may skip
+ * materialisation and serve BoardPort directly from ActionStore.
  */
 export interface KanbanStore {
   createBoard(board: Board): Promise<Board>;

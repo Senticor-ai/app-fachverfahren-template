@@ -14,15 +14,18 @@ erschwert konkurrente Appends und Audit-Abfragen. Nachweise werden vor
 Hybrid-Modell: Snapshot in `app_cases.payload` plus append-only
 `app_case_events`, Idempotenz in `app_case_idempotency`, Linkage in
 `app_case_attachments`. Attachment-Lifecycle: unbound Token → bind bei
-`einreichen` → Orphan-TTL. Boards bleiben unabhängig (kein Dual-Write).
+`einreichen` → Orphan-TTL.
+
+> **Hinweis:** Die frühere Aussage „Boards bleiben unabhängig“ ist durch
+> [ADR-0004](0004-kanban-as-action-thing-view.md) ersetzt — Kanban ist eine
+> Sicht auf Action+Thing, kein zweites SoR.
 
 ## Alternativen
 
-| Alternative             | Vorteile        | Nachteile                 | Warum verworfen        |
-| ----------------------- | --------------- | ------------------------- | ---------------------- |
-| Nur JSONB inkl. History | Einfacher Start | Schwache Konkurrenz/Audit | Verworfen              |
-| Draft-Case vor Upload   | Frühe case_id   | Mehr Zustände             | Unbound-Token reicht   |
-| Case→Board-Projektion   | Einheitliche UX | Cross-Store-Transaktionen | Explizit später/outbox |
+| Alternative             | Vorteile        | Nachteile                 | Warum verworfen      |
+| ----------------------- | --------------- | ------------------------- | -------------------- |
+| Nur JSONB inkl. History | Einfacher Start | Schwache Konkurrenz/Audit | Verworfen            |
+| Draft-Case vor Upload   | Frühe case_id   | Mehr Zustände             | Unbound-Token reicht |
 
 ## Konsequenzen
 

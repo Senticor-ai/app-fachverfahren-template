@@ -175,8 +175,9 @@ Jede Zeile beschreibt den IST-Stand. Zeilen mit `(PLAN)` existieren noch nicht.
 | `packages/public-sector-ui/src/`                                  | Public-Sector-UI-Fassade + Stories                       | UI-Vertrag; ShadCN bleibt Implementierungsdetail   |
 | `packages/platform-contracts/`                                    | Capability-Ports                                         | Fachlogik nutzt Ports, nie Provider direkt         |
 | `packages/public-sector-sdk/`                                     | Authorization, RBAC, Audit, Domain-Kernel                | Rollen über RBAC-Registry erweitern                |
-| `packages/fachverfahren-domain/`                                  | Headless Vorgang/Transition-Typen (ohne React)           | CaseService/Domain; kein UI                        |
-| `packages/app-store-contracts/`                                   | Provider-neutrale Store-Interfaces                       | Case/Kanban/Attachment/AppStore; kein Postgres     |
+| `packages/fachverfahren-domain/`                                  | Headless Vorgang/Thing/Action + Board-Projektion         | CaseService/Domain; kein UI                        |
+| `packages/app-store-contracts/`                                   | Provider-neutrale Store-Interfaces                       | Case/Thing/Action/Kanban(view)/Attachment          |
+| `docs/adr/0004-kanban-as-action-thing-view.md`                    | Kanban = Sicht auf Action+Thing                          | Boards sind kein SoR                               |
 | `packages/app-store-postgres/`                                    | Store-Implementierungen + Migrator                       | Migrationen über `db:migrate`                      |
 | `docs/reference/persistence-adapters.md`                          | Persistenz-Schichten + CHOS-PLAN-Seam                    | Lesen vor Store-/Provider-Arbeit                   |
 | `jurisdictions/de`, `jurisdictions/eu`                            | Rechtsraum-Packs                                         | Keine `country === "DE"`-Logik in der App          |

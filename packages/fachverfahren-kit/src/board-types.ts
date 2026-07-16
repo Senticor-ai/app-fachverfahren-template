@@ -1,16 +1,12 @@
-// fachverfahren-kit/board-types — der generische Vertrag der Kanban-Workspace-Oberfläche.
+// fachverfahren-kit/board-types — Kanban als VIEW über Actions auf Things.
 //
-// Gleiche Entkopplung wie `VorgangPort<T>` in types.ts: die UI kennt nur `BoardPort`, nie den
-// konkreten REST-Client oder die In-Memory-Implementierung. DEV/Storybook = `createBoardStore`
-// (In-Memory), PROD = ein REST-Client gegen `/api/v1/boards*` — dieselbe Schnittstelle, zwei
-// Laufzeiten. Anders als `VorgangPort` ist `BoardPort` bewusst ASYNCHRON: die produktive
-// Implementierung spricht über echtes HTTP mit dem Server, nicht mit einem synchronen Zustand-Store.
+// System of Record: ThingStore + ActionStore (Schema.org-inspiriert: CreativeWork, Person,
+// Organization, ApproveAction, CommunicateAction, …). BoardPort ist die Browser-Naht der
+// Arbeitswarteschlange — DEV/Storybook = createBoardStore, PROD = HTTP gegen materialisierte
+// Boards oder (PLAN) direkt gegen Action-Projektion. Karten sollten `actionId`/`objectThingId`
+// tragen bzw. über sourceKey `action:<id>` verknüpft sein.
 //
-// Trello-artige Funktionen (Labels, Checkliste, Kommentare, Spalten-Umbenennen) sind als OPTIONALE
-// `BoardPort`-Methoden modelliert — dasselbe Muster wie optionale `LeistungConfig`-Felder
-// ("NUR setzen, wenn das Fachkonzept es vorsieht"). Das lässt die UX-Arbeit in Storybook/DEV
-// vorangehen, ohne die produktive REST-Anbindung sofort mitziehen zu müssen; `board-client.ts`
-// kann diese Methoden nachreichen, sobald die Server-Routen existieren.
+// Trello-artige Funktionen (Labels, Checkliste, Kommentare) bleiben OPTIONALE BoardPort-Methoden.
 
 export type BoardVisibility = "personal" | "team";
 
@@ -106,6 +102,14 @@ export interface BoardCard<TCardData = Record<string, unknown>> {
   version: number;
   archivedAt: string | null;
   data?: TCardData;
+  /** Durable Action this card projects (`action:<id>` sourceKey when materialised). */
+  actionId?: string;
+  /** Schema.org-ish Action type, e.g. ApproveAction / CommunicateAction. */
+  actionType?: string;
+  /** Thing the Action is about (schema.org/object). */
+  objectThingId?: string;
+  /** Thing type, e.g. CreativeWork / Person / Organization. */
+  objectType?: string;
 }
 
 export interface CreateBoardInput {

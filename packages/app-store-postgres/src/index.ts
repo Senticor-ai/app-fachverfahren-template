@@ -87,11 +87,21 @@ export {
   LocalFsAttachmentStore,
   UnavailableAttachmentStore,
 } from "./attachment-store.js";
+export {
+  createActionStoreFromEnv,
+  createThingStoreFromEnv,
+  InMemoryActionStore,
+  InMemoryThingStore,
+  UnavailableActionStore,
+  UnavailableThingStore,
+} from "./thing-action-store.js";
 export type {
+  ActionStore,
   AttachmentStore,
   CaseStore,
   CaseScope,
   CaseListQuery,
+  ThingStore,
   VersionedCaseRecord,
 } from "@senticor/app-store-contracts";
 export { nextPositionKey } from "./position.js";

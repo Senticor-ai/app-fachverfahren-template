@@ -4,4 +4,5 @@ export * from "./app-store.js";
 export * from "./kanban.js";
 export * from "./case.js";
 export * from "./attachment.js";
+export * from "./thing-action.js";
 export * from "./case-contract-tests.js";
