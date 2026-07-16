@@ -107,3 +107,31 @@ export const CaseAuditListDtoSchema = Type.Object(
 );
 
 export type CaseAuditListDto = Static<typeof CaseAuditListDtoSchema>;
+
+// Eine im AKTUELLEN Zustand erlaubte Aktion (Übergang) — abgeleitet AUS dem Verfahren (ProcedureVersion.
+// allowedTransitions, gefiltert auf `from === state`). Der Zielzustand + die Rechtsgrundlage stammen NIE aus
+// dem Client; dieser Read sagt dem UI nur, WELCHE `action` es an `POST /transitions` senden darf.
+export const CaseAllowedActionDtoSchema = Type.Object(
+  {
+    action: Type.String({ minLength: 1 }),
+    to: Type.String({ minLength: 1 }),
+    requiredPermission: Type.String({ minLength: 1 }),
+    requiresFourEyes: Type.Boolean(),
+  },
+  { additionalProperties: false },
+);
+
+export type CaseAllowedActionDto = Static<typeof CaseAllowedActionDtoSchema>;
+
+// Erlaubte Aktionen eines Falls im aktuellen Zustand + `version` (für das Optimistic-Locking des Übergangs).
+// Unbekanntes Verfahren → leere Liste (fail-safe: der Fall lässt sich nicht bewegen) statt eines Fehlers.
+export const CaseAllowedActionsDtoSchema = Type.Object(
+  {
+    state: Type.String({ minLength: 1 }),
+    version: Type.Integer({ minimum: 1 }),
+    actions: Type.Array(CaseAllowedActionDtoSchema),
+  },
+  { additionalProperties: false },
+);
+
+export type CaseAllowedActionsDto = Static<typeof CaseAllowedActionsDtoSchema>;

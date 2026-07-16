@@ -54,6 +54,22 @@ export interface CaseZielFortschritt {
   percent: number;
 }
 
+/** Eine im aktuellen Zustand erlaubte Aktion — 1:1 zur BFF-`CaseAllowedActionDto`. Der Client sendet nur
+ *  `action` an `transitionCase`; Zielzustand/Rechtsgrundlage/Vier-Augen bleiben server-autoritativ. */
+export interface CaseAllowedAction {
+  action: string;
+  to: string;
+  requiredPermission: string;
+  requiresFourEyes: boolean;
+}
+
+/** Erlaubte Aktionen eines Falls + aktueller Zustand + `version` (für das Optimistic-Locking des Übergangs). */
+export interface CaseAllowedActions {
+  state: string;
+  version: number;
+  actions: CaseAllowedAction[];
+}
+
 /** Ein Verlaufs-/Audit-Eintrag einer Akte — 1:1 zur BFF-`CaseAuditEventDto` (append-only, chronologisch).
  *  `payload` ist frei-formig (z. B. previousState/newState/summary/detail); `legalBasisId` ist die
  *  revisionssichere Verankerung. Die Server-Topologie (tenant/authority/jurisdiction) bleibt verborgen. */
@@ -91,6 +107,7 @@ export interface CasePort {
     caseId: string,
     query?: { limit?: number },
   ): Promise<CaseAuditEvent[]>;
+  listAllowedActions(caseId: string): Promise<CaseAllowedActions>;
   // Schreibpfade — Request-/Antwort-Formen aus den BFF-Wire-Verträgen. Nicht-2xx (400/403/404/409/503)
   // wirft `CaseRequestError` mit Statuscode; der Aufrufer entscheidet fachlich (Konflikt/verwehrt/…).
   createCase(req: CaseCreateRequestDto): Promise<CaseDto>;
@@ -212,6 +229,12 @@ export function createHttpCasePort(): CasePort {
         `/api/cases/${encodeURIComponent(caseId)}/audit${qs}`,
       );
       return body.events;
+    },
+
+    async listAllowedActions(caseId) {
+      return await request<CaseAllowedActions>(
+        `/api/cases/${encodeURIComponent(caseId)}/allowed-actions`,
+      );
     },
 
     async createCase(req) {

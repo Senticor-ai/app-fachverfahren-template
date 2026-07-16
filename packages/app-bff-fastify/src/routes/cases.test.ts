@@ -152,4 +152,40 @@ describe("BFF /api/cases", () => {
     expect(res.statusCode).toBe(404);
     await fremd.app.close();
   });
+
+  it("GET /api/cases/:id/allowed-actions liefert die Übergänge des aktuellen Zustands (aus dem Verfahren); Fremd-Behörde → 404", async () => {
+    const { app } = await buildCasesApp();
+    const created = (await createCase(app)).json();
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/cases/${created.caseId}/allowed-actions`,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.state).toBe("aufgenommen");
+    expect(body.version).toBe(1);
+    // Genau der eine Übergang des Verfahrens mit from="aufgenommen" (requiresFourEyes zu Boolean normalisiert).
+    expect(body.actions).toEqual([
+      {
+        action: "aktivieren",
+        to: "aktiv",
+        requiredPermission: "case.decision.prepare",
+        requiresFourEyes: false,
+      },
+    ]);
+    await app.close();
+
+    // Fremde Behörde im selben Mandanten → 404 (kein Existenz-Leak).
+    const fremd = await buildBffApp({
+      session: caseworkerSession({ authorityId: "authority-2" }),
+      caseStore: new InMemoryCaseStore(),
+      procedureRegistry: createInMemoryProcedureRegistry([procedure]),
+    });
+    const res2 = await fremd.app.inject({
+      method: "GET",
+      url: `/api/cases/${created.caseId}/allowed-actions`,
+    });
+    expect(res2.statusCode).toBe(404);
+    await fremd.app.close();
+  });
 });

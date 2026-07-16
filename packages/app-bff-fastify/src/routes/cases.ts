@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 import {
+  CaseAllowedActionsDtoSchema,
   CaseAuditListDtoSchema,
   CaseAuditQuerySchema,
   CaseCreateRequestSchema,
@@ -223,6 +224,63 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
         return storeUnavailable(request, reply);
       }
       return reply.send({ events: events.map(toAuditDto) });
+    },
+  );
+
+  typed.get(
+    "/api/cases/:id/allowed-actions",
+    {
+      config: readAuth.config,
+      preHandler: readAuth.preHandler,
+      schema: {
+        tags: ["cases"],
+        summary:
+          "Erlaubte Aktionen (Übergänge) eines Falls im aktuellen Zustand — abgeleitet aus dem Verfahren",
+        params: CaseIdParamsSchema,
+        response: { 200: CaseAllowedActionsDtoSchema, ...errorResponses },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      let found: AppCase | undefined;
+      try {
+        found = await deps.caseStore.getCase({
+          tenantId: session.tenantId,
+          caseId: request.params.id,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      // Behörden-Scope: Fremd-Behörde/fehlend → 404 (keine Existenz-Leaks).
+      if (!found || found.authorityId !== session.authorityId)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+      const appCase = found;
+
+      // Erlaubte Aktionen = die Übergänge des Verfahrens, deren `from` der aktuelle Zustand ist. Zielzustand,
+      // Rechtsgrundlage und Vier-Augen-Pflicht stammen AUSSCHLIESSLICH aus dem Verfahren (DATEN) — der Client
+      // bekommt nur die `action`-Kennung, die er an POST /transitions senden darf. Unbekanntes Verfahren →
+      // leere Liste (fail-safe: der Fall lässt sich nicht bewegen), kein Fehler auf einem Lese-Endpunkt.
+      const procedure = deps.procedureRegistry.get(
+        appCase.procedureId,
+        appCase.procedureVersion,
+      );
+      const actions = procedure
+        ? procedure.allowedTransitions
+            .filter((transition) => transition.from === appCase.state)
+            .map((transition) => ({
+              action: transition.action,
+              to: transition.to,
+              requiredPermission: transition.requiredPermission,
+              requiresFourEyes: transition.requiresFourEyes ?? false,
+            }))
+        : [];
+      return reply.send({
+        state: appCase.state,
+        version: appCase.version,
+        actions,
+      });
     },
   );
 

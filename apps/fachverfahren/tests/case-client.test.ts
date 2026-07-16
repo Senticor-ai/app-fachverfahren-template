@@ -160,6 +160,27 @@ describe("case-client Schreibpfade", () => {
     });
   });
 
+  it("listAllowedActions → GET /api/cases/:id/allowed-actions, parst {state,version,actions}", async () => {
+    const payload = {
+      state: "aufgenommen",
+      version: 1,
+      actions: [
+        {
+          action: "aktivieren",
+          to: "aktiv",
+          requiredPermission: "case.decision.prepare",
+          requiresFourEyes: false,
+        },
+      ],
+    };
+    const { calls } = stubFetchJson(payload, 200);
+    const result = await createHttpCasePort().listAllowedActions("case.1");
+    expect(result).toEqual(payload);
+    expect(calls[0]?.method).toBe("GET");
+    expect(calls[0]?.url).toBe("/api/cases/case.1/allowed-actions");
+    expect(calls[0]?.credentials).toBe("include");
+  });
+
   it("Nicht-2xx-Status (409 Konflikt) → CaseRequestError mit Statuscode", async () => {
     stubFetchJson({ error: "case version conflict" }, 409);
     const rejection = expect(

@@ -135,6 +135,11 @@ describe("Routen-Klassifizierung (config.auth)", () => {
         { method: "GET", url: "/api/cases/:id", policy: "rbac:case.read" },
         {
           method: "GET",
+          url: "/api/cases/:id/allowed-actions",
+          policy: "rbac:case.read",
+        },
+        {
+          method: "GET",
           url: "/api/cases/:id/audit",
           policy: "rbac:case.read",
         },

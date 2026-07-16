@@ -32,6 +32,8 @@ export {
   type MailboxMessageDto,
 } from "./mailbox.js";
 export {
+  CaseAllowedActionDtoSchema,
+  CaseAllowedActionsDtoSchema,
   CaseAuditEventDtoSchema,
   CaseAuditListDtoSchema,
   CaseAuditQuerySchema,
@@ -41,6 +43,8 @@ export {
   CaseListDtoSchema,
   CaseListQuerySchema,
   CaseTransitionRequestSchema,
+  type CaseAllowedActionDto,
+  type CaseAllowedActionsDto,
   type CaseAuditEventDto,
   type CaseAuditListDto,
   type CaseAuditQueryDto,

@@ -15,12 +15,14 @@ import {
 } from "@senticor/fachverfahren-kit";
 import { casePort } from "../app/case-port.js";
 import type {
+  CaseAllowedActions,
   CaseAuditEvent,
   CaseSummary,
   CaseTask,
   CaseZielFortschritt,
 } from "../case-client.js";
 import { Shell } from "../app/shell.js";
+import { CaseAktionen } from "./case-aktionen.js";
 import { toAkteProps, toVerlauf } from "./case-akte-view.js";
 
 /** Die roh geladenen Akten-Daten (die Sicht hält keinen abgeleiteten Zustand — Props werden im Render gerechnet). */
@@ -29,6 +31,7 @@ interface AkteDaten {
   tasks: CaseTask[];
   progress: CaseZielFortschritt[];
   audit: CaseAuditEvent[];
+  allowedActions: CaseAllowedActions;
 }
 
 type LoadState =
@@ -52,14 +55,15 @@ export function AmtAktePage(): React.JSX.Element {
         setState({ kind: "notFound" });
         return;
       }
-      const [tasks, progress, audit] = await Promise.all([
+      const [tasks, progress, audit, allowedActions] = await Promise.all([
         casePort.listTasks(id),
         casePort.getProgress(id),
         casePort.listAudit(id),
+        casePort.listAllowedActions(id),
       ]);
       setState({
         kind: "ready",
-        data: { caseSummary, tasks, progress, audit },
+        data: { caseSummary, tasks, progress, audit, allowedActions },
       });
     } catch {
       setState({ kind: "error" });
@@ -141,6 +145,15 @@ export function AmtAktePage(): React.JSX.Element {
             )}
             verlauf={toVerlauf(state.data.audit)}
             onSchrittToggle={handleSchrittToggle}
+            kopfAktion={
+              <CaseAktionen
+                caseId={id}
+                state={state.data.allowedActions.state}
+                version={state.data.allowedActions.version}
+                actions={state.data.allowedActions.actions}
+                onDone={reload}
+              />
+            }
           />
         )}
       </section>
