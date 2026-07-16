@@ -54,6 +54,20 @@ export interface CaseZielFortschritt {
   percent: number;
 }
 
+/** Ein Verlaufs-/Audit-Eintrag einer Akte — 1:1 zur BFF-`CaseAuditEventDto` (append-only, chronologisch).
+ *  `payload` ist frei-formig (z. B. previousState/newState/summary/detail); `legalBasisId` ist die
+ *  revisionssichere Verankerung. Die Server-Topologie (tenant/authority/jurisdiction) bleibt verborgen. */
+export interface CaseAuditEvent {
+  auditEventId: string;
+  caseId: string | null;
+  eventType: string;
+  actorId: string;
+  purpose: string;
+  legalBasisId: string;
+  payload: Record<string, unknown>;
+  occurredAt: string;
+}
+
 export interface CaseListQuery {
   state?: string;
   procedureId?: string;
@@ -73,6 +87,10 @@ export interface CasePort {
   getCase(caseId: string): Promise<CaseSummary | undefined>;
   listTasks(caseId: string, query?: TaskListQuery): Promise<CaseTask[]>;
   getProgress(caseId: string): Promise<CaseZielFortschritt[]>;
+  listAudit(
+    caseId: string,
+    query?: { limit?: number },
+  ): Promise<CaseAuditEvent[]>;
   // Schreibpfade — Request-/Antwort-Formen aus den BFF-Wire-Verträgen. Nicht-2xx (400/403/404/409/503)
   // wirft `CaseRequestError` mit Statuscode; der Aufrufer entscheidet fachlich (Konflikt/verwehrt/…).
   createCase(req: CaseCreateRequestDto): Promise<CaseDto>;
@@ -186,6 +204,14 @@ export function createHttpCasePort(): CasePort {
         `/api/cases/${encodeURIComponent(caseId)}/progress`,
       );
       return body.ziele;
+    },
+
+    async listAudit(caseId, query) {
+      const qs = queryString({ limit: query?.limit });
+      const body = await request<{ events: CaseAuditEvent[] }>(
+        `/api/cases/${encodeURIComponent(caseId)}/audit${qs}`,
+      );
+      return body.events;
     },
 
     async createCase(req) {

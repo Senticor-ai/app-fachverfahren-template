@@ -65,6 +65,7 @@ describe("OpenAPI intern-only", () => {
       "/api/capabilities",
       "/api/cases",
       "/api/cases/{id}",
+      "/api/cases/{id}/audit",
       "/api/cases/{id}/progress",
       "/api/cases/{id}/tasks",
       "/api/cases/{id}/transitions",
@@ -77,6 +78,7 @@ describe("OpenAPI intern-only", () => {
       doc.paths as Record<string, Record<string, unknown>>,
     ).flatMap((path) => Object.keys(path));
     expect(operations.sort()).toEqual([
+      "get",
       "get",
       "get",
       "get",

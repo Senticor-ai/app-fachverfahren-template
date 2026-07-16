@@ -173,6 +173,9 @@ importers:
       '@senticor/provider-local-auth':
         specifier: workspace:*
         version: link:../../packages/provider-local-auth
+      '@senticor/public-sector-sdk':
+        specifier: workspace:*
+        version: link:../../packages/public-sector-sdk
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1

@@ -120,4 +120,36 @@ describe("BFF /api/cases", () => {
     expect(res.statusCode).toBe(404);
     await fremd.app.close();
   });
+
+  it("GET /api/cases/:id/audit liest den append-only Verlauf (case.opened); Fremd-Behörde → 404", async () => {
+    const { app } = await buildCasesApp();
+    const created = (await createCase(app)).json();
+    const verlauf = await app.inject({
+      method: "GET",
+      url: `/api/cases/${created.caseId}/audit`,
+    });
+    expect(verlauf.statusCode).toBe(200);
+    const events = verlauf.json().events;
+    expect(events).toHaveLength(1);
+    expect(events[0].eventType).toBe("case.opened");
+    expect(events[0].legalBasisId).toBe("VwV-IGM-2023");
+    // Die Server-Topologie wird NICHT exponiert (nur der pseudonyme Akteur + fachliche Verankerung).
+    expect(events[0].tenantId).toBeUndefined();
+    expect(events[0].authorityId).toBeUndefined();
+    expect(typeof events[0].actorId).toBe("string");
+    await app.close();
+
+    // Fremde Behörde im selben Mandanten liest den Verlauf NICHT (404, kein Existenz-Leak).
+    const fremd = await buildBffApp({
+      session: caseworkerSession({ authorityId: "authority-2" }),
+      caseStore: new InMemoryCaseStore(),
+      procedureRegistry: createInMemoryProcedureRegistry([procedure]),
+    });
+    const res = await fremd.app.inject({
+      method: "GET",
+      url: `/api/cases/${created.caseId}/audit`,
+    });
+    expect(res.statusCode).toBe(404);
+    await fremd.app.close();
+  });
 });

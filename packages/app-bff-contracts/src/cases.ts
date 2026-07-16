@@ -73,3 +73,37 @@ export const CaseTransitionRequestSchema = Type.Object(
 export type CaseTransitionRequestDto = Static<
   typeof CaseTransitionRequestSchema
 >;
+
+// Verlauf/Audit einer Akte (append-only, chronologisch). Die Server-Topologie (tenant/authority/jurisdiction)
+// wird — wie bei der Fall-DTO — bewusst NICHT exponiert. `payload` ist frei-formig (z. B. previousState/newState/
+// summary/detail) → nur dort ist additionalProperties erlaubt. `actorId` ist die (pseudonyme) Akteurs-Kennung,
+// `legalBasisId`/`purpose` die revisionssichere Verankerung (nie erfunden).
+export const CaseAuditEventDtoSchema = Type.Object(
+  {
+    auditEventId: Type.String({ minLength: 1 }),
+    caseId: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+    eventType: Type.String({ minLength: 1 }),
+    actorId: Type.String({ minLength: 1 }),
+    purpose: Type.String({ minLength: 1 }),
+    legalBasisId: Type.String({ minLength: 1 }),
+    payload: Type.Record(Type.String(), Type.Unknown()),
+    occurredAt: Type.String({ minLength: 1 }),
+  },
+  { additionalProperties: false },
+);
+
+export type CaseAuditEventDto = Static<typeof CaseAuditEventDtoSchema>;
+
+export const CaseAuditQuerySchema = Type.Object(
+  { limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 })) },
+  { additionalProperties: false },
+);
+
+export type CaseAuditQueryDto = Static<typeof CaseAuditQuerySchema>;
+
+export const CaseAuditListDtoSchema = Type.Object(
+  { events: Type.Array(CaseAuditEventDtoSchema) },
+  { additionalProperties: false },
+);
+
+export type CaseAuditListDto = Static<typeof CaseAuditListDtoSchema>;

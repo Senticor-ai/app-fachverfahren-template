@@ -28,6 +28,7 @@
     "@senticor/app-store-postgres": "workspace:*",
     "@senticor/fachverfahren-kit": "workspace:*",
     "@senticor/provider-local-auth": "workspace:*",
+    "@senticor/public-sector-sdk": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "fastify": "catalog:",

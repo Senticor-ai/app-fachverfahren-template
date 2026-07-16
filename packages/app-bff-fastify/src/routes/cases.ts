@@ -6,6 +6,8 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 import {
+  CaseAuditListDtoSchema,
+  CaseAuditQuerySchema,
   CaseCreateRequestSchema,
   CaseDtoSchema,
   CaseIdParamsSchema,
@@ -13,6 +15,7 @@ import {
   CaseListQuerySchema,
   CaseTransitionRequestSchema,
   ErrorEnvelopeSchema,
+  type CaseAuditEventDto,
   type CaseDto,
 } from "@senticor/app-bff-contracts";
 import {
@@ -42,6 +45,20 @@ function toCaseDto(c: AppCase): CaseDto {
     subjectIds: c.subjectIds,
     openedAt: c.openedAt,
     closedAt: c.closedAt,
+  };
+}
+
+/** AppAuditEvent → CaseAuditEventDto (Server-Topologie tenant/authority/jurisdiction + requestId bleiben verborgen). */
+function toAuditDto(e: AppAuditEvent): CaseAuditEventDto {
+  return {
+    auditEventId: e.auditEventId,
+    caseId: e.caseId,
+    eventType: e.eventType,
+    actorId: e.actorId,
+    purpose: e.purpose,
+    legalBasisId: e.legalBasisId,
+    payload: e.payload,
+    occurredAt: e.occurredAt,
   };
 }
 
@@ -159,6 +176,53 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
           .code(404)
           .send({ error: "not found", requestId: requestIdOf(request) });
       return reply.send(toCaseDto(found));
+    },
+  );
+
+  typed.get(
+    "/api/cases/:id/audit",
+    {
+      config: readAuth.config,
+      preHandler: readAuth.preHandler,
+      schema: {
+        tags: ["cases"],
+        summary: "Verlauf/Audit einer Akte lesen (append-only, chronologisch)",
+        params: CaseIdParamsSchema,
+        querystring: CaseAuditQuerySchema,
+        response: { 200: CaseAuditListDtoSchema, ...errorResponses },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      // Behörden-Scope zuerst: fehlt der Fall bzw. gehört er einer Fremd-Behörde → 404 (keine Existenz-/Audit-Leaks),
+      // BEVOR überhaupt Audit-Einträge gelesen werden.
+      let found: AppCase | undefined;
+      try {
+        found = await deps.caseStore.getCase({
+          tenantId: session.tenantId,
+          caseId: request.params.id,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      if (!found || found.authorityId !== session.authorityId)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+
+      let events: AppAuditEvent[];
+      try {
+        events = await deps.caseStore.listAuditEvents({
+          tenantId: session.tenantId,
+          caseId: found.caseId,
+          ...(request.query.limit !== undefined
+            ? { limit: request.query.limit }
+            : {}),
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      return reply.send({ events: events.map(toAuditDto) });
     },
   );
 

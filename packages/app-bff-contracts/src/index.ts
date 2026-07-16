@@ -32,12 +32,18 @@ export {
   type MailboxMessageDto,
 } from "./mailbox.js";
 export {
+  CaseAuditEventDtoSchema,
+  CaseAuditListDtoSchema,
+  CaseAuditQuerySchema,
   CaseCreateRequestSchema,
   CaseDtoSchema,
   CaseIdParamsSchema,
   CaseListDtoSchema,
   CaseListQuerySchema,
   CaseTransitionRequestSchema,
+  type CaseAuditEventDto,
+  type CaseAuditListDto,
+  type CaseAuditQueryDto,
   type CaseCreateRequestDto,
   type CaseDto,
   type CaseIdParamsDto,
