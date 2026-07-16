@@ -106,7 +106,51 @@
       "additionalProperties": true
     },
     "domainVocabulary": { "type": "array", "items": { "type": "string" } },
-    "extensions": { "type": "object" }
+    "procedure": {
+      "type": "object",
+      "description": "OPTIONAL: Fall/Dossier-Verfahren (Zustandsmaschine + Rechtsgrundlagen als DATEN). Präsenz markiert eine Dossier-App; Antrag-nur-Apps lassen den Block weg. Durchgesetzt von validateAppSpecShape (das JSON-Schema ist nur Editor-/Doku-Hilfe).",
+      "required": [
+        "procedureId",
+        "version",
+        "legalBasisIds",
+        "allowedStates",
+        "allowedTransitions"
+      ],
+      "properties": {
+        "procedureId": { "type": "string" },
+        "version": { "type": "string" },
+        "effectiveFrom": { "type": "string" },
+        "legalBasisIds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "bpmnPath": { "type": "string" },
+        "allowedStates": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "allowedTransitions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["from", "to", "action"],
+            "properties": {
+              "from": { "type": "string" },
+              "to": { "type": "string" },
+              "action": { "type": "string" },
+              "requiredPermission": { "type": "string" },
+              "requiresFourEyes": { "type": "boolean" },
+              "closesCase": { "type": "boolean" }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    }
   },
   "additionalProperties": true
 }

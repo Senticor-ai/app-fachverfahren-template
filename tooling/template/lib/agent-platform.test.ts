@@ -153,6 +153,101 @@ describe("agent platform contract", () => {
     }
   });
 
+  it("validates the OPTIONAL dossier procedure block (rejects malformed, accepts valid, stays optional)", async () => {
+    const source = await readStructuredFile<AppSpec>(
+      join(root, "docs/examples/hundesteuer/app.spec.yaml"),
+    );
+    const base = {
+      ...source,
+      fim: source.fim
+        ? { sourceId: source.fim.sourceId, rootId: source.fim.rootId }
+        : undefined,
+    };
+    const validProcedure = {
+      procedureId: "integrationsmanagement",
+      version: "2026.1",
+      legalBasisIds: ["de-aufenthg-43"],
+      allowedStates: ["aufgenommen", "aktiv", "abgeschlossen"],
+      allowedTransitions: [
+        { from: "aufgenommen", to: "aktiv", action: "aktivieren" },
+        {
+          from: "aktiv",
+          to: "abgeschlossen",
+          action: "abschliessen",
+          requiresFourEyes: true,
+          closesCase: true,
+        },
+        { from: "abgeschlossen", to: "aktiv", action: "wiederaufnehmen" },
+      ],
+    };
+
+    async function runWith(
+      procedure: unknown,
+    ): Promise<{ status: string; failures: string[] }> {
+      const temp = await mkdtemp(join(tmpdir(), "agent-app-new-proc-"));
+      try {
+        const spec = {
+          ...base,
+          id: "proc",
+          module: {
+            ...base.module,
+            id: "proc-service",
+            destination: "modules/proc-service",
+          },
+          ...(procedure !== undefined ? { procedure } : {}),
+        };
+        const specPath = "docs/examples/proc/app.spec.yaml";
+        await mkdir(join(temp, "docs/examples/proc"), { recursive: true });
+        await writeFile(
+          join(temp, specPath),
+          `${JSON.stringify(spec, null, 2)}\n`,
+        );
+        const result = await appNew(temp, { specPath });
+        return { status: result.status, failures: result.failures ?? [] };
+      } finally {
+        await rm(temp, { recursive: true, force: true });
+      }
+    }
+
+    // Valide → nicht abgelehnt.
+    expect((await runWith(validProcedure)).status).not.toBe("failed");
+
+    // Ohne den schließenden Übergang → kein closesCase → abgelehnt.
+    const noClose = await runWith({
+      ...validProcedure,
+      allowedTransitions: validProcedure.allowedTransitions.filter(
+        (t) => !("closesCase" in t),
+      ),
+    });
+    expect(noClose.status).toBe("failed");
+    expect(
+      noClose.failures.some((f) => f.includes("schließender Übergang")),
+    ).toBe(true);
+
+    // Übergang auf einen unbekannten Zustand → abgelehnt.
+    const dangling = await runWith({
+      ...validProcedure,
+      allowedTransitions: [
+        ...validProcedure.allowedTransitions,
+        {
+          from: "aktiv",
+          to: "nirgendwo",
+          action: "abzweigen",
+          closesCase: true,
+        },
+      ],
+    });
+    expect(dangling.status).toBe("failed");
+    expect(
+      dangling.failures.some((f) =>
+        f.includes('unbekannten to-Zustand "nirgendwo"'),
+      ),
+    ).toBe(true);
+
+    // OHNE procedure-Block bleibt der Spec valide (Optionalität — Antrag-nur-Apps).
+    expect((await runWith(undefined)).status).not.toBe("failed");
+  });
+
   it("rejects stale report task hashes", async () => {
     const spec = await readStructuredFile<AppSpec>(
       join(root, "docs/examples/hundesteuer/app.spec.yaml"),

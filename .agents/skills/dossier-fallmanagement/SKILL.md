@@ -189,6 +189,12 @@ Gateway-Semantik XOR/AND) — das füllt der Provider hinter der Naht.
    `leistung.config.ts`). Ableitbar aus BPMN via `bpmnToProcedureVersion`
    ([[bpmn-prozess-workflow]]) als Authoring-Schritt. Vollständiges reales Beispiel:
    `docs/examples/integrationsberatung/integrationsmanagement.{bpmn,config.yaml}`.
+   Im governten `app.spec.yaml` kannst du das Verfahren zusätzlich als OPTIONALEN
+   `procedure`-Block deklarieren (dieselbe Zustandsmaschine als DATEN); `app:new`
+   **validiert** ihn (mind. 1 Rechtsgrundlage, Übergänge referenzieren deklarierte
+   Zustände, eindeutige `(from,action)`, mind. 1 schließender Übergang, keine
+   Sackgasse/Waise). Der Emit `spec.procedure` → `procedure.config.ts` ist noch nicht
+   verdrahtet — die Naht bleibt vorerst die Wahrheit, die du direkt schreibst.
    1b. **Vertrag emittieren + committen** (PFLICHT, sonst ist das Gate rot):
 
    ```bash

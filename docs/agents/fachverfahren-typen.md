@@ -104,8 +104,13 @@ der Session, nie vom Client.
   `platform/capabilities.json` — die Naht liegt heute unter
   `workflow`/`records-management`/`audit` (ADR-0004, Rule of Three).
 - Ein „Neue Akte anlegen"-Formular in der App fehlt (`createCase` existiert im Client).
-- Der governed-build-Pfad kennt die Dossier-Naht noch nicht im `app.spec.yaml`
-  (PLAN) — heute schreibt man `procedure.config.ts` direkt.
+- **IST**: `app.spec.yaml` trägt jetzt einen OPTIONALEN `procedure`-Block (Fall/Dossier-
+  Zustandsmaschine als DATEN); `app:new` validiert ihn (mind. 1 Rechtsgrundlage, Übergänge
+  referenzieren deklarierte Zustände, eindeutige `(from,action)`, mind. 1 schließender Übergang,
+  keine Sackgasse/Waise). Antrag-nur-Apps lassen ihn weg. **PLAN**: der EMIT
+  `spec.procedure` → `apps/fachverfahren/server/procedure.config.ts` ist noch NICHT verdrahtet
+  (er überschriebe eine Datei außerhalb `modules/` — bewusst aufgeschoben) — heute schreibt man
+  `procedure.config.ts` direkt (die Naht bleibt die Wahrheit).
 
 ## Standalone (OSS) vs. chos — dieselbe Naht
 

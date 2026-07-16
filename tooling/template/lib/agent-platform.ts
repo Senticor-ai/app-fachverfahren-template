@@ -12,6 +12,33 @@ const execFileAsync = promisify(execFile);
 export const discoveryPath = "agent.discovery.json";
 export const defaultTaskSpecPath = "docs/examples/hundesteuer/app.spec.yaml";
 
+/** Ein Übergang der Fall/Dossier-Zustandsmaschine im governten Spec. `requiredPermission` ist optional
+ *  (die Naht/Runtime injiziert sonst die Stub-Konstante); `requiresFourEyes`/`closesCase` sind fachliche Wahrheit. */
+export interface SpecProcedureTransition {
+  from: string;
+  to: string;
+  action: string;
+  requiredPermission?: string;
+  requiresFourEyes?: boolean;
+  closesCase?: boolean;
+}
+
+/** OPTIONALER Dossier-Block: die SDK-`ProcedureVersion` (Zustandsmaschine + Rechtsgrundlagen) als DATEN im
+ *  governten `app.spec.yaml`. Seine PRÄSENZ markiert ein Fall/Dossier-Verfahren — Antrag-nur-Apps lassen ihn weg.
+ *  Spiegelt `apps/fachverfahren/server/procedure.config.ts` (`dossierProcedure`); ein späterer Emit-Schritt kann
+ *  daraus die Naht schreiben. Rechtsgrundlagen/Version werden NIE aus der BPMN erfunden. */
+export interface SpecProcedure {
+  procedureId: string;
+  version: string;
+  effectiveFrom?: string;
+  legalBasisIds: string[];
+  allowedStates: string[];
+  allowedTransitions: SpecProcedureTransition[];
+  /** OPTIONALE Provenienz: die FIM/KGSt-BPMN, aus der die Zustandsmaschine abgeleitet wurde (muss laut
+   *  check:bpmn-example mit ihr deckungsgleich sein). */
+  bpmnPath?: string;
+}
+
 export interface AppSpec {
   schemaVersion: string;
   id: string;
@@ -37,6 +64,8 @@ export interface AppSpec {
   workflows: string[];
   integrations: string[];
   humanApproval?: string[];
+  /** OPTIONAL: markiert ein Fall/Dossier-Verfahren (Antrag-nur-Apps lassen es weg). */
+  procedure?: SpecProcedure;
   domainVocabulary: string[];
 }
 
@@ -1331,6 +1360,91 @@ async function listSkillNames(root: string) {
     .sort();
 }
 
+/** Strukturprüfung des OPTIONALEN Dossier-Blocks — dieselben Invarianten wie das Datei-Gate
+ *  scripts/check-procedure-contract.mts, aber lokal (Tooling darf nicht aus packages/ importieren). Prüft nur,
+ *  WENN ein Block da ist: mind. 1 Rechtsgrundlage; Übergänge referenzieren deklarierte Zustände; eindeutige
+ *  (from,action); mind. 1 schließender Übergang (closesCase); keine Sackgasse; kein verwaister Zustand. */
+function validateProcedureBlock(procedure: SpecProcedure): string[] {
+  const failures: string[] = [];
+  const fail = (m: string) => failures.push(`app spec procedure: ${m}`);
+
+  if (!procedure.procedureId) fail("procedureId fehlt/leer.");
+  if (!procedure.version) fail("version fehlt/leer.");
+  if (
+    procedure.effectiveFrom !== undefined &&
+    Number.isNaN(Date.parse(procedure.effectiveFrom))
+  )
+    fail(
+      `effectiveFrom ("${procedure.effectiveFrom}") ist kein gültiges ISO-Datum.`,
+    );
+
+  const legal = procedure.legalBasisIds;
+  if (!Array.isArray(legal) || legal.length < 1)
+    fail(
+      "legalBasisIds muss mind. 1 Rechtsgrundlage enthalten (nie erfunden).",
+    );
+  else if (legal.some((id) => !id || id.trim() === ""))
+    fail("legalBasisIds enthält einen leeren Eintrag.");
+
+  const states = procedure.allowedStates;
+  if (!Array.isArray(states) || states.length < 1) {
+    fail("allowedStates muss mind. 1 Zustand enthalten.");
+    return failures;
+  }
+  if (states.some((s) => !s || s.trim() === ""))
+    fail("allowedStates enthält einen leeren Zustand.");
+  if (new Set(states).size !== states.length)
+    fail("allowedStates enthält Duplikate.");
+
+  const transitions = procedure.allowedTransitions;
+  if (!Array.isArray(transitions) || transitions.length < 1) {
+    fail("allowedTransitions muss mind. 1 Übergang enthalten.");
+    return failures;
+  }
+
+  const known = new Set(states);
+  const pairs = new Set<string>();
+  for (const t of transitions) {
+    if (!known.has(t.from))
+      fail(`Übergang referenziert unbekannten from-Zustand "${t.from}".`);
+    if (!known.has(t.to))
+      fail(`Übergang referenziert unbekannten to-Zustand "${t.to}".`);
+    if (!t.action || t.action.trim() === "")
+      fail(`Übergang ${t.from}→${t.to} hat keine action.`);
+    const key = `${t.from} ${t.action}`;
+    if (pairs.has(key))
+      fail(
+        `Mehrdeutiger Übergang: (from "${t.from}", action "${t.action}") mehrfach definiert.`,
+      );
+    pairs.add(key);
+  }
+
+  const schliessende = transitions.filter((t) => t.closesCase === true);
+  if (schliessende.length < 1)
+    fail(
+      "kein schließender Übergang (closesCase: true) — der Fall kann nicht abgeschlossen werden.",
+    );
+
+  const hatAusgang = new Set(transitions.map((t) => t.from));
+  const geschlosseneZiele = new Set(schliessende.map((t) => t.to));
+  for (const s of states)
+    if (!hatAusgang.has(s) && !geschlosseneZiele.has(s))
+      fail(
+        `Zustand "${s}" hat keinen ausgehenden Übergang und ist kein geschlossener Zustand (Sackgasse).`,
+      );
+
+  const beruehrt = new Set<string>();
+  for (const t of transitions) {
+    beruehrt.add(t.from);
+    beruehrt.add(t.to);
+  }
+  for (const s of states)
+    if (!beruehrt.has(s))
+      fail(`Zustand "${s}" wird von keinem Übergang referenziert (verwaist).`);
+
+  return failures;
+}
+
 function validateAppSpecShape(spec: AppSpec) {
   const failures: string[] = [];
   if (spec.schemaVersion !== "1.0.0") {
@@ -1356,6 +1470,10 @@ function validateAppSpecShape(spec: AppSpec) {
     (typeof spec.fim.services !== "object" || Array.isArray(spec.fim.services))
   ) {
     failures.push("app spec fim services must be an object when provided");
+  }
+  // OPTIONALER Dossier-Block — nur prüfen, wenn er da ist (Antrag-nur-Apps bleiben valide).
+  if (spec.procedure) {
+    failures.push(...validateProcedureBlock(spec.procedure));
   }
   return failures;
 }
