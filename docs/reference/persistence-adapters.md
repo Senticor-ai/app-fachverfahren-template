@@ -17,12 +17,16 @@
 
 ## IST matrix
 
-| Concern               | Port (browser)   | Service             | Store             | Package                          |
-| --------------------- | ---------------- | ------------------- | ----------------- | -------------------------------- |
-| Cases / Vorgänge      | `VorgangPort`    | `CaseService`       | `CaseStore`       | contracts + `app-store-postgres` |
-| Kanban boards         | `BoardPort`      | thin routes         | `KanbanStore`     | contracts + `app-store-postgres` |
-| Attachments           | `AttachmentPort` | `AttachmentService` | `AttachmentStore` | contracts + `app-store-postgres` |
-| Preferences / mailbox | BFF client       | BFF routes          | `AppStore`        | contracts + `app-store-postgres` |
+| Concern               | Port (browser)                 | Service           | Store             | Package                          |
+| --------------------- | ------------------------------ | ----------------- | ----------------- | -------------------------------- |
+| Cases / Vorgänge      | `VorgangPort` (HTTP client)    | `CaseService`     | `CaseStore`       | contracts + `app-store-postgres` |
+| Kanban boards         | `BoardPort`                    | thin routes       | `KanbanStore`     | contracts + `app-store-postgres` |
+| Attachments           | `AttachmentPort` (HTTP client) | attachment routes | `AttachmentStore` | contracts + `app-store-postgres` |
+| Preferences / mailbox | BFF client                     | BFF routes        | `AppStore`        | contracts + `app-store-postgres` |
+| Register lookup       | `RegisterLookupPort`           | local Naht mock   | —                 | not part of case seam            |
+
+The production app (`apps/fachverfahren/src/store.ts`) uses `createVorgangClient()` —
+not `createFachverfahrenStore`. Storybook/tests keep the in-memory kit store.
 
 Boards are **independent collaboration objects**, not projections of case status. No dual-write CaseStore ↔ KanbanStore.
 

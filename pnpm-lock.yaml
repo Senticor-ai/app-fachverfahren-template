@@ -161,9 +161,15 @@ importers:
       '@senticor/app-runtime-fastify':
         specifier: workspace:*
         version: link:../../packages/app-runtime-fastify
+      '@senticor/app-store-contracts':
+        specifier: workspace:*
+        version: link:../../packages/app-store-contracts
       '@senticor/app-store-postgres':
         specifier: workspace:*
         version: link:../../packages/app-store-postgres
+      '@senticor/fachverfahren-domain':
+        specifier: workspace:*
+        version: link:../../packages/fachverfahren-domain
       '@senticor/fachverfahren-kit':
         specifier: workspace:*
         version: link:../../packages/fachverfahren-kit

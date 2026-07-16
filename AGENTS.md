@@ -17,9 +17,9 @@ Plattformpakete:
 - `packages/fachverfahren-kit` liefert die generischen Bausteine
   (AntragStepper, Arbeitsvorrat, ReviewWorkspace, AufsichtDashboard, …) und den
   Typ `LeistungConfig`, aus dem die App rendert.
-- Weitere Pakete (`platform-contracts`, `public-sector-sdk`,
-  `public-sector-ui`, `provider-*`, `conformance-kit`, `migration-kit`,
-  `app-store-postgres`, `jurisdictions/*`) sind die wiederverwendbare
+- Weitere Pakete (`platform-contracts`, `fachverfahren-domain`, `app-store-contracts`,
+  `public-sector-sdk`, `public-sector-ui`, `provider-*`, `conformance-kit`,
+  `migration-kit`, `app-store-postgres`, `jurisdictions/*`) sind die wiederverwendbare
   Plattformbasis.
 
 Das Template baut ohne jedes externe Werkzeug; die klickbaren Sichten sind
@@ -175,7 +175,10 @@ Jede Zeile beschreibt den IST-Stand. Zeilen mit `(PLAN)` existieren noch nicht.
 | `packages/public-sector-ui/src/`                                  | Public-Sector-UI-Fassade + Stories                       | UI-Vertrag; ShadCN bleibt Implementierungsdetail   |
 | `packages/platform-contracts/`                                    | Capability-Ports                                         | Fachlogik nutzt Ports, nie Provider direkt         |
 | `packages/public-sector-sdk/`                                     | Authorization, RBAC, Audit, Domain-Kernel                | Rollen über RBAC-Registry erweitern                |
-| `packages/app-store-postgres/`                                    | PostgreSQL-Migrator + Plattformtabellen                  | Migrationen über `db:migrate`                      |
+| `packages/fachverfahren-domain/`                                  | Headless Vorgang/Transition-Typen (ohne React)           | CaseService/Domain; kein UI                        |
+| `packages/app-store-contracts/`                                   | Provider-neutrale Store-Interfaces                       | Case/Kanban/Attachment/AppStore; kein Postgres     |
+| `packages/app-store-postgres/`                                    | Store-Implementierungen + Migrator                       | Migrationen über `db:migrate`                      |
+| `docs/reference/persistence-adapters.md`                          | Persistenz-Schichten + CHOS-PLAN-Seam                    | Lesen vor Store-/Provider-Arbeit                   |
 | `jurisdictions/de`, `jurisdictions/eu`                            | Rechtsraum-Packs                                         | Keine `country === "DE"`-Logik in der App          |
 | `modules/`                                                        | Leerer Zielort des Generator-Pfads                       | `modules/README.md` lesen; keine Instanz (PLAN)    |
 | `docs/examples/hundesteuer/`                                      | Externes Beispiel (Spec + Prompt)                        | Nie in Runtime-Code kopieren                       |

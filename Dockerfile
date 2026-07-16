@@ -21,6 +21,8 @@ COPY packages/provider-codesphere/package.json packages/provider-codesphere/pack
 COPY packages/provider-dvc-generic/package.json packages/provider-dvc-generic/package.json
 COPY packages/conformance-kit/package.json packages/conformance-kit/package.json
 COPY packages/migration-kit/package.json packages/migration-kit/package.json
+COPY packages/app-store-contracts/package.json packages/app-store-contracts/package.json
+COPY packages/fachverfahren-domain/package.json packages/fachverfahren-domain/package.json
 COPY packages/app-store-postgres/package.json packages/app-store-postgres/package.json
 COPY packages/app-runtime-fastify/package.json packages/app-runtime-fastify/package.json
 COPY packages/app-bff-contracts/package.json packages/app-bff-contracts/package.json

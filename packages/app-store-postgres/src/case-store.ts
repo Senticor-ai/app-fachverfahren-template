@@ -571,6 +571,9 @@ function mapCaseRow(
 export function createCaseStoreFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): CaseStore {
+  if (env["APP_CASE_STORE"] === "memory") {
+    return new InMemoryCaseStore();
+  }
   const databaseUrl = env["APP_PG_URL"] ?? env["APP_PG_DIRECT_URL"];
   if (databaseUrl === "") {
     throw new Error(
@@ -580,6 +583,6 @@ export function createCaseStoreFromEnv(
   return databaseUrl
     ? new PostgresCaseStore(databaseUrl)
     : new UnavailableCaseStore(
-        "APP_PG_URL or APP_PG_DIRECT_URL is required for case data",
+        "APP_PG_URL or APP_PG_DIRECT_URL is required for case data (or set APP_CASE_STORE=memory for local DEV)",
       );
 }

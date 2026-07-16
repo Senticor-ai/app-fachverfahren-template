@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Klickbare Referenz-App: KOMPOSITION aus @senticor/fachverfahren-kit (fertige Bausteine) + der EINEN LeistungConfig (src/leistung.config.ts — die Austausch-Naht, die der governte Build überschreibt). Keine fachliche Logik hier — nur Routing + die EINE Store-Instanz + die Config.",
+  "description": "Klickbare Referenz-App: KOMPOSITION aus @senticor/fachverfahren-kit (fertige Bausteine) + der EINEN LeistungConfig (src/leistung.config.ts \u2014 die Austausch-Naht, die der governte Build \u00fcberschreibt). Keine fachliche Logik hier \u2014 nur Routing + die EINE Store-Instanz + die Config.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -36,7 +36,9 @@
     "react-resizable-panels": "^4.12.1",
     "react-router-dom": "^7.18.1",
     "tailwind-merge": "^3.6.0",
-    "zustand": "^5.0.14"
+    "zustand": "^5.0.14",
+    "@senticor/app-store-contracts": "workspace:*",
+    "@senticor/fachverfahren-domain": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.2",

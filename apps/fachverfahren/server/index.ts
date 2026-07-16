@@ -30,10 +30,14 @@ import {
   createAppStoreFromEnv,
   createAuditStoreFromEnv,
   createAuthStoreFromEnv,
+  createAttachmentStoreFromEnv,
+  createCaseStoreFromEnv,
   createKanbanStoreFromEnv,
   type AppStore,
+  type AttachmentStore,
   type AuditStore,
   type AuthStore,
+  type CaseStore,
   type KanbanStore,
 } from "@senticor/app-store-postgres";
 import type { FastifyInstance } from "fastify";
@@ -43,6 +47,8 @@ import { registerAuthPolicyGuard } from "./auth/authorization.js";
 import { registerAuthRoutes, type RegistrationMode } from "./auth/routes.js";
 import { createCookieSessionResolver } from "./auth/session-resolver.js";
 import { registerBoardRoutes } from "./kanban/routes.js";
+import { registerCaseRoutes } from "./cases/routes.js";
+import { registerAttachmentRoutes } from "./attachments/routes.js";
 import { registerUserRoutes } from "./users/routes.js";
 
 // App-Identität: der Renderer schreibt Domain-Token beim Scaffolding um — deshalb stehen
@@ -78,6 +84,8 @@ interface AppStores {
   authStore: AuthStore;
   kanbanStore: KanbanStore;
   auditStore: AuditStore;
+  caseStore: CaseStore;
+  attachmentStore: AttachmentStore;
 }
 
 interface BffWiring {
@@ -109,6 +117,11 @@ function registerAppRoutes(
     registrationMode: policy.registrationMode,
   });
   registerBoardRoutes(app, stores);
+  registerCaseRoutes(app, stores);
+  registerAttachmentRoutes(app, {
+    authStore: stores.authStore,
+    attachmentStore: stores.attachmentStore,
+  });
   registerUserRoutes(app, stores);
   registerAuditRoutes(app, {
     authStore: stores.authStore,
@@ -124,6 +137,8 @@ export function buildPublicServer({
   authStore = createAuthStoreFromEnv(),
   kanbanStore = createKanbanStoreFromEnv(),
   auditStore = createAuditStoreFromEnv(),
+  caseStore = createCaseStoreFromEnv(),
+  attachmentStore = createAttachmentStoreFromEnv(),
   appStore = createAppStoreFromEnv(),
   sessionResolver,
   auditSink = createAuditSinkFromEnv(),
@@ -138,6 +153,8 @@ export function buildPublicServer({
   authStore?: AuthStore;
   kanbanStore?: KanbanStore;
   auditStore?: AuditStore;
+  caseStore?: CaseStore;
+  attachmentStore?: AttachmentStore;
   appStore?: AppStore;
   sessionResolver?: SessionResolver;
   auditSink?: AuditSink;
@@ -151,7 +168,7 @@ export function buildPublicServer({
     registerRoutes: (app) =>
       registerAppRoutes(
         app,
-        { authStore, kanbanStore, auditStore },
+        { authStore, kanbanStore, auditStore, caseStore, attachmentStore },
         { bootstrapToken, registrationMode },
         {
           appStore,
@@ -194,7 +211,15 @@ export async function startRuntime(
   const authStore = createAuthStoreFromEnv(env);
   const kanbanStore = createKanbanStoreFromEnv(env);
   const auditStore = createAuditStoreFromEnv(env);
-  const stores = { authStore, kanbanStore, auditStore };
+  const caseStore = createCaseStoreFromEnv(env);
+  const attachmentStore = createAttachmentStoreFromEnv(env);
+  const stores = {
+    authStore,
+    kanbanStore,
+    auditStore,
+    caseStore,
+    attachmentStore,
+  };
   const policy = {
     bootstrapToken: env["BOOTSTRAP_TOKEN"],
     registrationMode: parseRegistrationMode(env["AUTH_REGISTRATION_MODE"]),
