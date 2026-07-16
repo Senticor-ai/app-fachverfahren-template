@@ -70,6 +70,9 @@ export interface CaseTransition {
   action: string;
   requiredPermission: string;
   requiresFourEyes?: boolean;
+  /** Schließt dieser Übergang den Fall? Dann wird `closedAt` gestempelt. Data-driven statt eines hart
+   *  kodierten Zielzustand-Namens — jedes Verfahren benennt seinen Endzustand selbst (z. B. „abgeschlossen"). */
+  closesCase?: boolean;
 }
 
 export interface Task {
@@ -170,14 +173,19 @@ export function transitionCase(
   if (!transition) {
     throw new Error(`invalid case transition: ${currentCase.state}/${action}`);
   }
-  return {
+  const next: Case = {
     ...currentCase,
     state: transition.to,
     version: currentCase.version + 1,
-    ...(transition.to === "closed"
-      ? { closedAt: new Date().toISOString() }
-      : {}),
   };
+  if (transition.closesCase === true) {
+    next.closedAt = new Date().toISOString();
+  } else {
+    // Nicht-schließender Übergang (z. B. Wiederaufnahme aus dem Endzustand) entfernt eine ggf. gesetzte
+    // Schließzeit wieder — ein wiederaufgenommener Fall ist nicht mehr „geschlossen am".
+    delete next.closedAt;
+  }
+  return next;
 }
 
 /** Nachschlage-Naht über die VerfahrensVersionen (die Prozess-/Zustandsmaschine + Rechtsgrundlagen als DATEN). Der

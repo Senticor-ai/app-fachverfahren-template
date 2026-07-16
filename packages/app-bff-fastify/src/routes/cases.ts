@@ -495,9 +495,10 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
           caseId: appCase.caseId,
           expectedVersion: body.expectedVersion,
           newState: reduced.state,
-          ...(reduced.closedAt !== undefined
-            ? { closedAt: reduced.closedAt }
-            : {}),
+          // Immer den NEUEN Wert setzen: ein schließender Übergang stempelt `closedAt`, ein nicht-
+          // schließender (z. B. Wiederaufnahme) räumt es via `null` wieder ab — sonst bliebe eine
+          // veraltete Schließzeit an einem wiederaufgenommenen Fall hängen.
+          closedAt: reduced.closedAt ?? null,
           auditEvent,
         });
       } catch (error) {

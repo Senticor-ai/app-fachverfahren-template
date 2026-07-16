@@ -72,6 +72,7 @@ export const REFERENCE_PROCEDURE: ProcedureVersion = {
       action: "abschließen",
       requiredPermission: PREPARE,
       requiresFourEyes: true,
+      closesCase: true,
     },
     {
       from: "abgeschlossen",
@@ -82,13 +83,18 @@ export const REFERENCE_PROCEDURE: ProcedureVersion = {
   ],
 };
 
-// DEV-Login (nur In-Memory): das Passwort erfüllt die Mindestlänge von bootstrapWorkspace und erscheint
-// bewusst in KEINEM Logfeld. Nur ephemer/DEV — niemals in einer erreichbaren Umgebung memory-Modus fahren.
+// DEV-Login (nur In-Memory): der Account wird NUR angelegt, wenn ein Passwort über die Umgebung
+// (APP_DEV_SEED_PASSWORD) bereitgestellt wird — es gibt bewusst KEIN im Quelltext festgeschriebenes
+// Passwort (der memory-Modus wird auch für erreichbare Previews genutzt; ein committetes Login-Secret
+// wäre eine öffentlich bekannte Zugangsdaten-Naht). Ohne die Variable existiert kein Demo-Login.
+const DEV_PASSWORD_ENV = "APP_DEV_SEED_PASSWORD";
 const DEV_EMAIL = "sachbearbeitung@example.org";
-const DEV_PASSWORD = "dev-demo-passwort";
 const DEV_NAME = "Demo-Sachbearbeitung";
 
 const DEMO_CASE_ID = "case.demo-igm-0001";
+// Eröffnungs-Akteur des Demo-Falls: ein FESTER synthetischer Akteur, bewusst VERSCHIEDEN vom Login-Konto,
+// damit der Vier-Augen-Abschluss (jüngster-Audit-Akteur ≠ auslösender Akteur) vom Demo-Login ausübbar ist.
+const SEED_AUDIT_ACTOR = "actor.dev-seed-opener";
 
 type SeedLog = (
   level: "info" | "error",
@@ -101,58 +107,61 @@ export interface ReferenceSeedDeps {
   kanbanStore: KanbanStore;
   caseStore: CaseStore;
   taskStore: TaskStore;
+  env?: NodeJS.ProcessEnv;
   log?: SeedLog;
 }
 
-/** Idempotenter DEV-Seed: legt (falls noch KEIN Konto existiert) einen anmeldbaren Sachbearbeitungs-
- *  Account an und seedet ein synthetisches Demo-Dossier (Fall + Ziele/Schritte/Termine + Eröffnungs-
- *  Audit). Wirft NIE — Fehler landen im Log, der Server startet trotzdem (analog autoBootstrapAdminFromEnv). */
+/** Idempotenter DEV-Seed: legt — NUR wenn APP_DEV_SEED_PASSWORD gesetzt ist und noch kein Konto existiert —
+ *  einen anmeldbaren Sachbearbeitungs-Account an und seedet ein synthetisches Demo-Dossier (Fall + Ziele/
+ *  Schritte/Termine + Eröffnungs-Audit, Urheber ein FESTER synthetischer Akteur ≠ Login). Wirft NIE — Fehler
+ *  landen im Log, der Server startet trotzdem (analog autoBootstrapAdminFromEnv). */
 export async function seedReferenceDemo(
   deps: ReferenceSeedDeps,
 ): Promise<void> {
   const log: SeedLog = deps.log ?? (() => undefined);
-  const actorId = await seedDevCaseworker(deps, log);
-  await seedDemoDossier(deps, actorId ?? "actor.dev-seed", log);
+  await seedDevCaseworker(deps, log);
+  // Das Demo-Dossier ist unabhängig vom Login und wird IMMER einem festen synthetischen Eröffnungs-Akteur
+  // zugeschrieben (≠ Login-Konto) — so bleibt der Vier-Augen-Abschluss vom Demo-Login ausübbar.
+  await seedDemoDossier(deps, SEED_AUDIT_ACTOR, log);
 }
 
 async function seedDevCaseworker(
   deps: ReferenceSeedDeps,
   log: SeedLog,
-): Promise<string | undefined> {
+): Promise<void> {
+  const password = deps.env?.[DEV_PASSWORD_ENV];
+  if (password === undefined || password === "") {
+    // Kein committetes Login-Secret: ohne bereitgestelltes Passwort wird KEIN anmeldbares Konto angelegt.
+    log("info", "runtime.dev-seed.user.skipped", {
+      reason: `${DEV_PASSWORD_ENV} not set — kein Demo-Login angelegt`,
+    });
+    return;
+  }
   try {
-    return await deps.authStore.withBootstrapLock(
-      DEFAULT_TENANT_ID,
-      async () => {
-        const existing = await deps.authStore.countUsers({
-          tenantId: DEFAULT_TENANT_ID,
+    await deps.authStore.withBootstrapLock(DEFAULT_TENANT_ID, async () => {
+      const existing = await deps.authStore.countUsers({
+        tenantId: DEFAULT_TENANT_ID,
+      });
+      if (existing > 0) {
+        // Ein Konto existiert bereits (z. B. via AUTH_BOOTSTRAP_ADMIN_*): der explizite Env-Bootstrap gewinnt.
+        log("info", "runtime.dev-seed.user.skipped", {
+          reason: "already-bootstrapped",
         });
-        if (existing > 0) {
-          // Ein Konto existiert bereits (z. B. via AUTH_BOOTSTRAP_ADMIN_*): der explizite Env-Bootstrap
-          // gewinnt; wir übernehmen den ersten Actor als Audit-Urheber des Demo-Falls.
-          log("info", "runtime.dev-seed.user.skipped", {
-            reason: "already-bootstrapped",
-          });
-          const users = await deps.authStore.listUsers({
-            tenantId: DEFAULT_TENANT_ID,
-          });
-          return users[0]?.actorId;
-        }
-        const result = await bootstrapWorkspace(
-          { authStore: deps.authStore, kanbanStore: deps.kanbanStore },
-          { email: DEV_EMAIL, password: DEV_PASSWORD, displayName: DEV_NAME },
-        );
-        log("info", "runtime.dev-seed.user.created", {
-          actorId: result.user.actorId,
-          email: DEV_EMAIL,
-        });
-        return result.user.actorId;
-      },
-    );
+        return;
+      }
+      const result = await bootstrapWorkspace(
+        { authStore: deps.authStore, kanbanStore: deps.kanbanStore },
+        { email: DEV_EMAIL, password, displayName: DEV_NAME },
+      );
+      log("info", "runtime.dev-seed.user.created", {
+        actorId: result.user.actorId,
+        email: DEV_EMAIL,
+      });
+    });
   } catch (error) {
     log("error", "runtime.dev-seed.user.failed", {
       reason: error instanceof Error ? error.message : String(error),
     });
-    return undefined;
   }
 }
 

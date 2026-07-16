@@ -86,6 +86,71 @@ describe("BFF POST /api/cases/:id/transitions", () => {
     await app.close();
   });
 
+  it("closesCase-Übergang stempelt closedAt; Wiederaufnahme räumt es via null wieder ab", async () => {
+    const reopenable: ProcedureVersion = {
+      procedureId: "reopenable",
+      version: "1",
+      effectiveFrom: "2026-01-01T00:00:00.000Z",
+      legalBasisIds: ["VwV-IGM-2023"],
+      allowedStates: ["aktiv", "abgeschlossen"],
+      allowedTransitions: [
+        {
+          from: "aktiv",
+          to: "abgeschlossen",
+          action: "abschliessen",
+          requiredPermission: "case.decision.prepare",
+          closesCase: true,
+        },
+        {
+          from: "abgeschlossen",
+          to: "aktiv",
+          action: "wiederaufnehmen",
+          requiredPermission: "case.decision.prepare",
+        },
+      ],
+    };
+    const { app } = await buildBffApp({
+      session: caseworkerSession(),
+      caseStore: new InMemoryCaseStore(),
+      procedureRegistry: createInMemoryProcedureRegistry([reopenable]),
+    });
+    const created = (
+      await app.inject({
+        method: "POST",
+        url: "/api/cases",
+        payload: {
+          procedureId: "reopenable",
+          procedureVersion: "1",
+          state: "aktiv",
+          subjectIds: ["subject.1"],
+        },
+      })
+    ).json();
+
+    // Abschluss → closedAt gesetzt (obwohl der Endzustand NICHT „closed" heißt — data-driven closesCase).
+    const closed = (
+      await app.inject({
+        method: "POST",
+        url: `/api/cases/${created.caseId}/transitions`,
+        payload: { action: "abschliessen", expectedVersion: created.version },
+      })
+    ).json();
+    expect(closed.state).toBe("abgeschlossen");
+    expect(typeof closed.closedAt).toBe("string");
+
+    // Wiederaufnahme → closedAt wieder null (kein „Geschlossen am" an einem laufenden Fall).
+    const reopened = (
+      await app.inject({
+        method: "POST",
+        url: `/api/cases/${created.caseId}/transitions`,
+        payload: { action: "wiederaufnehmen", expectedVersion: closed.version },
+      })
+    ).json();
+    expect(reopened.state).toBe("aktiv");
+    expect(reopened.closedAt).toBeNull();
+    await app.close();
+  });
+
   it("400 bei ungültiger Action (kein passender Übergang)", async () => {
     const { app } = await buildApp();
     const created = await createCase(app);

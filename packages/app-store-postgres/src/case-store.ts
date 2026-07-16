@@ -283,7 +283,9 @@ export class InMemoryCaseStore implements CaseStore {
       ...found,
       state: input.newState,
       version: found.version + 1,
-      closedAt: input.closedAt ?? found.closedAt,
+      // Explizites `null` LÖSCHT die Schließzeit (Wiederaufnahme), ein String SETZT sie; nur ein
+      // ausgelassenes Feld (undefined) lässt sie unverändert — Parität zum Postgres-Pfad (closed_at = $2).
+      closedAt: input.closedAt !== undefined ? input.closedAt : found.closedAt,
     };
     this.cases.set(this.key(input.tenantId, input.caseId), next);
     this.audit.push({
