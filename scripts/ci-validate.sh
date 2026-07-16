@@ -2,7 +2,14 @@
 set -eu
 
 if [ -z "${TMPDIR:-}" ]; then
-  TMPDIR="$(pwd)/../.tmp-senticor-app-fachverfahren-template"
+  sibling="$(pwd)/../.tmp-senticor-app-fachverfahren-template"
+  if mkdir -p "$sibling" 2>/dev/null; then
+    TMPDIR="$sibling"
+  else
+    # Cloud/CI sandboxes may not allow writing next to the checkout (e.g. /workspace → /).
+    TMPDIR="${TMPDIR:-/tmp}/.tmp-senticor-app-fachverfahren-template-$$"
+    mkdir -p "$TMPDIR"
+  fi
   export TMPDIR
 fi
 

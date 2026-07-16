@@ -21,6 +21,7 @@ import type {
   Vorgang,
   VorgangPort,
 } from "../types.js";
+import { useVorgaenge } from "../hooks/use-vorgang-resource.js";
 import { cn } from "../lib/cn.js";
 import {
   Table,
@@ -120,7 +121,9 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
   onReload,
 }: ArbeitsvorratProps<T>): ReactElement {
   const { announce } = useStatusRegion();
-  const alle = port.list();
+  const resource = useVorgaenge(port);
+  const isLoading = loading || resource.status === "loading";
+  const alle: Vorgang<T>[] = resource.status === "success" ? resource.data : [];
   const states = config.statusMachine.states;
   const [pageIndex, setPageIndex] = React.useState(0);
   const [currentPageSize, setCurrentPageSize] = React.useState(() =>
@@ -315,14 +318,14 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
 
   // Lade-/Ergebnis-Zustand zentral ansagen (eine Ansage-Wahrheit, nicht je Widget).
   React.useEffect(() => {
-    if (loading) {
+    if (isLoading) {
       announce("Arbeitsvorrat wird geladen", "polite");
     }
-  }, [loading, announce]);
+  }, [isLoading, announce]);
   React.useEffect(() => {
-    if (loading) return;
+    if (isLoading) return;
     announce(`${rows.length} von ${alle.length} Vorgängen angezeigt`, "polite");
-  }, [loading, rows.length, alle.length, announce]);
+  }, [isLoading, rows.length, alle.length, announce]);
 
   // Pfeiltasten-Navigation der Tabellenzeilen (Roving-Tabindex). Enter/Space öffnen bleiben erhalten.
   const handleRowKeyDown = React.useCallback(
@@ -393,7 +396,7 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
       </div>
 
       <div className="mx-auto flex w-full min-h-0 max-w-6xl flex-1 flex-col px-6 py-6">
-        {loading ? (
+        {isLoading ? (
           // Ladezustand: layout-treuer Tabellen-Platzhalter statt Spinner (kein Layout-Shift).
           // Ansage übernimmt zentral useStatusRegion; das Skeleton selbst ist dekorativ (aria-hidden).
           <div className="mt-1 flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card p-4 shadow-sm">

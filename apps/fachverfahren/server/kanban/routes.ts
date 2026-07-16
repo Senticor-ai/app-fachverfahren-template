@@ -1,3 +1,6 @@
+// Kanban HTTP surface — materialised view cache over Action+Thing (ADR-0004).
+// Durable work items live in ActionStore/ThingStore; cards should use
+// sourceKey `action:<actionId>` when projected from Actions.
 import { randomUUID } from "node:crypto";
 import type {
   AuditEventType,

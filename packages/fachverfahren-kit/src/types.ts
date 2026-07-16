@@ -120,6 +120,8 @@ export interface Vorgang<TAntragsdaten = Record<string, unknown>> {
   ki: KiEinschaetzung;
   nachweise: Nachweis[];
   history: VorgangHistorie[];
+  /** Optimistic-Concurrency-Version (optional, für expectedVersion-Checks und Versionskonflikt-Erkennung). */
+  version?: number;
 }
 
 // ── Status-State-Machine (data-driven) ──────────────────────────────────────
@@ -138,6 +140,9 @@ export interface Transition {
   rollen: string[]; // wer den Übergang auslösen darf
   vierAugen?: boolean;
   detailPflicht?: boolean; // Begründung/Detail erforderlich (z.B. bei Ablehnung)
+  /** Optionaler Ereignis-Name (statt dem Default `from->to`) für den `uebergang()`-Aufruf.
+   *  Erlaubt semantische Event-Namen (z. B. „genehmigen") statt des Zielstatus. */
+  eventName?: string;
 }
 export interface StatusMachine {
   initial: string; // Status bei Antrags-Eingang ("eingegangen")
@@ -692,30 +697,37 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   personas?: readonly import("./components/PersonaSwitcher.js").PersonaDescriptor[];
 }
 
-/** DATENSCHICHT-PORT — die EINE Schnittstelle, die der Kit nutzt. DEV: Zustand-Store. PROD: SDK/Fastify. */
+/** DATENSCHICHT-PORT — Browser/UI. DEV: in-memory adapter. PROD: HTTP client → CaseService.
+ *  Asynchronous so remote backends (and delayed in-memory tests) share one contract. */
 export interface VorgangPort<TAntragsdaten = Record<string, unknown>> {
-  list(): Vorgang<TAntragsdaten>[];
-  get(id: string): Vorgang<TAntragsdaten> | undefined;
-  /** Bürger-Antrag absenden → neuer Vorgang im Initialstatus + History-Eintrag. `erbrachteNachweise` (optional, generisch)
-   *  = die vom Bürger hochgeladenen Dateien, keyed by Nachweis-Id → der Vorgang trägt sie als „hochgeladen" (sonst
-   *  zeigte der Sachbearbeiter für JEDEN Nachweis „Fehlt", egal was hochgeladen wurde). */
+  list(query?: {
+    states?: string[];
+    search?: string;
+    cursor?: string;
+    limit?: number;
+  }): Promise<Vorgang<TAntragsdaten>[]>;
+  get(id: string): Promise<Vorgang<TAntragsdaten> | undefined>;
+  /** Bürger-Antrag absenden. Client sends idempotencyKey to survive retries. */
   einreichen(
     antragsdaten: TAntragsdaten,
     erbrachteNachweise?: Record<
       string,
-      { name: string; groesse: number } | null
+      { name: string; groesse: number; attachmentId?: string } | null
     >,
-  ): Vorgang<TAntragsdaten>;
-  /** Status-Übergang (SB-Entscheidung) — prüft die Transition + schreibt History (4-Augen serverseitig in PROD).
-   *  `akteur` (optional): pseudonyme Kennung des Handelnden → landet als `history[].akteur` und macht Vier-Augen
-   *  nachweisbar; bei `vierAugen`-Transitionen prüft schon der DEV-Store, dass ZWEI VERSCHIEDENE Akteure handeln. */
+    opts?: { idempotencyKey?: string },
+  ): Promise<Vorgang<TAntragsdaten>>;
+  /** Status-Übergang by event name (or legacy target state). Server is authoritative. */
   uebergang(
     id: string,
-    to: string,
+    eventName: string,
     rolle: string,
     detail?: string,
     akteur?: string,
-  ): void;
-  /** Once-Only-Lookup gegen das Register. */
-  lookupRegister(query: string): Record<string, string> | undefined;
+    opts?: { expectedVersion?: number; idempotencyKey?: string },
+  ): Promise<Vorgang<TAntragsdaten>>;
+}
+
+/** Once-Only register lookup — not part of the case persistence seam. */
+export interface RegisterLookupPort {
+  lookupRegister(query: string): Promise<Record<string, string> | undefined>;
 }

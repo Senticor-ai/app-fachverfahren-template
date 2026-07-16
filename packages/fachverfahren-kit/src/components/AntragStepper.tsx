@@ -36,10 +36,12 @@ import type {
   CodelistenMarkierung,
   FeldDef,
   LeistungConfig,
+  RegisterLookupPort,
   StepDef,
   Vorgang,
   VorgangPort,
 } from "../types.js";
+import { useEinreichen } from "../hooks/use-vorgang-resource.js";
 import {
   asString,
   feldAnzeige,
@@ -125,22 +127,23 @@ function adressAus(daten: Antragsdaten): AdressWert {
 }
 
 /** Deterministischer Registerabgleich über den Port: ein Treffer mit allen Adressbestandteilen → genau-1-Treffer. */
-function adressValidieren<T extends Antragsdaten>(
-  port: VorgangPort<T>,
+async function adressValidieren<T extends Antragsdaten>(
+  port: VorgangPort<T> & Partial<RegisterLookupPort>,
   wert: AdressWert,
 ): Promise<AdressTreffer[]> {
   const query = [wert.strasse, wert.plz, wert.ort]
     .map((s) => (s ?? "").trim())
     .filter(Boolean)
     .join(" ");
-  const treffer = query ? port.lookupRegister(query) : undefined;
-  if (!treffer) return Promise.resolve([]);
+  const treffer =
+    query && port.lookupRegister ? await port.lookupRegister(query) : undefined;
+  if (!treffer) return [];
   const strasse = treffer["strasse"] ?? wert.strasse ?? "";
   const plz = treffer["plz"] ?? wert.plz ?? "";
   const ort = treffer["ort"] ?? wert.ort ?? "";
   // Nur als vollständiger amtlicher Treffer melden, wenn alle Bestandteile vorliegen.
-  if (!strasse || !plz || !ort) return Promise.resolve([]);
-  return Promise.resolve([{ strasse, plz, ort }]);
+  if (!strasse || !plz || !ort) return [];
+  return [{ strasse, plz, ort }];
 }
 
 /** DETERMINISTISCHE Feld-DOM-id (gemeinsame Wahrheit für Control, aria-describedby UND ErrorSummary-Anker).
@@ -173,7 +176,7 @@ function stepFehlerEintraege(
 // ── Props ────────────────────────────────────────────────────────────────────────────────────
 export interface AntragStepperProps<T extends Antragsdaten = Antragsdaten> {
   config: LeistungConfig<T>;
-  port: VorgangPort<T>;
+  port: VorgangPort<T> & Partial<RegisterLookupPort>;
   onDone: (vorgang: Vorgang<T>) => void;
   /** OPTIONAL: ein Dokument-Extraktions-PORT (KI/OCR). Ist er gesetzt, erscheint im ersten Schritt der
    *  DokumentExtraktion-Assistent (Upload → Vorschläge → Bestätigung → Feld befüllt). Fehlt er, ist der
@@ -196,6 +199,8 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
   leichteSprache = false,
   zeigeFachbegriffe = false,
 }: AntragStepperProps<T>): React.ReactElement {
+  const { pending: submitPending, einreichen: doEinreichen } =
+    useEinreichen(port);
   // Auswahl-Optionen einmalig auflösen: Felder mit `optionsRef` ziehen ihre Optionen aus `config.datenlisten` ODER
   // `config.codelisten` (data-driven, z. B. eine Rassenliste) — ab hier lesen ALLE Funktionen nur noch
   // `feld.options`. Eine Wahrheit. `steps` ist die VOLLE (aufgelöste) Menge; die progressive-disclosure-Filterung
@@ -341,14 +346,14 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
   const allValid = invalidStep === null;
 
   // ── Once-Only: über die ersten editierbaren onceOnly-Felder gegen das Register suchen ────────
-  function tryRegisterLookup(feld: FeldDef, rohwert: string) {
-    if (!feld.onceOnly) return;
+  async function tryRegisterLookup(feld: FeldDef, rohwert: string) {
+    if (!feld.onceOnly || !port.lookupRegister) return;
     const q = rohwert.trim();
     if (!q) {
       setRegisterHinweis(null);
       return;
     }
-    const treffer = port.lookupRegister(q);
+    const treffer = await port.lookupRegister(q);
     if (!treffer) {
       setRegisterHinweis(null);
       return;
@@ -414,7 +419,7 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
     }
   };
 
-  function submit() {
+  async function submit() {
     // PFLICHT-SPERRE auch beim Absenden: offene Angaben sammeln, oben anzeigen, Fokus + Ansage — NICHT einreichen.
     if (!allValid) {
       focusSummary(alleFehlerEintraege().errors);
@@ -425,11 +430,12 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
     // Werte inkl. der abgeleiteten Felder (der Store leitet defensiv nochmals ab; die Ableitung ist idempotent).
     // Die tatsächlich hochgeladenen Nachweis-Dateien (keyed by Nachweis-Id) MIT einreichen — sonst verpuffen sie und der
     // Sachbearbeiter sieht für jeden Nachweis „Fehlt" (Wurzel-Fix „Upload landet nicht beim Sachbearbeiter").
-    const vorgang = port.einreichen(
+    // useEinreichen verhindert Doppel-Submit (inFlight-Guard) und generiert den idempotency key.
+    const vorgang = await doEinreichen(
       effektiveDaten as T,
       nachweisDateien.current,
     );
-    onDone(vorgang);
+    if (vorgang) onDone(vorgang);
   }
 
   return (
@@ -654,11 +660,11 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
             </Button>
           ) : (
             <Button
-              onClick={submit}
-              disabled={!allValid}
-              aria-disabled={!allValid}
+              onClick={() => void submit()}
+              disabled={!allValid || submitPending}
+              aria-disabled={!allValid || submitPending}
             >
-              Antrag absenden
+              {submitPending ? "Wird gesendet…" : "Antrag absenden"}
               <ChevronRight className="h-4 w-4" />
             </Button>
           )}

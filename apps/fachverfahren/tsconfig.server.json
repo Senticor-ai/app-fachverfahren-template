@@ -11,6 +11,8 @@
     "tsBuildInfoFile": "dist-server/.tsbuildinfo"
   },
   "references": [
+    { "path": "../../packages/app-store-contracts" },
+    { "path": "../../packages/fachverfahren-domain" },
     { "path": "../../packages/app-bff-contracts" },
     { "path": "../../packages/app-bff-fastify" },
     { "path": "../../packages/app-runtime-fastify" },

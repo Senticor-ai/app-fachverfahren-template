@@ -21,7 +21,9 @@
   },
   "dependencies": {
     "fractional-indexing": "^4.0.0",
-    "pg": "catalog:"
+    "pg": "catalog:",
+    "@senticor/app-store-contracts": "workspace:*",
+    "@senticor/fachverfahren-domain": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

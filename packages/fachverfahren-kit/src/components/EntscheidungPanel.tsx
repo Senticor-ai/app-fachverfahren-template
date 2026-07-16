@@ -4,7 +4,8 @@
 // Übergängen für (`vorgang.status`, `rolle`) — `config.statusMachine.transitions`. 4-Augen-Hinweis bei `vierAugen`,
 // Begründungs-Pflichtfeld bei `detailPflicht`. Kein Domänen-Literal — ein zweites Verfahren läuft unverändert.
 import { useState } from "react";
-import { AlertTriangle, Check, ShieldCheck, X } from "lucide-react";
+import { AlertTriangle, Check, Loader2, ShieldCheck, X } from "lucide-react";
+import { useUebergang } from "../hooks/use-vorgang-resource.js";
 import type {
   LeistungConfig,
   Transition,
@@ -55,9 +56,18 @@ export function EntscheidungPanel<T = Record<string, unknown>>({
   const states = config.statusMachine?.states ?? [];
   const toneOf = (key: string) => states.find((s) => s.key === key)?.tone;
 
+  const {
+    pending: transitionPending,
+    error: transitionError,
+    uebergang: doUebergang,
+    reset: resetTransitionError,
+  } = useUebergang(port);
+
   // Pro Übergang ein eigenes Begründungsfeld (nur bei detailPflicht sichtbar/erforderlich).
   const [detail, setDetail] = useState<Record<string, string>>({});
-  const [fehler, setFehler] = useState<string | null>(null);
+  const [validationFehler, setValidationFehler] = useState<string | null>(null);
+
+  const fehler = validationFehler ?? transitionError?.message ?? null;
 
   const aktuellerStatus = states.find((s) => s.key === vorgang.status);
 
@@ -77,20 +87,26 @@ export function EntscheidungPanel<T = Record<string, unknown>>({
     );
   }
 
-  function ausloesen(t: Transition) {
+  async function ausloesen(t: Transition) {
     const text = (detail[t.to] ?? "").trim();
     if (t.detailPflicht && !text) {
-      setFehler(`"${t.label}" erfordert eine Begründung.`);
+      setValidationFehler(`"${t.label}" erfordert eine Begründung.`);
       return;
     }
-    try {
-      // Übergang über den Port — DEV: Zustand-Store, PROD: SDK/Fastify. 4-Augen wird serverseitig erzwungen;
-      // der akteur macht den Vier-Augen-Nachweis in der History führbar (zwei VERSCHIEDENE Personen).
-      port.uebergang(vorgang.id, t.to, rolle, text || undefined, akteur);
-      setFehler(null);
+    setValidationFehler(null);
+    resetTransitionError();
+    // Übergang über den Port — DEV: Zustand-Store, PROD: SDK/Fastify. 4-Augen wird serverseitig erzwungen;
+    // der akteur macht den Vier-Augen-Nachweis in der History führbar (zwei VERSCHIEDENE Personen).
+    // useUebergang verhindert Doppel-Submit (inFlight-Guard) und generiert den idempotency key.
+    const next = await doUebergang(
+      vorgang.id,
+      t.to,
+      rolle,
+      text || undefined,
+      akteur,
+    );
+    if (next) {
       onEntschieden?.(t.to);
-    } catch (e) {
-      setFehler(e instanceof Error ? e.message : "Übergang nicht möglich.");
     }
   }
 
@@ -138,10 +154,19 @@ export function EntscheidungPanel<T = Record<string, unknown>>({
               <Button
                 variant={variant}
                 className="w-full justify-between"
-                onClick={() => ausloesen(t)}
+                disabled={transitionPending}
+                onClick={() => void ausloesen(t)}
               >
+                {transitionPending ? (
+                  <Loader2
+                    className="h-4 w-4 animate-spin"
+                    aria-hidden="true"
+                  />
+                ) : null}
                 {t.label}
-                {Icon && <Icon className="h-4 w-4" aria-hidden="true" />}
+                {!transitionPending && Icon ? (
+                  <Icon className="h-4 w-4" aria-hidden="true" />
+                ) : null}
               </Button>
 
               {t.vierAugen && (

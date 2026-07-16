@@ -3,8 +3,9 @@
 > **Für Agenten: Quellen & Pflicht-Lektüre.**
 > Status: IST für die neutrale Web-Delivery-Runtime in
 > `packages/app-runtime-fastify` (komponiert unter
-> `apps/fachverfahren/server/`); fachliche API-, OpenAPI-, App-Daten- und
-> Postgres-E2E-Routen bleiben explizite Ausbauschritte.
+> `apps/fachverfahren/server/`) sowie Case-/Attachment-Routen über
+> `CaseService`/`CaseStore`. Volle Browser-`test:e2e:postgres`-Suite bleibt
+> Ausbauschritt; Store-Contract- und Route-Inject-Tests sind IST.
 > Quellen: Architekturentscheidungen dieses Templates, `AGENTS.md`.
 > Pflicht-Lektüre vorher: `AGENTS.md`.
 
@@ -44,6 +45,28 @@ kritische Abhängigkeiten prüfen; Liveness darf das nicht.
 - `GET /api/mailbox?box=inbox|outbox&scope=own|authority` —
   `mailbox.own.read` bzw. `mailbox.authority.read`
 - `POST /api/mailbox` — `mailbox.own.write` bzw. `mailbox.authority.write`
+
+### Case- und Attachment-Routen (public Port)
+
+Autoritative Fall-API über `CaseService` → `CaseStore` (siehe
+`docs/reference/persistence-adapters.md`):
+
+- `GET /api/v1/cases` — Liste (tenant-scoped)
+- `GET /api/v1/cases/:caseId` — Detail inkl. Events
+- `POST /api/v1/cases` — Einreichen (`Idempotency-Key` Pflicht)
+- `POST /api/v1/cases/:caseId/transitions` — Übergang per `eventName` +
+  `expectedVersion` (`Idempotency-Key` Pflicht)
+- `POST /api/v1/attachments` — Unbound-Upload (Binary-Body)
+- `GET /api/v1/attachments/:attachmentId` — Download-Stream
+- `DELETE /api/v1/attachments/:attachmentId`
+
+Statuscodes: 401 ohne Sitzung, 404 scope-safe, 409 Konflikt/Version,
+422 Domain-Regel (Vier-Augen/Transition), 503 Store unavailable.
+Tenant/Actor kommen aus der Sitzung, nie aus dem Body.
+
+Die laufende App spricht Vorgänge über den HTTP-`VorgangPort`-Client an und
+benötigt Postgres (`APP_PG_*`) oder lokal `APP_CASE_STORE=memory`. Storybook
+nutzt weiter den In-Memory-Kit-Store.
 
 Verträge (TypeBox-DTOs, Fehler-Envelope `{ error, requestId? }`) liegen in
 `@senticor/app-bff-contracts`; Statuscodes: 401 ohne Sitzung, 403 bei
