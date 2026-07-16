@@ -48,5 +48,21 @@
     "tailwindcss": "^4.3.2",
     "typescript": "6.0.3",
     "vite": "^8.1.4"
+  },
+  "chos": {
+    "runtime": {
+      "//": "Laufzeit-Descriptor (DIE EINE Wahrheit, welche Prozesse die App zum Laufen braucht) — vom CHOS-Preview-Boot + Boot-Smoke-Gate gelesen. Neben dem Vite-Frontend hat diese App ein Fastify-Backend (dist-server). Eine App OHNE Backend lässt diesen Block weg → nur das Frontend bootet.",
+      "backend": {
+        "prepareScript": "build:server",
+        "startScript": "start",
+        "portEnv": "PORT",
+        "defaultPort": 8080,
+        "healthPath": "/auth/status",
+        "gateProbePath": "/auth/session",
+        "proxyTargetEnv": "VITE_DEV_API_PROXY_TARGET",
+        "staticDirEnv": "STATIC_DIR",
+        "previewEnv": { "APP_STORE_MODE": "memory" }
+      }
+    }
   }
 }

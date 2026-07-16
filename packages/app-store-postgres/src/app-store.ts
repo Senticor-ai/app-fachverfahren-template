@@ -318,6 +318,8 @@ export class UnavailableAppStore implements AppStore {
 export function createAppStoreFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): AppStore {
+  // Ephemerer Preview-/Dev-Store (s. createAuthStoreFromEnv): APP_STORE_MODE=memory → prozess-lokaler In-Memory-Store.
+  if (env["APP_STORE_MODE"] === "memory") return new InMemoryAppStore();
   const databaseUrl = env["APP_PG_URL"] ?? env["APP_PG_DIRECT_URL"];
   return databaseUrl
     ? new PostgresAppStore(databaseUrl)

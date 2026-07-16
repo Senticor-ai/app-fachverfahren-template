@@ -709,6 +709,8 @@ export class UnavailableKanbanStore implements KanbanStore {
 export function createKanbanStoreFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): KanbanStore {
+  // Ephemerer Preview-/Dev-Store (s. createAuthStoreFromEnv): APP_STORE_MODE=memory → prozess-lokaler In-Memory-Store.
+  if (env["APP_STORE_MODE"] === "memory") return new InMemoryKanbanStore();
   const databaseUrl = env["APP_PG_URL"] ?? env["APP_PG_DIRECT_URL"];
   return databaseUrl
     ? new PostgresKanbanStore(databaseUrl)

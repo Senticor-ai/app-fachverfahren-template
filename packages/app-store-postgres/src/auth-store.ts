@@ -646,6 +646,11 @@ export class UnavailableAuthStore implements AuthStore {
 export function createAuthStoreFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): AuthStore {
+  // EPHEMERER PREVIEW-/DEV-STORE (EINE Wahrheit über alle Stores): mit APP_STORE_MODE=memory läuft die Runtime OHNE
+  // Postgres auf einem prozess-lokalen In-Memory-Store. Ohne ihn wäre der Store „unavailable" → storeAvailable=false →
+  // apiAvailable=false → die Preview rendert „Server nicht erreichbar". Rückwärtskompatibel: der Default (ungesetzt) bleibt
+  // Postgres-or-Unavailable; NUR der explizite memory-Modus (Preview/Smoke) schaltet den flüchtigen Store frei.
+  if (env["APP_STORE_MODE"] === "memory") return new InMemoryAuthStore();
   const databaseUrl = env["APP_PG_URL"] ?? env["APP_PG_DIRECT_URL"];
   return databaseUrl
     ? new PostgresAuthStore(databaseUrl)
