@@ -38,6 +38,7 @@ function task(
     data: {},
     sortRank: "",
     version: 1,
+    createdAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
   };
 }
@@ -75,6 +76,21 @@ const tasks: CaseTask[] = [
     assignedTo: "sb.1",
   }),
   task({ taskId: "u1", taskKind: "aufgabe", title: "Interne Aufgabe" }),
+  // Zwei Vermerke (unterschiedliche createdAt) — die Abbildung ordnet neueste zuerst; Autor aus data.createdBy.
+  task({
+    taskId: "n1",
+    taskKind: "notiz",
+    title: "Älterer Vermerk",
+    createdAt: "2026-02-01T08:00:00.000Z",
+    data: { createdBy: "actor.a" },
+  }),
+  task({
+    taskId: "n2",
+    taskKind: "notiz",
+    title: "Neuerer Vermerk",
+    createdAt: "2026-02-05T08:00:00.000Z",
+    data: { createdBy: "actor.b" },
+  }),
 ];
 
 const progress = [
@@ -107,6 +123,16 @@ describe("toAkteProps", () => {
     expect(zielB?.fortschrittProzent).toBeUndefined();
     expect(zielB?.schritte).toBeUndefined();
     expect(zielB?.frist).toBeUndefined();
+  });
+
+  it("Notizen: nur taskKind=notiz, neueste zuerst, Autor:in aus data.createdBy, Zeit aus createdAt", () => {
+    const notizen = props.notizen ?? [];
+    expect(notizen.map((n) => n.text)).toEqual([
+      "Neuerer Vermerk",
+      "Älterer Vermerk",
+    ]);
+    expect(notizen[0]?.autor).toBe("actor.b");
+    expect(notizen[0]?.zeit).toBeInstanceOf(Date);
   });
 
   it("Termine: nur taskKind=termin, Fälligkeit als Date, Zuständigkeit als Beschreibung", () => {

@@ -43,6 +43,7 @@ export interface CaseTask {
   data: Record<string, unknown>;
   sortRank: string;
   version: number;
+  createdAt: string;
 }
 
 /** Fortschritt je Ziel — 1:1 zur BFF-`ProgressDto`-Zeile (compute-on-read aus den Schritten). */

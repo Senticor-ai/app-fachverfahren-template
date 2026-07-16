@@ -12,6 +12,7 @@ import type {
   DescriptionListItem,
   DossierAkte360Props,
   DossierMerkmal,
+  DossierNotiz,
   DossierTermin,
   DossierZiel,
   DossierZielSchritt,
@@ -21,6 +22,7 @@ import type {
 const TASK_KIND_ZIEL = "ziel";
 const TASK_KIND_SCHRITT = "checkliste-item";
 const TASK_KIND_TERMIN = "termin";
+const TASK_KIND_NOTIZ = "notiz";
 
 /** ISO-Zeitstempel als lokalisiertes Datum; nicht parsebare Werte bleiben unverändert. */
 export function formatDate(iso: string): string {
@@ -100,6 +102,24 @@ function toTermine(tasks: readonly CaseTask[]): DossierTermin[] {
         ...(zuweisung !== null
           ? { beschreibung: `Zuständig: ${zuweisung}` }
           : {}),
+      };
+    });
+}
+
+/** Notiz-/Vermerk-Tasks (taskKind "notiz") → `DossierNotiz[]`, neueste zuerst. Autor:in aus dem
+ *  server-gesetzten `data.createdBy` (nie clientseitig); Zeit aus `createdAt`. */
+function toNotizen(tasks: readonly CaseTask[]): DossierNotiz[] {
+  return tasks
+    .filter((task) => task.taskKind === TASK_KIND_NOTIZ)
+    .slice()
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map((task): DossierNotiz => {
+      const autor = task.data["createdBy"];
+      return {
+        id: task.taskId,
+        text: task.title,
+        zeit: asZeit(task.createdAt),
+        ...(typeof autor === "string" && autor.length > 0 ? { autor } : {}),
       };
     });
 }
@@ -193,5 +213,6 @@ export function toAkteProps(
     stammdaten: toStammdaten(caseSummary),
     ziele: toZiele(tasks, progress),
     termine: toTermine(tasks),
+    notizen: toNotizen(tasks),
   };
 }

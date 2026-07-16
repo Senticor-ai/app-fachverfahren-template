@@ -976,6 +976,7 @@
                             ]
                           },
                           "caseId": { "minLength": 1, "type": "string" },
+                          "createdAt": { "minLength": 1, "type": "string" },
                           "data": {
                             "additionalProperties": {},
                             "type": "object"
@@ -1017,7 +1018,8 @@
                           "parentTaskId",
                           "data",
                           "sortRank",
-                          "version"
+                          "version",
+                          "createdAt"
                         ],
                         "type": "object"
                       },
@@ -1159,6 +1161,7 @@
                       ]
                     },
                     "caseId": { "minLength": 1, "type": "string" },
+                    "createdAt": { "minLength": 1, "type": "string" },
                     "data": { "additionalProperties": {}, "type": "object" },
                     "dueAt": {
                       "anyOf": [
@@ -1197,7 +1200,8 @@
                     "parentTaskId",
                     "data",
                     "sortRank",
-                    "version"
+                    "version",
+                    "createdAt"
                   ],
                   "type": "object"
                 }
@@ -2174,6 +2178,7 @@
                       ]
                     },
                     "caseId": { "minLength": 1, "type": "string" },
+                    "createdAt": { "minLength": 1, "type": "string" },
                     "data": { "additionalProperties": {}, "type": "object" },
                     "dueAt": {
                       "anyOf": [
@@ -2212,7 +2217,8 @@
                     "parentTaskId",
                     "data",
                     "sortRank",
-                    "version"
+                    "version",
+                    "createdAt"
                   ],
                   "type": "object"
                 }

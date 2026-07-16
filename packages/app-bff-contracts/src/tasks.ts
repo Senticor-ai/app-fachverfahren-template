@@ -27,6 +27,8 @@ export const TaskDtoSchema = Type.Object(
     data: Type.Record(Type.String(), Type.Unknown()),
     sortRank: Type.String(),
     version: Type.Integer({ minimum: 1 }),
+    /** Erstellzeitpunkt (ISO) — u. a. der Zeitstempel eines Vermerks (taskKind "notiz"). */
+    createdAt: Type.String({ minLength: 1 }),
   },
   { additionalProperties: false },
 );

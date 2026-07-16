@@ -45,6 +45,7 @@ function toTaskDto(t: AppTask): TaskDto {
     data: t.data,
     sortRank: t.sortRank,
     version: t.version,
+    createdAt: t.createdAt,
   };
 }
 
@@ -160,7 +161,9 @@ export function registerTaskRoutes(app: FastifyInstance, deps: BffDeps): void {
           dueAt: body.dueAt ?? null,
           taskKind: body.taskKind ?? "aufgabe",
           parentTaskId: body.parentTaskId ?? null,
-          data: body.data ?? {},
+          // Urheber:in server-autoritativ aus der Session (nie vom Client) — generische Metadaten für JEDE
+          // Aufgabe; u. a. der Autor eines Vermerks (taskKind "notiz"). Überschreibt ein evtl. mitgesendetes Feld.
+          data: { ...(body.data ?? {}), createdBy: session.actorId },
           sortRank: body.sortRank ?? "",
           version: 1,
           createdAt: now,

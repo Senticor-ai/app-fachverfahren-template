@@ -32,6 +32,7 @@ import {
 
 import { cn } from "../lib/utils.js";
 import { Badge } from "../ui/badge.js";
+import { Button } from "../ui/button.js";
 import { Checkbox } from "../ui/checkbox.js";
 import { Progress } from "../ui/progress.js";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs.js";
@@ -120,6 +121,8 @@ export interface DossierAkte360Labels {
   keineTermine: string;
   keineNotizen: string;
   keinVerlauf: string;
+  notizPlatzhalter: string;
+  notizHinzufuegen: string;
 }
 
 const DEFAULT_LABELS: DossierAkte360Labels = {
@@ -136,6 +139,8 @@ const DEFAULT_LABELS: DossierAkte360Labels = {
   keineTermine: "Keine Termine oder Fristen vorgemerkt.",
   keineNotizen: "Noch keine Notizen erfasst.",
   keinVerlauf: "Noch keine Verlaufseinträge.",
+  notizPlatzhalter: "Vermerk hinzufügen …",
+  notizHinzufuegen: "Vermerk speichern",
 };
 
 export interface DossierAkte360Props {
@@ -166,6 +171,12 @@ export interface DossierAkte360Props {
    * (erledigt/Fortschritt) fließt anschließend über die Props zurück — die Sicht hält keinen Zustand.
    */
   onSchrittToggle?: DossierSchrittToggle;
+  /**
+   * OPTIONAL: einen Vermerk/eine Notiz erfassen. Ist der Callback gesetzt, rendert die Notizen-Sektion ein
+   * barrierefreies Eingabeformular; sonst bleibt sie rein darstellend (rückwärtskompatibel). Async
+   * (Server-Roundtrip); die neue Notiz fließt anschließend über die `notizen`-Prop zurück.
+   */
+  onNotizAdd?: DossierNotizAdd;
   /** Welcher Tab initial offen ist. Default: `stammdaten`. */
   defaultTab?: "stammdaten" | "ziele" | "termine" | "notizen" | "verlauf";
   /** Überschreibbare Beschriftungen (deutsche Defaults). */
@@ -207,6 +218,67 @@ export type DossierSchrittToggle = (
   schrittId: string,
   erledigt: boolean,
 ) => void | Promise<void>;
+
+/** Einen Vermerk erfassen — additiv. Ist der Callback gesetzt, rendert die Notizen-Sektion ein Eingabe-
+ *  formular. Async (Server-Roundtrip); die neue Notiz kommt danach über die `notizen`-Prop zurück. */
+export type DossierNotizAdd = (text: string) => void | Promise<void>;
+
+/** Barrierefreies Eingabeformular für einen neuen Vermerk (nur gerendert, wenn `onNotizAdd` gesetzt ist). */
+function NotizForm({
+  onNotizAdd,
+  labels,
+}: {
+  onNotizAdd: DossierNotizAdd;
+  labels: DossierAkte360Labels;
+}): ReactElement {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const inputId = useId();
+
+  async function submit(event: React.FormEvent): Promise<void> {
+    event.preventDefault();
+    const trimmed = text.trim();
+    if (trimmed === "" || busy) return;
+    setBusy(true);
+    try {
+      await onNotizAdd(trimmed);
+      setText("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={(event) => void submit(event)}
+      className="rounded-lg border border-border bg-card p-4"
+    >
+      <label htmlFor={inputId} className="sr-only">
+        {labels.notizPlatzhalter}
+      </label>
+      <textarea
+        id={inputId}
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        disabled={busy}
+        aria-busy={busy}
+        rows={3}
+        placeholder={labels.notizPlatzhalter}
+        className="w-full resize-y rounded-md border border-input bg-background p-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
+      <div className="mt-2 flex justify-end">
+        <Button
+          type="submit"
+          size="sm"
+          disabled={busy || text.trim() === ""}
+          aria-busy={busy}
+        >
+          {labels.notizHinzufuegen}
+        </Button>
+      </div>
+    </form>
+  );
+}
 
 /** Eine Ziel-Karte: Titel, Meta (Kategorie/Status/Frist), Fortschrittsbalken + Schritt-Checkliste. */
 function ZielKarte({
@@ -461,6 +533,7 @@ export function DossierAkte360({
   notizen = [],
   verlauf = [],
   onSchrittToggle,
+  onNotizAdd,
   defaultTab = "stammdaten",
   labels: labelOverrides,
   className,
@@ -553,7 +626,10 @@ export function DossierAkte360({
           )}
         </TabsContent>
 
-        <TabsContent value="notizen" className="mt-4">
+        <TabsContent value="notizen" className="mt-4 space-y-3">
+          {onNotizAdd !== undefined && (
+            <NotizForm onNotizAdd={onNotizAdd} labels={labels} />
+          )}
           {notizen.length > 0 ? (
             <ul className="space-y-3">
               {notizen.map((notiz) => (

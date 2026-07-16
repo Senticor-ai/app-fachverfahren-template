@@ -111,6 +111,16 @@ export function AmtAktePage(): React.JSX.Element {
     [id, silentReload],
   );
 
+  // Einen Vermerk erfassen: als Task (taskKind "notiz") anlegen — der Server setzt die Urheber:in aus der
+  // Session (data.createdBy). Danach ohne Skeleton neu laden, damit die Notiz in der Sektion erscheint.
+  const handleNotizAdd = useCallback(
+    async (text: string) => {
+      await casePort.createTask(id, { title: text, taskKind: "notiz" });
+      await silentReload();
+    },
+    [id, silentReload],
+  );
+
   return (
     <Shell persona="sachbearbeitung" activeNavKey="akten">
       <section className="mx-auto w-full max-w-5xl px-6 py-6">
@@ -159,6 +169,7 @@ export function AmtAktePage(): React.JSX.Element {
             )}
             verlauf={toVerlauf(state.data.audit)}
             onSchrittToggle={handleSchrittToggle}
+            onNotizAdd={handleNotizAdd}
             kopfAktion={
               <CaseAktionen
                 caseId={id}
