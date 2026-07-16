@@ -50,6 +50,10 @@ import { autoBootstrapAdminFromEnv } from "./auth/auto-bootstrap.js";
 import { registerAuthPolicyGuard } from "./auth/authorization.js";
 import { registerAuthRoutes, type RegistrationMode } from "./auth/routes.js";
 import { createCookieSessionResolver } from "./auth/session-resolver.js";
+import {
+  REFERENCE_PROCEDURE,
+  seedReferenceDemo,
+} from "./dev/reference-seed.js";
 import { registerBoardRoutes } from "./kanban/routes.js";
 import { registerUserRoutes } from "./users/routes.js";
 
@@ -225,7 +229,9 @@ export async function startRuntime(
     appStore: createAppStoreFromEnv(env),
     caseStore: createCaseStoreFromEnv(env),
     taskStore: createTaskStoreFromEnv(env),
-    procedureRegistry: createInMemoryProcedureRegistry([]),
+    // Der Runtime-Entrypoint registriert das Referenz-Verfahren (der generische buildPublicServer-Default
+    // bleibt fail-closed/leer — Unit-Tests injizieren ihre eigene Registry). In PROD kann chos die Naht liefern.
+    procedureRegistry: createInMemoryProcedureRegistry([REFERENCE_PROCEDURE]),
     sessionResolver: createCookieSessionResolver(authStore),
     auditSink: createAuditSinkFromEnv(env),
   };
@@ -238,14 +244,33 @@ export async function startRuntime(
     // Fresh-Deployment-Akzeptanz: mit AUTH_BOOTSTRAP_ADMIN_* entsteht der Admin samt
     // Team-Discovery-Board beim Start — idempotent, wirft nie (Fehler landen im Log).
     beforeListen: async () => {
+      const log = (
+        level: "info" | "error",
+        event: string,
+        fields: Record<string, unknown>,
+      ): void => {
+        if (level === "error") logError(event, fields);
+        else logInfo(event, fields);
+      };
       await autoBootstrapAdminFromEnv({
         authStore,
         kanbanStore,
         auditStore,
         env,
-        log: (level, event, fields) =>
-          level === "error" ? logError(event, fields) : logInfo(event, fields),
+        log,
       });
+      // DEV-Komfort NUR im ephemeren In-Memory-Modus: ein anmeldbarer Sachbearbeitungs-Account + ein
+      // synthetisches Demo-Dossier (Fall + Ziele/Schritte/Termine), damit die Referenz-App den Integrations-
+      // management-Dossier-Flow ohne Postgres sofort zeigt. In PROD (Postgres) NIE. Idempotent, wirft nie.
+      if (env["APP_STORE_MODE"] === "memory") {
+        await seedReferenceDemo({
+          authStore,
+          kanbanStore,
+          caseStore: bff.caseStore,
+          taskStore: bff.taskStore,
+          log,
+        });
+      }
     },
   });
 }
