@@ -11,6 +11,38 @@ import type { RuntimeConfig } from "./config.js";
 import { IMMUTABLE, NO_STORE } from "./constants.js";
 import { safePathname } from "./hooks.js";
 
+// Bekannte statische Asset-Extensions: eine fehlende Datei mit einer davon ist eine Asset-Anfrage und
+// wird 404-JSON beantwortet (ein 200-HTML für eine .js/.css-Anfrage bräche Asset-Laden/Caching). ALLES
+// andere fällt auf das SPA-Index zurück — insbesondere Client-Routen mit einem Punkt im letzten Segment
+// (z. B. /amt/akte/case.<uuid>: echte caseIds SIND punkthaltig), die sonst fälschlich als Datei-Anfrage
+// gälten und beim Deep-Link/Reload 404 statt der App lieferten.
+const STATIC_ASSET_EXTENSIONS = new Set([
+  ".html",
+  ".js",
+  ".mjs",
+  ".css",
+  ".json",
+  ".webmanifest",
+  ".map",
+  ".svg",
+  ".png",
+  ".ico",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".avif",
+  ".txt",
+  ".xml",
+  ".woff",
+  ".woff2",
+  ".ttf",
+  ".otf",
+  ".eot",
+  ".wasm",
+  ".pdf",
+]);
+
 export function registerStaticDelivery(
   app: FastifyInstance,
   config: RuntimeConfig,
@@ -49,7 +81,10 @@ export function registerStaticDelivery(
         .send({ status: "method-not-allowed" });
     }
     const pathname = safePathname(request.url);
-    if (path.extname(pathname)) {
+    // NUR fehlende Dateien mit BEKANNTER Asset-Extension → 404-JSON; punkthaltige Client-Routen
+    // (z. B. /amt/akte/case.<uuid>) sind KEINE Asset-Anfragen und bekommen den History-Fallback.
+    const ext = path.extname(pathname).toLowerCase();
+    if (ext !== "" && STATIC_ASSET_EXTENSIONS.has(ext)) {
       return reply
         .code(404)
         .header("Cache-Control", NO_STORE)
