@@ -91,18 +91,18 @@ kommt **AUSSCHLIESSLICH aus der Session** (`sessionOf`), nie vom Client. Jede
 Task-Route prüft zuerst über die Akte den Behörden-Scope (Fremd-Behörde → 404,
 keine Existenz-Leaks). Store-Ausfall → 503 (`storeUnavailable`).
 
-| Methode + Pfad                    | Recht                   | Kurz                                                                                                                                                                                                                                                             |
-| --------------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/cases`                  | `case.read`             | Fälle der Behörde listen (Filter `state`/`procedureId`/`limit`).                                                                                                                                                                                                 |
-| `GET /api/cases/:id`              | `case.read`             | Einen Fall lesen.                                                                                                                                                                                                                                                |
-| `POST /api/cases`                 | `case.decision.prepare` | Akte anlegen. Server erzeugt `caseId`/`version=1`/`openedAt`; `state` muss in `procedure.allowedStates` sein; `legalBasisId` aus der `ProcedureVersion`; Audit `case.opened`.                                                                                    |
-| `POST /api/cases/:id/transitions` | `case.decision.prepare` | Zustandswechsel. Übergang aus `procedure.allowedTransitions` (Match `from`=aktueller Zustand & `action` aus dem Body — **Ziel NIE aus dem Body**), Vier-Augen serverseitig, `transitionCase`-Reducer, atomar `patchCaseState`+Audit; `409` bei Versionskonflikt. |
-| `GET /api/cases/:id/tasks`        | `case.read`             | Aufgaben/Ziele/Schritte/Termine der Akte (Filter `taskKind`/`parentTaskId`/`limit`).                                                                                                                                                                             |
-| `POST /api/cases/:id/tasks`       | `case.decision.prepare` | Aufgabe/Ziel/Schritt/Termin anlegen (`taskKind` default `aufgabe`, `parentTaskId`, `data`).                                                                                                                                                                      |
-| `PATCH /api/tasks/:id`            | `case.decision.prepare` | Metadaten + `dataPatch`-Merge, Optimistic-Locking (`409`).                                                                                                                                                                                                       |
-| `GET /api/cases/:id/progress`     | `case.read`             | Fortschritt je `ziel` — compute-on-read aus den `checkliste-item`-Kindern mit `data.erledigt`.                                                                                                                                                                   |
-| `GET /api/cases/:id/audit`        | `case.read`             | Verlauf/Audit der Akte (append-only, chronologisch). Server-Topologie verborgen; treibt die Verlauf-Sektion.                                                                                                                                                     |
-| `GET /api/cases/:id/allowed-actions` | `case.read`          | Die im AKTUELLEN Zustand erlaubten Übergänge (aus dem Verfahren gefiltert: `from`=state). Der Client bekommt nur die `action`-Kennung + `version` (Ziel/Rechtsgrundlage/Vier-Augen server-autoritativ) → treibt die Aktionsleiste/Vier-Augen-Sicht.               |
+| Methode + Pfad                       | Recht                   | Kurz                                                                                                                                                                                                                                                             |
+| ------------------------------------ | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/cases`                     | `case.read`             | Fälle der Behörde listen (Filter `state`/`procedureId`/`limit`).                                                                                                                                                                                                 |
+| `GET /api/cases/:id`                 | `case.read`             | Einen Fall lesen.                                                                                                                                                                                                                                                |
+| `POST /api/cases`                    | `case.decision.prepare` | Akte anlegen. Server erzeugt `caseId`/`version=1`/`openedAt`; `state` muss in `procedure.allowedStates` sein; `legalBasisId` aus der `ProcedureVersion`; Audit `case.opened`.                                                                                    |
+| `POST /api/cases/:id/transitions`    | `case.decision.prepare` | Zustandswechsel. Übergang aus `procedure.allowedTransitions` (Match `from`=aktueller Zustand & `action` aus dem Body — **Ziel NIE aus dem Body**), Vier-Augen serverseitig, `transitionCase`-Reducer, atomar `patchCaseState`+Audit; `409` bei Versionskonflikt. |
+| `GET /api/cases/:id/tasks`           | `case.read`             | Aufgaben/Ziele/Schritte/Termine der Akte (Filter `taskKind`/`parentTaskId`/`limit`).                                                                                                                                                                             |
+| `POST /api/cases/:id/tasks`          | `case.decision.prepare` | Aufgabe/Ziel/Schritt/Termin anlegen (`taskKind` default `aufgabe`, `parentTaskId`, `data`).                                                                                                                                                                      |
+| `PATCH /api/tasks/:id`               | `case.decision.prepare` | Metadaten + `dataPatch`-Merge, Optimistic-Locking (`409`).                                                                                                                                                                                                       |
+| `GET /api/cases/:id/progress`        | `case.read`             | Fortschritt je `ziel` — compute-on-read aus den `checkliste-item`-Kindern mit `data.erledigt`.                                                                                                                                                                   |
+| `GET /api/cases/:id/audit`           | `case.read`             | Verlauf/Audit der Akte (append-only, chronologisch). Server-Topologie verborgen; treibt die Verlauf-Sektion.                                                                                                                                                     |
+| `GET /api/cases/:id/allowed-actions` | `case.read`             | Die im AKTUELLEN Zustand erlaubten Übergänge (aus dem Verfahren gefiltert: `from`=state). Der Client bekommt nur die `action`-Kennung + `version` (Ziel/Rechtsgrundlage/Vier-Augen server-autoritativ) → treibt die Aktionsleiste/Vier-Augen-Sicht.              |
 
 **Vier-Augen** bei `POST …/transitions`: trägt der Übergang `requiresFourEyes`,
 darf der Akteur des jüngsten Audit-Eintrags ihn nicht selbst auslösen (→ 403).
@@ -189,6 +189,21 @@ Gateway-Semantik XOR/AND) — das füllt der Provider hinter der Naht.
    `leistung.config.ts`). Ableitbar aus BPMN via `bpmnToProcedureVersion`
    ([[bpmn-prozess-workflow]]) als Authoring-Schritt. Vollständiges reales Beispiel:
    `docs/examples/integrationsberatung/integrationsmanagement.{bpmn,config.yaml}`.
+   1b. **Vertrag emittieren + committen** (PFLICHT, sonst ist das Gate rot):
+
+   ```bash
+   pnpm --filter @senticor/fachverfahren emit:procedure-contract   # → procedure.contract.json
+   pnpm run check:procedure-contract                                # Frische + Struktur
+   ```
+
+   Das Gate prüft generisch (ohne Domänen-Literale): mind. eine Rechtsgrundlage
+   (Geerdet-Prinzip), alle Übergänge referenzieren deklarierte Zustände, eindeutige
+   `(from, action)`-Paare (`transitionCase` löst per `find()` auf — Duplikate wären
+   mehrdeutig), mind. ein schließender Übergang (`closesCase`), keine Sackgasse
+   (nur geschlossene Zustände dürfen ohne Ausgang sein), kein verwaister Zustand,
+   und `dossierDemo.initialState` ∈ `allowedStates`. Läuft in `precommit:check` +
+   `check:agent-domain`.
+
 2. **Registry ist bereits verdrahtet**: `startRuntime` registriert `dossierProcedure`
    aus der Naht (`createInMemoryProcedureRegistry([dossierProcedure])`). Nichts weiter
    zu tun — die Naht IST der Eingriffspunkt. (Referenz-Motor + Preview-Seed:

@@ -17,12 +17,12 @@ den Typ wählen, dann NUR das passende Skill lesen — nicht beide.
 
 ## Zwei Verfahrenstypen — wähle EINEN
 
-| Frage  | Antrag / Vorgang                                               | Fall / Dossier / Case-Management                                      |
-| ------ | -------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Kern   | Einmal-Antrag → StatusMachine → Bescheid                       | langlebiges Subjekt (Akte) mit Zielen, Schritten, Terminen, Vermerken |
+| Frage  | Antrag / Vorgang                                               | Fall / Dossier / Case-Management                                                  |
+| ------ | -------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Kern   | Einmal-Antrag → StatusMachine → Bescheid                       | langlebiges Subjekt (Akte) mit Zielen, Schritten, Terminen, Vermerken             |
 | Naht   | `apps/fachverfahren/src/leistung.config.ts` (`LeistungConfig`) | `apps/fachverfahren/server/procedure.config.ts` (`dossierProcedure`) + Stores/BFF |
-| Träger | eine Config, aus der 3 Personas rendern                        | `app_cases` + `app_tasks`, API unter `/api/cases`                     |
-| Skill  | `.agents/skills/fachverfahren-app/SKILL.md`                    | `.agents/skills/dossier-fallmanagement/SKILL.md`                      |
+| Träger | eine Config, aus der 3 Personas rendern                        | `app_cases` + `app_tasks`, API unter `/api/cases`                                 |
+| Skill  | `.agents/skills/fachverfahren-app/SKILL.md`                    | `.agents/skills/dossier-fallmanagement/SKILL.md`                                  |
 
 Beide Nähte sind **EINE Datei, die der generierende Build überschreibt** — für ein
 anderes Verfahren ändert sich nur diese eine Datei, sonst nichts an der App.
@@ -44,6 +44,20 @@ Naht-Typ `packages/fachverfahren-kit/src/types.ts`.
 
 ## Fall/Dossier/Case-Management → Skill `dossier-fallmanagement`
 
+Fülle GENAU die eine Naht `apps/fachverfahren/server/procedure.config.ts`
+(`dossierProcedure`) und erzeuge den Vertrags-Snapshot neu:
+
+```bash
+pnpm --filter @senticor/fachverfahren emit:procedure-contract
+```
+
+Das schreibt `apps/fachverfahren/procedure.contract.json` (mit-committen). Das Gate
+`pnpm run check:procedure-contract` prüft beides: **Frische** (Naht geändert, aber
+emit vergessen → rot) und **Struktur** (mind. eine Rechtsgrundlage; alle Übergänge
+referenzieren deklarierte Zustände; eindeutige `(from, action)`-Paare; mind. ein
+schließender Übergang; keine Sackgasse; kein verwaister Zustand). Es läuft in
+`precommit:check` + `check:agent-domain` — exakt symmetrisch zum Antrag-Pfad.
+
 Front Door: `.agents/skills/dossier-fallmanagement/SKILL.md`. Zwei
 Nebenpfade, wenn dein Verfahren sie braucht:
 
@@ -57,16 +71,16 @@ Nebenpfade, wenn dein Verfahren sie braucht:
 
 ### Paket-Anker (IST, committet)
 
-| Baustein                                                                   | Ort                                                                                                             |
-| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Datenschicht `CaseStore`/`TaskStore` (Trias Postgres/InMemory/Unavailable) | `packages/app-store-postgres/src/case-store.ts`, `.../task-store.ts`, `.../migrations/20260714140000_app_tasks` |
-| Fall-BFF-API                                                               | `packages/app-bff-fastify/src/routes/cases.ts` + `tasks.ts`                                                     |
-| Verfahren als Daten (`ProcedureRegistry`/`transitionCase`)                 | `packages/public-sector-sdk/src/domain-kernel.ts`                                                               |
-| **Verfahren-Naht (überschreibbar)**                                        | `apps/fachverfahren/server/procedure.config.ts` (`dossierProcedure` + neutrales Demo)                          |
-| BPMN → `ProcedureVersion` (Stub, Authoring-Schritt)                        | `packages/workflow-bpmn-stub`                                                                                   |
-| Generische Fallakte (nur präsentierend)                                    | `packages/fachverfahren-kit/src/components/DossierAkte360.tsx`                                                  |
+| Baustein                                                                   | Ort                                                                                                                                  |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Datenschicht `CaseStore`/`TaskStore` (Trias Postgres/InMemory/Unavailable) | `packages/app-store-postgres/src/case-store.ts`, `.../task-store.ts`, `.../migrations/20260714140000_app_tasks`                      |
+| Fall-BFF-API                                                               | `packages/app-bff-fastify/src/routes/cases.ts` + `tasks.ts`                                                                          |
+| Verfahren als Daten (`ProcedureRegistry`/`transitionCase`)                 | `packages/public-sector-sdk/src/domain-kernel.ts`                                                                                    |
+| **Verfahren-Naht (überschreibbar)**                                        | `apps/fachverfahren/server/procedure.config.ts` (`dossierProcedure` + neutrales Demo)                                                |
+| BPMN → `ProcedureVersion` (Stub, Authoring-Schritt)                        | `packages/workflow-bpmn-stub`                                                                                                        |
+| Generische Fallakte (nur präsentierend)                                    | `packages/fachverfahren-kit/src/components/DossierAkte360.tsx`                                                                       |
 | Referenz-Anbindung App (lebende Vorlage)                                   | `apps/fachverfahren/src/pages/amt-akte.tsx` + `amt-akten.tsx` + `app/case-port.ts` + `pages/case-akte-view.ts` + `case-aktionen.tsx` |
-| Beispiel (synthetisch)                                                     | `docs/examples/integrationsberatung/integrationsmanagement.bpmn` + `integrationsmanagement.config.yaml`         |
+| Beispiel (synthetisch)                                                     | `docs/examples/integrationsberatung/integrationsmanagement.bpmn` + `integrationsmanagement.config.yaml`                              |
 
 Die BFF-Routen im Überblick: `GET/POST /api/cases`, `GET /api/cases/:id`,
 `POST /api/cases/:id/transitions`, `GET/POST /api/cases/:id/tasks`,

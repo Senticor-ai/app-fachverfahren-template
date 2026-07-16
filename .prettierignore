@@ -10,4 +10,6 @@ pnpm-lock.yaml
 **/public/mockServiceWorker.js
 # GENERIERT via `pnpm --filter @senticor/fachverfahren emit:contract` — Format ist der emit-Output, nie Prettier
 **/leistung.contract.json
+# GENERIERT via `pnpm --filter @senticor/fachverfahren emit:procedure-contract` — Format ist der emit-Output, nie Prettier
+**/procedure.contract.json
 **/deploy/helm/**/templates/**
