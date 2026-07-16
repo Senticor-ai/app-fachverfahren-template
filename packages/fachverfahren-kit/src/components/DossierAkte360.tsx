@@ -231,7 +231,11 @@ function ZielKarte({
     schrittId: string,
     erledigt: boolean,
   ): Promise<void> {
-    if (!onSchrittToggle) return;
+    // Re-Entry-Schutz OHNE das fokussierte Element auf `disabled` zu setzen: ein natives `disabled` auf dem
+    // gerade fokussierten Control reißt den Fokus von Tastatur-/Screenreader-Nutzenden auf document.body und
+    // gibt ihn nicht zurück (WCAG 2.1.1/2.4.3). Stattdessen verwirft der pending-Guard einen laufenden
+    // Roundtrip; patchTask(erledigt) ist zudem idempotent, ein Doppelklick schadet also nicht.
+    if (!onSchrittToggle || pending.has(schrittId)) return;
     setPending((prev) => new Set(prev).add(schrittId));
     try {
       await onSchrittToggle(schrittId, erledigt);
@@ -300,7 +304,6 @@ function ZielKarte({
                     <Checkbox
                       id={controlId}
                       checked={erledigt}
-                      disabled={busy}
                       aria-busy={busy}
                       onCheckedChange={(state) =>
                         void toggleSchritt(schritt.id, state === true)

@@ -45,30 +45,44 @@ export function AmtAktePage(): React.JSX.Element {
   const navigate = useNavigate();
   const [state, setState] = useState<LoadState>({ kind: "loading" });
 
+  // Alle Akten-Daten holen (OHNE den Lade-Zustand zu setzen) → als LoadState. getCase zuerst: fehlt die Akte
+  // (bzw. Fremd-Behörde → 404), gilt „nicht gefunden"; die task/progress/audit/actions-Routen antworten dann
+  // ebenfalls 404, also gar nicht erst anfragen.
+  const fetchAkte = useCallback(async (): Promise<LoadState> => {
+    const caseSummary = await casePort.getCase(id);
+    if (!caseSummary) return { kind: "notFound" };
+    const [tasks, progress, audit, allowedActions] = await Promise.all([
+      casePort.listTasks(id),
+      casePort.getProgress(id),
+      casePort.listAudit(id),
+      casePort.listAllowedActions(id),
+    ]);
+    return {
+      kind: "ready",
+      data: { caseSummary, tasks, progress, audit, allowedActions },
+    };
+  }, [id]);
+
+  // Voll-Reload MIT Skeleton — Erst-Laden + Fehler-Retry.
   const reload = useCallback(async () => {
     setState({ kind: "loading" });
     try {
-      // getCase zuerst: fehlt die Akte (bzw. Fremd-Behörde → 404), gilt „nicht gefunden" — die
-      // task/progress/audit-Routen antworten dann ebenfalls 404, also gar nicht erst anfragen.
-      const caseSummary = await casePort.getCase(id);
-      if (!caseSummary) {
-        setState({ kind: "notFound" });
-        return;
-      }
-      const [tasks, progress, audit, allowedActions] = await Promise.all([
-        casePort.listTasks(id),
-        casePort.getProgress(id),
-        casePort.listAudit(id),
-        casePort.listAllowedActions(id),
-      ]);
-      setState({
-        kind: "ready",
-        data: { caseSummary, tasks, progress, audit, allowedActions },
-      });
+      setState(await fetchAkte());
     } catch {
       setState({ kind: "error" });
     }
-  }, [id]);
+  }, [fetchAkte]);
+
+  // Reload OHNE Skeleton: die Akte + Aktionsleiste bleiben montiert. Nach einer Aktion (Übergang/Abhaken) —
+  // damit eine role=alert-Meldung (z. B. 409-Konflikt) nicht durch einen Unmount verschwindet, bevor sie
+  // angesagt werden kann, und die Fall-Version für einen erneuten Versuch frisch ist.
+  const silentReload = useCallback(async () => {
+    try {
+      setState(await fetchAkte());
+    } catch {
+      setState({ kind: "error" });
+    }
+  }, [fetchAkte]);
 
   useEffect(() => {
     void reload();
@@ -76,7 +90,7 @@ export function AmtAktePage(): React.JSX.Element {
 
   // Einen Schritt abhaken/zurücksetzen: der Server ist die Wahrheit — patchTask schreibt `data.erledigt`,
   // der Fortschritt wird server-seitig neu aggregiert. Danach Tasks + Fortschritt ohne Skeleton neu laden
-  // (Checkbox + Balken aktualisieren sich gemeinsam). Bei Fehler (409/503/…) die Akte vollständig resynchronisieren.
+  // (Checkbox + Balken aktualisieren sich gemeinsam). Bei Fehler (409/503/…) ohne Skeleton resynchronisieren.
   const handleSchrittToggle = useCallback(
     async (_zielId: string, schrittId: string, erledigt: boolean) => {
       try {
@@ -91,10 +105,10 @@ export function AmtAktePage(): React.JSX.Element {
             : prev,
         );
       } catch {
-        await reload();
+        await silentReload();
       }
     },
-    [id, reload],
+    [id, silentReload],
   );
 
   return (
@@ -151,7 +165,7 @@ export function AmtAktePage(): React.JSX.Element {
                 state={state.data.allowedActions.state}
                 version={state.data.allowedActions.version}
                 actions={state.data.allowedActions.actions}
-                onDone={reload}
+                onDone={silentReload}
               />
             }
           />
