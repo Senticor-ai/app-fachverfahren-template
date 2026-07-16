@@ -101,6 +101,8 @@ keine Existenz-Leaks). Store-Ausfall → 503 (`storeUnavailable`).
 | `POST /api/cases/:id/tasks`       | `case.decision.prepare` | Aufgabe/Ziel/Schritt/Termin anlegen (`taskKind` default `aufgabe`, `parentTaskId`, `data`).                                                                                                                                                                      |
 | `PATCH /api/tasks/:id`            | `case.decision.prepare` | Metadaten + `dataPatch`-Merge, Optimistic-Locking (`409`).                                                                                                                                                                                                       |
 | `GET /api/cases/:id/progress`     | `case.read`             | Fortschritt je `ziel` — compute-on-read aus den `checkliste-item`-Kindern mit `data.erledigt`.                                                                                                                                                                   |
+| `GET /api/cases/:id/audit`        | `case.read`             | Verlauf/Audit der Akte (append-only, chronologisch). Server-Topologie verborgen; treibt die Verlauf-Sektion.                                                                                                                                                     |
+| `GET /api/cases/:id/allowed-actions` | `case.read`          | Die im AKTUELLEN Zustand erlaubten Übergänge (aus dem Verfahren gefiltert: `from`=state). Der Client bekommt nur die `action`-Kennung + `version` (Ziel/Rechtsgrundlage/Vier-Augen server-autoritativ) → treibt die Aktionsleiste/Vier-Augen-Sicht.               |
 
 **Vier-Augen** bei `POST …/transitions`: trägt der Übergang `requiresFourEyes`,
 darf der Akteur des jüngsten Audit-Eintrags ihn nicht selbst auslösen (→ 403).
@@ -110,18 +112,29 @@ Details/Governance: siehe [[governance-vier-augen]].
 
 Der Prozess ist DATEN, kein Code (`packages/public-sector-sdk/src/domain-kernel.ts`).
 Eine `ProcedureVersion` trägt `allowedStates`, `allowedTransitions`
-(`{from, to, action, requiredPermission, requiresFourEyes?}`) und `legalBasisIds`.
-Die `ProcedureRegistry.get(procedureId, version)` löst eine Akte zu ihrer Version
-auf; `transitionCase(case, version, action, expectedVersion)` ist der reine
-Reducer (Versionskonflikt, Verfahren-Mismatch, ungültiger Übergang; setzt `to` +
-`version+1`, `closedAt` bei Ziel `closed`).
+(`{from, to, action, requiredPermission, requiresFourEyes?, closesCase?}`) und
+`legalBasisIds`. Die `ProcedureRegistry.get(procedureId, version)` löst eine Akte
+zu ihrer Version auf; `transitionCase(case, version, action, expectedVersion)` ist
+der reine Reducer (Versionskonflikt, Verfahren-Mismatch, ungültiger Übergang; setzt
+`to` + `version+1`; stempelt `closedAt` bei `closesCase`-Übergängen — data-driven,
+kein hart kodierter Zielzustand — und entfernt es bei Wiederaufnahme).
 
+- **`apps/fachverfahren/server/procedure.config.ts` ist DIE EINE Dossier-Naht** —
+  das server-seitige Gegenstück zu `src/leistung.config.ts` (Antrag). Sie exportiert
+  `dossierProcedure: ProcedureVersion` (+ ein optionales neutrales `dossierDemo` fürs
+  Preview-Seed); `startRuntime` registriert genau dieses Verfahren. **Der generierende
+  Build (chos-code/gtc-builder) ÜBERSCHREIBT GENAU DIESE DATEI** — dieselbe App,
+  anderes Verfahren, ohne weitere Änderung. Der Template-Default ist ein neutrales
+  „Musterverfahren" (kein echtes Fachverfahren).
 - **Rechtsgrundlage NIE erfinden**: `legalBasisIds` stammen aus der
   Verfahrenskonfiguration, nie aus der BPMN, nie geraten.
-- Die Registry ist per Default **leer** (`createInMemoryProcedureRegistry([])`,
-  fail-closed: ohne Verfahren kein Fall). Der Konsument/Generator füllt sie.
+- `buildPublicServer` (den die Unit-Tests nutzen) hat die Registry per Default
+  **leer** (`createInMemoryProcedureRegistry([])`, fail-closed). Nur der Runtime-
+  Entrypoint `startRuntime` füllt sie aus `procedure.config.ts`.
 - Aus BPMN ableitbar über den Stub `bpmnToProcedureVersion` — Querverweis
-  [[bpmn-prozess-workflow]].
+  [[bpmn-prozess-workflow]]. Das ist ein **Authoring-/Build-Schritt** (die `.bpmn`
+  wird NICHT in `dist-server` ausgeliefert): daraus die `ProcedureVersion` erzeugen
+  und als `dossierProcedure` in `procedure.config.ts` schreiben.
 
 ## UI — die Kit-Komponente `DossierAkte360`
 
@@ -134,11 +147,27 @@ präsentierend & domänen-neutral**: kein `fetch`, kein Store, keine Fach-Litera
 **Termine/Fristen**, **Notizen/Vermerke**, **Verlauf** (`Timeline`).
 Fortschritt: `fortschrittProzent` falls gesetzt, sonst aus erledigten Schritten.
 
-> **Offen/geplant**: Eine App-Route, die `DossierAkte360` an die Fall-API bindet
-> (z. B. `/amt/akte/:id`), ist **noch nicht verdrahtet**. Ebenso gibt es (noch)
-> **keine** eigene `case-management`-Capability in `platform/capabilities.json`
-> — die Naht liegt heute unter `workflow`/`records-management`/`audit`. Beides
-> ist geplant (ADR-0001), aber im Template nicht vorhanden.
+**Die Referenz-Anbindung EXISTIERT** (nutze sie als lebende Vorlage, nicht neu erfinden):
+
+- **App-Routen**: `/amt/akten` (Aktenliste) + `/amt/akte/:id` (360°-Sicht) sind
+  verdrahtet (`apps/fachverfahren/src/pages/amt-akten.tsx` + `amt-akte.tsx`), plus
+  ein Nav-Reiter „Akten". `amt-akte.tsx` lädt Fall+Tasks+Fortschritt+Verlauf+erlaubte
+  Aktionen, hakt Schritte interaktiv ab (`onSchrittToggle` → `PATCH /api/tasks/:id` →
+  Fortschritt live) und rendert `DossierAkte360`.
+- **Client-Naht**: `apps/fachverfahren/src/app/case-port.ts` + `case-client.ts` (die
+  Netz-Naht, analog `board-client`; lesend + schreibend inkl. `listAudit`/
+  `listAllowedActions`/`transitionCase`), `case-akte-view.ts` (**reine** Abbildung
+  API-Zeilen → `DossierAkte360`-Props: `toAkteProps` + `toVerlauf`),
+  `pages/case-aktionen.tsx` (Aktionsleiste: erlaubte Übergänge als Buttons, Vier-Augen
+  lesbar gemeldet).
+- **Preview-Seed**: `apps/fachverfahren/server/dev/reference-seed.ts` ist der
+  **runnable Blueprint** — der generische Motor, der Verfahren + Demo-Dossier aus
+  `procedure.config.ts` in die Stores seedet (nur `APP_STORE_MODE=memory`, nie PROD).
+
+> **Ehrlich offen**: Es gibt (noch) **keine** eigene `case-management`-Capability in
+> `platform/capabilities.json` — die Naht liegt heute unter
+> `workflow`/`records-management`/`audit` (ADR-0004, Rule of Three). Ein „Neue
+> Akte anlegen"-Formular in der App fehlt noch (`createCase` existiert im Client).
 
 ## Stub vs. chos (eine Naht)
 
@@ -153,12 +182,17 @@ Gateway-Semantik XOR/AND) — das füllt der Provider hinter der Naht.
 
 ## Rezept — neues Dossier-Fachverfahren anlegen
 
-1. **Verfahren als Daten definieren**: `ProcedureVersion` mit `allowedStates`,
-   `allowedTransitions` und `legalBasisIds` — aus der Verfahrenskonfiguration
-   oder aus BPMN via `bpmnToProcedureVersion` ([[bpmn-prozess-workflow]]).
-   Vorlage: `docs/examples/integrationsberatung/integrationsmanagement.{bpmn,config.yaml}`.
-2. **Registry füllen**: `createInMemoryProcedureRegistry([version])` und in die
-   `BffDeps` hängen (App-Komposition `apps/fachverfahren/server`).
+1. **Verfahren als Daten in die Naht schreiben**: `dossierProcedure`
+   (`ProcedureVersion` mit `allowedStates`, `allowedTransitions`, `legalBasisIds`,
+   `closesCase?` am Abschluss) in **`apps/fachverfahren/server/procedure.config.ts`**
+   — DIE EINE Dossier-Naht, die der generierende Build überschreibt (Analogon zu
+   `leistung.config.ts`). Ableitbar aus BPMN via `bpmnToProcedureVersion`
+   ([[bpmn-prozess-workflow]]) als Authoring-Schritt. Vollständiges reales Beispiel:
+   `docs/examples/integrationsberatung/integrationsmanagement.{bpmn,config.yaml}`.
+2. **Registry ist bereits verdrahtet**: `startRuntime` registriert `dossierProcedure`
+   aus der Naht (`createInMemoryProcedureRegistry([dossierProcedure])`). Nichts weiter
+   zu tun — die Naht IST der Eingriffspunkt. (Referenz-Motor + Preview-Seed:
+   `apps/fachverfahren/server/dev/reference-seed.ts`.)
 3. **Persistenz bereitstellen**: `APP_PG_URL` setzen und
    `pnpm --filter @senticor/app-store-postgres db:migrate` (legt `app_cases`,
    `app_tasks`, `app_audit_events` an); `createCaseStoreFromEnv`/
@@ -173,8 +207,11 @@ Gateway-Semantik XOR/AND) — das füllt der Provider hinter der Naht.
 7. **Zustandswechsel steuern**: `POST /api/cases/:id/transitions` mit `action` +
    `expectedVersion`; `requiresFourEyes`-Übergänge erfordern zwei Personen
    ([[governance-vier-augen]]).
-8. **UI anbinden**: `DossierAkte360` mit den API-Daten als Props rendern (die
-   App-Route ist noch zu verdrahten — siehe „Offen/geplant").
+8. **UI ist bereits angebunden**: `/amt/akten` + `/amt/akte/:id` binden
+   `DossierAkte360` an die Fall-API (Schritte abhakbar, Aktionsleiste, Verlauf) —
+   nutze `pages/amt-akte.tsx` + `case-akte-view.ts` + `case-aktionen.tsx` als
+   Vorlage. Für ein anderes Verfahren bleiben diese generisch; nur `procedure.config.ts`
+   (Schritt 1) ändert sich.
 
 ## Minimalbeispiel (server-autoritativ, generisch)
 

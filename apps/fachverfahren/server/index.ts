@@ -50,11 +50,9 @@ import { autoBootstrapAdminFromEnv } from "./auth/auto-bootstrap.js";
 import { registerAuthPolicyGuard } from "./auth/authorization.js";
 import { registerAuthRoutes, type RegistrationMode } from "./auth/routes.js";
 import { createCookieSessionResolver } from "./auth/session-resolver.js";
-import {
-  REFERENCE_PROCEDURE,
-  seedReferenceDemo,
-} from "./dev/reference-seed.js";
+import { seedReferenceDemo } from "./dev/reference-seed.js";
 import { registerBoardRoutes } from "./kanban/routes.js";
+import { dossierProcedure } from "./procedure.config.js";
 import { registerUserRoutes } from "./users/routes.js";
 
 // App-Identität: der Renderer schreibt Domain-Token beim Scaffolding um — deshalb stehen
@@ -229,9 +227,10 @@ export async function startRuntime(
     appStore: createAppStoreFromEnv(env),
     caseStore: createCaseStoreFromEnv(env),
     taskStore: createTaskStoreFromEnv(env),
-    // Der Runtime-Entrypoint registriert das Referenz-Verfahren (der generische buildPublicServer-Default
-    // bleibt fail-closed/leer — Unit-Tests injizieren ihre eigene Registry). In PROD kann chos die Naht liefern.
-    procedureRegistry: createInMemoryProcedureRegistry([REFERENCE_PROCEDURE]),
+    // Der Runtime-Entrypoint registriert das Verfahren aus der procedure.config-Naht (der generische
+    // buildPublicServer-Default bleibt fail-closed/leer — Unit-Tests injizieren ihre eigene Registry).
+    // Eine generierende App überschreibt procedure.config.ts; in PROD kann chos die Naht liefern.
+    procedureRegistry: createInMemoryProcedureRegistry([dossierProcedure]),
     sessionResolver: createCookieSessionResolver(authStore),
     auditSink: createAuditSinkFromEnv(env),
   };
