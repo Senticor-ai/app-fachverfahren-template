@@ -167,6 +167,24 @@ describe("ownership/scaffold parity", () => {
     expect(sample).toEqual({ pattern: "packages/*/**", strategy: "replace" });
   });
 
+  it("hält die Dossier-Naht beim Konsumenten — sonst überschriebe template:update sein Verfahren", () => {
+    // procedure.config.ts trägt das Verfahren des Konsumenten (dossierProcedure). Fiele sie unter
+    // apps/*/server/** = replace, überschriebe JEDES Upgrade sie mit dem neutralen Musterverfahren.
+    expect(
+      explainOwnership(
+        defaultOwnership,
+        "apps/fachverfahren/server/procedure.config.ts",
+      ),
+    ).toEqual({
+      pattern: "apps/*/server/procedure.config.ts",
+      strategy: "consumer",
+    });
+    // Das übrige Server-Fundament bleibt Vorlagen-besitz (replace) — die Ausnahme ist chirurgisch.
+    expect(
+      explainOwnership(defaultOwnership, "apps/fachverfahren/server/index.ts"),
+    ).toEqual({ pattern: "apps/*/server/**", strategy: "replace" });
+  });
+
   it.skipIf(!isPristineTemplate)(
     "classifies every scaffolded file: ownership entry, curated candidate, or documented opt-out",
     async () => {
