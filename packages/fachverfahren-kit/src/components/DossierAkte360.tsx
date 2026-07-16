@@ -19,7 +19,13 @@
 //     („erledigt"/„offen"). Termine/Notizen nutzen `<time>` mit maschinenlesbarem `dateTime`.
 //   * Leere Sektionen rendern `EmptyState` (role=status), nicht eine stumme leere Liste.
 //   * Nur semantische Tokens, kein rohes Hex/oklch/px; Motion erbt Token-Transitions (reduced-motion-safe).
-import { useId, useState, type ReactElement, type ReactNode } from "react";
+import {
+  useId,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import {
   Calendar,
   Check,
@@ -234,15 +240,20 @@ function NotizForm({
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const inputId = useId();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   async function submit(event: React.FormEvent): Promise<void> {
     event.preventDefault();
     const trimmed = text.trim();
+    // Re-Entry-Schutz (busy) statt das Feld zu `disabled`en — ein natives `disabled` auf dem fokussierten
+    // Control risse den Fokus von Tastatur-/Screenreader-Nutzenden auf document.body (WCAG 2.1.1/2.4.3).
     if (trimmed === "" || busy) return;
     setBusy(true);
     try {
       await onNotizAdd(trimmed);
       setText("");
+      // Fokus zurück ins Feld für den nächsten Vermerk (das Feld war nie disabled, ist also fokussierbar).
+      textareaRef.current?.focus();
     } finally {
       setBusy(false);
     }
@@ -257,10 +268,10 @@ function NotizForm({
         {labels.notizPlatzhalter}
       </label>
       <textarea
+        ref={textareaRef}
         id={inputId}
         value={text}
         onChange={(event) => setText(event.target.value)}
-        disabled={busy}
         aria-busy={busy}
         rows={3}
         placeholder={labels.notizPlatzhalter}
