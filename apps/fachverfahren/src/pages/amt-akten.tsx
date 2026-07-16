@@ -45,7 +45,7 @@ export function AmtAktenPage(): React.JSX.Element {
   }
 
   return (
-    <Shell persona="sachbearbeitung">
+    <Shell persona="sachbearbeitung" activeNavKey="akten">
       <section className="mx-auto w-full max-w-5xl px-6 py-6">
         <div className="flex items-center gap-2">
           <FolderOpen className="h-5 w-5 text-foreground" aria-hidden="true" />

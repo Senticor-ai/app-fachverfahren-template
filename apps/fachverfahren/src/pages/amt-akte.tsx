@@ -94,7 +94,7 @@ export function AmtAktePage(): React.JSX.Element {
   );
 
   return (
-    <Shell persona="sachbearbeitung">
+    <Shell persona="sachbearbeitung" activeNavKey="akten">
       <section className="mx-auto w-full max-w-5xl px-6 py-6">
         <Button
           type="button"

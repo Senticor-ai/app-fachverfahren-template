@@ -14,6 +14,7 @@
 import {
   Database,
   FileText,
+  FolderOpen,
   Home,
   Inbox,
   LayoutGrid,
@@ -125,6 +126,10 @@ function navFor<T>(
     case "sachbearbeitung": {
       const items: ShellNavItem[] = [
         { key: "eingang", label: "Eingangskorb", icon: Inbox, href: "/amt" },
+        // Fall-/Dossier-Akten (Case-Management): /amt/akten ist eine ECHTE App-Route (routes.tsx) und
+        // listet mandanten-scoped die Akten der Behörde; für reine Antrags-Verfahren ohne Fälle zeigt sie
+        // ihren Leerzustand. Kein toter Nav-Eintrag (Audit D3-1: Shell-Nav == App-Routen).
+        { key: "akten", label: "Akten", icon: FolderOpen, href: "/amt/akten" },
       ];
       if ((config.register?.mock?.length ?? 0) > 0) {
         items.push({
