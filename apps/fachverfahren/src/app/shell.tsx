@@ -8,8 +8,8 @@ import {
 } from "@senticor/fachverfahren-kit";
 import {
   allowedPersonas,
-  PERSONA_HOME,
   personaDescriptors,
+  personaRoute,
 } from "../personas.js";
 import { useSession } from "../session.js";
 import { store } from "../store.js";
@@ -26,7 +26,10 @@ export function Shell({
 }): React.JSX.Element {
   const navigate = useNavigate();
   const { principal, capabilities } = useSession();
-  const onPersonaChange = (next: Persona) => navigate(PERSONA_HOME[next]);
+  // Ziel des Wechsels aus DERSELBEN Wahrheit wie die Landing-Einstiege (config.personas → home),
+  // mit der App-Routen-Konvention als Fallback.
+  const onPersonaChange = (next: Persona) =>
+    navigate(personaRoute(next, store.config));
   const onNavigate = (item: ShellNavItem) => {
     if (item.href) navigate(item.href);
   };

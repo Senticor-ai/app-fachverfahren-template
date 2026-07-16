@@ -7,6 +7,7 @@ import type { Persona } from "@senticor/fachverfahren-kit";
 import { allowedPersonas, personaHome } from "../personas.js";
 import { useSession } from "../session.js";
 import { needsFirstRunSetup } from "../session-state.js";
+import { store } from "../store.js";
 
 /** Das EINE Session-Gate (Layout-Route): jede Route außer der Landing braucht eine Session.
  *  Unangemeldet geht es mit `state.from` zur Landing — nach dem Login kehrt die Landing auf
@@ -78,7 +79,10 @@ export function RequirePersonaExperience({
   const allowed = allowedPersonas(principal, capabilities);
   if (!allowed.includes(persona)) {
     return (
-      <Navigate to={personaHome(allowed, principal?.permissions)} replace />
+      <Navigate
+        to={personaHome(allowed, principal?.permissions, store.config)}
+        replace
+      />
     );
   }
   return <Outlet />;

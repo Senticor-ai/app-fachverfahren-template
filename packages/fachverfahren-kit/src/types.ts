@@ -686,9 +686,16 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   seed?: (helpers: {
     vorgangsnummer: () => string;
   }) => Vorgang<TAntragsdaten>[];
-  /** VERFAHRENSSPEZIFISCHE Rollen für den PersonaSwitcher (aus dem Fachkonzept, z.B. Bauherr:in/Entwurfsverfasser:in/
-   *  Bauaufsicht statt generisch). Fehlt es, nutzt die Shell die generischen DEFAULT_PERSONAS. Die `key`s bleiben die
-   *  drei kanonischen Rollen (buerger/sachbearbeitung/aufsicht) — nur Label/Untertitel sind verfahrensspezifisch. */
+  /** DIE EINE WAHRHEIT DER SICHTUMSCHALTUNG: die VERFAHRENSSPEZIFISCHEN Arbeitsbereiche (aus dem Personas-Artefakt des
+   *  Fachkonzepts abgeleitet, z.B. Bauherr:in/Entwurfsverfasser:in/Bauaufsicht statt generisch). Landing (Bereichs-
+   *  Einstiege) UND Shell (PersonaSwitcher) rendern die Sichten NUR hieraus — es gibt kein zweites, hartkodiertes
+   *  Bereichs-Array mehr. Die `key`s bleiben die drei kanonischen Rollen (buerger/sachbearbeitung/aufsicht — der
+   *  Typ-Vertrag, an dem Routing/Zuweisung hängen); Label/Untertitel/Beschreibung/`home`-Route sind die
+   *  verfahrensspezifischen DATEN.
+   *
+   *  FEHLT das Feld, greifen die generischen DEFAULT_PERSONAS (FAIL-OPEN — bestehende Apps und die unveränderte
+   *  Vorlage laufen unverändert weiter). Rein daten-getrieben + JSON-serialisierbar: eine generierende Fabrik schreibt
+   *  es deterministisch in die Naht, der Vertrags-Snapshot (`emit:contract`) trägt es mit. */
   personas?: readonly import("./components/PersonaSwitcher.js").PersonaDescriptor[];
 }
 

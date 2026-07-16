@@ -6,6 +6,13 @@
 // Routen sind session-pflichtig und bouncen unangemeldet mit `state.from` hierher; nach
 // dem Login geht es auf den ursprünglichen Deep-Link zurück (postLoginRedirect — nur bei
 // Client-Navigation, der History-State überlebt keinen Full-Reload).
+//
+// DIE BEREICHE KOMMEN AUS DER CONFIG (`config.personas` → personaBereiche), NICHT aus einem
+// hartkodierten Array: früher stand hier ein festes BEREICHE = [Bürger:in · Sachbearbeitung ·
+// Aufsicht] mit „(Demo-Daten)"-Texten — der generische Start-Screen, der JEDES Verfahren gleich
+// aussehen ließ, obwohl das Fachkonzept eigene Personas beschreibt. Jetzt rendert die Landing die
+// Sichten DIESES Verfahrens aus derselben EINEN Wahrheit, aus der auch die Shell ihren
+// PersonaSwitcher speist. Fehlt `config.personas`, greifen die generischen Kit-Defaults (fail-open).
 import * as React from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import {
@@ -13,7 +20,6 @@ import {
   Card,
   CardContent,
   CardHeader,
-  type Persona,
 } from "@senticor/fachverfahren-kit";
 import {
   ApiUnavailableNotice,
@@ -22,45 +28,9 @@ import {
   RegisterForm,
 } from "./auth-forms.js";
 import { landingView, postLoginRedirect } from "./landing-state.js";
-import { allowedPersonas } from "./personas.js";
+import { personaBereiche, sichtbareBereiche } from "./personas.js";
 import { useSession } from "./session.js";
 import { store } from "./store.js";
-
-/** Die Bereichs-Einstiege: Arbeitsbereiche (Demo-Daten) + der Boards-Workspace (echte
- *  Daten, permission-gated). Unangemeldet sind alle sichtbar — jeder Klick bounct durchs
- *  Session-Gate; angemeldet filtert `sichtbareBereiche` auf das eigene Konto. */
-const BEREICHE: ReadonlyArray<{
-  href: string;
-  label: string;
-  beschreibung: string;
-  persona?: Persona;
-  permission?: string;
-}> = [
-  {
-    href: "/buerger",
-    label: "Bürger:in",
-    beschreibung: "Antrag stellen und Eingangsbestätigung (Demo-Daten)",
-    persona: "buerger",
-  },
-  {
-    href: "/amt",
-    label: "Sachbearbeitung",
-    beschreibung: "Arbeitsvorrat und Vorgangsprüfung (Demo-Daten)",
-    persona: "sachbearbeitung",
-  },
-  {
-    href: "/aufsicht",
-    label: "Aufsicht",
-    beschreibung: "Kennzahlen und Audit (Demo-Daten)",
-    persona: "aufsicht",
-  },
-  {
-    href: "/boards",
-    label: "Boards",
-    beschreibung: "Team-Arbeitsbereich mit echten Arbeitsdaten",
-    permission: "boards.collaborate",
-  },
-];
 
 export function LandingPage(): React.ReactElement | null {
   const session = useSession();
@@ -93,23 +63,15 @@ export function LandingPage(): React.ReactElement | null {
             ? "Registrieren"
             : "Anmelden";
 
-  // Angemeldet: nur die eigenen Arbeitsbereiche + Boards nur mit Permission.
-  // Unangemeldet: alle Einstiege (der Klick bounct durchs Session-Gate).
-  const sichtbareBereiche =
-    view === "authenticated"
-      ? BEREICHE.filter((bereich) => {
-          if (bereich.persona) {
-            return allowedPersonas(
-              session.principal,
-              session.capabilities,
-            ).includes(bereich.persona);
-          }
-          if (bereich.permission) {
-            return session.principal?.permissions?.includes(bereich.permission);
-          }
-          return true;
-        })
-      : BEREICHE;
+  // Die Bereiche AUS DER CONFIG ableiten (EINE Wahrheit mit dem PersonaSwitcher der Shell),
+  // dann angemeldet auf die eigenen Arbeitsbereiche + Boards-Permission filtern; unangemeldet
+  // sind alle Einstiege sichtbar (der Klick bounct durchs Session-Gate).
+  const bereiche = sichtbareBereiche(
+    personaBereiche(store.config),
+    view === "authenticated",
+    session.principal,
+    session.capabilities,
+  );
 
   return (
     <main className="min-h-screen bg-secondary/20 px-4 py-10 md:py-16">
@@ -145,9 +107,9 @@ export function LandingPage(): React.ReactElement | null {
             >
               Bereiche
             </h2>
-            {sichtbareBereiche.length > 0 ? (
+            {bereiche.length > 0 ? (
               <ul className="space-y-3">
-                {sichtbareBereiche.map((bereich) => (
+                {bereiche.map((bereich) => (
                   <li key={bereich.href}>
                     <Link
                       to={bereich.href}
