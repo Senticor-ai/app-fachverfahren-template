@@ -3,6 +3,7 @@
 // Alle fachlichen Begriffe (Handlungsfelder, Phasen, Status) stehen AUSSCHLIESSLICH in den Props dieser Story
 // (dem Aufrufer), NICHT in der Komponente — das belegt die Domänen-Neutralität. Sämtliche Daten sind
 // SYNTHETISCH („Klient:in A", subject.1, Muster-Werte); keine echten Personen/PII.
+import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
 
 import {
@@ -137,6 +138,51 @@ export const Vollstaendig: Story = {
       />
     </div>
   ),
+};
+
+/**
+ * Interaktiv: die Schritte sind abhakbar (`onSchrittToggle`) — hier lokal simuliert, in der App
+ * server-autoritativ (patchTask → Fortschritt server-seitig neu gerechnet). Der Fortschrittsbalken
+ * wird aus den erledigten Schritten abgeleitet und aktualisiert sich beim Abhaken sofort.
+ */
+export const Interaktiv: Story = {
+  render: function InteraktivStory() {
+    const [erledigt, setErledigt] = useState<Record<string, boolean>>({
+      "s.1": true,
+      "s.2": true,
+      "s.3": false,
+      "s.4": false,
+    });
+    const zieleInteraktiv: DossierZiel[] = [
+      {
+        id: "ziel.1",
+        titel: "Sprachkurs B1 abschließen",
+        kategorie: "Handlungsfeld: Sprache",
+        status: { label: "laufend", tone: "info" },
+        frist: "30.09.2026",
+        schritte: [
+          { id: "s.1", label: "Kurs anmelden", erledigt: erledigt["s.1"] },
+          { id: "s.2", label: "Modul 1 besuchen", erledigt: erledigt["s.2"] },
+          { id: "s.3", label: "Modul 2 besuchen", erledigt: erledigt["s.3"] },
+          { id: "s.4", label: "Prüfung ablegen", erledigt: erledigt["s.4"] },
+        ],
+      },
+    ];
+    return (
+      <div className="mx-auto max-w-3xl">
+        <DossierAkte360
+          titel="Klient:in A"
+          untertitel="Fall FALL-2026-0001 — Schritte abhakbar"
+          ziele={zieleInteraktiv}
+          defaultTab="ziele"
+          labels={{ ziele: "Integrationsziele" }}
+          onSchrittToggle={(_zielId, schrittId, next) =>
+            setErledigt((prev) => ({ ...prev, [schrittId]: next }))
+          }
+        />
+      </div>
+    );
+  },
 };
 
 /** Neuer, noch leerer Fall: jede Sektion zeigt ihren Leerzustand (role=status), keine stummen Listen. */

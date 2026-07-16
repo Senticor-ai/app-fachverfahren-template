@@ -3,6 +3,7 @@
 // die Netz-Naht liegt im case-client, das Rendering im Kit — hier steckt nur die (testbare)
 // Transformation. Verfahrens-agnostisch: keine Fach-Literale, nur generische Dossier-Chrome.
 import type {
+  CaseAuditEvent,
   CaseSummary,
   CaseTask,
   CaseZielFortschritt,
@@ -14,6 +15,7 @@ import type {
   DossierTermin,
   DossierZiel,
   DossierZielSchritt,
+  TimelineItem,
 } from "@senticor/fachverfahren-kit";
 
 const TASK_KIND_ZIEL = "ziel";
@@ -100,6 +102,53 @@ function toTermine(tasks: readonly CaseTask[]): DossierTermin[] {
           : {}),
       };
     });
+}
+
+// ── Verlauf/Audit → Timeline (rein, verfahrens-agnostisch) ───────────────────────────────────────
+// Generische, deutsche Chrome-Titel je Ereignistyp; die fachliche Wahrheit (Zustände, Rechtsgrundlage,
+// Akteur) steht im append-only Audit-`payload` — hier wird NICHTS erfunden, nur lesbar gemacht.
+const AUDIT_TITEL: Record<string, string> = {
+  "case.opened": "Fall eröffnet",
+  "case.transitioned": "Zustandswechsel",
+};
+
+const AUDIT_TONE: Record<string, TimelineItem["tone"]> = {
+  "case.opened": "info",
+  "case.transitioned": "ok",
+};
+
+/** Bevorzugt die im Audit hinterlegte `summary`, sonst ein generischer Titel je Ereignistyp. */
+function verlaufTitel(event: CaseAuditEvent): string {
+  const summary = event.payload["summary"];
+  if (typeof summary === "string" && summary.length > 0) return summary;
+  return AUDIT_TITEL[event.eventType] ?? event.eventType;
+}
+
+/** Zustandswechsel (previousState → newState), optionaler Vermerk + der (pseudonyme) Akteur. */
+function verlaufBeschreibung(event: CaseAuditEvent): string {
+  const teile: string[] = [];
+  const prev = event.payload["previousState"];
+  const next = event.payload["newState"];
+  if (typeof prev === "string" && typeof next === "string") {
+    teile.push(`${prev} → ${next}`);
+  } else if (typeof next === "string") {
+    teile.push(`Zustand: ${next}`);
+  }
+  const detail = event.payload["detail"];
+  if (typeof detail === "string" && detail.length > 0) teile.push(detail);
+  teile.push(`Akteur: ${event.actorId}`);
+  return teile.join(" · ");
+}
+
+/** Append-only Audit-Ereignisse (chronologisch) → `TimelineItem[]` für die Verlauf-Sektion. */
+export function toVerlauf(events: readonly CaseAuditEvent[]): TimelineItem[] {
+  return events.map((event): TimelineItem => ({
+    id: event.auditEventId,
+    title: verlaufTitel(event),
+    time: asZeit(event.occurredAt),
+    tone: AUDIT_TONE[event.eventType] ?? "muted",
+    description: verlaufBeschreibung(event),
+  }));
 }
 
 /** Stammdaten-Zeilen aus der Fall-Zusammenfassung (leere Werte blendet die DescriptionList aus). */

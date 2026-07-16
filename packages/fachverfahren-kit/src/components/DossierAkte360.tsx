@@ -19,7 +19,7 @@
 //     („erledigt"/„offen"). Termine/Notizen nutzen `<time>` mit maschinenlesbarem `dateTime`.
 //   * Leere Sektionen rendern `EmptyState` (role=status), nicht eine stumme leere Liste.
 //   * Nur semantische Tokens, kein rohes Hex/oklch/px; Motion erbt Token-Transitions (reduced-motion-safe).
-import { useId, type ReactElement, type ReactNode } from "react";
+import { useId, useState, type ReactElement, type ReactNode } from "react";
 import {
   Calendar,
   Check,
@@ -32,6 +32,7 @@ import {
 
 import { cn } from "../lib/utils.js";
 import { Badge } from "../ui/badge.js";
+import { Checkbox } from "../ui/checkbox.js";
 import { Progress } from "../ui/progress.js";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs.js";
 import {
@@ -158,6 +159,13 @@ export interface DossierAkte360Props {
   notizen?: DossierNotiz[];
   /** Verlauf/Audit (append-only) — an das `Timeline`-Primitiv durchgereicht. */
   verlauf?: TimelineItem[];
+  /**
+   * OPTIONAL: einen Schritt (Checklisten-Item) eines Ziels abhaken/zurücksetzen. Ist der Callback
+   * gesetzt, werden die Schritte interaktiv (barrierefreie Checkboxen); sonst bleibt die Akte rein
+   * darstellend (rückwärtskompatibel). Der Callback ist async (Server-Roundtrip); die neue Wahrheit
+   * (erledigt/Fortschritt) fließt anschließend über die Props zurück — die Sicht hält keinen Zustand.
+   */
+  onSchrittToggle?: DossierSchrittToggle;
   /** Welcher Tab initial offen ist. Default: `stammdaten`. */
   defaultTab?: "stammdaten" | "ziele" | "termine" | "notizen" | "verlauf";
   /** Überschreibbare Beschriftungen (deutsche Defaults). */
@@ -190,17 +198,51 @@ function zielFortschritt(ziel: DossierZiel): number {
   return Math.round((erledigt / schritte.length) * 100);
 }
 
+/** Ein Schritt einer Aufgabe abhaken/zurücksetzen — additiv. Ist der Callback gesetzt, werden die
+ *  Schritte als barrierefreie Checkboxen (Radix, tastaturbedienbar) gerendert; sonst bleibt die rein
+ *  darstellende Checkliste unverändert. Der Callback ist async (Server-Roundtrip) → der Schritt wird
+ *  bis zum Abschluss gesperrt; die Wahrheit (erledigt/Fortschritt) kommt danach über die Props zurück. */
+export type DossierSchrittToggle = (
+  zielId: string,
+  schrittId: string,
+  erledigt: boolean,
+) => void | Promise<void>;
+
 /** Eine Ziel-Karte: Titel, Meta (Kategorie/Status/Frist), Fortschrittsbalken + Schritt-Checkliste. */
 function ZielKarte({
   ziel,
   labels,
+  onSchrittToggle,
 }: {
   ziel: DossierZiel;
   labels: DossierAkte360Labels;
+  onSchrittToggle?: (
+    schrittId: string,
+    erledigt: boolean,
+  ) => void | Promise<void>;
 }): ReactElement {
   const prozent = zielFortschritt(ziel);
   const schritte = ziel.schritte ?? [];
   const progressId = useId();
+  // Schritte, deren Server-Roundtrip gerade läuft (Doppelklick-/Race-Schutz: der Schritt ist gesperrt).
+  const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set());
+
+  async function toggleSchritt(
+    schrittId: string,
+    erledigt: boolean,
+  ): Promise<void> {
+    if (!onSchrittToggle) return;
+    setPending((prev) => new Set(prev).add(schrittId));
+    try {
+      await onSchrittToggle(schrittId, erledigt);
+    } finally {
+      setPending((prev) => {
+        const next = new Set(prev);
+        next.delete(schrittId);
+        return next;
+      });
+    }
+  }
 
   return (
     <article className="rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm">
@@ -244,6 +286,47 @@ function ZielKarte({
           <ul className="mt-2 space-y-2">
             {schritte.map((schritt) => {
               const erledigt = schritt.erledigt === true;
+
+              // Interaktiv (Callback gesetzt): barrierefreie Checkbox, deren Name der Schritt-Text via
+              // <label htmlFor> ist. Bis der Server geantwortet hat, ist der Schritt gesperrt.
+              if (onSchrittToggle) {
+                const busy = pending.has(schritt.id);
+                const controlId = `${progressId}-${schritt.id}`;
+                return (
+                  <li
+                    key={schritt.id}
+                    className="flex items-start gap-2.5 text-sm text-foreground"
+                  >
+                    <Checkbox
+                      id={controlId}
+                      checked={erledigt}
+                      disabled={busy}
+                      aria-busy={busy}
+                      onCheckedChange={(state) =>
+                        void toggleSchritt(schritt.id, state === true)
+                      }
+                      className="mt-0.5"
+                    />
+                    <label
+                      htmlFor={controlId}
+                      className={cn(
+                        "min-w-0 cursor-pointer break-words",
+                        busy && "opacity-70",
+                        erledigt && "text-muted-foreground line-through",
+                      )}
+                    >
+                      <span className="sr-only">
+                        {erledigt
+                          ? labels.schrittErledigt
+                          : labels.schrittOffen}
+                        :{" "}
+                      </span>
+                      {schritt.label}
+                    </label>
+                  </li>
+                );
+              }
+
               return (
                 <li
                   key={schritt.id}
@@ -374,6 +457,7 @@ export function DossierAkte360({
   termine = [],
   notizen = [],
   verlauf = [],
+  onSchrittToggle,
   defaultTab = "stammdaten",
   labels: labelOverrides,
   className,
@@ -434,7 +518,19 @@ export function DossierAkte360({
           {ziele.length > 0 ? (
             <div className="space-y-3">
               {ziele.map((ziel) => (
-                <ZielKarte key={ziel.id} ziel={ziel} labels={labels} />
+                <ZielKarte
+                  key={ziel.id}
+                  ziel={ziel}
+                  labels={labels}
+                  {...(onSchrittToggle
+                    ? {
+                        onSchrittToggle: (
+                          schrittId: string,
+                          erledigt: boolean,
+                        ) => onSchrittToggle(ziel.id, schrittId, erledigt),
+                      }
+                    : {})}
+                />
               ))}
             </div>
           ) : (
