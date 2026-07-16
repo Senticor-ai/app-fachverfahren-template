@@ -4,6 +4,7 @@
 // Prüfschema), darüber KI-Vorschlag + Status + Audit-Trail. ABER streng config-getrieben: NICHTS Domänen-spezifisches
 // ist hartkodiert. Der Entscheidungs-Flow läuft über `EntscheidungPanel` → `port.uebergang`.
 import { useMemo, useState } from "react";
+import { useVorgang } from "../hooks/use-vorgang-resource.js";
 import {
   ArrowLeft,
   FileText,
@@ -69,7 +70,9 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
   akteur,
   className,
 }: ReviewWorkspaceProps<T>) {
-  const vorgang = port.get(vorgangId);
+  const vorgangResource = useVorgang(port, vorgangId);
+  const vorgang =
+    vorgangResource.status === "success" ? vorgangResource.data : undefined;
   const [tab, setTab] = useState("dokumente");
 
   // Belege-Tab „Dokumente": die geforderten Nachweise des Vorgangs (Vertrag), kein Domänen-Literal.
@@ -145,6 +148,43 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
           )),
     );
   }, [config.statusMachine, vorgang, rolle]);
+
+  if (vorgangResource.status === "loading") {
+    return (
+      <div
+        className={cn(
+          "flex h-full flex-col items-center justify-center gap-4",
+          className,
+        )}
+      >
+        <p className="text-sm text-muted-foreground">Vorgang wird geladen…</p>
+      </div>
+    );
+  }
+
+  if (vorgangResource.status === "error") {
+    return (
+      <div
+        className={cn(
+          "flex h-full flex-col items-center justify-center gap-4",
+          className,
+        )}
+      >
+        <p className="text-sm text-muted-foreground">
+          {vorgangResource.error.message}
+        </p>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={vorgangResource.retry}>
+            Erneut versuchen
+          </Button>
+          <Button variant="outline" onClick={onClose}>
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Zurück
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (!vorgang) {
     return (
@@ -373,7 +413,7 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
                   // mit `akteur`, sodass der Vier-Augen-Schutz (store: andere Person als der Ersteller) greift. Danach
                   // schließt die Sicht (zurück in den Arbeitsvorrat).
                   onFreigeben={async () => {
-                    port.uebergang(
+                    await port.uebergang(
                       vorgang.id,
                       vierAugenTransition.to,
                       rolle,
@@ -385,7 +425,7 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
                   {...(ablehnTransition
                     ? {
                         onAblehnen: async (grund: string) => {
-                          port.uebergang(
+                          await port.uebergang(
                             vorgang.id,
                             ablehnTransition.to,
                             rolle,

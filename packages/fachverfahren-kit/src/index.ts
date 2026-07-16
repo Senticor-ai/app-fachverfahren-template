@@ -58,6 +58,7 @@ export * from "./components/ArchivedCardsPanel.js";
 
 // ── Standardisierungs-Layer (M0/M1): der EINE Zustands-/Ansage-/Theming-Vertrag, auf den alle ──
 // ── Komponenten zurückgreifen (shadcn/ui + Tailwind-Token). Eine Wahrheit pro Belang. ──
+export * from "./hooks/use-vorgang-resource.js";
 export * from "./hooks/use-view-state.js";
 export * from "./hooks/use-step-machine.js";
 export * from "./components/StatusRegion.js";

@@ -24,6 +24,7 @@ import type {
   VorgangPort,
 } from "../types.js";
 import { formatBetrag as formatBetragKit } from "../format.js";
+import { useVorgaenge } from "../hooks/use-vorgang-resource.js";
 
 /** Aufsichts-Sicht — rein generisch über Config + Port; keine personenbezogenen Klartext-Daten. */
 export interface AufsichtDashboardProps<T = Record<string, unknown>> {
@@ -86,15 +87,20 @@ export function AufsichtDashboard<T = Record<string, unknown>>({
   loading = false,
 }: AufsichtDashboardProps<T>): React.ReactElement {
   const { announce } = useStatusRegion();
+
+  const resource = useVorgaenge(port);
+  const isLoading = loading || resource.status === "loading";
+  const vorgaenge: Vorgang<T>[] =
+    resource.status === "success" ? resource.data : [];
+
   // Lade-/Fertig-Ansage zentral über die EINE Live-Region (BITV: Zustand nicht nur visuell).
   React.useEffect(() => {
     announce(
-      loading ? "Kennzahlen werden geladen." : "Kennzahlen aktualisiert.",
+      isLoading ? "Kennzahlen werden geladen." : "Kennzahlen aktualisiert.",
       "polite",
     );
-  }, [loading, announce]);
+  }, [isLoading, announce]);
 
-  const vorgaenge: Vorgang<T>[] = port.list();
   const states: StatusDef[] = config.statusMachine.states;
   const total = vorgaenge.length;
   const schwelle = config.ki?.schwelleAutonom ?? 1;
@@ -168,7 +174,7 @@ export function AufsichtDashboard<T = Record<string, unknown>>({
         </p>
       </div>
 
-      {loading ? (
+      {isLoading ? (
         /* Ladezustand — layout-treue Skeletons (KPI-Kacheln · Status-Mix · Summe · Audit-Trail).
            Die Lade-ANSAGE übernimmt StatusRegion (oben), die Skeletons sind rein dekorativ (aria-hidden). */
         <div className="px-6 py-6" aria-busy="true">

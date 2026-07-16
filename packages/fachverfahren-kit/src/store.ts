@@ -1,15 +1,12 @@
-// fachverfahren-kit/store — die generische DEV-Datenschicht: ein Zustand-Store, der `VorgangPort` implementiert,
-// gesteuert NUR durch die `LeistungConfig`. Aus etablierten Public-Sector-UX-Mustern abgeleitet, leistungs-
-// agnostisch: dieselbe Vorgang-State-Machine + History + Once-Only-Register für JEDES Fachverfahren.
-//
-// DEV (im Vite-Dev-Server, end-to-end klickbar): dieser In-Memory/Zustand-Store.
-// PROD: dieselbe `VorgangPort`-Schnittstelle gegen das SDK/Fastify-Backend — die Bausteine merken keinen Unterschied.
+// fachverfahren-kit/store — DEV/Storybook in-memory adapter for VorgangPort + RegisterLookupPort.
+// Production persistence authority is Fastify CaseService; this store is a cache/fixture only.
 import { create, type StoreApi, type UseBoundStore } from "zustand";
 import type {
   LeistungConfig,
+  RegisterLookupPort,
+  Transition,
   Vorgang,
   VorgangPort,
-  Transition,
 } from "./types.js";
 import {
   abgeleiteteFelder,
@@ -21,27 +18,31 @@ import type { Antragsdaten } from "./lib/antrag-felder.js";
 let __seq = 0;
 const pad = (n: number, w: number) => String(n).padStart(w, "0");
 
-/** Erzeugt eine fortlaufende Vorgangsnummer im Format FV-<jahr>-<lfd> (deterministisch über einen injizierten Zähler). */
 function makeVorgangsnummer(jahr: number): () => string {
   return () => `FV-${jahr}-${pad(++__seq, 4)}`;
 }
 
-export interface FachverfahrenStore<T> extends VorgangPort<T> {
-  /** Reaktiver Zustand-Hook für die UI (subscribe auf vorgaenge). */
+export interface FachverfahrenStore<T>
+  extends VorgangPort<T>, RegisterLookupPort {
   use: UseBoundStore<StoreApi<{ vorgaenge: Vorgang<T>[] }>>;
   config: LeistungConfig<T>;
-  /** Findet den erlaubten Übergang (oder undefined). Für die UI, um Buttons/Rollen zu rendern. */
   transitionsFrom(status: string, rolle?: string): Transition[];
 }
 
-/** Baut den Store für EINE Leistung. `jahr` injiziert (kein `new Date()` in der Logik → deterministisch/testbar). */
 export function createFachverfahrenStore<T = Record<string, unknown>>(
   config: LeistungConfig<T>,
-  opts: { jahr?: number; now?: () => string } = {},
+  opts: {
+    jahr?: number;
+    now?: () => string;
+    /** Artificial delay to catch sync assumptions in tests (ms). */
+    delayMs?: number;
+  } = {},
 ): FachverfahrenStore<T> {
   const jahr = opts.jahr ?? 2026;
   const now = opts.now ?? (() => new Date().toISOString());
+  const delayMs = opts.delayMs ?? 0;
   const vorgangsnummer = makeVorgangsnummer(jahr);
+  const idempotency = new Map<string, Vorgang<T>>();
 
   const seed = config.seed?.({ vorgangsnummer }) ?? [];
   const use = create<{ vorgaenge: Vorgang<T>[] }>(() => ({ vorgaenge: seed }));
@@ -49,8 +50,13 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
   const setState = (fn: (s: Vorgang<T>[]) => Vorgang<T>[]) =>
     use.setState((s) => ({ vorgaenge: fn(s.vorgaenge) }));
 
+  const wait = async (): Promise<void> => {
+    if (delayMs > 0) {
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  };
+
   const transitionsFrom = (status: string, rolle?: string): Transition[] =>
-    // DEFENSIV gegen eine unvollständig generierte Config (statusMachine evtl. nicht vertragskonform).
     (config.statusMachine?.transitions ?? []).filter(
       (t) => t.from === status && (!rolle || t.rollen.includes(rolle)),
     );
@@ -60,27 +66,42 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
     use,
     transitionsFrom,
 
-    list: () => use.getState().vorgaenge,
-    get: (id) => use.getState().vorgaenge.find((v) => v.id === id),
+    list: async (query) => {
+      await wait();
+      let rows = use.getState().vorgaenge;
+      if (query?.states?.length) {
+        rows = rows.filter((v) => query.states!.includes(v.status));
+      }
+      if (query?.search?.trim()) {
+        const q = query.search.trim().toLowerCase();
+        rows = rows.filter((v) => v.vorgangsnummer.toLowerCase().includes(q));
+      }
+      const limit = query?.limit;
+      return limit ? rows.slice(0, limit) : rows;
+    },
 
-    einreichen: (antragsdaten, erbrachteNachweise) => {
+    get: async (id) => {
+      await wait();
+      return use.getState().vorgaenge.find((v) => v.id === id);
+    },
+
+    einreichen: async (antragsdaten, erbrachteNachweise, einreichenOpts) => {
+      await wait();
+      const key = einreichenOpts?.idempotencyKey;
+      if (key && idempotency.has(key)) {
+        return idempotency.get(key)!;
+      }
       const ki = { confidence: 0, flags: [] as string[] };
-      // DEFENSIV wie transitionsFrom (fail-closed gegen unvollständig generierte Config): OHNE Initial-Status kann kein
-      // Vorgang eröffnet werden — sprechender Fehler statt stiller TypeError, der die Bürger-Navigation verschluckt.
       const initialStatus = config.statusMachine?.initial;
-      if (!initialStatus)
+      if (!initialStatus) {
         throw new Error(
           "LeistungConfig ohne statusMachine.initial — Vorgang kann nicht eröffnet werden.",
         );
-      // M1 — ABGELEITETE Felder (Codelisten-Merkmal → Antragsfeld) VOR der Berechnung anwenden (defensiv &
-      // idempotent: der Stepper reicht i. d. R. schon abgeleitete Daten ein, ein direkter Port-Aufruf nicht). Die
-      // abgeleiteten Werte werden mit eingereicht, damit sie im Vorgang/Detail sichtbar sind.
+      }
       const wirksam = abgeleiteteFelder(
         config,
         antragsdaten as Antragsdaten,
       ) as T;
-      // EFFEKTIVE Berechnung/Nachweise: `berechne`/`nachweise` sind Escape-Hatches, sonst wertet der reine
-      // Interpreter `tarif`/`codelisten` aus (Default = Daten-Auswertung).
       const berechnung = effektiveBerechnung(config, wirksam);
       const v: Vorgang<T> = {
         id: `v-${pad(++__seq, 6)}`,
@@ -88,72 +109,104 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
         eingangIso: now(),
         antragsdaten: wirksam,
         status: initialStatus,
-        // berechnung ist optional — unter exactOptionalPropertyTypes nur setzen, wenn vorhanden.
         ...(berechnung ? { berechnung } : {}),
         ki,
-        // NACHWEIS-RECONCILE (Wurzel-Fix „hochgeladener Nachweis landet nicht beim Sachbearbeiter"): die aus der Config
-        // abgeleitete SOLL-Liste mit den TATSÄCHLICH eingereichten Dateien (keyed by Nachweis-Id) mergen — wo ein Upload
-        // existiert, hochgeladen:true + Datei-Metadaten ablegen. Rein data-driven über die Id, kein Verfahrens-Literal.
+        version: 1,
         nachweise: effektiveNachweise(config, wirksam).map((n) => {
           const datei = erbrachteNachweise?.[n.id];
-          return datei ? { ...n, hochgeladen: true, datei } : n;
+          if (!datei) return n;
+          return {
+            ...n,
+            hochgeladen: true,
+            datei: { name: datei.name, groesse: datei.groesse },
+            ...(datei.attachmentId ? { attachmentId: datei.attachmentId } : {}),
+          };
         }),
         history: [
           { ts: now(), aktion: "Antrag eingegangen", rolle: "buerger" },
         ],
       };
       setState((vs) => [v, ...vs]);
+      if (key) idempotency.set(key, v);
       return v;
     },
 
-    uebergang: (id, to, rolle, detail, akteur) => {
-      const v = store.get(id);
-      if (!v) throw new Error(`Vorgang ${id} nicht gefunden`);
-      const t = config.statusMachine.transitions.find(
-        (x) => x.from === v.status && x.to === to,
-      );
-      if (!t) throw new Error(`Übergang ${v.status} → ${to} nicht erlaubt`);
-      if (!t.rollen.includes(rolle))
-        throw new Error(
-          `Rolle ${rolle} darf ${v.status} → ${to} nicht auslösen`,
-        );
-      if (t.detailPflicht && !detail)
-        throw new Error(`Übergang „${t.label}" erfordert eine Begründung`);
-      // 4-Augen wird in PROD serverseitig erzwungen (anderer Bearbeiter als der Antragsteller/Vorprüfer).
-      // Im DEV-Store gilt dieselbe Regel, sobald Akteure bekannt sind: ZWEI VERSCHIEDENE Personen — der letzte
-      // bekannte Akteur der History darf einen vierAugen-Übergang nicht selbst auslösen. Ohne Akteur-Angabe bleibt
-      // es (abwärtskompatibel) beim History-Vermerk; der Nachweis ist dann über history[].akteur nicht führbar.
-      if (t.vierAugen && akteur) {
-        const letzter = [...v.history].reverse().find((h) => h.akteur)?.akteur;
-        if (letzter && letzter === akteur)
-          throw new Error(
-            `Vier-Augen verletzt: „${t.label}" erfordert eine ANDERE Person als ${akteur} (letzter Akteur der History)`,
-          );
+    uebergang: async (id, eventName, rolle, detail, akteur, uebergangOpts) => {
+      await wait();
+      const key = uebergangOpts?.idempotencyKey;
+      if (key && idempotency.has(key)) {
+        return idempotency.get(key)!;
       }
-      setState((vs) =>
-        vs.map((x) =>
-          x.id === id
-            ? {
-                ...x,
-                status: to,
-                history: [
-                  ...x.history,
-                  // detail/akteur sind optional — unter exactOptionalPropertyTypes nur setzen, wenn vorhanden.
-                  {
-                    ts: now(),
-                    aktion: `${t.label} (→ ${to})`,
-                    rolle,
-                    ...(akteur ? { akteur } : {}),
-                    ...(detail ? { detail } : {}),
-                  },
-                ],
-              }
-            : x,
-        ),
-      );
+      const current = use.getState().vorgaenge.find((v) => v.id === id);
+      if (!current) throw new Error(`Vorgang ${id} nicht gefunden`);
+      if (
+        uebergangOpts?.expectedVersion !== undefined &&
+        current.version !== undefined &&
+        current.version !== uebergangOpts.expectedVersion
+      ) {
+        throw new Error(
+          `Versionskonflikt: erwartet ${uebergangOpts.expectedVersion}, aktuell ${current.version}`,
+        );
+      }
+      const t =
+        config.statusMachine.transitions.find(
+          (x) =>
+            x.from === current.status &&
+            (x.to === eventName ||
+              (x.eventName ?? `${x.from}->${x.to}`) === eventName),
+        ) ??
+        config.statusMachine.transitions.find(
+          (x) => x.from === current.status && x.to === eventName,
+        );
+      if (!t)
+        throw new Error(
+          `Übergang ${current.status} → ${eventName} nicht erlaubt`,
+        );
+      if (!t.rollen.includes(rolle)) {
+        throw new Error(
+          `Rolle ${rolle} darf ${current.status} → ${t.to} nicht auslösen`,
+        );
+      }
+      if (t.detailPflicht && !detail) {
+        throw new Error(`Übergang „${t.label}" erfordert eine Begründung`);
+      }
+      if (t.vierAugen) {
+        if (!akteur) {
+          throw new Error(
+            `Vier-Augen verletzt: „${t.label}" erfordert eine Akteur-Identität`,
+          );
+        }
+        const letzter = [...current.history]
+          .reverse()
+          .find((h) => h.akteur)?.akteur;
+        if (letzter && letzter === akteur) {
+          throw new Error(
+            `Vier-Augen verletzt: „${t.label}" erfordert eine ANDERE Person als ${akteur}`,
+          );
+        }
+      }
+      const next: Vorgang<T> = {
+        ...current,
+        status: t.to,
+        version: (current.version ?? 1) + 1,
+        history: [
+          ...current.history,
+          {
+            ts: now(),
+            aktion: `${t.label} (→ ${t.to})`,
+            rolle,
+            ...(akteur ? { akteur } : {}),
+            ...(detail ? { detail } : {}),
+          },
+        ],
+      };
+      setState((vs) => vs.map((x) => (x.id === id ? next : x)));
+      if (key) idempotency.set(key, next);
+      return next;
     },
 
-    lookupRegister: (query) => {
+    lookupRegister: async (query) => {
+      await wait();
       const q = query.toLowerCase().trim();
       if (!q) return undefined;
       return config.register.mock?.find((r) =>

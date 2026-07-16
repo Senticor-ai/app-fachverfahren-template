@@ -1,20 +1,21 @@
 // /buerger/bestaetigung/:id — Eingangsbestätigung: liest den eben erzeugten Vorgang aus
 // der EINEN Quelle.
 import { useNavigate, useParams } from "react-router-dom";
-import { formatBetragStatus } from "@senticor/fachverfahren-kit";
+import { formatBetragStatus, useVorgang } from "@senticor/fachverfahren-kit";
 import { Shell } from "../app/shell.js";
-import { useStoreVersion } from "../app/use-store-version.js";
 import { store } from "../store.js";
 
 export function BuergerBestaetigungPage(): React.JSX.Element {
-  useStoreVersion();
   const { id = "" } = useParams();
   const navigate = useNavigate();
-  const v = store.get(id);
+  const resource = useVorgang(store, id || undefined);
+  const v = resource.status === "success" ? resource.data : undefined;
   return (
     <Shell persona="buerger" activeNavKey="start">
       <div className="mx-auto max-w-2xl p-4 md:p-8">
-        {v ? (
+        {resource.status === "loading" ? (
+          <p className="text-sm text-muted-foreground">Wird geladen…</p>
+        ) : v ? (
           <div className="rounded-lg border border-status-ok/30 bg-status-ok-soft p-6">
             <h1 className="text-lg font-semibold text-foreground">
               Antrag eingegangen
