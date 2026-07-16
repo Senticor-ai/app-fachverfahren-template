@@ -154,6 +154,30 @@ Fehler `case version conflict` → `409`) und liefert den neuen `Case` mit
 `version + 1`. Der Zielzustand wird NIE aus dem Request-Body gelesen, sondern aus
 der `ProcedureVersion` gerechnet.
 
+## BPMN → die Dossier-Naht schreiben (governter Weg)
+
+Die abgeleitete `ProcedureVersion` gehört in **`apps/fachverfahren/server/procedure.config.ts`**
+(`dossierProcedure` — DIE EINE Dossier-Naht, [[dossier-fallmanagement]]). Weil die `.bpmn`
+NICHT nach `dist-server` ausgeliefert wird, ist die Ableitung ein **Authoring-/Build-Schritt**,
+nicht Laufzeit: erzeuge die `ProcedureVersion` aus deiner BPMN und schreibe sie als Literal in die
+Naht (Rechtsgrundlagen/Version kommen aus deiner Konfiguration, NIE aus der BPMN):
+
+```ts
+const version = bpmnToProcedureVersion(bpmnXml, {
+  procedureId: "<procedure-id>",
+  version: "<version>",
+  legalBasisIds: ["<belegte-norm>"], // aus der Konfiguration — NIE geraten
+});
+// version.allowedStates / version.allowedTransitions → als `dossierProcedure` in procedure.config.ts
+```
+
+**Drift-Gate `check:bpmn-example`** (in `precommit:check` + `check:agent-domain`): leitet mit
+`bpmnToProcedureVersion` aus der committeten `integrationsmanagement.bpmn` ab und vergleicht
+gegen die in `integrationsmanagement.config.yaml` dokumentierte `stateMachine` — ändert jemand die
+BPMN, aber nicht die config.yaml (oder umgekehrt), wird das Gate rot. So bleibt das Beispiel ein
+verlässlicher, ausführbarer Blueprint (die BPMN ist die EINE Wahrheit, ADR-0002). Baust du dein
+eigenes Verfahren analog (BPMN + `config.yaml`), spiegele diesen Gate-Vergleich.
+
 ## Stub (Template) vs. chos-Engine (PROD)
 
 Laut ADR-0002 sitzt der **`WorkflowPort`** (`startWorkflow`/`signalWorkflow`,
