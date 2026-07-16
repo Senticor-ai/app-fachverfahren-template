@@ -66,7 +66,13 @@ REPO_ROOT="$(pwd -P)"
 
 # TMPDIR außerhalb des Repos erzwingen (wie ci-validate.sh) — Scaffold-Ziele dürfen nicht im Checkout liegen.
 if [ -z "${TMPDIR:-}" ]; then
-  TMPDIR="${REPO_ROOT}/../.tmp-generated-app-ci"
+  sibling="${REPO_ROOT}/../.tmp-generated-app-ci"
+  if mkdir -p "$sibling" 2>/dev/null; then
+    TMPDIR="$sibling"
+  else
+    TMPDIR="/tmp/.tmp-generated-app-ci-$$"
+    mkdir -p "$TMPDIR"
+  fi
 fi
 mkdir -p "$TMPDIR"
 TMPDIR="$(cd "$TMPDIR" && pwd -P)"
