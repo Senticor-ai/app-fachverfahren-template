@@ -135,3 +135,24 @@ export const CaseAllowedActionsDtoSchema = Type.Object(
 );
 
 export type CaseAllowedActionsDto = Static<typeof CaseAllowedActionsDtoSchema>;
+
+// Ein registriertes Verfahren in Kurzform — genug, damit ein Anlege-Formular es zur Wahl anbietet
+// (procedureId/version + die Zustände, aus denen der Startzustand einer neuen Akte kommt). KEINE Übergänge/
+// Rechtsgrundlagen hier (die holt die Akte später über ihre ProcedureVersion server-seitig).
+export const ProcedureSummaryDtoSchema = Type.Object(
+  {
+    procedureId: Type.String({ minLength: 1 }),
+    version: Type.String({ minLength: 1 }),
+    allowedStates: Type.Array(Type.String({ minLength: 1 })),
+  },
+  { additionalProperties: false },
+);
+
+export type ProcedureSummaryDto = Static<typeof ProcedureSummaryDtoSchema>;
+
+export const ProcedureListDtoSchema = Type.Object(
+  { procedures: Type.Array(ProcedureSummaryDtoSchema) },
+  { additionalProperties: false },
+);
+
+export type ProcedureListDto = Static<typeof ProcedureListDtoSchema>;

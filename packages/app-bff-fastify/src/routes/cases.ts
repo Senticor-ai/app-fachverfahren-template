@@ -10,6 +10,7 @@ import {
   CaseAuditListDtoSchema,
   CaseAuditQuerySchema,
   CaseCreateRequestSchema,
+  ProcedureListDtoSchema,
   CaseDtoSchema,
   CaseIdParamsSchema,
   CaseListDtoSchema,
@@ -111,6 +112,31 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
     404: ErrorEnvelopeSchema,
     503: ErrorEnvelopeSchema,
   };
+
+  typed.get(
+    "/api/procedures",
+    {
+      config: readAuth.config,
+      preHandler: readAuth.preHandler,
+      schema: {
+        tags: ["cases"],
+        summary:
+          "Registrierte Verfahren in Kurzform (für die Wahl beim Anlegen einer Akte)",
+        response: { 200: ProcedureListDtoSchema, ...errorResponses },
+      },
+    },
+    async (_request, reply) => {
+      // Verfahren als DATEN aus der Registry — kein Store-Zugriff, kein Mandanten-Scope (die Zustandsmaschine
+      // ist nicht mandantenspezifisch). Nur die Kurzform (id/version/Zustände); Übergänge/Rechtsgrundlagen
+      // bleiben server-seitig und kommen später über die Akte.
+      const procedures = deps.procedureRegistry.list().map((procedure) => ({
+        procedureId: procedure.procedureId,
+        version: procedure.version,
+        allowedStates: [...procedure.allowedStates],
+      }));
+      return reply.send({ procedures });
+    },
+  );
 
   typed.get(
     "/api/cases",

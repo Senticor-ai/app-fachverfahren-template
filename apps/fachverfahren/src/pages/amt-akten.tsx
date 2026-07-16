@@ -3,9 +3,10 @@
 // Analog zum Boards-Muster (BoardList): Lade-/Fehler-/Leer-Zustand, Karten-Grid (reflowt bei Zoom).
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FolderOpen, Inbox } from "lucide-react";
+import { FolderOpen, Inbox, Plus } from "lucide-react";
 import {
   Badge,
+  Button,
   Card,
   CardContent,
   CardHeader,
@@ -17,12 +18,14 @@ import {
 import { casePort } from "../app/case-port.js";
 import type { CaseSummary } from "../case-client.js";
 import { Shell } from "../app/shell.js";
+import { NeueAkteForm } from "./neue-akte-form.js";
 
 export function AmtAktenPage(): React.JSX.Element {
   const navigate = useNavigate();
   const [cases, setCases] = useState<CaseSummary[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [showForm, setShowForm] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -47,10 +50,32 @@ export function AmtAktenPage(): React.JSX.Element {
   return (
     <Shell persona="sachbearbeitung" activeNavKey="akten">
       <section className="mx-auto w-full max-w-5xl px-6 py-6">
-        <div className="flex items-center gap-2">
-          <FolderOpen className="h-5 w-5 text-foreground" aria-hidden="true" />
-          <h1 className="text-2xl font-semibold text-foreground">Akten</h1>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <FolderOpen
+              className="h-5 w-5 text-foreground"
+              aria-hidden="true"
+            />
+            <h1 className="text-2xl font-semibold text-foreground">Akten</h1>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => setShowForm((visible) => !visible)}
+            aria-expanded={showForm}
+          >
+            <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
+            Neue Akte
+          </Button>
         </div>
+
+        {showForm && (
+          <div className="mt-4">
+            <NeueAkteForm
+              onCreated={(caseId) => open(caseId)}
+              onCancel={() => setShowForm(false)}
+            />
+          </div>
+        )}
 
         <div className="mt-6">
           {loading ? (

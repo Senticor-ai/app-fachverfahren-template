@@ -153,6 +153,33 @@ describe("BFF /api/cases", () => {
     await fremd.app.close();
   });
 
+  it("GET /api/procedures liefert die registrierten Verfahren in Kurzform (id/version/Zustände)", async () => {
+    const { app } = await buildCasesApp();
+    const res = await app.inject({ method: "GET", url: "/api/procedures" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.procedures).toEqual([
+      {
+        procedureId: procedure.procedureId,
+        version: procedure.version,
+        allowedStates: procedure.allowedStates,
+      },
+    ]);
+    await app.close();
+  });
+
+  it("GET /api/procedures ist leer, wenn kein Verfahren registriert ist (fail-safe)", async () => {
+    const leer = await buildBffApp({
+      session: caseworkerSession(),
+      caseStore: new InMemoryCaseStore(),
+      procedureRegistry: createInMemoryProcedureRegistry([]),
+    });
+    const res = await leer.app.inject({ method: "GET", url: "/api/procedures" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().procedures).toEqual([]);
+    await leer.app.close();
+  });
+
   it("GET /api/cases/:id/allowed-actions liefert die Übergänge des aktuellen Zustands (aus dem Verfahren); Fremd-Behörde → 404", async () => {
     const { app } = await buildCasesApp();
     const created = (await createCase(app)).json();

@@ -181,6 +181,24 @@ describe("case-client Schreibpfade", () => {
     expect(calls[0]?.credentials).toBe("include");
   });
 
+  it("listProcedures → GET /api/procedures, parst die Kurzform", async () => {
+    const payload = {
+      procedures: [
+        {
+          procedureId: "musterverfahren",
+          version: "1.0.0",
+          allowedStates: ["eingegangen", "in-bearbeitung"],
+        },
+      ],
+    };
+    const { calls } = stubFetchJson(payload, 200);
+    const result = await createHttpCasePort().listProcedures();
+    expect(result).toEqual(payload.procedures);
+    expect(calls[0]?.method).toBe("GET");
+    expect(calls[0]?.url).toBe("/api/procedures");
+    expect(calls[0]?.credentials).toBe("include");
+  });
+
   it("Nicht-2xx-Status (409 Konflikt) → CaseRequestError mit Statuscode", async () => {
     stubFetchJson({ error: "case version conflict" }, 409);
     const rejection = expect(

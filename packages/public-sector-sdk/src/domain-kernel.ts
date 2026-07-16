@@ -194,6 +194,8 @@ export function transitionCase(
  *  BPMN-Ableitung (ADR-0002); in Produktion kann chos die Registry hinter derselben Naht liefern. */
 export interface ProcedureRegistry {
   get(procedureId: string, version: string): ProcedureVersion | undefined;
+  /** Alle registrierten Verfahren-Versionen (z. B. damit ein Anlege-Formular sie zur Wahl anbietet). */
+  list(): ProcedureVersion[];
 }
 
 /** Baut eine In-Memory-`ProcedureRegistry` aus einer Liste von VerfahrensVersionen (Template-Stub/Standalone). */
@@ -208,5 +210,6 @@ export function createInMemoryProcedureRegistry(
   );
   return {
     get: (procedureId, version) => byKey.get(`${procedureId}:${version}`),
+    list: () => [...byKey.values()],
   };
 }

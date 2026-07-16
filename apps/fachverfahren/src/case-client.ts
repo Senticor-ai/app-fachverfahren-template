@@ -55,6 +55,13 @@ export interface CaseZielFortschritt {
   percent: number;
 }
 
+/** Ein registriertes Verfahren in Kurzform — 1:1 zur BFF-`ProcedureSummaryDto` (für die Wahl beim Anlegen). */
+export interface ProcedureSummary {
+  procedureId: string;
+  version: string;
+  allowedStates: string[];
+}
+
 /** Eine im aktuellen Zustand erlaubte Aktion — 1:1 zur BFF-`CaseAllowedActionDto`. Der Client sendet nur
  *  `action` an `transitionCase`; Zielzustand/Rechtsgrundlage/Vier-Augen bleiben server-autoritativ. */
 export interface CaseAllowedAction {
@@ -109,6 +116,7 @@ export interface CasePort {
     query?: { limit?: number },
   ): Promise<CaseAuditEvent[]>;
   listAllowedActions(caseId: string): Promise<CaseAllowedActions>;
+  listProcedures(): Promise<ProcedureSummary[]>;
   // Schreibpfade — Request-/Antwort-Formen aus den BFF-Wire-Verträgen. Nicht-2xx (400/403/404/409/503)
   // wirft `CaseRequestError` mit Statuscode; der Aufrufer entscheidet fachlich (Konflikt/verwehrt/…).
   createCase(req: CaseCreateRequestDto): Promise<CaseDto>;
@@ -236,6 +244,13 @@ export function createHttpCasePort(): CasePort {
       return await request<CaseAllowedActions>(
         `/api/cases/${encodeURIComponent(caseId)}/allowed-actions`,
       );
+    },
+
+    async listProcedures() {
+      const body = await request<{ procedures: ProcedureSummary[] }>(
+        `/api/procedures`,
+      );
+      return body.procedures;
     },
 
     async createCase(req) {
