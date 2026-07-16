@@ -28,7 +28,7 @@ import { cn } from "../lib/utils.js";
 import { Badge } from "../ui/badge.js";
 import { useKommuneTheme, KommuneLogo } from "./KommuneTheme.js";
 import {
-  DEFAULT_PERSONAS,
+  mergePersonas,
   PersonaSwitcher,
   type Persona,
   type PersonaDescriptor,
@@ -196,8 +196,10 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
   showDemoBadge = true,
 }: FachverfahrenShellProps<T>): React.JSX.Element {
   // DATA-DRIVEN Rollen: explizite Prop > verfahrensspezifische Rollen aus dem Vertrag (config.personas, aus dem
-  // Fachkonzept) > generische DEFAULT_PERSONAS. So spiegeln die 3 Sichten das jeweilige Verfahren, ohne Hardcode.
-  const personaList = personas ?? config.personas ?? DEFAULT_PERSONAS;
+  // Fachkonzept), PER KEY über die generischen DEFAULT_PERSONAS gelegt. So spiegeln die Sichten das jeweilige
+  // Verfahren, ohne Hardcode — und ein TEIL-Modell (nur ein Arbeitsbereich abgeleitet) lässt die übrigen Sichten
+  // generisch stehen, statt sie verschwinden zu lassen (per-key fail-open, s. mergePersonas).
+  const personaList = personas ?? mergePersonas(config.personas);
   // Wechsler nur zeigen, wenn es etwas zu wechseln gibt: mehr als ein Arbeitsbereich —
   // oder Workspace-Modus (keine aktive Persona) mit mindestens einem Einstieg.
   const showSwitcher =
