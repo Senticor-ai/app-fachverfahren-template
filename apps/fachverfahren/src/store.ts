@@ -9,10 +9,21 @@ import {
   createFachverfahrenStore,
   type FachverfahrenStore,
 } from "@senticor/fachverfahren-kit";
+import { createHttpVorgangPersistence } from "./antrag-client.js";
 // Die Config kommt aus DER EINEN Austausch-Naht (./leistung.config) — Default = ein NEUTRALES Demo-Verfahren,
 // von einem generierenden Build überschrieben mit der aus dem Fachkonzept generierten Config. Die Composition-App bleibt
 // VERFAHRENS-AGNOSTISCH: sie reicht eine beliebige LeistungConfig an dieselben Kit-Bausteine.
 import { leistungConfig } from "./leistung.config";
 
+// PERSISTENZ: Bürger-Anträge gehen server-seitig an /api/buerger/antraege (owner-scoped, aus der
+// Sitzung). Damit überlebt ein Antrag den Reload — vorher lebte er nur im Browser. Die procedureId
+// entspricht leistungConfig.id; der Server kennt das Verfahren als antragProcedure (drift-gesichert
+// gegen genau diese Config). Der Config-`seed` bleibt der ANFANGSBESTAND (die SB-Arbeitsvorrat-Sicht
+// zeigt ihn, ohne zu hydrieren); `store.laden()` ersetzt ihn durch die eigenen Server-Anträge.
 export const store: FachverfahrenStore<Record<string, unknown>> =
-  createFachverfahrenStore(leistungConfig);
+  createFachverfahrenStore(leistungConfig, {
+    persistence: createHttpVorgangPersistence({
+      procedureId: leistungConfig.id,
+      procedureVersion: "1",
+    }),
+  });

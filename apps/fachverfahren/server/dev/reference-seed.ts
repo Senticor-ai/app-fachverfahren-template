@@ -22,6 +22,7 @@ import {
   DEFAULT_JURISDICTION_ID,
   DEFAULT_TENANT_ID,
 } from "../auth/bootstrap.js";
+import { hashPassword } from "@senticor/provider-local-auth";
 import { dossierDemo, dossierProcedure } from "../procedure.config.js";
 
 // DEV-Login (nur In-Memory): der Account wird NUR angelegt, wenn ein Passwort über die Umgebung
@@ -31,6 +32,12 @@ import { dossierDemo, dossierProcedure } from "../procedure.config.js";
 const DEV_PASSWORD_ENV = "APP_DEV_SEED_PASSWORD";
 const DEV_EMAIL = "sachbearbeitung@example.org";
 const DEV_NAME = "Demo-Sachbearbeitung";
+// Ein ZWEITES Demo-Konto in der Bürgerrolle — damit der Bürger-Antrag-Flow (server-persistent seit
+// die Bürger-Seite stateful ist) demonstrierbar ist: die Sachbearbeitung (admin→caseworker) hat
+// bewusst KEIN case.own.submit; ein Bürger reicht ein, die Sachbearbeitung bearbeitet. Zwei-Konten-
+// Flow, wie im echten Verfahren. Nutzt dasselbe env-gegatete Passwort (kein committetes Secret).
+const DEV_CITIZEN_EMAIL = "buerger@example.org";
+const DEV_CITIZEN_NAME = "Demo-Bürger:in";
 
 // Eröffnungs-Akteur des Demo-Falls: ein FESTER synthetischer Akteur, bewusst VERSCHIEDEN vom Login-Konto,
 // damit der Vier-Augen-Abschluss (jüngster-Audit-Akteur ≠ auslösender Akteur) vom Demo-Login ausübbar ist.
@@ -60,9 +67,71 @@ export async function seedReferenceDemo(
 ): Promise<void> {
   const log: SeedLog = deps.log ?? (() => undefined);
   await seedDevCaseworker(deps, log);
+  await seedDevCitizen(deps, log);
   // Das Demo-Dossier ist unabhängig vom Login und wird IMMER einem festen synthetischen Eröffnungs-Akteur
   // zugeschrieben (≠ Login-Konto) — so bleibt der Vier-Augen-Abschluss vom Demo-Login ausübbar.
   await seedDemoDossier(deps, SEED_AUDIT_ACTOR, log);
+}
+
+/** Legt — nur mit APP_DEV_SEED_PASSWORD und nur wenn noch nicht vorhanden — ein anmeldbares
+ *  Bürger-Konto (Rolle citizen) an, damit der server-persistente Antrag-Flow demonstrierbar ist.
+ *  Idempotent (getUserByEmail); wirft NIE. Nutzt createLocalUserWithCredential direkt (nicht
+ *  bootstrapWorkspace — das ist dem ersten Konto/Workspace-Setup vorbehalten). */
+async function seedDevCitizen(
+  deps: ReferenceSeedDeps,
+  log: SeedLog,
+): Promise<void> {
+  const password = deps.env?.[DEV_PASSWORD_ENV];
+  if (password === undefined || password === "") return; // kein Login ohne bereitgestelltes Passwort
+  try {
+    const vorhanden = await deps.authStore.getUserByEmail({
+      tenantId: DEFAULT_TENANT_ID,
+      email: DEV_CITIZEN_EMAIL,
+    });
+    if (vorhanden) {
+      log("info", "runtime.dev-seed.citizen.skipped", { reason: "exists" });
+      return;
+    }
+    const nowIso = "2026-01-01T00:00:00.000Z";
+    const actorId = `actor.dev-citizen`;
+    const passwordHash = await hashPassword(password);
+    await deps.authStore.createLocalUserWithCredential({
+      user: {
+        actorId,
+        tenantId: DEFAULT_TENANT_ID,
+        authorityId: DEFAULT_AUTHORITY_ID,
+        jurisdictionId: DEFAULT_JURISDICTION_ID,
+        email: DEV_CITIZEN_EMAIL,
+        displayName: DEV_CITIZEN_NAME,
+        status: "active",
+        role: "citizen",
+        localPersonas: ["buerger"],
+        oidcPersonas: [],
+        personaManagementMode: "local",
+        principalVersion: 1,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      },
+      credential: {
+        actorId,
+        passwordHash,
+        hashAlgo: "argon2id",
+        passwordChangedAt: nowIso,
+        failedAttempts: 0,
+        lockedUntil: null,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      },
+    });
+    log("info", "runtime.dev-seed.citizen.created", {
+      actorId,
+      email: DEV_CITIZEN_EMAIL,
+    });
+  } catch (error) {
+    log("error", "runtime.dev-seed.citizen.failed", {
+      reason: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 async function seedDevCaseworker(
