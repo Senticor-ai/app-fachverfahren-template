@@ -23,6 +23,15 @@ export interface AppCase {
   subjectIds: string[];
   openedAt: string;
   closedAt: string | null;
+  /** Frei-formige fachliche NUTZLAST des Falls (Konvention wie app_tasks.data) — z. B. Antragsdaten,
+   *  Berechnung und Nachweis-Stand eines Antrags-Verfahrens.
+   *
+   *  FÜR DEN SERVER OPAK, BEWUSST: er interpretiert `data` NICHT und KANN es nicht — die fachliche Config
+   *  (leistung.config.ts) liegt ausserhalb seines rootDir und ist für ihn nicht importierbar. Der Client
+   *  rechnet, der Server bewahrt auf, stempelt Identität/Zeit und auditiert. Das deckt sich mit der
+   *  Bestandskraft-Anforderung: ein erlassener Verwaltungsakt darf nicht aus der lebenden Config neu
+   *  gerendert werden, sondern muss seine Fachlichkeit als selbsttragendes Datum mitführen. */
+  data: Record<string, unknown>;
 }
 
 /** Fachliches, append-only Audit-Ereignis (Persistenzform; `previousState`/`newState`/`summary` u. Ä. leben in
@@ -109,7 +118,7 @@ export class PostgresCaseStore implements CaseStore {
     return this.withClient(async (client) => {
       const result = await client.query<CaseRow>(
         `INSERT INTO app_cases (${CASE_COLS})
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12::jsonb)
          RETURNING ${CASE_COLS}`,
         caseInsertParams(input),
       );
@@ -242,9 +251,17 @@ export class InMemoryCaseStore implements CaseStore {
   }
 
   async insertCase(input: AppCase): Promise<AppCase> {
-    const stored: AppCase = { ...input, subjectIds: [...input.subjectIds] };
+    const stored: AppCase = {
+      ...input,
+      subjectIds: [...input.subjectIds],
+      data: cloneData(input.data),
+    };
     this.cases.set(this.key(input.tenantId, input.caseId), stored);
-    return { ...stored, subjectIds: [...stored.subjectIds] };
+    return {
+      ...stored,
+      subjectIds: [...stored.subjectIds],
+      data: cloneData(stored.data),
+    };
   }
 
   async getCase(input: {
@@ -252,7 +269,13 @@ export class InMemoryCaseStore implements CaseStore {
     caseId: string;
   }): Promise<AppCase | undefined> {
     const found = this.cases.get(this.key(input.tenantId, input.caseId));
-    return found ? { ...found, subjectIds: [...found.subjectIds] } : undefined;
+    return found
+      ? {
+          ...found,
+          subjectIds: [...found.subjectIds],
+          data: cloneData(found.data),
+        }
+      : undefined;
   }
 
   async listCases(query: ListCasesQuery): Promise<AppCase[]> {
@@ -267,7 +290,11 @@ export class InMemoryCaseStore implements CaseStore {
       )
       .sort((a, b) => b.openedAt.localeCompare(a.openedAt))
       .slice(0, query.limit ?? 100)
-      .map((c) => ({ ...c, subjectIds: [...c.subjectIds] }));
+      .map((c) => ({
+        ...c,
+        subjectIds: [...c.subjectIds],
+        data: cloneData(c.data),
+      }));
   }
 
   async patchCaseState(input: PatchCaseStateInput): Promise<AppCase> {
@@ -292,7 +319,11 @@ export class InMemoryCaseStore implements CaseStore {
       ...input.auditEvent,
       payload: { ...input.auditEvent.payload },
     });
-    return { ...next, subjectIds: [...next.subjectIds] };
+    return {
+      ...next,
+      subjectIds: [...next.subjectIds],
+      data: cloneData(next.data),
+    };
   }
 
   async appendAuditEvent(event: AppAuditEvent): Promise<AppAuditEvent> {
@@ -353,9 +384,26 @@ export function createCaseStoreFromEnv(
       );
 }
 
+/**
+ * Kopiert die frei-formige `data`-Nutzlast über einen JSON-Roundtrip — und zwar GENAU SO, nicht als
+ * flache Kopie oder structuredClone.
+ *
+ * WARUM: Der Postgres-Pfad speichert `data` als `jsonb`. Damit durchläuft es ZWANGSLÄUFIG einen
+ * JSON-Roundtrip: Der Aufrufer bekommt ein fremdes Objekt (Mutationen am Ergebnis erreichen die DB
+ * nie), und Werte werden normalisiert (Date → String, `undefined`-Felder verschwinden, Klassen-
+ * Instanzen werden zu Plain Objects). Ein In-Memory-Store, der stattdessen die REFERENZ teilt oder
+ * flach kopiert, verhält sich in beidem anders — und genau solche stillen Divergenzen zwischen den
+ * Laufzeiten sind hier schon einmal teuer geworden (closedAt-Parität: InMemory behielt einen Wert,
+ * den Postgres abräumte; der Fehler fiel erst im Live-Drive auf, nicht in den Unit-Tests).
+ * Der JSON-Roundtrip ist deshalb keine „Kopie", sondern die TREUE Nachbildung des Postgres-Verhaltens.
+ */
+function cloneData(data: Record<string, unknown>): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(data ?? {})) as Record<string, unknown>;
+}
+
 // ── SQL + Row-Mapping ────────────────────────────────────────────────────────────────────────
 const CASE_COLS = `case_id, tenant_id, authority_id, jurisdiction_id, procedure_id,
-  procedure_version, state, version, subject_ids, opened_at, closed_at`;
+  procedure_version, state, version, subject_ids, opened_at, closed_at, data`;
 const AUDIT_COLS = `audit_event_id, case_id, tenant_id, authority_id, jurisdiction_id,
   actor_id, event_type, purpose, legal_basis_id, request_id, payload, occurred_at`;
 const AUDIT_INSERT_SQL = `INSERT INTO app_audit_events (${AUDIT_COLS})
@@ -374,6 +422,7 @@ function caseInsertParams(c: AppCase): unknown[] {
     JSON.stringify(c.subjectIds),
     c.openedAt,
     c.closedAt,
+    JSON.stringify(c.data),
   ];
 }
 
@@ -406,6 +455,7 @@ interface CaseRow extends Record<string, unknown> {
   subject_ids: string[];
   opened_at: Date | string;
   closed_at: Date | string | null;
+  data: Record<string, unknown>;
 }
 
 interface AuditRow extends Record<string, unknown> {
@@ -436,6 +486,12 @@ function caseFromRow(row: CaseRow): AppCase {
     subjectIds: Array.isArray(row.subject_ids) ? row.subject_ids : [],
     openedAt: toIsoString(row.opened_at),
     closedAt: row.closed_at === null ? null : toIsoString(row.closed_at),
+    // Defensiv gegen Zeilen aus der Zeit VOR der data-Migration (Spalte hat zwar DEFAULT '{}', aber ein
+    // getrennt migrierter Read-Replica-/Altbestand darf hier keinen TypeError auslösen).
+    data:
+      row.data && typeof row.data === "object" && !Array.isArray(row.data)
+        ? row.data
+        : {},
   };
 }
 

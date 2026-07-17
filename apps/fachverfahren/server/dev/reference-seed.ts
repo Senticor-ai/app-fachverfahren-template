@@ -132,6 +132,10 @@ async function seedDemoDossier(
       subjectIds: [dossierDemo.subjectId],
       openedAt: dossierDemo.openedAt,
       closedAt: null,
+      // Ein DOSSIER-Fall trägt seine Fachlichkeit in Aufgaben/Zielen (app_tasks), nicht in der
+      // Fall-Nutzlast — `data` bleibt leer. Gefüllt wird sie von der ANTRAGS-Art (Antragsdaten +
+      // Berechnung), die den Fall als Akte nutzt.
+      data: {},
     };
     await deps.caseStore.insertCase(demoCase);
 

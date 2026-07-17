@@ -27,6 +27,7 @@ function macheCase(over: Partial<AppCase> = {}): AppCase {
     subjectIds: ["subj-1"],
     openedAt: "2026-06-01T00:00:00.000Z",
     closedAt: null,
+    data: {},
     ...over,
   };
 }
@@ -84,6 +85,45 @@ for (const impl of impls) {
       expect(
         await store.getCase({ tenantId: "fremd", caseId: c.caseId }),
       ).toBeUndefined();
+    });
+
+    it("data: verschachtelte fachliche Nutzlast überlebt den Roundtrip unverändert", async () => {
+      // Die ANTRAGS-Art legt hier Antragsdaten + Berechnung ab (der Server interpretiert sie nie).
+      const daten = {
+        antragsdaten: {
+          antragsteller: { vorname: "Alex", plz: "12345" },
+          anliegen: { kategorie: "standard" },
+        },
+        berechnung: {
+          betrag: 120,
+          einheit: "EUR/Jahr",
+          positionen: [{ label: "Grundbetrag", betrag: 120 }],
+        },
+      };
+      const c = macheCase({ data: daten });
+      await store.insertCase(c);
+      const gelesen = await store.getCase({ tenantId: "t1", caseId: c.caseId });
+      expect(gelesen?.data).toEqual(daten);
+    });
+
+    it("data: der Aufrufer bekommt eine KOPIE — Mutation am Ergebnis erreicht den Store nicht", async () => {
+      // PARITÄTS-FALLE: Postgres speichert `data` als jsonb, der Aufrufer bekommt dort ZWANGSLÄUFIG ein
+      // fremdes Objekt. Ein In-Memory-Store, der die Referenz teilte, verhielte sich anders — und genau
+      // solche stillen Divergenzen sind hier schon einmal erst im Live-Drive aufgefallen (closedAt).
+      const c = macheCase({ data: { antragsdaten: { plz: "12345" } } });
+      await store.insertCase(c);
+      const gelesen = await store.getCase({ tenantId: "t1", caseId: c.caseId });
+      (gelesen!.data["antragsdaten"] as Record<string, unknown>)["plz"] =
+        "99999";
+      const nochmal = await store.getCase({ tenantId: "t1", caseId: c.caseId });
+      expect(nochmal?.data).toEqual({ antragsdaten: { plz: "12345" } });
+    });
+
+    it("data: fehlende Nutzlast ist ein leeres Objekt, nie undefined", async () => {
+      const c = macheCase({ data: {} });
+      await store.insertCase(c);
+      const gelesen = await store.getCase({ tenantId: "t1", caseId: c.caseId });
+      expect(gelesen?.data).toEqual({});
     });
 
     it("listCases filtert nach Mandant/Behörde/Status/Verfahren, opened_at DESC", async () => {

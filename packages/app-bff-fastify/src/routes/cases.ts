@@ -65,6 +65,7 @@ function toCaseDto(c: AppCase): CaseDto {
     subjectIds: c.subjectIds,
     openedAt: c.openedAt,
     closedAt: c.closedAt,
+    data: c.data,
   };
 }
 
@@ -378,6 +379,8 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
         subjectIds: body.subjectIds ?? [],
         openedAt: now,
         closedAt: null,
+        // Fachliche Nutzlast unverändert durchreichen — der Server interpretiert sie NICHT.
+        data: body.data ?? {},
       };
       try {
         await deps.caseStore.insertCase(created);

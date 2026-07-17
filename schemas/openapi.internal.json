@@ -109,6 +109,10 @@
                               { "type": "null" }
                             ]
                           },
+                          "data": {
+                            "additionalProperties": {},
+                            "type": "object"
+                          },
                           "openedAt": { "minLength": 1, "type": "string" },
                           "procedureId": { "minLength": 1, "type": "string" },
                           "procedureVersion": {
@@ -130,7 +134,8 @@
                           "version",
                           "subjectIds",
                           "openedAt",
-                          "closedAt"
+                          "closedAt",
+                          "data"
                         ],
                         "type": "object"
                       },
@@ -235,6 +240,7 @@
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "data": { "additionalProperties": {}, "type": "object" },
                   "procedureId": { "minLength": 1, "type": "string" },
                   "procedureVersion": { "minLength": 1, "type": "string" },
                   "state": { "minLength": 1, "type": "string" },
@@ -264,6 +270,7 @@
                         { "type": "null" }
                       ]
                     },
+                    "data": { "additionalProperties": {}, "type": "object" },
                     "openedAt": { "minLength": 1, "type": "string" },
                     "procedureId": { "minLength": 1, "type": "string" },
                     "procedureVersion": { "minLength": 1, "type": "string" },
@@ -282,7 +289,8 @@
                     "version",
                     "subjectIds",
                     "openedAt",
-                    "closedAt"
+                    "closedAt",
+                    "data"
                   ],
                   "type": "object"
                 }
@@ -399,6 +407,7 @@
                         { "type": "null" }
                       ]
                     },
+                    "data": { "additionalProperties": {}, "type": "object" },
                     "openedAt": { "minLength": 1, "type": "string" },
                     "procedureId": { "minLength": 1, "type": "string" },
                     "procedureVersion": { "minLength": 1, "type": "string" },
@@ -417,7 +426,8 @@
                     "version",
                     "subjectIds",
                     "openedAt",
-                    "closedAt"
+                    "closedAt",
+                    "data"
                   ],
                   "type": "object"
                 }
@@ -1335,6 +1345,7 @@
                         { "type": "null" }
                       ]
                     },
+                    "data": { "additionalProperties": {}, "type": "object" },
                     "openedAt": { "minLength": 1, "type": "string" },
                     "procedureId": { "minLength": 1, "type": "string" },
                     "procedureVersion": { "minLength": 1, "type": "string" },
@@ -1353,7 +1364,8 @@
                     "version",
                     "subjectIds",
                     "openedAt",
-                    "closedAt"
+                    "closedAt",
+                    "data"
                   ],
                   "type": "object"
                 }

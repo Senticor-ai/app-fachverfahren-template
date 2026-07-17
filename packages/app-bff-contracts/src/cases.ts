@@ -14,6 +14,10 @@ export const CaseDtoSchema = Type.Object(
     subjectIds: Type.Array(Type.String({ minLength: 1 })),
     openedAt: Type.String({ minLength: 1 }),
     closedAt: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+    // Fachliche NUTZLAST des Falls (z. B. Antragsdaten + Berechnung eines Antrags-Verfahrens).
+    // Für den Server OPAK: er interpretiert sie nicht und kann es nicht (die fachliche Config liegt
+    // ausserhalb seines rootDir). Der Client rechnet, der Server bewahrt auf und auditiert.
+    data: Type.Record(Type.String(), Type.Unknown()),
   },
   { additionalProperties: false },
 );
@@ -45,6 +49,9 @@ export const CaseCreateRequestSchema = Type.Object(
     // Initialzustand des Falls (aus dem Verfahren). Der Server generiert caseId/version=1/openedAt.
     state: Type.String({ minLength: 1 }),
     subjectIds: Type.Optional(Type.Array(Type.String({ minLength: 1 }))),
+    // OPTIONALE fachliche Nutzlast beim Anlegen (Antragsdaten + Berechnung eines Antrags-Verfahrens).
+    // Additiv: ein Dossier-Fall legt ohne `data` an und verhält sich unverändert.
+    data: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
   },
   { additionalProperties: false },
 );
