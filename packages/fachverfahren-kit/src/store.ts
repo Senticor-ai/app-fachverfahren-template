@@ -8,6 +8,7 @@ import { create, type StoreApi, type UseBoundStore } from "zustand";
 import type {
   LeistungConfig,
   Vorgang,
+  VorgangPersistence,
   VorgangPort,
   Transition,
 } from "./types.js";
@@ -34,16 +35,26 @@ export interface FachverfahrenStore<T> extends VorgangPort<T> {
   transitionsFrom(status: string, rolle?: string): Transition[];
 }
 
-/** Baut den Store für EINE Leistung. `jahr` injiziert (kein `new Date()` in der Logik → deterministisch/testbar). */
+/** Baut den Store für EINE Leistung. `jahr` injiziert (kein `new Date()` in der Logik → deterministisch/testbar).
+ *  `persistence` (optional): bindet den Store an eine Aufbewahrungs-Naht (PROD: HTTP gegen das BFF). Ist sie
+ *  gesetzt, ist der SERVER die Wahrheit — der DEV-`config.seed` entfällt, der Anfangs-Snapshot ist leer, bis
+ *  `laden()` hydriert. Ohne `persistence` bleibt alles wie bisher (In-Memory + Seed, rückwärtskompatibel). */
 export function createFachverfahrenStore<T = Record<string, unknown>>(
   config: LeistungConfig<T>,
-  opts: { jahr?: number; now?: () => string } = {},
+  opts: {
+    jahr?: number;
+    now?: () => string;
+    persistence?: VorgangPersistence<T>;
+  } = {},
 ): FachverfahrenStore<T> {
   const jahr = opts.jahr ?? 2026;
   const now = opts.now ?? (() => new Date().toISOString());
+  const persistence = opts.persistence;
   const vorgangsnummer = makeVorgangsnummer(jahr);
 
-  const seed = config.seed?.({ vorgangsnummer }) ?? [];
+  // Mit Persistenz kommt der Bestand vom Server (via laden()) — der DEV-Seed wäre dann eine zweite,
+  // divergierende Wahrheit. Ohne Persistenz seedet die Config wie bisher.
+  const seed = persistence ? [] : (config.seed?.({ vorgangsnummer }) ?? []);
   const use = create<{ vorgaenge: Vorgang<T>[] }>(() => ({ vorgaenge: seed }));
 
   const setState = (fn: (s: Vorgang<T>[]) => Vorgang<T>[]) =>
@@ -62,6 +73,17 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
 
     list: () => use.getState().vorgaenge,
     get: (id) => use.getState().vorgaenge.find((v) => v.id === id),
+
+    // Hydriert den Snapshot aus der Persistenz-Naht (PROD: GET). Ohne Persistenz ein no-op — der
+    // In-Memory-Store trägt seinen Bestand bereits selbst (Seed + eingereichte Vorgänge).
+    ...(persistence
+      ? {
+          laden: async () => {
+            const vorgaenge = await persistence.laden();
+            use.setState({ vorgaenge });
+          },
+        }
+      : {}),
 
     // ASYNC nur der SIGNATUR nach: dieser DEV-Store rechnet rein lokal und synchron. Der Vertrag ist
     // async, damit die PROD-Implementierung (HTTP gegen das BFF) überhaupt typisierbar ist — vorher
@@ -107,6 +129,15 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
           { ts: now(), aktion: "Antrag eingegangen", rolle: "buerger" },
         ],
       };
+      // Mit Persistenz: erst SPEICHERN, dann den kanonischen Vorgang (Server vergibt id/Nummer/Zeit) in
+      // den Snapshot übernehmen. Der Server ist die Quelle der id — sonst zeigte die Bestätigungsseite eine
+      // Client-id, die nach einem Reload nicht mehr existierte. Wirft die Persistenz (Netz/403/…), landet
+      // NICHTS im Snapshot und der Fehler propagiert an den Aufrufer (AntragStepper meldet ihn sichtbar).
+      if (persistence) {
+        const kanonisch = await persistence.einreichen(v);
+        setState((vs) => [kanonisch, ...vs]);
+        return kanonisch;
+      }
       setState((vs) => [v, ...vs]);
       return v;
     },

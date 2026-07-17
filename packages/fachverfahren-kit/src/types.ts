@@ -707,6 +707,26 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
 }
 
 /**
+ * PERSISTENZ-NAHT des Vorgang-Stores — die dünne Grenze zwischen fachlicher Berechnung (bleibt im
+ * Kit-Store, EIN Ort) und Aufbewahrung (In-Memory-DEV vs. HTTP gegen das BFF).
+ *
+ * WARUM HIER und nicht als zweite Store-Implementierung: die Vorgang-Konstruktion (abgeleitete Felder,
+ * Tarif-BERECHNUNG, Nachweis-Reconcile) ist Domänen-Logik, die der Server nicht kann (seine rootDir-
+ * Mauer sperrt die fachliche Config aus). Sie darf deshalb NICHT in einem HTTP-Port dupliziert werden.
+ * Der Store rechnet den Vorgang wie bisher und übergibt das FERTIGE Ergebnis an diese Naht — „der
+ * Client rechnet, der Server bewahrt auf".
+ */
+export interface VorgangPersistence<TAntragsdaten = Record<string, unknown>> {
+  /** Lädt die persistierten Vorgänge (PROD: GET /api/buerger/antraege). Bestimmt den Anfangs-Snapshot;
+   *  ersetzt den DEV-`config.seed` (der Server ist dann die Wahrheit, nicht die Config). */
+  laden(): Promise<Vorgang<TAntragsdaten>[]>;
+  /** Persistiert einen neu eingereichten (bereits FERTIG gerechneten) Vorgang und gibt die KANONISCHE
+   *  Fassung zurück — der Server vergibt id/vorgangsnummer/Eingangszeitpunkt verbindlich. Der Store
+   *  übernimmt die Rückgabe in den Snapshot, damit ein Reload später denselben Vorgang findet. */
+  einreichen(vorgang: Vorgang<TAntragsdaten>): Promise<Vorgang<TAntragsdaten>>;
+}
+
+/**
  * DATENSCHICHT-PORT — die EINE Schnittstelle, die der Kit nutzt. DEV: Zustand-Store (In-Memory).
  * PROD: HTTP gegen das BFF.
  *

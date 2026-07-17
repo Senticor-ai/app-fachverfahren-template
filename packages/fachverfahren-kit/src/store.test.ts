@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createFachverfahrenStore } from "./store.js";
-import type { LeistungConfig } from "./types.js";
+import type { LeistungConfig, Vorgang } from "./types.js";
 
 // Der SCHREIBPFAD des Stores war vollständig ungetestet — genau der Pfad, den die Bürger-Journey nutzt
 // (Antrag absenden → Sachbearbeitung entscheidet). Diese Datei nagelt den Port-Vertrag fest, inklusive
@@ -136,5 +136,80 @@ describe("VorgangPort — Schreibpfad", () => {
     });
     await expect(s.lookupRegister("gibt-es-nicht")).resolves.toBeUndefined();
     await expect(s.lookupRegister("")).resolves.toBeUndefined();
+  });
+});
+
+describe("VorgangPort — Persistenz-Naht", () => {
+  it("ohne Persistenz: der DEV-Seed trägt den Bestand, laden() gibt es nicht", () => {
+    const mitSeed = createFachverfahrenStore(
+      { ...config, seed: () => [] as never[] },
+      { now: () => "2026-01-01T00:00:00.000Z" },
+    );
+    // Ohne Persistenz existiert kein laden() (optionale Port-Methode) — rückwärtskompatibel.
+    expect(mitSeed.laden).toBeUndefined();
+  });
+
+  it("mit Persistenz: der Seed ENTFÄLLT (der Server ist die Wahrheit), laden() hydriert den Snapshot", async () => {
+    const persistierte: Vorgang[] = [
+      {
+        id: "case.remote-1",
+        vorgangsnummer: "FV-2026-9999",
+        eingangIso: "2026-05-01T00:00:00.000Z",
+        antragsdaten: { name: "Remote" },
+        status: "in_pruefung",
+        nachweise: [],
+        history: [],
+      },
+    ];
+    const persistence = {
+      laden: async () => persistierte,
+      einreichen: async (v: Vorgang) => v,
+    };
+    // Diese Config HAT einen Seed — mit Persistenz darf er NICHT erscheinen.
+    const s = createFachverfahrenStore(
+      { ...config, seed: () => [{ id: "seed-1" }] as never },
+      { now: () => "2026-01-01T00:00:00.000Z", persistence },
+    );
+    expect(s.list()).toEqual([]); // KEIN Seed
+    await s.laden!();
+    expect(s.list().map((v) => v.id)).toEqual(["case.remote-1"]);
+  });
+
+  it("mit Persistenz: einreichen SPEICHERT und übernimmt die KANONISCHE Fassung (Server-id), nicht die Client-id", async () => {
+    const gespeichert: Vorgang[] = [];
+    const persistence = {
+      laden: async () => gespeichert,
+      // Der Server ersetzt die Client-id durch seine kanonische caseId.
+      einreichen: async (v: Vorgang) => {
+        const kanonisch = { ...v, id: "case.server-vergeben" };
+        gespeichert.push(kanonisch);
+        return kanonisch;
+      },
+    };
+    const s = createFachverfahrenStore(config, {
+      now: () => "2026-01-01T00:00:00.000Z",
+      persistence,
+    });
+    const v = await s.einreichen({ name: "Muster" });
+    // Der Snapshot trägt die SERVER-id — sonst zeigte die Bestätigung eine id, die ein Reload nicht fände.
+    expect(v.id).toBe("case.server-vergeben");
+    expect(s.get("case.server-vergeben")?.id).toBe("case.server-vergeben");
+    expect(gespeichert).toHaveLength(1);
+  });
+
+  it("mit Persistenz: schlägt das Speichern fehl, landet NICHTS im Snapshot und der Fehler propagiert", async () => {
+    const persistence = {
+      laden: async () => [],
+      einreichen: async () => {
+        throw new Error("403 Vier-Augen / Netz / …");
+      },
+    };
+    const s = createFachverfahrenStore(config, {
+      now: () => "2026-01-01T00:00:00.000Z",
+      persistence,
+    });
+    await expect(s.einreichen({ name: "Muster" })).rejects.toThrow();
+    // Fail-loud: kein halb-gespeicherter Vorgang im Snapshot.
+    expect(s.list()).toEqual([]);
   });
 });
