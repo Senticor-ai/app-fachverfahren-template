@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card.js";
 import { Skeleton, SkeletonCard } from "../ui/skeleton.js";
 import { EmptyState } from "./EmptyState.js";
 import { useStatusRegion } from "./StatusRegion.js";
+import { kiKennzahlen } from "../lib/ki-kennzahlen.js";
 
 export interface ReportingPanelProps<T = Record<string, unknown>> {
   vorgaenge: Vorgang<T>[];
@@ -59,18 +60,8 @@ function summiereBetraege<T>(vorgaenge: Vorgang<T>[]): {
   return { summe, einheit, anzahl };
 }
 
-/** KI-autonom-Quote: Anteil der Vorgänge mit Konfidenz >= Schwelle UND ohne Flags am Gesamtbestand. */
-function kiAutonomQuote<T>(
-  vorgaenge: Vorgang<T>[],
-  schwelle: number,
-): { autonom: number; quote: number } {
-  if (vorgaenge.length === 0) return { autonom: 0, quote: 0 };
-  let autonom = 0;
-  for (const v of vorgaenge) {
-    if (v.ki.confidence >= schwelle && v.ki.flags.length === 0) autonom += 1;
-  }
-  return { autonom, quote: autonom / vorgaenge.length };
-}
+// Die KI-Aggregation lebt in lib/ki-kennzahlen (EINE Wahrheit, geteilt mit AufsichtDashboard) — sie
+// war hier lokal nachgebaut und teilte durch den Gesamtbestand statt durch die bewerteten Vorgänge.
 
 // ── Format-Helfer ────────────────────────────────────────────────────────────────────────────────
 
@@ -203,7 +194,7 @@ export function ReportingPanel<T = Record<string, unknown>>({
 
   const schwelle = config.ki?.schwelleAutonom ?? 1;
   const ki = useMemo(
-    () => kiAutonomQuote(vorgaenge, schwelle),
+    () => kiKennzahlen(vorgaenge, schwelle),
     [vorgaenge, schwelle],
   );
 
@@ -332,11 +323,16 @@ export function ReportingPanel<T = Record<string, unknown>>({
         />
         <KpiKarte
           titel="KI-autonom-Quote"
-          wert={gesamt > 0 ? `${prozent(ki.quote)} %` : "—"}
+          // Bezugsgröße ist `ki.bewertet` (Vorgänge MIT Modell-Bewertung), nicht `gesamt`: ohne
+          // gebundenen Adapter ist kein Vorgang bewertet — dann ist die Quote bezugslos und die
+          // Kachel sagt das offen, statt „0 %" wie einen Messwert auszuweisen.
+          wert={ki.bewertet > 0 ? `${prozent(ki.quote)} %` : "—"}
           sub={
-            gesamt > 0
-              ? `${ki.autonom} von ${gesamt} · Konfidenz ≥ ${prozent(schwelle)} %, ohne Hinweise`
-              : "kein Bestand"
+            ki.bewertet > 0
+              ? `${ki.autonom} von ${ki.bewertet} bewertet · Konfidenz ≥ ${prozent(schwelle)} %, ohne Hinweise`
+              : gesamt > 0
+                ? "kein KI-Modell aktiv"
+                : "kein Bestand"
           }
           icon={
             <Sparkles className="h-4 w-4 text-status-info" aria-hidden="true" />

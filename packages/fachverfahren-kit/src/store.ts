@@ -64,7 +64,10 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
     get: (id) => use.getState().vorgaenge.find((v) => v.id === id),
 
     einreichen: (antragsdaten, erbrachteNachweise) => {
-      const ki = { confidence: 0, flags: [] as string[] };
+      // KEINE KI-Einschätzung: an diesen Store ist KEIN Modell gebunden (der AiAssistPort ist eine
+      // Naht ohne Adapter). Die Vorfassung schrieb hier hart `{confidence: 0, flags: []}` — das las
+      // sich in der Aufsicht als „die KI war zu 0 % sicher" statt „es lief gar keine KI". `ki` bleibt
+      // deshalb UNGESETZT, bis ein Adapter den Vorgang wirklich bewertet.
       // DEFENSIV wie transitionsFrom (fail-closed gegen unvollständig generierte Config): OHNE Initial-Status kann kein
       // Vorgang eröffnet werden — sprechender Fehler statt stiller TypeError, der die Bürger-Navigation verschluckt.
       const initialStatus = config.statusMachine?.initial;
@@ -90,7 +93,6 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
         status: initialStatus,
         // berechnung ist optional — unter exactOptionalPropertyTypes nur setzen, wenn vorhanden.
         ...(berechnung ? { berechnung } : {}),
-        ki,
         // NACHWEIS-RECONCILE (Wurzel-Fix „hochgeladener Nachweis landet nicht beim Sachbearbeiter"): die aus der Config
         // abgeleitete SOLL-Liste mit den TATSÄCHLICH eingereichten Dateien (keyed by Nachweis-Id) mergen — wo ein Upload
         // existiert, hochgeladen:true + Datei-Metadaten ablegen. Rein data-driven über die Id, kein Verfahrens-Literal.

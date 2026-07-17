@@ -212,12 +212,17 @@ export const leistungConfig: LeistungConfig = {
     },
   ],
   ki: { schwelleAutonom: 0.9 },
+  // DEMO-SEED OHNE KI-BEWERTUNG: an dieses Musterverfahren ist KEIN Modell gebunden (der AiAssistPort
+  // ist eine Naht ohne Adapter) — also ist kein Vorgang bewertet, und `ki` bleibt ungesetzt. Die
+  // Vorfassung stempelte hier frei erfundene Konfidenzen (0.94/0.72/0.55) auf die Demo-Vorgänge; das
+  // Aufsicht-Dashboard mittelte sie zu „Ø KI-Konfidenz 94 %" und wies eine Modell-Leistung aus, die
+  // nie gemessen wurde. Sobald ein Adapter Vorgänge WIRKLICH bewertet, füllen sich die Kennzahlen
+  // von selbst — bis dahin zeigen sie ehrlich „kein KI-Modell aktiv".
   seed: ({ vorgangsnummer }) => {
     const mk = (
       min: number,
       status: string,
       antragsdaten: MusterAntrag,
-      ki?: { confidence: number; flags: string[] },
     ): Vorgang<MusterAntrag> => {
       const vn = vorgangsnummer();
       return {
@@ -229,7 +234,6 @@ export const leistungConfig: LeistungConfig = {
         antragsdaten,
         status,
         berechnung: berechneDemo(antragsdaten),
-        ki: ki ?? { confidence: 0.94, flags: [] },
         nachweise: [],
         history: [
           {
@@ -251,35 +255,25 @@ export const leistungConfig: LeistungConfig = {
         },
         anliegen: { kategorie: "standard" },
       }),
-      mk(
-        180,
-        "in_pruefung",
-        {
-          antragsteller: {
-            vorname: "Kim",
-            nachname: "Beispiel",
-            plz: "12347",
-            ort: "Musterstadt",
-            bekannt: true,
-          },
-          anliegen: { kategorie: "express" },
+      mk(180, "in_pruefung", {
+        antragsteller: {
+          vorname: "Kim",
+          nachname: "Beispiel",
+          plz: "12347",
+          ort: "Musterstadt",
+          bekannt: true,
         },
-        { confidence: 0.72, flags: ["angabe_unklar"] },
-      ),
-      mk(
-        600,
-        "review_noetig",
-        {
-          antragsteller: {
-            vorname: "Sam",
-            nachname: "Vorlage",
-            plz: "12345",
-            ort: "Musterstadt",
-          },
-          anliegen: { kategorie: "standard" },
+        anliegen: { kategorie: "express" },
+      }),
+      mk(600, "review_noetig", {
+        antragsteller: {
+          vorname: "Sam",
+          nachname: "Vorlage",
+          plz: "12345",
+          ort: "Musterstadt",
         },
-        { confidence: 0.55, flags: ["nachweis_fehlt"] },
-      ),
+        anliegen: { kategorie: "standard" },
+      }),
       mk(1440, "festgesetzt", {
         antragsteller: {
           vorname: "Toni",

@@ -161,6 +161,10 @@ export * from "./components/AgentTrace.js";
 export * from "./components/ToolCallCard.js";
 export * from "./components/AssistentPanel.js";
 
+// ── KI-Kennzahlen: EINE reine Aggregations-Wahrheit. Quoten beziehen sich IMMER auf die BEWERTETEN
+//    Vorgänge; `aktiv: false` = kein Modell gebunden → Sichten zeigen „—", nie eine erfundene 0. ──
+export * from "./lib/ki-kennzahlen.js";
+
 // ── KI-Steuerung: der Mensch schaltet die KI (Präferenz-Schicht), humanOversight unabschaltbar; localStorage-Hook. ──
 export * from "./lib/ki-steuerung.js";
 export * from "./hooks/useKiSteuerung.js";

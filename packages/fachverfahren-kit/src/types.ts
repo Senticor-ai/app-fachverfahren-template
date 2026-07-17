@@ -117,7 +117,14 @@ export interface Vorgang<TAntragsdaten = Record<string, unknown>> {
   antragsdaten: TAntragsdaten;
   status: string; // ein Schlüssel aus config.statusMachine.states
   berechnung?: Berechnung;
-  ki: KiEinschaetzung;
+  /** Die KI-Einschätzung — OPTIONAL, und die Abwesenheit ist eine EIGENE Aussage: „kein Modell hat
+   *  diesen Vorgang bewertet". Das ist NICHT dasselbe wie `confidence: 0` („ein Modell lief und war
+   *  unsicher"). Vorfassung: Pflichtfeld — dadurch MUSSTE jeder Schreibpfad einen Wert erfinden
+   *  (echter Antrag: hart 0, Demo-Seed: hart 0.94), und das Aufsicht-Dashboard mittelte beide zu
+   *  einer KI-Leistungskennzahl, die nie jemand gemessen hat. Auswertende Sichten MÜSSEN daher
+   *  über `ki !== undefined` filtern und die Bezugsgröße ausweisen (n von m bewertet), statt
+   *  Unbewertetes als Null zu zählen. */
+  ki?: KiEinschaetzung;
   nachweise: Nachweis[];
   history: VorgangHistorie[];
 }

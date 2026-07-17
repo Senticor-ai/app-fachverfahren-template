@@ -4,12 +4,7 @@
 // (verschachtelte Pfade in `vorgang.antragsdaten`), nicht aus Domänen-Literalen. Ein zweites Verfahren
 // rendert unverändert.
 import { Database, FileText, Sparkles } from "lucide-react";
-import type {
-  DetailSektion,
-  KiEinschaetzung,
-  LeistungConfig,
-  Vorgang,
-} from "../types.js";
+import type { DetailSektion, LeistungConfig, Vorgang } from "../types.js";
 import { cn } from "../lib/cn.js";
 import { formatBetrag as formatBetragKit } from "../format.js";
 import { KiVorschlag } from "./KiVorschlag.js";
@@ -93,10 +88,12 @@ function BerechnungsKarte({
   flagLabel?: (flag: string) => string;
 }) {
   const b = vorgang.berechnung;
-  // Begründung der Subsumtion in die KI-Anzeige spiegeln (KI assistiert, Mensch entscheidet).
-  const ki: KiEinschaetzung = b?.begruendung
-    ? { ...vorgang.ki, begruendung: vorgang.ki.begruendung ?? b.begruendung }
-    : vorgang.ki;
+  // HERKUNFT NICHT VERWISCHEN: `berechnung` stammt aus dem REINEN Interpreter (die `tarif`-Regeln der
+  // Config), nicht aus einem Modell — deshalb heißt diese Karte „Berechnungsvorschlag" und nicht
+  // „KI-Vorschlag". Die Vorfassung trug die KI-Überschrift über der Regel-Ausgabe und spiegelte
+  // zusätzlich `b.begruendung` in die KI-Einschätzung; damit sah deterministische Subsumtion wie
+  // Modell-Leistung aus. Die KI-Einschätzung wird DARUNTER separat gezeigt — nur wenn es sie gibt.
+  const ki = vorgang.ki;
 
   return (
     <section className="overflow-hidden rounded-md border border-status-info/30 bg-status-info-soft">
@@ -104,7 +101,7 @@ function BerechnungsKarte({
         <div className="min-w-0">
           <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-status-info">
             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-            KI-Vorschlag · Sie entscheiden
+            Berechnungsvorschlag · Sie entscheiden
           </span>
           {b && (
             <>
@@ -139,13 +136,17 @@ function BerechnungsKarte({
           )}
         </div>
       </div>
-      <div className="border-t border-status-info/20 bg-card/40 p-3">
-        <KiVorschlag
-          ki={ki}
-          {...(schwelleAutonom !== undefined ? { schwelleAutonom } : {})}
-          {...(flagLabel ? { flagLabel } : {})}
-        />
-      </div>
+      {/* KI-Einschätzung NUR bei tatsächlicher Bewertung: ohne gebundenes Modell bleibt `ki`
+          ungesetzt — dann entfällt der Block, statt eine 0-Konfidenz zu zeigen, die es nie gab. */}
+      {ki ? (
+        <div className="border-t border-status-info/20 bg-card/40 p-3">
+          <KiVorschlag
+            ki={ki}
+            {...(schwelleAutonom !== undefined ? { schwelleAutonom } : {})}
+            {...(flagLabel ? { flagLabel } : {})}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }

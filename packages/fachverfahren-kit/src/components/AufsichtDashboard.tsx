@@ -15,6 +15,7 @@ import { Badge } from "../ui/badge.js";
 import { SkeletonCard, SkeletonTable } from "../ui/skeleton.js";
 import { EmptyState } from "./EmptyState.js";
 import { useStatusRegion } from "./StatusRegion.js";
+import { kiBezugText, kiKennzahlen } from "../lib/ki-kennzahlen.js";
 import type {
   LeistungConfig,
   StatusDef,
@@ -120,23 +121,17 @@ export function AufsichtDashboard<T = Record<string, unknown>>({
     }));
   }, [vorgaenge]);
 
-  // ── KI-/Autonomie-Quote: Anteil „autonom-fähig" = confidence ≥ Schwelle UND 0 Flags ──
-  const autonomFaehig = React.useMemo(
-    () =>
-      vorgaenge.filter(
-        (v) => v.ki.confidence >= schwelle && v.ki.flags.length === 0,
-      ).length,
+  // ── KI-Kennzahlen: EINE geteilte Wahrheit (lib/ki-kennzahlen) ────────────────────────────────
+  // Die Aggregation ist bewusst KEIN Komponenten-Detail: ReportingPanel zeigt dieselben Quoten und
+  // rechnete sie früher unabhängig nach — beide über `vorgaenge.length` statt über die bewerteten.
+  // `aktiv: false` heißt „kein Modell gebunden" → die Kacheln zeigen „—", nie eine 0, die wie ein
+  // Messwert aussieht.
+  const ki = React.useMemo(
+    () => kiKennzahlen(vorgaenge, schwelle),
     [vorgaenge, schwelle],
   );
-  const autonomQuote = total ? Math.round((autonomFaehig / total) * 100) : 0;
-  const avgConfidence = total
-    ? Math.round(
-        (vorgaenge.reduce((s, v) => s + v.ki.confidence, 0) / total) * 100,
-      )
-    : 0;
-  // Anteil Vorgänge mit mindestens einem KI-Flag (= Review-Indikator).
-  const mitFlags = vorgaenge.filter((v) => v.ki.flags.length > 0).length;
-  const flagQuote = total ? Math.round((mitFlags / total) * 100) : 0;
+  const prozent = (quote: number): string => `${Math.round(quote * 100)}%`;
+  const kiBezug = kiBezugText(ki);
 
   // ── Audit-Trail: letzte History-Einträge über ALLE Vorgänge, pseudonymisiert, ohne PII ──
   const auditTrail = React.useMemo(() => {
@@ -194,17 +189,20 @@ export function AufsichtDashboard<T = Record<string, unknown>>({
             <Kpi label="Vorgänge gesamt" value={String(total)} />
             <Kpi
               label="Autonom-fähig-Quote"
-              value={`${autonomQuote}%`}
+              value={ki.aktiv ? prozent(ki.autonomQuote) : "—"}
+              hint={kiBezug}
               tone="ok"
             />
             <Kpi
               label="Review-Indikator (Flags)"
-              value={`${flagQuote}%`}
+              value={ki.aktiv ? prozent(ki.flagQuote) : "—"}
+              hint={kiBezug}
               tone="warn"
             />
             <Kpi
               label="Ø KI-Konfidenz"
-              value={`${avgConfidence}%`}
+              value={ki.aktiv ? prozent(ki.avgConfidence) : "—"}
+              hint={kiBezug}
               tone="info"
             />
           </div>
@@ -340,8 +338,12 @@ interface KpiProps {
   label: string;
   value: string;
   tone?: StatusTone;
+  /** Bezugsgröße/Einordnung unter dem Wert (z. B. „3 von 12 bewertet", „kein KI-Modell aktiv").
+   *  Eine Quote ohne Bezugsgröße ist nicht interpretierbar — und ein „—" braucht die Erklärung,
+   *  WARUM nicht gemessen wurde. */
+  hint?: string;
 }
-function Kpi({ label, value, tone }: KpiProps): React.ReactElement {
+function Kpi({ label, value, tone, hint }: KpiProps): React.ReactElement {
   return (
     <Card className={tone ? TONE_BORDER[tone] : "border-border"}>
       <CardContent className="p-4">
@@ -351,6 +353,9 @@ function Kpi({ label, value, tone }: KpiProps): React.ReactElement {
         <div className="mt-1 text-2xl font-semibold text-foreground">
           {value}
         </div>
+        {hint ? (
+          <div className="mt-1 text-xs text-muted-foreground">{hint}</div>
+        ) : null}
       </CardContent>
     </Card>
   );
