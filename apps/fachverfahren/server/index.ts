@@ -3,7 +3,7 @@
 // Shutdown) lebt im Paket; hier stehen nur App-Identität, Store-Konstruktion und die
 // Registrierung der App-Routen über die Registrar-Naht. Die Exporte bleiben stabil
 // (index.test.ts, tests/e2e/personas.e2e.test.ts importieren sie).
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import fastifyCookie from "@fastify/cookie";
 import {
@@ -57,8 +57,16 @@ import { registerUserRoutes } from "./users/routes.js";
 
 // App-Identität: der Renderer schreibt Domain-Token beim Scaffolding um — deshalb stehen
 // sie HIER (consumer-seitig) und nicht im template-verwalteten Runtime-Paket.
+//
+// STATIC-DIR MODUL-RELATIV, NICHT cwd-relativ: eine App darf NICHT davon abhängen, aus WELCHEM Verzeichnis sie
+// gestartet wird. Die Vorfassung nahm `process.cwd()` = Repo-Wurzel an — aber `start` ist `node dist-server/index.js`
+// und läuft aus dem APP-Verzeichnis. Ergebnis: apps/fachverfahren + "apps/fachverfahren/dist" = VERDOPPELT →
+// „ENOENT … /apps/fachverfahren/apps/fachverfahren/dist/index.html" → runtime.startup.failed → die App bootet NICHT
+// (am E2E-Lauf belegt: Boot-Smoke ✗ health 500). Das Modul kennt seinen eigenen Ort: dist-server/index.js → ../dist
+// und server/index.ts (dev) → ../dist treffen BEIDE das richtige Verzeichnis, unabhängig von der cwd.
+const APP_DIR = path.dirname(path.dirname(fileURLToPath(import.meta.url))); // dist-server/… bzw. server/… → App-Wurzel
 const APP_IDENTITY = {
-  defaultStaticDir: path.join(process.cwd(), "apps/fachverfahren/dist"),
+  defaultStaticDir: path.join(APP_DIR, "dist"),
   applicationId: "fachverfahren",
   displayName: "Fachverfahren",
 };
