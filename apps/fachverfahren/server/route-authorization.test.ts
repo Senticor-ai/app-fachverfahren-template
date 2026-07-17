@@ -169,6 +169,25 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           url: "/api/tasks/:id",
           policy: "rbac:case.decision.prepare",
         },
+        // Bürger-Sicht auf die EIGENEN Anträge: eine eigene Routen-Familie mit EIGENEN Permissions.
+        // Bewusst `rbac:` und NICHT `rbac-scoped:` wie die Mailbox — hier gibt es keine Scope-WAHL:
+        // die Route IST der Scope, er kommt nicht von der Leitung (scopeOf läse Query/Body).
+        // Und NIE `case.read`/`case.decision.prepare`: das sind die Behörden-Rechte über ALLE Fälle.
+        {
+          method: "GET",
+          url: "/api/buerger/antraege",
+          policy: "rbac:case.own.read",
+        },
+        {
+          method: "POST",
+          url: "/api/buerger/antraege",
+          policy: "rbac:case.own.submit",
+        },
+        {
+          method: "GET",
+          url: "/api/buerger/antraege/:id",
+          policy: "rbac:case.own.read",
+        },
         {
           method: "GET",
           url: "/api/mailbox",

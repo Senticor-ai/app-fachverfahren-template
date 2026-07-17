@@ -54,6 +54,19 @@ export const builtInPermissions = {
     permission: "case.decision.prepare",
     description: "Entscheidung vorbereiten",
   },
+  // ── Bürger-Sicht auf EIGENE Vorgänge ──────────────────────────────────────────────────────────
+  // Bewusst EIGENE Permissions statt `case.read` für die Bürgerrolle: `case.read` ist die
+  // BEHÖRDEN-Sicht und listet alle Vorgänge der Behörde — sie an Bürger:innen zu geben wäre ein
+  // Totalverlust. Namens- und Schnittmuster folgen `mailbox.own.*` (die Präzedenz für „nur meins").
+  // Lesen und Einreichen sind GETRENNT: ein Schreibrecht darf nie auf einem Leserecht mitreiten.
+  caseOwnRead: {
+    permission: "case.own.read",
+    description: "Eigene Vorgänge lesen",
+  },
+  caseOwnSubmit: {
+    permission: "case.own.submit",
+    description: "Eigenen Antrag einreichen",
+  },
 } as const satisfies Record<string, RbacPermission>;
 
 export const builtInRbacRegistry = {
@@ -69,6 +82,9 @@ export const builtInRbacRegistry = {
         builtInPermissions.preferencesWrite,
         builtInPermissions.mailboxOwnRead,
         builtInPermissions.mailboxOwnWrite,
+        // NUR die eigenen Vorgänge — NIE `case.read` (das ist die Behörden-Sicht über ALLE Fälle).
+        builtInPermissions.caseOwnRead,
+        builtInPermissions.caseOwnSubmit,
       ],
       builtIn: true,
     },

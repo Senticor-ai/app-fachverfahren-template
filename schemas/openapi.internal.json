@@ -7,6 +7,417 @@
   },
   "openapi": "3.0.3",
   "paths": {
+    "/api/buerger/antraege": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "antraege": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "abgeschlossenAm": {
+                            "anyOf": [
+                              { "minLength": 1, "type": "string" },
+                              { "type": "null" }
+                            ]
+                          },
+                          "antragId": { "minLength": 1, "type": "string" },
+                          "data": {
+                            "additionalProperties": {},
+                            "type": "object"
+                          },
+                          "eingereichtAm": { "minLength": 1, "type": "string" },
+                          "procedureId": { "minLength": 1, "type": "string" },
+                          "procedureVersion": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "state": { "minLength": 1, "type": "string" },
+                          "version": { "minimum": 1, "type": "integer" }
+                        },
+                        "required": [
+                          "antragId",
+                          "procedureId",
+                          "procedureVersion",
+                          "state",
+                          "version",
+                          "eingereichtAm",
+                          "abgeschlossenAm",
+                          "data"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["antraege"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Die eigenen Anträge lesen",
+        "tags": ["buerger"]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "data": { "additionalProperties": {}, "type": "object" },
+                  "procedureId": { "minLength": 1, "type": "string" },
+                  "procedureVersion": { "minLength": 1, "type": "string" }
+                },
+                "required": ["procedureId", "procedureVersion", "data"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "abgeschlossenAm": {
+                      "anyOf": [
+                        { "minLength": 1, "type": "string" },
+                        { "type": "null" }
+                      ]
+                    },
+                    "antragId": { "minLength": 1, "type": "string" },
+                    "data": { "additionalProperties": {}, "type": "object" },
+                    "eingereichtAm": { "minLength": 1, "type": "string" },
+                    "procedureId": { "minLength": 1, "type": "string" },
+                    "procedureVersion": { "minLength": 1, "type": "string" },
+                    "state": { "minLength": 1, "type": "string" },
+                    "version": { "minimum": 1, "type": "integer" }
+                  },
+                  "required": [
+                    "antragId",
+                    "procedureId",
+                    "procedureVersion",
+                    "state",
+                    "version",
+                    "eingereichtAm",
+                    "abgeschlossenAm",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Einen eigenen Antrag einreichen",
+        "tags": ["buerger"]
+      }
+    },
+    "/api/buerger/antraege/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "abgeschlossenAm": {
+                      "anyOf": [
+                        { "minLength": 1, "type": "string" },
+                        { "type": "null" }
+                      ]
+                    },
+                    "antragId": { "minLength": 1, "type": "string" },
+                    "data": { "additionalProperties": {}, "type": "object" },
+                    "eingereichtAm": { "minLength": 1, "type": "string" },
+                    "procedureId": { "minLength": 1, "type": "string" },
+                    "procedureVersion": { "minLength": 1, "type": "string" },
+                    "state": { "minLength": 1, "type": "string" },
+                    "version": { "minimum": 1, "type": "integer" }
+                  },
+                  "required": [
+                    "antragId",
+                    "procedureId",
+                    "procedureVersion",
+                    "state",
+                    "version",
+                    "eingereichtAm",
+                    "abgeschlossenAm",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Einen eigenen Antrag lesen",
+        "tags": ["buerger"]
+      }
+    },
     "/api/capabilities": {
       "get": {
         "responses": {
@@ -2451,6 +2862,13 @@
       "description": "Benutzereinstellungen (eigenes Konto)",
       "name": "preferences"
     },
-    { "description": "Postfach (eigenes bzw. behördliches)", "name": "mailbox" }
+    {
+      "description": "Postfach (eigenes bzw. behördliches)",
+      "name": "mailbox"
+    },
+    {
+      "description": "Bürger-Sicht auf die EIGENEN Anträge (Eigentümerschaft ausschliesslich aus der Sitzung)",
+      "name": "buerger"
+    }
   ]
 }

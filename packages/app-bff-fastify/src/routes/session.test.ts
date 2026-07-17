@@ -80,7 +80,7 @@ describe("GET /api/session", () => {
 });
 
 describe("GET /api/capabilities", () => {
-  it("liefert sortierte Permissions inkl. der neuen Mailbox-Schreibrechte", async () => {
+  it("liefert sortierte Permissions inkl. Mailbox-Schreibrechte und der EIGENEN Vorgänge", async () => {
     ({ app } = await buildBffApp({ session: citizenSession() }));
     const response = await app.inject({
       method: "GET",
@@ -90,12 +90,18 @@ describe("GET /api/capabilities", () => {
     const body = response.json();
     expect(body.rbacRoles).toEqual(["citizen"]);
     expect(body.permissions).toEqual([
+      // Die Bürgerrolle darf ihre EIGENEN Vorgänge lesen/einreichen — aber NIE `case.read`:
+      // das ist die Behörden-Sicht über ALLE Fälle der Behörde.
+      "case.own.read",
+      "case.own.submit",
       "mailbox.own.read",
       "mailbox.own.write",
       "preferences.read",
       "preferences.write",
       "session.read",
     ]);
+    expect(body.permissions).not.toContain("case.read");
+    expect(body.permissions).not.toContain("case.decision.prepare");
   });
 
   it("caseworker erhält die authority-Schreibrechte", async () => {

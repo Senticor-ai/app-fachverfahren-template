@@ -14,4 +14,9 @@ export const openApiTags = [
   { name: "session", description: "Sitzung und aufgelöste Berechtigungen" },
   { name: "preferences", description: "Benutzereinstellungen (eigenes Konto)" },
   { name: "mailbox", description: "Postfach (eigenes bzw. behördliches)" },
+  {
+    name: "buerger",
+    description:
+      "Bürger-Sicht auf die EIGENEN Anträge (Eigentümerschaft ausschliesslich aus der Sitzung)",
+  },
 ] as const;

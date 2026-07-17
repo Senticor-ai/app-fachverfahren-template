@@ -18,6 +18,7 @@ import type {
 import type { BffDeps } from "./deps.js";
 import { requestIdOf } from "./route-auth.js";
 import { registerCapabilitiesRoute } from "./routes/capabilities.js";
+import { registerBuergerRoutes } from "./routes/buerger.js";
 import { registerCaseRoutes } from "./routes/cases.js";
 import { registerMailboxRoutes } from "./routes/mailbox.js";
 import { registerPreferencesRoutes } from "./routes/preferences.js";
@@ -71,4 +72,6 @@ export async function appBff(
   registerMailboxRoutes(app, deps);
   registerCaseRoutes(app, deps);
   registerTaskRoutes(app, deps);
+  // Bürger-Sicht auf die EIGENEN Anträge (eigene Familie: der Scope ist durch die Route impliziert).
+  registerBuergerRoutes(app, deps);
 }

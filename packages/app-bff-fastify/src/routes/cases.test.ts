@@ -174,7 +174,10 @@ describe("BFF /api/cases", () => {
       caseStore: new InMemoryCaseStore(),
       procedureRegistry: createInMemoryProcedureRegistry([]),
     });
-    const res = await leer.app.inject({ method: "GET", url: "/api/procedures" });
+    const res = await leer.app.inject({
+      method: "GET",
+      url: "/api/procedures",
+    });
     expect(res.statusCode).toBe(200);
     expect(res.json().procedures).toEqual([]);
     await leer.app.close();

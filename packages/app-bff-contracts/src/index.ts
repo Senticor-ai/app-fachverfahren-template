@@ -77,4 +77,14 @@ export {
   type TaskPatchRequestDto,
   type TaskStateDto,
 } from "./tasks.js";
+export {
+  AntragDtoSchema,
+  AntragEinreichenRequestSchema,
+  AntragIdParamsSchema,
+  AntragListDtoSchema,
+  type AntragDto,
+  type AntragEinreichenRequestDto,
+  type AntragIdParamsDto,
+  type AntragListDto,
+} from "./buerger.js";
 export { openApiInfo, openApiTags } from "./openapi.js";
