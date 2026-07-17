@@ -197,4 +197,54 @@ describe("BFF POST /api/cases/:id/transitions", () => {
     expect(res.statusCode).toBe(403);
     await app.close();
   });
+
+  it("403 Vier-Augen bleibt bestehen, wenn ein FREMDES Ereignis dazwischenfunkt (Sperre gilt der Entscheidung, nicht der Reihenfolge)", async () => {
+    // ANGRIFF, den diese Prüfung fährt: die Vorfassung verglich gegen das JÜNGSTE Audit-Ereignis
+    // ohne Typ-Filter. Schreibt irgendein anderer Akteur nach dem Vorbereiter in den Fall-Strom,
+    // rutschte dessen Ereignis aus der letzten Position — und er durfte seine EIGENE Vorbereitung
+    // freigeben. Genau so ein Fremd-Ereignis entsteht zwangsläufig, sobald der Bescheid-Abruf des
+    // Bürgers auditiert wird (bekanntgabe-relevant). Hier steht stellvertretend ein Abruf-Ereignis.
+    const caseStore = new InMemoryCaseStore();
+    const { app } = await buildBffApp({
+      session: caseworkerSession(),
+      caseStore,
+      procedureRegistry: createInMemoryProcedureRegistry([procedure]),
+    });
+    const created = await createCase(app);
+    const aktiv = await app.inject({
+      method: "POST",
+      url: `/api/cases/${created.caseId}/transitions`,
+      payload: { action: "aktivieren", expectedVersion: created.version },
+    });
+    expect(aktiv.statusCode).toBe(200);
+
+    // Ein DRITTER Akteur schreibt ein NICHT-Bearbeitungs-Ereignis in denselben Fall-Strom.
+    const session = caseworkerSession();
+    await caseStore.appendAuditEvent({
+      auditEventId: "audit.fremd-abruf",
+      caseId: created.caseId,
+      tenantId: session.tenantId,
+      authorityId: session.authorityId,
+      jurisdictionId: session.jurisdictionId,
+      actorId: "actor.buerger-ganz-anders",
+      eventType: "bescheid.abgerufen",
+      purpose: "case-management",
+      legalBasisId: "VwV-IGM-2023",
+      requestId: "req.fremd",
+      payload: { summary: "Bürger hat den Bescheid abgerufen" },
+      occurredAt: new Date().toISOString(),
+    });
+
+    // Der Vorbereiter versucht erneut, SEINE eigene Vorbereitung freizugeben → muss weiterhin 403 sein.
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/cases/${created.caseId}/transitions`,
+      payload: {
+        action: "abschliessen",
+        expectedVersion: aktiv.json().version,
+      },
+    });
+    expect(res.statusCode).toBe(403);
+    await app.close();
+  });
 });

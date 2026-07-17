@@ -36,6 +36,24 @@ import type { BffDeps } from "../deps.js";
 import { bffRouteAuth, requestIdOf, sessionOf } from "../route-auth.js";
 import { storeUnavailable } from "../store-error.js";
 
+/**
+ * Die Ereignistypen, die einen BEARBEITUNGSSCHRITT AM FALL darstellen — und damit die einzigen, an denen
+ * sich die Vier-Augen-Sperre bemisst („wer diesen Schritt vorbereitet hat, gibt ihn nicht selbst frei").
+ *
+ * SICHERHEITSRELEVANT — beim Ergänzen eines neuen Fall-Audit-Ereignisses bewusst entscheiden:
+ *  - Ein Ereignis, das eine BEARBEITUNG durch eine bedienstete Person ist, gehört HIERHER.
+ *  - Ein Ereignis, das nur eine BEOBACHTUNG/Zustellung protokolliert (Bescheid-Abruf durch den Bürger,
+ *    Zustellnachweis, Lesebestätigung), gehört ausdrücklich NICHT hierher: sonst verschöbe der Abruf
+ *    durch einen Dritten die Bezugsgröße und der Vorbereiter dürfte seine eigene Entscheidung freigeben.
+ *
+ * Die Vorfassung hatte diese Menge nicht und nahm einfach das jüngste Ereignis — was genau so lange
+ * gutging, wie ausschliesslich Bearbeitungs-Ereignisse in den Strom liefen.
+ */
+const FOUR_EYES_RELEVANT_EVENT_TYPES: ReadonlySet<string> = new Set([
+  "case.opened",
+  "case.transitioned",
+]);
+
 /** AppCase → CaseDto (Server-Topologie tenant/authority/jurisdiction bleibt verborgen). */
 function toCaseDto(c: AppCase): CaseDto {
   return {
@@ -457,8 +475,18 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
           `invalid case transition: ${appCase.state}/${body.action}`,
         );
 
-      // Vier-Augen (root-cause: zwei verschiedene Personen): der Akteur des jüngsten Audit-Eintrags darf einen
-      // requiresFourEyes-Übergang nicht selbst auslösen. listAuditEvents ist aufsteigend nach occurredAt sortiert.
+      // Vier-Augen (root-cause: zwei verschiedene Personen): wer den letzten BEARBEITUNGSSCHRITT am Fall
+      // gemacht hat, darf den requiresFourEyes-Übergang nicht selbst auslösen.
+      //
+      // WARUM GEFILTERT WIRD: die Vorfassung nahm schlicht das JÜNGSTE Audit-Ereignis („events[length-1]")
+      // ohne Rücksicht auf dessen Typ. Damit war die Sperre keine Eigenschaft der ENTSCHEIDUNG, sondern
+      // davon, wer zuletzt IRGENDETWAS in den Fall-Strom schrieb — jeder neue Audit-Schreiber hätte sie
+      // ausgehebelt: schreibt ein beliebiger anderer Akteur (z. B. ein Bürger, der seinen Bescheid abruft —
+      // ein Vorgang, den die Bekanntgabe zwingend auditieren MUSS) nach dem Vorbereiter, rutscht dessen
+      // Ereignis aus der letzten Position und er dürfte seine EIGENE Vorbereitung freigeben. Heute fällt das
+      // nur nicht auf, weil zufällig ausschliesslich BEARBEITUNGS-Ereignisse in diesen Strom laufen.
+      // Die Sperre bezieht sich deshalb explizit auf die Ereignisse, die einen Bearbeitungsschritt am Fall
+      // DARSTELLEN — neue Ereignistypen (Abruf, Zustellung, Vermerk) verschieben die Bezugsgröße nicht mehr.
       if (transition.requiresFourEyes) {
         let events: AppAuditEvent[];
         try {
@@ -469,8 +497,13 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
         } catch {
           return storeUnavailable(request, reply);
         }
-        const latest = events[events.length - 1];
-        if (latest && latest.actorId === session.actorId)
+        // listAuditEvents ist aufsteigend nach occurredAt sortiert → der letzte Treffer ist der jüngste.
+        const bearbeitungsschritte = events.filter((e) =>
+          FOUR_EYES_RELEVANT_EVENT_TYPES.has(e.eventType),
+        );
+        const letzterSchritt =
+          bearbeitungsschritte[bearbeitungsschritte.length - 1];
+        if (letzterSchritt && letzterSchritt.actorId === session.actorId)
           return reply.code(403).send({
             error: "four-eyes: der auslösende Akteur muss ein anderer sein",
             requestId: requestIdOf(request),
