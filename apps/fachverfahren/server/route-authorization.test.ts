@@ -190,6 +190,11 @@ describe("Routen-Klassifizierung (config.auth)", () => {
         },
         {
           method: "GET",
+          url: "/api/buerger/antraege/:id/bescheid",
+          policy: "rbac:case.own.read",
+        },
+        {
+          method: "GET",
           url: "/api/mailbox",
           policy:
             "rbac-scoped:own=mailbox.own.read,authority=mailbox.authority.read",

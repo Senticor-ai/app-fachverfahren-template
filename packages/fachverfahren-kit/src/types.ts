@@ -145,6 +145,11 @@ export interface Transition {
   rollen: string[]; // wer den Übergang auslösen darf
   vierAugen?: boolean;
   detailPflicht?: boolean; // Begründung/Detail erforderlich (z.B. bei Ablehnung)
+  /** Erlässt dieser Übergang einen förmlichen VERWALTUNGSAKT? Dann friert der Server beim Übergang den
+   *  Bescheid ein (Tenor aus der Berechnung + Rechtsbehelf-Snapshot + Hash). Data-driven, symmetrisch zu
+   *  `vierAugen`. Die server-seitige Ableitung (statusMachineToProcedureVersion) mappt es auf
+   *  CaseTransition.issuesVerwaltungsakt; das Drift-Gate check:antrag-procedure sichert die Deckung. */
+  erlaesstBescheid?: boolean;
 }
 export interface StatusMachine {
   initial: string; // Status bei Antrags-Eingang ("eingegangen")
@@ -301,6 +306,20 @@ export interface EPaymentConfig {
   titel?: string | undefined;
 }
 
+/** Rechtsbehelfs-Regime als DATEN (kit-Spiegel des SDK-`RechtsbehelfConfig` — der Kit importiert das SDK
+ *  bewusst nicht, browser-neutral). Regime-NEUTRAL: `widerspruch` (VwVfG), `einspruch` (AO — für ein
+ *  Abgaben-/Steuerverfahren ist Widerspruch FALSCH) oder `klage` (VwGO). BescheidView rendert die Belehrung
+ *  daraus statt aus hart kodierten Literalen. */
+export interface RechtsbehelfConfig {
+  art: "widerspruch" | "einspruch" | "klage";
+  fristWert: number;
+  fristEinheit: "monat" | "woche" | "tag";
+  /** Bei welcher Stelle der Rechtsbehelf einzulegen ist (z. B. „der erlassenden Behörde"). */
+  stelle: string;
+  /** Die Rechtsgrundlage des Rechtsbehelfs (z. B. „§ 68 ff. VwGO", „§ 347 AO"). */
+  norm: string;
+}
+
 /** Zustellungs-/Bekanntgabe-Signal: schaltet Bescheid-Tab (PdfViewer) + Bürger-Postfach frei. */
 export interface ZustellungConfig {
   /** ISO-Datum der rechtlichen Bekanntgabe (§ 41 VwVfG) — maßgeblich für den Fristlauf. */
@@ -316,6 +335,10 @@ export interface ZustellungConfig {
   fiktionNorm?: string | undefined;
   /** URL des Bescheid-PDFs — gesetzt ⇒ Bescheid-Tab (PdfViewer) + Postfach-Dokument. */
   bescheidUrl?: string | undefined;
+  /** Regime des Rechtsbehelfs (Widerspruch/Einspruch/Klage) — data-driven statt der hart kodierten
+   *  VwVfG-Widerspruch-Belehrung. Wird beim Erlass in den Bescheid eingefroren. Fehlt sie, fällt
+   *  BescheidView auf die generische Widerspruchs-Belehrung zurück (Abwärtskompatibilität). */
+  rechtsbehelf?: RechtsbehelfConfig | undefined;
 }
 
 /** Eine zu überwachende Frist (spiegelt TerminFristPanel `FristItem` — `status` exakt-optional, ohne `| undefined`). */

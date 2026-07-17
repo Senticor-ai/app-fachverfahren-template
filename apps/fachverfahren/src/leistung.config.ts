@@ -163,6 +163,8 @@ export const leistungConfig: LeistungConfig = {
         label: "Festsetzen",
         rollen: ["sachbearbeitung"],
         vierAugen: true,
+        // Die Festsetzung ERLÄSST den Verwaltungsakt → der Server friert beim Übergang den Bescheid ein.
+        erlaesstBescheid: true,
       },
       {
         from: "review_noetig",
@@ -170,6 +172,7 @@ export const leistungConfig: LeistungConfig = {
         label: "Festsetzen (Zweitfreigabe)",
         rollen: ["sachbearbeitung"],
         vierAugen: true,
+        erlaesstBescheid: true,
       },
       {
         from: "in_pruefung",
@@ -211,6 +214,22 @@ export const leistungConfig: LeistungConfig = {
       ],
     },
   ],
+  // Zustellung/Bekanntgabe + Rechtsbehelfs-REGIME als DATEN. Das neutrale Musterverfahren ist ein
+  // allgemeines Verwaltungsverfahren → Widerspruch/VwGO/VwVfG. Ein Abgaben-/Steuerverfahren (AO-Regime)
+  // setzt hier stattdessen Einspruch/§ 347 AO/§ 122 Abs. 2 AO — der Bescheid trägt dann die RICHTIGE
+  // Belehrung, statt der früher hart kodierten Widerspruchs-Belehrung. Diese Werte werden beim Erlass in
+  // den Bescheid EINGEFROREN (bestandskraft-fest), nicht beim Abruf live gelesen.
+  zustellung: {
+    fiktionTage: 4,
+    fiktionNorm: "§ 41 Abs. 2 VwVfG",
+    rechtsbehelf: {
+      art: "widerspruch",
+      fristWert: 1,
+      fristEinheit: "monat",
+      stelle: "der erlassenden Behörde",
+      norm: "§ 68 ff. VwGO",
+    },
+  },
   ki: { schwelleAutonom: 0.9 },
   // DEMO-SEED OHNE KI-BEWERTUNG: an dieses Musterverfahren ist KEIN Modell gebunden (der AiAssistPort
   // ist eine Naht ohne Adapter) — also ist kein Vorgang bewertet, und `ki` bleibt ungesetzt. Die

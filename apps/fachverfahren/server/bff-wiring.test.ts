@@ -202,6 +202,7 @@ describe("BFF-Verdrahtung im App-Server", () => {
       expect(Object.keys(internal.json().paths).sort()).toEqual([
         "/api/buerger/antraege",
         "/api/buerger/antraege/{id}",
+        "/api/buerger/antraege/{id}/bescheid",
         "/api/capabilities",
         "/api/cases",
         "/api/cases/{id}",

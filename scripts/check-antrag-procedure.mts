@@ -39,12 +39,31 @@ const permission =
   antragProcedure.allowedTransitions[0]?.requiredPermission ??
   "case.decision.prepare";
 
+// Verwaltungsakt-Fachlichkeit aus leistung.config.zustellung ableiten (Rechtsbehelf-Regime + Fiktion).
+// Nur wenn ein Rechtsbehelf deklariert ist — sonst erlässt das Verfahren keinen förmlichen Bescheid.
+const rb = leistungConfig.zustellung?.rechtsbehelf;
+const verwaltungsakt = rb
+  ? {
+      rechtsbehelf: {
+        art: rb.art,
+        fristWert: rb.fristWert,
+        fristEinheit: rb.fristEinheit,
+        stelle: rb.stelle,
+        norm: rb.norm,
+      },
+      fiktionTage: leistungConfig.zustellung?.fiktionTage ?? 4,
+      fiktionNorm:
+        leistungConfig.zustellung?.fiktionNorm ?? "§ 41 Abs. 2 VwVfG",
+    }
+  : undefined;
+
 const quelle: StatusMachineSource = {
   procedureId: leistungConfig.id,
   version: antragProcedure.version,
   effectiveFrom: antragProcedure.effectiveFrom,
   legalBasisIds: leistungConfig.rechtsgrundlagen.map((r) => r.norm),
   requiredPermission: permission,
+  ...(verwaltungsakt ? { verwaltungsakt } : {}),
   states: sm.states.map((s) => ({
     key: s.key,
     ...(s.terminal ? { terminal: true } : {}),
@@ -54,6 +73,7 @@ const quelle: StatusMachineSource = {
     to: t.to,
     label: t.label,
     ...(t.vierAugen ? { vierAugen: true } : {}),
+    ...(t.erlaesstBescheid ? { erlaesstBescheid: true } : {}),
   })),
 };
 

@@ -22,16 +22,53 @@ import {
   AntragIdParamsSchema,
   AntragListDtoSchema,
   ErrorEnvelopeSchema,
+  VerwaltungsaktDtoSchema,
   type AntragDto,
+  type VerwaltungsaktDto,
 } from "@senticor/app-bff-contracts";
-import type { AppCase } from "@senticor/app-store-postgres";
+import type { AppAuditEvent, AppCase } from "@senticor/app-store-postgres";
 import {
   builtInPermissions,
   createFachlicheAuditEvent,
 } from "@senticor/public-sector-sdk";
 import type { BffDeps } from "../deps.js";
+import { canonicalSha256 } from "../canonical-hash.js";
 import { bffRouteAuth, requestIdOf, sessionOf } from "../route-auth.js";
 import { storeUnavailable } from "../store-error.js";
+
+/** Die eingefrorene VA-Form, wie sie in der Audit-payload liegt. */
+interface GefrorenerVa {
+  content: Record<string, unknown>;
+  checksumSha256: string;
+}
+
+/** Sucht den zuletzt eingefrorenen Verwaltungsakt in den Audit-Ereignissen (payload.verwaltungsakt am
+ *  festsetzenden case.transitioned). `undefined`, wenn noch kein Bescheid erlassen wurde. */
+function findVerwaltungsakt(events: AppAuditEvent[]): GefrorenerVa | undefined {
+  // listAuditEvents ist aufsteigend — den JÜNGSTEN VA nehmen (ein späterer Änderungsbescheid überschreibt
+  // die Sicht, ohne den älteren im append-only Audit zu löschen).
+  for (let i = events.length - 1; i >= 0; i--) {
+    const va = events[i]?.payload["verwaltungsakt"] as
+      Partial<GefrorenerVa> | undefined;
+    if (
+      va &&
+      typeof va.checksumSha256 === "string" &&
+      va.content &&
+      typeof va.content === "object"
+    ) {
+      return { content: va.content, checksumSha256: va.checksumSha256 };
+    }
+  }
+  return undefined;
+}
+
+/** Die gefrorene VA-payload → das vollständige DTO (content-Felder + der separate Hash). */
+function toVerwaltungsaktDto(va: GefrorenerVa): VerwaltungsaktDto {
+  return {
+    ...(va.content as Omit<VerwaltungsaktDto, "checksumSha256">),
+    checksumSha256: va.checksumSha256,
+  };
+}
 
 /** AppCase → AntragDto: die BÜRGER-Projektion. Interne Zuordnung (subjectIds) und Server-Topologie
  *  (tenant/authority/jurisdiction) bleiben bewusst draussen — sie gehen den Antragsteller nichts an. */
@@ -130,6 +167,103 @@ export function registerBuergerRoutes(
           .code(404)
           .send({ error: "not found", requestId: requestIdOf(request) });
       return reply.send(toAntragDto(found));
+    },
+  );
+
+  typed.get(
+    "/api/buerger/antraege/:id/bescheid",
+    {
+      config: readAuth.config,
+      preHandler: readAuth.preHandler,
+      schema: {
+        tags: ["buerger"],
+        summary: "Den eigenen (eingefrorenen) Bescheid abrufen — Bekanntgabe",
+        params: AntragIdParamsSchema,
+        // Response VOLLSTÄNDIG deklariert — sonst wirft Fastifys removeAdditional den checksumSha256
+        // STILL weg und der Beweiswert ginge lautlos verloren.
+        response: { 200: VerwaltungsaktDtoSchema, ...errorResponses },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      // Owner-Scope aus der SITZUNG — fremder/nicht vorhandener Fall ⇒ 404, nie 403 (kein Existenz-Orakel).
+      let found: AppCase | undefined;
+      try {
+        found = await deps.caseStore.getCase({
+          tenantId: session.tenantId,
+          caseId: request.params.id,
+          scope: "owner",
+          actorId: session.actorId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      if (!found)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+
+      // Den EINGEFRORENEN VA aus dem append-only Audit holen (KEIN Live-Render-Fallback: fehlt er,
+      // ist der Fall noch nicht festgesetzt ⇒ 404).
+      let events: AppAuditEvent[];
+      try {
+        events = await deps.caseStore.listAuditEvents({
+          tenantId: session.tenantId,
+          caseId: found.caseId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      const va = findVerwaltungsakt(events);
+      if (!va)
+        return reply
+          .code(404)
+          .send({ error: "kein Bescheid", requestId: requestIdOf(request) });
+
+      // DEFENSE-IN-DEPTH: den Hash über die gelieferten Bytes NACHRECHNEN. Weicht er ab, wurde die
+      // Audit-Zeile trotz Trigger manipuliert — dann NICHT ausliefern (500), nie einen unbewiesenen
+      // Bescheid herausgeben.
+      if (canonicalSha256(va.content) !== va.checksumSha256)
+        return reply.code(500).send({
+          error: "bescheid integrity check failed",
+          requestId: requestIdOf(request),
+        });
+
+      // BEKANNTGABE als eigenes, auditiertes Ereignis (Fristlauf-Anker). EIGENER eventType
+      // `case.disclosed` — bewusst NICHT in FOUR_EYES_RELEVANT_EVENT_TYPES: ein Bürger-Abruf ist eine
+      // BEOBACHTUNG, kein Bearbeitungsschritt; er darf die Vier-Augen-Bezugsgröße nicht verschieben.
+      const bekanntgabe = createFachlicheAuditEvent({
+        eventType: "case.disclosed",
+        actorId: session.actorId,
+        actingAuthorityId: found.authorityId,
+        purpose: "bekanntgabe",
+        legalBasisId: String(va.content["fiktionNorm"] ?? "§ 41 Abs. 2 VwVfG"),
+        caseId: found.caseId,
+        requestId: requestIdOf(request),
+        summary: `Bescheid ${found.caseId} durch die/den Eigentümer:in abgerufen (Bekanntgabe)`,
+      });
+      try {
+        await deps.caseStore.appendAuditEvent({
+          auditEventId: bekanntgabe.auditEventId,
+          caseId: found.caseId,
+          tenantId: session.tenantId,
+          authorityId: found.authorityId,
+          jurisdictionId: found.jurisdictionId,
+          actorId: session.actorId,
+          eventType: bekanntgabe.eventType,
+          purpose: bekanntgabe.purpose,
+          legalBasisId: bekanntgabe.legalBasisId,
+          requestId: bekanntgabe.requestId,
+          payload: { summary: bekanntgabe.summary },
+          occurredAt: bekanntgabe.occurredAt,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+
+      // inline: die SPA rendert den Bescheid (BescheidView) und bietet window.print() an.
+      void reply.header("content-disposition", "inline");
+      return reply.send(toVerwaltungsaktDto(va));
     },
   );
 

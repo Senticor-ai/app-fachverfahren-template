@@ -32,6 +32,37 @@ export interface Procedure {
   currentVersion: string;
 }
 
+/**
+ * Rechtsbehelfs-Regime als DATEN — welcher Rechtsbehelf gegen den Verwaltungsakt statthaft ist, in welcher
+ * Frist, bei welcher Stelle, auf welcher Norm. Bewusst regime-NEUTRAL: `widerspruch` (VwVfG), `einspruch`
+ * (AO — für ein Abgaben-/Steuerverfahren ist Widerspruch FALSCH) oder `klage` (VwGO ohne Vorverfahren).
+ * Präzedenz: die Bekanntgabe-Fiktionsnorm ist bereits data-driven; die Belehrung war es NICHT (hart
+ * kodiert auf Widerspruch/1 Monat/VwVfG) und war damit für das mitgelieferte AO-Beispiel juristisch falsch.
+ */
+export interface RechtsbehelfConfig {
+  art: "widerspruch" | "einspruch" | "klage";
+  fristWert: number;
+  fristEinheit: "monat" | "woche" | "tag";
+  /** Bei welcher Stelle der Rechtsbehelf einzulegen ist (z. B. „der erlassenden Behörde"). */
+  stelle: string;
+  /** Die Rechtsgrundlage des Rechtsbehelfs (z. B. „§ 68 ff. VwGO", „§ 347 AO"). */
+  norm: string;
+}
+
+/**
+ * Verwaltungsakt-Fachlichkeit eines Verfahrens (Rechtsbehelf + Bekanntgabe-Fiktion) — die Werte, die beim
+ * ERLASS in den bestandskräftigen Bescheid EINGEFROREN werden. Sie dürfen beim Abruf NIEMALS live aus der
+ * (lebenden) Config gelesen werden: sonst schriebe eine spätere Regime-/Fristen-Umstellung einen VA von
+ * 2024 rückwirkend um. Der eingefrorene Snapshot ist selbsttragend.
+ */
+export interface VerwaltungsaktConfig {
+  rechtsbehelf: RechtsbehelfConfig;
+  /** Bekanntgabefiktion in Tagen nach Aufgabe zur Post (Default-Regime 4 seit PostModG). */
+  fiktionTage: number;
+  /** Norm der Bekanntgabefiktion (z. B. „§ 41 Abs. 2 VwVfG", „§ 122 Abs. 2 AO"). */
+  fiktionNorm: string;
+}
+
 export interface ProcedureVersion {
   procedureId: string;
   version: string;
@@ -40,6 +71,9 @@ export interface ProcedureVersion {
   legalBasisIds: string[];
   allowedStates: string[];
   allowedTransitions: CaseTransition[];
+  /** Verwaltungsakt-Fachlichkeit — vorhanden, wenn das Verfahren einen förmlichen Bescheid erlässt
+   *  (mindestens ein Übergang trägt `issuesVerwaltungsakt`). Regime-neutral, data-driven. */
+  verwaltungsakt?: VerwaltungsaktConfig;
 }
 
 export interface Application {
@@ -73,6 +107,10 @@ export interface CaseTransition {
   /** Schließt dieser Übergang den Fall? Dann wird `closedAt` gestempelt. Data-driven statt eines hart
    *  kodierten Zielzustand-Namens — jedes Verfahren benennt seinen Endzustand selbst (z. B. „abgeschlossen"). */
   closesCase?: boolean;
+  /** Erlässt dieser Übergang einen förmlichen Verwaltungsakt? Dann friert der Server beim Übergang den
+   *  Bescheid (Tenor aus case.data + Rechtsbehelf-Snapshot + Hash) im append-only Audit ein — data-driven,
+   *  symmetrisch zu `closesCase`/`requiresFourEyes`. */
+  issuesVerwaltungsakt?: boolean;
 }
 
 export interface Task {

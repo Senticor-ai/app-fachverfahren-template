@@ -82,9 +82,12 @@ export {
   AntragEinreichenRequestSchema,
   AntragIdParamsSchema,
   AntragListDtoSchema,
+  RechtsbehelfDtoSchema,
+  VerwaltungsaktDtoSchema,
   type AntragDto,
   type AntragEinreichenRequestDto,
   type AntragIdParamsDto,
   type AntragListDto,
+  type VerwaltungsaktDto,
 } from "./buerger.js";
 export { openApiInfo, openApiTags } from "./openapi.js";

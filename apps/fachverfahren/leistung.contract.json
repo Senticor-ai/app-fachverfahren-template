@@ -138,7 +138,8 @@
         "rollen": [
           "sachbearbeitung"
         ],
-        "vierAugen": true
+        "vierAugen": true,
+        "erlaesstBescheid": true
       },
       {
         "from": "review_noetig",
@@ -147,7 +148,8 @@
         "rollen": [
           "sachbearbeitung"
         ],
-        "vierAugen": true
+        "vierAugen": true,
+        "erlaesstBescheid": true
       },
       {
         "from": "in_pruefung",

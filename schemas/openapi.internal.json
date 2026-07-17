@@ -418,6 +418,171 @@
         "tags": ["buerger"]
       }
     },
+    "/api/buerger/antraege/{id}/bescheid": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "aktenzeichen": { "minLength": 1, "type": "string" },
+                    "checksumSha256": {
+                      "maxLength": 64,
+                      "minLength": 64,
+                      "type": "string"
+                    },
+                    "fiktionNorm": { "minLength": 1, "type": "string" },
+                    "fiktionTage": { "minimum": 0, "type": "integer" },
+                    "issuedAt": { "minLength": 1, "type": "string" },
+                    "issuedBy": { "minLength": 1, "type": "string" },
+                    "rechtsbehelf": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "art": {
+                          "anyOf": [
+                            { "enum": ["widerspruch"], "type": "string" },
+                            { "enum": ["einspruch"], "type": "string" },
+                            { "enum": ["klage"], "type": "string" }
+                          ]
+                        },
+                        "fristEinheit": {
+                          "anyOf": [
+                            { "enum": ["monat"], "type": "string" },
+                            { "enum": ["woche"], "type": "string" },
+                            { "enum": ["tag"], "type": "string" }
+                          ]
+                        },
+                        "fristWert": { "minimum": 1, "type": "integer" },
+                        "norm": { "minLength": 1, "type": "string" },
+                        "stelle": { "minLength": 1, "type": "string" }
+                      },
+                      "required": [
+                        "art",
+                        "fristWert",
+                        "fristEinheit",
+                        "stelle",
+                        "norm"
+                      ],
+                      "type": "object"
+                    },
+                    "tenor": {
+                      "anyOf": [
+                        { "additionalProperties": {}, "type": "object" },
+                        { "type": "null" }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "aktenzeichen",
+                    "issuedAt",
+                    "issuedBy",
+                    "tenor",
+                    "rechtsbehelf",
+                    "fiktionTage",
+                    "fiktionNorm",
+                    "checksumSha256"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Den eigenen (eingefrorenen) Bescheid abrufen — Bekanntgabe",
+        "tags": ["buerger"]
+      }
+    },
     "/api/capabilities": {
       "get": {
         "responses": {

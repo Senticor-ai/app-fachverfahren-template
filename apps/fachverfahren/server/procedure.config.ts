@@ -94,6 +94,19 @@ export const antragProcedure: ProcedureVersion =
     effectiveFrom: "2026-01-01T00:00:00.000Z",
     legalBasisIds: ["§ 1 Demo-Satzung"],
     requiredPermission: PREPARE,
+    // Verwaltungsakt-Fachlichkeit — SPIEGEL von leistung.config.zustellung (der Server kann leistung.config
+    // nicht importieren, rootDir-Mauer). Das Drift-Gate check:antrag-procedure sichert die Deckung.
+    verwaltungsakt: {
+      rechtsbehelf: {
+        art: "widerspruch",
+        fristWert: 1,
+        fristEinheit: "monat",
+        stelle: "der erlassenden Behörde",
+        norm: "§ 68 ff. VwGO",
+      },
+      fiktionTage: 4,
+      fiktionNorm: "§ 41 Abs. 2 VwVfG",
+    },
     states: [
       { key: "eingegangen" },
       { key: "in_pruefung" },
@@ -109,12 +122,14 @@ export const antragProcedure: ProcedureVersion =
         to: "festgesetzt",
         label: "Festsetzen",
         vierAugen: true,
+        erlaesstBescheid: true,
       },
       {
         from: "review_noetig",
         to: "festgesetzt",
         label: "Festsetzen (Zweitfreigabe)",
         vierAugen: true,
+        erlaesstBescheid: true,
       },
       { from: "in_pruefung", to: "abgelehnt", label: "Ablehnen" },
     ],

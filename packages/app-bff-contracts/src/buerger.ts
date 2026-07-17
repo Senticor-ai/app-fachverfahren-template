@@ -56,3 +56,50 @@ export const AntragIdParamsSchema = Type.Object(
   { additionalProperties: false },
 );
 export type AntragIdParamsDto = Static<typeof AntragIdParamsSchema>;
+
+/** Das Rechtsbehelfs-Regime, wie es beim Erlass EINGEFROREN wurde (regime-neutral). */
+export const RechtsbehelfDtoSchema = Type.Object(
+  {
+    art: Type.Union([
+      Type.Literal("widerspruch"),
+      Type.Literal("einspruch"),
+      Type.Literal("klage"),
+    ]),
+    fristWert: Type.Integer({ minimum: 1 }),
+    fristEinheit: Type.Union([
+      Type.Literal("monat"),
+      Type.Literal("woche"),
+      Type.Literal("tag"),
+    ]),
+    stelle: Type.String({ minLength: 1 }),
+    norm: Type.String({ minLength: 1 }),
+  },
+  { additionalProperties: false },
+);
+
+/**
+ * Der eingefrorene VERWALTUNGSAKT, wie ihn der Bürger abruft — die selbsttragenden Bytes + das
+ * Integritäts-Token. VOLLSTÄNDIG deklariert: fehlte `checksumSha256` im Schema, würfe Fastifys
+ * `removeAdditional` den Hash STILL weg und der Beweiswert ginge lautlos verloren.
+ */
+export const VerwaltungsaktDtoSchema = Type.Object(
+  {
+    aktenzeichen: Type.String({ minLength: 1 }),
+    /** ISO-Zeitpunkt des Erlasses (Server-Uhr). */
+    issuedAt: Type.String({ minLength: 1 }),
+    /** Akteur-Kennung des Festsetzenden (Server-Session, nicht aus dem Body). */
+    issuedBy: Type.String({ minLength: 1 }),
+    /** Der eingefrorene Tenor (die client-gerechnete Berechnung) — opak, deshalb frei-formig. */
+    tenor: Type.Union([
+      Type.Record(Type.String(), Type.Unknown()),
+      Type.Null(),
+    ]),
+    rechtsbehelf: RechtsbehelfDtoSchema,
+    fiktionTage: Type.Integer({ minimum: 0 }),
+    fiktionNorm: Type.String({ minLength: 1 }),
+    /** SHA-256 über die kanonisch serialisierten Bytes — das portable Beweis-Token. */
+    checksumSha256: Type.String({ minLength: 64, maxLength: 64 }),
+  },
+  { additionalProperties: false },
+);
+export type VerwaltungsaktDto = Static<typeof VerwaltungsaktDtoSchema>;

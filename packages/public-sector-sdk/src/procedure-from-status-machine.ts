@@ -11,7 +11,11 @@
 // Präzedenz: `bpmnToProcedureVersion` (workflow-bpmn-stub) leitet dieselbe Zielform aus BPMN ab. Beide
 // speisen dieselben Gates (check:procedure-contract-Struktur). Ein Drift-Gate (check:antrag-procedure)
 // verifiziert, dass die server-seitige Deklaration mit der Ableitung aus leistung.config übereinstimmt.
-import type { CaseTransition, ProcedureVersion } from "./domain-kernel.js";
+import type {
+  CaseTransition,
+  ProcedureVersion,
+  VerwaltungsaktConfig,
+} from "./domain-kernel.js";
 
 /** Ein Zustand der Antrags-Maschine (nur die für die Ableitung nötigen Felder). */
 export interface StatusMachineStateSource {
@@ -28,6 +32,8 @@ export interface StatusMachineTransitionSource {
   label: string;
   /** Vier-Augen-pflichtig? → requiresFourEyes. */
   vierAugen?: boolean;
+  /** Erlässt dieser Übergang einen förmlichen Verwaltungsakt? → issuesVerwaltungsakt. */
+  erlaesstBescheid?: boolean;
 }
 
 /** Die strukturelle Quelle der Ableitung — bewusst NICHT der Kit-`LeistungConfig`-Typ (kein UI-Dep). */
@@ -40,6 +46,9 @@ export interface StatusMachineSource {
   transitions: readonly StatusMachineTransitionSource[];
   /** Die für JEDEN Übergang nötige Permission. Antrags-Übergänge sind Sachbearbeitungs-Entscheidungen. */
   requiredPermission: string;
+  /** Verwaltungsakt-Fachlichkeit (Rechtsbehelf + Bekanntgabe) — vorhanden, wenn das Verfahren einen
+   *  Bescheid erlässt. Wird 1:1 an ProcedureVersion.verwaltungsakt durchgereicht. */
+  verwaltungsakt?: VerwaltungsaktConfig;
 }
 
 /** Deterministischer, ASCII-sicherer Slug eines Labels → stabile `action`. Umlaute werden transliteriert,
@@ -85,6 +94,8 @@ export function statusMachineToProcedureVersion(
       ...(t.vierAugen ? { requiresFourEyes: true } : {}),
       // Ein Übergang IN einen Endzustand schließt den Fall — data-driven, kein hart kodierter Zustandsname.
       ...(terminals.has(t.to) ? { closesCase: true } : {}),
+      // Erlässt dieser Übergang einen Verwaltungsakt? → der Server friert beim Übergang den Bescheid ein.
+      ...(t.erlaesstBescheid ? { issuesVerwaltungsakt: true } : {}),
     };
   });
   return {
@@ -94,5 +105,7 @@ export function statusMachineToProcedureVersion(
     legalBasisIds: [...src.legalBasisIds],
     allowedStates: src.states.map((s) => s.key),
     allowedTransitions,
+    // Verwaltungsakt-Fachlichkeit durchreichen, wenn deklariert.
+    ...(src.verwaltungsakt ? { verwaltungsakt: src.verwaltungsakt } : {}),
   };
 }

@@ -33,6 +33,7 @@ import {
   type Case as DomainCase,
 } from "@senticor/public-sector-sdk";
 import type { BffDeps } from "../deps.js";
+import { canonicalSha256 } from "../canonical-hash.js";
 import { bffRouteAuth, requestIdOf, sessionOf } from "../route-auth.js";
 import { storeUnavailable } from "../store-error.js";
 
@@ -553,6 +554,33 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
         return badRequest(reply, request, message);
       }
 
+      // VERWALTUNGSAKT EINFRIEREN: erlässt dieser Übergang einen förmlichen Bescheid, friert der Server
+      // hier den bestandskräftigen VA ein und legt ihn in die payload des OHNEHIN atomar geschriebenen
+      // Audit-Ereignisses (append-only-Trigger trägt die Unveränderlichkeit — app_cases ist NICHT
+      // append-only). Der Tenor kommt aus der bereits gespeicherten, client-gerechneten `case.data.berechnung`
+      // (server-opak) — NICHT aus dem Request-Body (keine zweite Tenor-Wahrheit; Vier-Augen prüfte den
+      // Zustand, nicht einen Body-Inhalt). Rechtsbehelf/Fiktion aus dem Verfahren, issuedAt/issuedBy
+      // server-autoritativ. Der `eventType` bleibt `case.transitioned` (Festsetzen IST ein Bearbeitungs-
+      // schritt, four-eyes-relevant, korrekt); der VA reitet in dessen payload. Der Hash über die
+      // KANONISCHEN Bytes ist das portable Beweis-Token (der Bürger re-hasht die gelieferten Bytes).
+      const now = new Date().toISOString();
+      let verwaltungsaktPayload: Record<string, unknown> | undefined;
+      if (transition.issuesVerwaltungsakt && procedure.verwaltungsakt) {
+        const content = {
+          aktenzeichen: appCase.caseId,
+          issuedAt: now,
+          issuedBy: session.actorId,
+          tenor: appCase.data["berechnung"] ?? null,
+          rechtsbehelf: procedure.verwaltungsakt.rechtsbehelf,
+          fiktionTage: procedure.verwaltungsakt.fiktionTage,
+          fiktionNorm: procedure.verwaltungsakt.fiktionNorm,
+        };
+        verwaltungsaktPayload = {
+          content,
+          checksumSha256: canonicalSha256(content),
+        };
+      }
+
       const auditEvent: AppAuditEvent = {
         auditEventId: `audit.${randomUUID()}`,
         caseId: appCase.caseId,
@@ -568,8 +596,11 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
           previousState: appCase.state,
           newState: reduced.state,
           ...(body.detail !== undefined ? { detail: body.detail } : {}),
+          ...(verwaltungsaktPayload
+            ? { verwaltungsakt: verwaltungsaktPayload }
+            : {}),
         },
-        occurredAt: new Date().toISOString(),
+        occurredAt: now,
       };
 
       let updated: AppCase;
