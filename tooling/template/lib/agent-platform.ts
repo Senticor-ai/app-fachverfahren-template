@@ -1,7 +1,14 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { access, mkdir, readFile, readdir, stat } from "node:fs/promises";
-import { dirname, extname, join, relative, resolve } from "node:path";
+import {
+  dirname,
+  extname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+} from "node:path";
 import { promisify } from "node:util";
 import { parse as parseYaml } from "yaml";
 import { getGitCommit, getGitShortStatus } from "./git.ts";
@@ -582,6 +589,33 @@ export async function appNew(
     return { status: "failed", spec, generated: [], preserved: [], failures };
   }
   const destination = join(root, spec.module.destination);
+  // TRAVERSAL-SCHUTZ: das Modul muss STRIKT im modules-Baum liegen. Die Spec-Pruefung vergleicht nur das
+  // PRAEFIX ("modules/") und laesst sich mit ".." aushebeln — erst das Aufloesen der Grenze erzwingt, was
+  // das Praefix meinte. Nachgewiesene Ausbrueche, die das Praefix passieren:
+  //   "modules/../../ausserhalb" -> /ausserhalb        (ausserhalb des Repos)
+  //   "modules/.."               -> /repo              (Repo-Wurzel: ueberschrieb die echte AGENTS.md)
+  //   "modules/../modules-evil"  -> /repo/modules-evil (im Repo, aber ausserhalb des modules-Baums →
+  //                                                     faellt aus den modules-Ownership-Regeln heraus)
+  assertInsideBoundary(join(root, "modules"), destination);
+  // JEDER Schreibpfad von app:new läuft durch diese zwei Wrapper — sie erzwingen die Modul-Grenze
+  // (siehe assertInsideBoundary). Damit ist „app:new scaffoldt ausschliesslich das Modul" eine
+  // durchgesetzte Invariante statt einer Konvention, auf die man sich verlässt.
+  const writeInModule = async (
+    target: string,
+    content: string,
+  ): Promise<void> => {
+    assertInsideBoundary(destination, target);
+    await writeFileAtomic(target, content);
+  };
+  const writeInModuleIfMissing = async (
+    target: string,
+    content: string,
+    preservedPaths: string[],
+    relativePath: string,
+  ): Promise<void> => {
+    assertInsideBoundary(destination, target);
+    await writeIfMissing(target, content, preservedPaths, relativePath);
+  };
   const contract = deriveModuleContract(spec);
   const migrationFile = `0001_create_${tableName(spec.module.id)}_cases.sql`;
   const storyFile = `${pascalCase(spec.module.id)}Screens.stories.tsx`;
@@ -613,90 +647,90 @@ export async function appNew(
     } else {
       preserved.push(spec.module.destination);
     }
-    await writeFileAtomic(
+    await writeInModule(
       join(destination, "AGENTS.md"),
       moduleAgentsContent(spec),
     );
-    await writeFileAtomic(
+    await writeInModule(
       join(destination, "module.contract.yaml"),
       stableStringify(contract),
     );
     const domainPath = join(destination, "domain.module.yaml");
     const existingDomain = await readOptional(domainPath);
     if (!existingDomain || existingDomain.includes("replace-with-domain-id")) {
-      await writeFileAtomic(domainPath, domainModuleYaml(spec));
+      await writeInModule(domainPath, domainModuleYaml(spec));
     } else {
       preserved.push(`${spec.module.destination}/domain.module.yaml`);
     }
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "contracts", "citizen-intake.screen.yaml"),
       screenContractYaml(spec, "citizen"),
       preserved,
       `${spec.module.destination}/contracts/citizen-intake.screen.yaml`,
     );
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "contracts", "caseworker-workspace.screen.yaml"),
       screenContractYaml(spec, "caseworker"),
       preserved,
       `${spec.module.destination}/contracts/caseworker-workspace.screen.yaml`,
     );
     if (hasAuditRoute) {
-      await writeIfMissing(
+      await writeInModuleIfMissing(
         join(destination, "contracts", "audit-workspace.screen.yaml"),
         screenContractYaml(spec, "audit"),
         preserved,
         `${spec.module.destination}/contracts/audit-workspace.screen.yaml`,
       );
     }
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "events", "events.yaml"),
       eventsYaml(spec),
       preserved,
       `${spec.module.destination}/events/events.yaml`,
     );
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "forms", "intake.form.schema.json"),
       intakeFormSchema(spec),
       preserved,
       `${spec.module.destination}/forms/intake.form.schema.json`,
     );
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "i18n", "de.json"),
       i18nJson(spec),
       preserved,
       `${spec.module.destination}/i18n/de.json`,
     );
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "migrations", "database", migrationFile),
       migrationSql(spec),
       preserved,
       `${spec.module.destination}/migrations/database/${migrationFile}`,
     );
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "permissions", "permissions.yaml"),
       permissionsYaml(spec),
       preserved,
       `${spec.module.destination}/permissions/permissions.yaml`,
     );
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "tests", `${spec.module.id}.test.ts`),
       moduleTestTs(spec),
       preserved,
       `${spec.module.destination}/tests/${spec.module.id}.test.ts`,
     );
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "ui", storyFile),
       screensStoryTsx(spec),
       preserved,
       `${spec.module.destination}/ui/${storyFile}`,
     );
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "ui", "screens.tsx"),
       screensTsx(spec),
       preserved,
       `${spec.module.destination}/ui/screens.tsx`,
     );
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "compliance", "profile.example.json"),
       complianceProfileJson(spec),
       preserved,
@@ -1453,7 +1487,13 @@ function validateAppSpecShape(spec: AppSpec) {
   if (!spec.module?.id || !spec.module?.destination) {
     failures.push("app spec missing module id or destination");
   }
-  if (!spec.module?.destination?.startsWith("modules/")) {
+  // `..`-Segmente hebeln die Praefix-Pruefung aus: "modules/.." und "modules/../apps" beginnen mit
+  // "modules/", zeigen nach dem Aufloesen aber auf die Repo-Wurzel bzw. aus dem modules-Baum heraus.
+  // Der Spec faellt deshalb SAUBER durch die Validierung (status "failed" mit Meldung) — der
+  // Write-Boundary-Guard bleibt die letzte Verteidigungslinie fuer fehlgeleitete Schreibpfade.
+  if (spec.module?.destination?.split("/").includes("..")) {
+    failures.push("module destination must not contain .. segments");
+  } else if (!spec.module?.destination?.startsWith("modules/")) {
     failures.push("module destination must be under modules/");
   }
   if (!spec.acceptanceCriteria?.length) {
@@ -1580,6 +1620,28 @@ async function createDomainModuleSkeleton(destination: string) {
   );
   await writeFileAtomic(join(destination, "migrations/database/.gitkeep"), "");
   await writeFileAtomic(join(destination, "migrations/documents/.gitkeep"), "");
+}
+
+// Write-Boundary: wirft, wenn ein Schreibziel AUSSERHALB der erlaubten Grenze liegt.
+//
+// WARUM: `writeFileAtomic` legt jeden Pfad einfach an — es gibt sonst KEINE Durchsetzung. Die Regel
+// „app:new scaffoldt ausschliesslich das Modul" galt bisher nur BY CONSTRUCTION (jeder Write ist
+// `join(destination, …)`) und war durch keinen Guard und keinen Exklusivitäts-Test gedeckt: ein
+// fehlgeleitetes Ziel (etwa in den Vorlagen-eigenen apps-server-Bäumen) schlüge STILL durch — grüne
+// Tests, aber verletzter Governance-Scope, geclobberte Ownership und ein blinder agent:verify-Report.
+// Lieber laut scheitern als still danebenschreiben.
+// (Zeilen-Kommentar statt Block: Ownership-Globs enthalten die Zeichenfolge, die einen Block beendet.)
+function assertInsideBoundary(boundary: string, target: string): void {
+  const rel = relative(resolve(boundary), resolve(target));
+  // `rel === ""` heisst: das Ziel IST die Grenze selbst — das ist KEIN „strikt darunter" und muss ebenso
+  // scheitern. Ohne diesen Fall zeigte `module.destination: "modules/.."` auf das Repo-Wurzelverzeichnis
+  // (relative(root, root) === "", also weder ".."-Praefix noch absolut) und app:new ueberschrieb dort die
+  // echte AGENTS.md des Repos — nachgewiesen, nicht theoretisch.
+  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {
+    throw new Error(
+      `app:new: Ziel ausserhalb der erlaubten Grenze — "${target}" liegt nicht strikt unter "${boundary}"`,
+    );
+  }
 }
 
 async function writeIfMissing(

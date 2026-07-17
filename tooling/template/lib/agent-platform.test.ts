@@ -153,6 +153,55 @@ describe("agent platform contract", () => {
     }
   });
 
+  it("wirft bei JEDEM module.destination, das per .. aus dem modules-Baum ausbricht (Traversal-Schutz)", async () => {
+    // Alle drei passieren die Praefix-Pruefung ("modules/") und brachen vorher aus. Der mittlere Fall war
+    // der gefaehrlichste: destination === Repo-Wurzel → app:new ueberschrieb die echte AGENTS.md
+    // (relative(root, root) === "" — weder ".."-Praefix noch absolut).
+    const ausbrueche = [
+      "modules/../../ausserhalb", // ausserhalb des Repos
+      "modules/..", // Repo-Wurzel
+      "modules/../modules-evil", // im Repo, aber ausserhalb des modules-Baums
+    ];
+    for (const destination of ausbrueche) {
+      const temp = await mkdtemp(join(tmpdir(), "agent-app-new-escape-"));
+      try {
+        // Eine echte Repo-Datei, die app:new NIEMALS anfassen darf.
+        await writeFile(join(temp, "AGENTS.md"), "ORIGINAL");
+        const source = await readStructuredFile<AppSpec>(
+          join(root, "docs/examples/hundesteuer/app.spec.yaml"),
+        );
+        const spec = {
+          ...source,
+          id: "escape",
+          fim: source.fim
+            ? { sourceId: source.fim.sourceId, rootId: source.fim.rootId }
+            : undefined,
+          module: { ...source.module, id: "escape", destination },
+        };
+        const specPath = "docs/examples/escape/app.spec.yaml";
+        await mkdir(join(temp, "docs/examples/escape"), { recursive: true });
+        await writeFile(
+          join(temp, specPath),
+          `${JSON.stringify(spec, null, 2)}\n`,
+        );
+
+        // Der Spec faellt SAUBER durch die Validierung (governed-build-Fehlerkanal) — nicht als
+        // Exception tief im Schreibpfad. Der Write-Boundary-Guard bleibt die letzte Verteidigungslinie.
+        const result = await appNew(temp, { specPath });
+        expect(result.status, `destination "${destination}"`).toBe("failed");
+        expect(result.failures ?? []).toContain(
+          "module destination must not contain .. segments",
+        );
+        // ... und nichts angefasst haben.
+        expect(await readFile(join(temp, "AGENTS.md"), "utf8")).toBe(
+          "ORIGINAL",
+        );
+      } finally {
+        await rm(temp, { recursive: true, force: true });
+      }
+    }
+  });
+
   it("validates the OPTIONAL dossier procedure block (rejects malformed, accepts valid, stays optional)", async () => {
     const source = await readStructuredFile<AppSpec>(
       join(root, "docs/examples/hundesteuer/app.spec.yaml"),
