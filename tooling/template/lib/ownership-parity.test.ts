@@ -102,6 +102,7 @@ const updateUnmanagedPaths: string[] = [
   // Lockfiles divergieren legitim (siehe deploy-demo-consumer.sh: bewusst nicht template-managed).
   "pnpm-lock.yaml",
   // Repo-Skripte außerhalb der verwalteten check-template-*/check-web|k8s-delivery/scaffold-*-Muster.
+  "scripts/check-antrag-procedure.mts",
   "scripts/check-bpmn-example.mts",
   "scripts/check-css-token-aliases.mjs",
   "scripts/check-dev-dependencies.mjs",

@@ -15,7 +15,10 @@
 //
 // Ein vollständiges reales Beispiel (Integrationsmanagement mit §§ AufenthG/FlüAG) liegt als AGENT-VORLAGE in der
 // dossier-fallmanagement-Skill + docs/examples/integrationsberatung/ — es gehört NICHT in diese neutrale Vorlage.
-import { builtInPermissions } from "@senticor/public-sector-sdk";
+import {
+  builtInPermissions,
+  statusMachineToProcedureVersion,
+} from "@senticor/public-sector-sdk";
 import type { ProcedureVersion } from "@senticor/public-sector-sdk";
 
 /** Feinere RBAC lebt in der Governance-/BFF-Schicht; die Übergänge tragen die Schreib-Permission
@@ -70,6 +73,52 @@ export const dossierProcedure: ProcedureVersion = {
     },
   ],
 };
+
+/**
+ * Das ANTRAGS-Verfahren als server-seitige `ProcedureVersion` — das server-importierbare Gegenstück zur
+ * Antrags-Zustandsmaschine in src/leistung.config.ts.
+ *
+ * WARUM DUPLIZIERT (und wie gegen Drift gesichert): leistung.config.ts ist Client-Wahrheit und liegt
+ * ausserhalb des Server-rootDir (server/ vs. src/) — der Server KANN sie nicht importieren. Damit ein
+ * eingereichter Antrag zur server-persistierten Akte werden kann (POST /api/buerger/antraege), braucht der
+ * Server dieselbe Zustandsmaschine hier. Die untenstehende Quelle SPIEGELT leistung.config.statusMachine;
+ * das Gate `check:antrag-procedure` verifiziert die Übereinstimmung, indem es aus BEIDEN ableitet und
+ * vergleicht (Präzedenz: check:bpmn-example gegen die BPMN). Weicht eine Kopie ab, schlägt das Gate an.
+ *
+ * `procedureId` MUSS `leistung.config.id` entsprechen — der Client sendet ihn beim Einreichen.
+ */
+export const antragProcedure: ProcedureVersion =
+  statusMachineToProcedureVersion({
+    procedureId: "musterantrag",
+    version: "1",
+    effectiveFrom: "2026-01-01T00:00:00.000Z",
+    legalBasisIds: ["§ 1 Demo-Satzung"],
+    requiredPermission: PREPARE,
+    states: [
+      { key: "eingegangen" },
+      { key: "in_pruefung" },
+      { key: "review_noetig" },
+      { key: "festgesetzt", terminal: true },
+      { key: "abgelehnt", terminal: true },
+    ],
+    transitions: [
+      { from: "eingegangen", to: "in_pruefung", label: "In Prüfung nehmen" },
+      { from: "in_pruefung", to: "review_noetig", label: "Zur Zweitprüfung" },
+      {
+        from: "in_pruefung",
+        to: "festgesetzt",
+        label: "Festsetzen",
+        vierAugen: true,
+      },
+      {
+        from: "review_noetig",
+        to: "festgesetzt",
+        label: "Festsetzen (Zweitfreigabe)",
+        vierAugen: true,
+      },
+      { from: "in_pruefung", to: "abgelehnt", label: "Ablehnen" },
+    ],
+  });
 
 /** Ein Ziel des Demo-Dossiers: Titel, optionale Frist/Kategorie/Status + Checklisten-Schritte. */
 export interface DossierDemoZiel {

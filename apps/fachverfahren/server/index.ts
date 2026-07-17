@@ -52,7 +52,7 @@ import { registerAuthRoutes, type RegistrationMode } from "./auth/routes.js";
 import { createCookieSessionResolver } from "./auth/session-resolver.js";
 import { seedReferenceDemo } from "./dev/reference-seed.js";
 import { registerBoardRoutes } from "./kanban/routes.js";
-import { dossierProcedure } from "./procedure.config.js";
+import { antragProcedure, dossierProcedure } from "./procedure.config.js";
 import { registerUserRoutes } from "./users/routes.js";
 
 // App-Identität: der Renderer schreibt Domain-Token beim Scaffolding um — deshalb stehen
@@ -238,7 +238,12 @@ export async function startRuntime(
     // Der Runtime-Entrypoint registriert das Verfahren aus der procedure.config-Naht (der generische
     // buildPublicServer-Default bleibt fail-closed/leer — Unit-Tests injizieren ihre eigene Registry).
     // Eine generierende App überschreibt procedure.config.ts; in PROD kann chos die Naht liefern.
-    procedureRegistry: createInMemoryProcedureRegistry([dossierProcedure]),
+    // BEIDE Verfahrens-Arten: das Dossier-Verfahren (Fall/Akte) UND das Antrags-Verfahren (aus
+    // leistung.config abgeleitet, drift-gesichert) — sonst liefe ein Bürger-Antrag in „unknown procedure".
+    procedureRegistry: createInMemoryProcedureRegistry([
+      dossierProcedure,
+      antragProcedure,
+    ]),
     sessionResolver: createCookieSessionResolver(authStore),
     auditSink: createAuditSinkFromEnv(env),
   };
