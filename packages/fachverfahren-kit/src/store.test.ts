@@ -149,7 +149,7 @@ describe("VorgangPort — Persistenz-Naht", () => {
     expect(mitSeed.laden).toBeUndefined();
   });
 
-  it("mit Persistenz: der Seed ENTFÄLLT (der Server ist die Wahrheit), laden() hydriert den Snapshot", async () => {
+  it("mit Persistenz: der Seed ist der ANFANGSBESTAND, laden() ERSETZT ihn durch die Server-Wahrheit", async () => {
     const persistierte: Vorgang[] = [
       {
         id: "case.remote-1",
@@ -165,14 +165,14 @@ describe("VorgangPort — Persistenz-Naht", () => {
       laden: async () => persistierte,
       einreichen: async (v: Vorgang) => v,
     };
-    // Diese Config HAT einen Seed — mit Persistenz darf er NICHT erscheinen.
+    // Diese Config HAT einen Seed — er ist der Anfangsbestand (eine SB-Sicht ohne Hydration sähe ihn).
     const s = createFachverfahrenStore(
       { ...config, seed: () => [{ id: "seed-1" }] as never },
       { now: () => "2026-01-01T00:00:00.000Z", persistence },
     );
-    expect(s.list()).toEqual([]); // KEIN Seed
+    expect(s.list().map((v) => v.id)).toEqual(["seed-1"]); // Anfangsbestand vor Hydration
     await s.laden!();
-    expect(s.list().map((v) => v.id)).toEqual(["case.remote-1"]);
+    expect(s.list().map((v) => v.id)).toEqual(["case.remote-1"]); // ersetzt
   });
 
   it("mit Persistenz: einreichen SPEICHERT und übernimmt die KANONISCHE Fassung (Server-id), nicht die Client-id", async () => {

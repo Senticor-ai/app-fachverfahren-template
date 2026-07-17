@@ -52,9 +52,11 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
   const persistence = opts.persistence;
   const vorgangsnummer = makeVorgangsnummer(jahr);
 
-  // Mit Persistenz kommt der Bestand vom Server (via laden()) — der DEV-Seed wäre dann eine zweite,
-  // divergierende Wahrheit. Ohne Persistenz seedet die Config wie bisher.
-  const seed = persistence ? [] : (config.seed?.({ vorgangsnummer }) ?? []);
+  // Der Config-Seed ist der ANFANGSBESTAND — auch mit Persistenz. `laden()` ERSETZT ihn bei der
+  // Hydration durch die Server-Wahrheit; wer nicht hydriert (z. B. eine SB-Sicht, die den Demo-
+  // Bestand zeigt), behält den Seed. So teilen Bürger- und SB-Sicht EINE Store-Instanz, ohne dass
+  // die eine der anderen den Bestand wegzieht.
+  const seed = config.seed?.({ vorgangsnummer }) ?? [];
   const use = create<{ vorgaenge: Vorgang<T>[] }>(() => ({ vorgaenge: seed }));
 
   const setState = (fn: (s: Vorgang<T>[]) => Vorgang<T>[]) =>
@@ -74,8 +76,9 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
     list: () => use.getState().vorgaenge,
     get: (id) => use.getState().vorgaenge.find((v) => v.id === id),
 
-    // Hydriert den Snapshot aus der Persistenz-Naht (PROD: GET). Ohne Persistenz ein no-op — der
-    // In-Memory-Store trägt seinen Bestand bereits selbst (Seed + eingereichte Vorgänge).
+    // Hydriert den Snapshot aus der Persistenz-Naht (PROD: GET) — und ERSETZT dabei den bisherigen
+    // Bestand (Seed) durch die Server-Wahrheit. Ohne Persistenz existiert die Methode nicht (der
+    // In-Memory-Store trägt seinen Bestand selbst: Seed + eingereichte Vorgänge).
     ...(persistence
       ? {
           laden: async () => {
