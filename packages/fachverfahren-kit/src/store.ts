@@ -63,7 +63,10 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
     list: () => use.getState().vorgaenge,
     get: (id) => use.getState().vorgaenge.find((v) => v.id === id),
 
-    einreichen: (antragsdaten, erbrachteNachweise) => {
+    // ASYNC nur der SIGNATUR nach: dieser DEV-Store rechnet rein lokal und synchron. Der Vertrag ist
+    // async, damit die PROD-Implementierung (HTTP gegen das BFF) überhaupt typisierbar ist — vorher
+    // schloss die synchrone Signatur jede server-gestützte Umsetzung aus.
+    einreichen: async (antragsdaten, erbrachteNachweise) => {
       // KEINE KI-Einschätzung: an diesen Store ist KEIN Modell gebunden (der AiAssistPort ist eine
       // Naht ohne Adapter). Die Vorfassung schrieb hier hart `{confidence: 0, flags: []}` — das las
       // sich in der Aufsicht als „die KI war zu 0 % sicher" statt „es lief gar keine KI". `ki` bleibt
@@ -108,7 +111,7 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
       return v;
     },
 
-    uebergang: (id, to, rolle, detail, akteur) => {
+    uebergang: async (id, to, rolle, detail, akteur) => {
       const v = store.get(id);
       if (!v) throw new Error(`Vorgang ${id} nicht gefunden`);
       const t = config.statusMachine.transitions.find(
@@ -155,7 +158,7 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
       );
     },
 
-    lookupRegister: (query) => {
+    lookupRegister: async (query) => {
       const q = query.toLowerCase().trim();
       if (!q) return undefined;
       return config.register.mock?.find((r) =>

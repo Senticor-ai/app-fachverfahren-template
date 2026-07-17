@@ -326,10 +326,10 @@ export function ReportingPanel<T = Record<string, unknown>>({
           // Bezugsgröße ist `ki.bewertet` (Vorgänge MIT Modell-Bewertung), nicht `gesamt`: ohne
           // gebundenen Adapter ist kein Vorgang bewertet — dann ist die Quote bezugslos und die
           // Kachel sagt das offen, statt „0 %" wie einen Messwert auszuweisen.
-          wert={ki.bewertet > 0 ? `${prozent(ki.quote)} %` : "—"}
+          wert={ki.aktiv ? `${prozent(ki.autonomQuote)} %` : "—"}
           sub={
-            ki.bewertet > 0
-              ? `${ki.autonom} von ${ki.bewertet} bewertet · Konfidenz ≥ ${prozent(schwelle)} %, ohne Hinweise`
+            ki.aktiv
+              ? `${ki.autonomFaehig} von ${ki.bewertet} bewertet · Konfidenz ≥ ${prozent(schwelle)} %, ohne Hinweise`
               : gesamt > 0
                 ? "kein KI-Modell aktiv"
                 : "kein Bestand"

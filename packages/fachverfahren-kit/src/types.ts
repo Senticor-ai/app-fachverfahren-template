@@ -706,10 +706,33 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   personas?: readonly import("./components/PersonaSwitcher.js").PersonaDescriptor[];
 }
 
-/** DATENSCHICHT-PORT — die EINE Schnittstelle, die der Kit nutzt. DEV: Zustand-Store. PROD: SDK/Fastify. */
+/**
+ * DATENSCHICHT-PORT — die EINE Schnittstelle, die der Kit nutzt. DEV: Zustand-Store (In-Memory).
+ * PROD: HTTP gegen das BFF.
+ *
+ * DER SCHNITT (bewusst asymmetrisch, NICHT „alles async"):
+ *  - LESEN (`list`/`get`) ist SYNCHRON — es liest den lokalen Snapshot. Die Bausteine rufen `port.list()`
+ *    im Render-Body (z. B. AufsichtDashboard), und die App abonniert den Snapshot über
+ *    `useSyncExternalStore` (app/use-store-version.ts). Beides verlangt einen synchronen, referenz-
+ *    stabilen Lesepfad; ein `Promise` hier zerstörte die Reaktivität ohne jeden Gewinn.
+ *  - SCHREIBEN (`einreichen`/`uebergang`) und der REGISTER-Lookup sind ASYNC — sie gehen in PROD über
+ *    das Netz. Die Vorfassung typisierte sie synchron (`einreichen(): Vorgang`); damit war eine
+ *    server-gestützte Implementierung nicht einmal TIPPBAR, und die Zusage „PROD: dieselbe
+ *    Schnittstelle gegen SDK/Fastify" war durch die Signatur widerlegt. Genau deshalb blieb die
+ *    Bürger-Seite ein Browser-Store: ein Reload löschte jeden Antrag.
+ *  - `laden` HYDRIERT den Snapshot aus der Wahrheit hinter dem Port (PROD: GET; DEV: no-op).
+ *
+ * Schreibende Aufrufe können FEHLSCHLAGEN (Netz, 403 Vier-Augen, 409 Konflikt) — Aufrufer MÜSSEN das
+ * Promise abwarten und den Fehler behandeln; ein nicht abgewartetes Reject wäre ein stiller Verlust.
+ */
 export interface VorgangPort<TAntragsdaten = Record<string, unknown>> {
+  /** SYNCHRON aus dem lokalen Snapshot (siehe Schnitt oben) — nach `laden()` server-gedeckt. */
   list(): Vorgang<TAntragsdaten>[];
+  /** SYNCHRON aus dem lokalen Snapshot (siehe Schnitt oben). */
   get(id: string): Vorgang<TAntragsdaten> | undefined;
+  /** Lädt den Snapshot aus der Wahrheit hinter dem Port (PROD: GET /api/vorgaenge; DEV: no-op).
+   *  OPTIONAL/additiv: ein Port ohne Hydration (reiner In-Memory-DEV-Store) lässt es weg. */
+  laden?(): Promise<void>;
   /** Bürger-Antrag absenden → neuer Vorgang im Initialstatus + History-Eintrag. `erbrachteNachweise` (optional, generisch)
    *  = die vom Bürger hochgeladenen Dateien, keyed by Nachweis-Id → der Vorgang trägt sie als „hochgeladen" (sonst
    *  zeigte der Sachbearbeiter für JEDEN Nachweis „Fehlt", egal was hochgeladen wurde). */
@@ -719,7 +742,7 @@ export interface VorgangPort<TAntragsdaten = Record<string, unknown>> {
       string,
       { name: string; groesse: number } | null
     >,
-  ): Vorgang<TAntragsdaten>;
+  ): Promise<Vorgang<TAntragsdaten>>;
   /** Status-Übergang (SB-Entscheidung) — prüft die Transition + schreibt History (4-Augen serverseitig in PROD).
    *  `akteur` (optional): pseudonyme Kennung des Handelnden → landet als `history[].akteur` und macht Vier-Augen
    *  nachweisbar; bei `vierAugen`-Transitionen prüft schon der DEV-Store, dass ZWEI VERSCHIEDENE Akteure handeln. */
@@ -729,7 +752,7 @@ export interface VorgangPort<TAntragsdaten = Record<string, unknown>> {
     rolle: string,
     detail?: string,
     akteur?: string,
-  ): void;
-  /** Once-Only-Lookup gegen das Register. */
-  lookupRegister(query: string): Record<string, string> | undefined;
+  ): Promise<void>;
+  /** Once-Only-Lookup gegen das Register (in PROD ein Netz-Aufruf gegen ein Fremdregister). */
+  lookupRegister(query: string): Promise<Record<string, string> | undefined>;
 }

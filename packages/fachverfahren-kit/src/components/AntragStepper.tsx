@@ -125,7 +125,7 @@ function adressAus(daten: Antragsdaten): AdressWert {
 }
 
 /** Deterministischer Registerabgleich über den Port: ein Treffer mit allen Adressbestandteilen → genau-1-Treffer. */
-function adressValidieren<T extends Antragsdaten>(
+async function adressValidieren<T extends Antragsdaten>(
   port: VorgangPort<T>,
   wert: AdressWert,
 ): Promise<AdressTreffer[]> {
@@ -133,14 +133,15 @@ function adressValidieren<T extends Antragsdaten>(
     .map((s) => (s ?? "").trim())
     .filter(Boolean)
     .join(" ");
-  const treffer = query ? port.lookupRegister(query) : undefined;
-  if (!treffer) return Promise.resolve([]);
+  // Der Register-Lookup ist in PROD ein Netz-Aufruf gegen ein Fremdregister — deshalb awaiten.
+  const treffer = query ? await port.lookupRegister(query) : undefined;
+  if (!treffer) return [];
   const strasse = treffer["strasse"] ?? wert.strasse ?? "";
   const plz = treffer["plz"] ?? wert.plz ?? "";
   const ort = treffer["ort"] ?? wert.ort ?? "";
   // Nur als vollständiger amtlicher Treffer melden, wenn alle Bestandteile vorliegen.
-  if (!strasse || !plz || !ort) return Promise.resolve([]);
-  return Promise.resolve([{ strasse, plz, ort }]);
+  if (!strasse || !plz || !ort) return [];
+  return [{ strasse, plz, ort }];
 }
 
 /** DETERMINISTISCHE Feld-DOM-id (gemeinsame Wahrheit für Control, aria-describedby UND ErrorSummary-Anker).
@@ -296,6 +297,13 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
   // Fehler-Zusammenfassung (oben): leer, solange nicht blockiert wurde. Bei „Weiter"/„Absenden" mit offenen
   // Pflicht-/Format-Angaben gefüllt, Fokus springt hinein (summaryRef), zentrale Ansage über announce.
   const [summaryErrors, setSummaryErrors] = useState<FieldError[]>([]);
+  // ── Absende-Zustand (Folge des async-Ports) ─────────────────────────────────────────────────────
+  // `sendenLaeuft` (Ref) sperrt SOFORT gegen Doppel-Absenden — State griffe erst nach dem Render.
+  // `sendet` (State) treibt nur die Anzeige; `sendeFehler` trägt einen fehlgeschlagenen Absende-Versuch
+  // sichtbar in die Oberfläche, statt ihn als unbehandelte Rejection zu verlieren.
+  const sendenLaeuft = useRef(false);
+  const [sendet, setSendet] = useState(false);
+  const [sendeFehler, setSendeFehler] = useState<string | null>(null);
   const focusSummary = (errs: FieldError[]): void => {
     setSummaryErrors(errs);
     const anzahl = errs.length;
@@ -341,14 +349,14 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
   const allValid = invalidStep === null;
 
   // ── Once-Only: über die ersten editierbaren onceOnly-Felder gegen das Register suchen ────────
-  function tryRegisterLookup(feld: FeldDef, rohwert: string) {
+  async function tryRegisterLookup(feld: FeldDef, rohwert: string) {
     if (!feld.onceOnly) return;
     const q = rohwert.trim();
     if (!q) {
       setRegisterHinweis(null);
       return;
     }
-    const treffer = port.lookupRegister(q);
+    const treffer = await port.lookupRegister(q);
     if (!treffer) {
       setRegisterHinweis(null);
       return;
@@ -414,22 +422,52 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
     }
   };
 
-  function submit() {
+  async function submit() {
     // PFLICHT-SPERRE auch beim Absenden: offene Angaben sammeln, oben anzeigen, Fokus + Ansage — NICHT einreichen.
     if (!allValid) {
       focusSummary(alleFehlerEintraege().errors);
       return;
     }
+    // DOPPEL-ABSENDE-SPERRE: `einreichen` geht in PROD über das Netz und braucht Zeit. Ohne diese Sperre
+    // erzeugte ein zweiter Klick (ungeduldiger Nutzer, langsame Leitung) einen ZWEITEN Vorgang zum selben
+    // Antrag. Solange der Aufruf synchron war, konnte das nicht passieren — die Sperre gehört deshalb
+    // zwingend zum async-Schnitt dazu. Ref statt State: die Sperre muss SOFORT greifen, nicht erst nach
+    // dem nächsten Render.
+    if (sendenLaeuft.current) return;
+    sendenLaeuft.current = true;
+    setSendet(true);
     setSummaryErrors([]);
-    // WIRKSAM einreichen (typisiert + M1-abgeleitet) — der Port/das Backend erhält fachlich korrekte, konsistente
-    // Werte inkl. der abgeleiteten Felder (der Store leitet defensiv nochmals ab; die Ableitung ist idempotent).
-    // Die tatsächlich hochgeladenen Nachweis-Dateien (keyed by Nachweis-Id) MIT einreichen — sonst verpuffen sie und der
-    // Sachbearbeiter sieht für jeden Nachweis „Fehlt" (Wurzel-Fix „Upload landet nicht beim Sachbearbeiter").
-    const vorgang = port.einreichen(
-      effektiveDaten as T,
-      nachweisDateien.current,
-    );
-    onDone(vorgang);
+    try {
+      // WIRKSAM einreichen (typisiert + M1-abgeleitet) — der Port/das Backend erhält fachlich korrekte, konsistente
+      // Werte inkl. der abgeleiteten Felder (der Store leitet defensiv nochmals ab; die Ableitung ist idempotent).
+      // Die tatsächlich hochgeladenen Nachweis-Dateien (keyed by Nachweis-Id) MIT einreichen — sonst verpuffen sie und der
+      // Sachbearbeiter sieht für jeden Nachweis „Fehlt" (Wurzel-Fix „Upload landet nicht beim Sachbearbeiter").
+      const vorgang = await port.einreichen(
+        effektiveDaten as T,
+        nachweisDateien.current,
+      );
+      onDone(vorgang);
+    } catch (fehler) {
+      // FAIL-LOUD: ein fehlgeschlagenes Einreichen DARF NICHT wie ein Erfolg aussehen. Ohne dieses catch
+      // liefe die Ablehnung als unbehandelte Promise-Rejection ins Leere — der Bürger sähe die
+      // Bestätigungsseite, obwohl kein Vorgang entstanden ist. Der Antrag bleibt hier vollständig
+      // erhalten, damit erneut abgesendet werden kann.
+      sendenLaeuft.current = false;
+      setSendet(false);
+      const text =
+        fehler instanceof Error && fehler.message
+          ? fehler.message
+          : "Unbekannter Fehler";
+      setSendeFehler(
+        `Der Antrag konnte nicht abgesendet werden: ${text} Ihre Angaben sind erhalten — bitte erneut absenden.`,
+      );
+      announce(
+        "Der Antrag konnte nicht abgesendet werden. Ihre Angaben sind erhalten.",
+        "assertive",
+      );
+      return;
+    }
+    // Erfolg: die Sperre bleibt gesetzt — `onDone` navigiert weg, ein Zurück-Klick darf nicht erneut senden.
   }
 
   return (
@@ -459,6 +497,16 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
             onErrorClick={onSummaryErrorClick}
             className="mb-6"
           />
+        )}
+        {/* Fehlgeschlagenes Absenden (Netz/Backend): role="alert" trägt es sofort an Screenreader — ein
+            stiller Fehlschlag wäre der schlimmste Ausgang (der Bürger hielte den Antrag für gestellt). */}
+        {sendeFehler && (
+          <p
+            role="alert"
+            className="mb-6 rounded-md border border-status-block/30 bg-status-block-soft p-4 text-sm text-foreground"
+          >
+            {sendeFehler}
+          </p>
         )}
 
         {/* Fach-Schritte (dynamisch aus config, M3-gefiltert/geordnet) */}
@@ -654,11 +702,17 @@ export function AntragStepper<T extends Antragsdaten = Antragsdaten>({
             </Button>
           ) : (
             <Button
-              onClick={submit}
+              onClick={() => void submit()}
               disabled={!allValid}
               aria-disabled={!allValid}
+              // NICHT zusätzlich `disabled={sendet}`: ein Button, der während des Roundtrips nativ
+              // deaktiviert wird, verliert den Fokus an document.body — die Tastatur-/AT-Position ist
+              // weg und die role=alert-Meldung landet im Nichts (dieselbe Falle wie bei der
+              // Akte-Checkbox, WCAG 2.1.1/2.4.3). Gegen Doppel-Absenden schützt der Ref-Guard in
+              // `submit`; `aria-busy` sagt den laufenden Vorgang an.
+              aria-busy={sendet}
             >
-              Antrag absenden
+              {sendet ? "Antrag wird abgesendet …" : "Antrag absenden"}
               <ChevronRight className="h-4 w-4" />
             </Button>
           )}
