@@ -70,17 +70,19 @@ export function registerTaskRoutes(app: FastifyInstance, deps: BffDeps): void {
     503: ErrorEnvelopeSchema,
   };
 
-  /** Akte laden und Behörden-Scope prüfen. `undefined` heißt: nicht vorhanden ODER Fremd-Behörde → 404. */
+  /** Akte im BEHÖRDEN-Scope laden. `undefined` heißt: nicht vorhanden ODER Fremd-Behörde → 404.
+   *  Der Scope steckt im Store-Prädikat (getCase scope:"authority"); die frühere Nachprüfung hier
+   *  war eine von fünf handgeschriebenen Kopien derselben Regel. */
   async function loadOwnedCase(
     session: ReturnType<typeof sessionOf>,
     caseId: string,
   ): Promise<AppCase | undefined> {
-    const found = await deps.caseStore.getCase({
+    return deps.caseStore.getCase({
       tenantId: session.tenantId,
       caseId,
+      scope: "authority",
+      authorityId: session.authorityId,
     });
-    if (!found || found.authorityId !== session.authorityId) return undefined;
-    return found;
   }
 
   typed.get(

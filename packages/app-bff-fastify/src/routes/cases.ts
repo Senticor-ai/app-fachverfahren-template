@@ -175,6 +175,11 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
       try {
         cases = await deps.caseStore.listCases({
           tenantId: session.tenantId,
+          // BEHÖRDEN-Sicht: diese Route ist die Sachbearbeitungs-Sicht (case.read). Der Bürger-Pfad
+          // („meine Anträge") bekommt eine EIGENE Routen-Familie mit scope "owner" — bewusst NICHT
+          // ein scope-Feld auf DIESER Route: `scopeOf` läse es aus Query/Body (Default "own"), und
+          // ein nicht im Schema deklariertes `scope` würde von Fastify STILL weggeworfen.
+          scope: "authority",
           authorityId: session.authorityId,
           ...(request.query.state !== undefined
             ? { state: request.query.state }
@@ -212,12 +217,16 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
         found = await deps.caseStore.getCase({
           tenantId: session.tenantId,
           caseId: request.params.id,
+          scope: "authority",
+          authorityId: session.authorityId,
         });
       } catch {
         return storeUnavailable(request, reply);
       }
-      // Behörden-Scope: eine Fremd-Behörde im selben Mandanten wird als 404 behandelt (keine Existenz-Leaks).
-      if (!found || found.authorityId !== session.authorityId)
+      // Der Behörden-Scope steckt im Store-PRÄDIKAT (getCase scope:"authority") — ein Fall einer
+      // Fremd-Behörde kommt gar nicht erst zurück. Die frühere Nachprüfung hier war eine an fünf
+      // Stellen duplizierte Handarbeit, die kein Gate deckte. 404 statt 403: kein Existenz-Orakel.
+      if (!found)
         return reply
           .code(404)
           .send({ error: "not found", requestId: requestIdOf(request) });
@@ -247,11 +256,14 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
         found = await deps.caseStore.getCase({
           tenantId: session.tenantId,
           caseId: request.params.id,
+          scope: "authority",
+          authorityId: session.authorityId,
         });
       } catch {
         return storeUnavailable(request, reply);
       }
-      if (!found || found.authorityId !== session.authorityId)
+      // Scope steckt im Store-Prädikat (s. o.) — hier reicht „nicht gefunden".
+      if (!found)
         return reply
           .code(404)
           .send({ error: "not found", requestId: requestIdOf(request) });
@@ -292,12 +304,14 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
         found = await deps.caseStore.getCase({
           tenantId: session.tenantId,
           caseId: request.params.id,
+          scope: "authority",
+          authorityId: session.authorityId,
         });
       } catch {
         return storeUnavailable(request, reply);
       }
-      // Behörden-Scope: Fremd-Behörde/fehlend → 404 (keine Existenz-Leaks).
-      if (!found || found.authorityId !== session.authorityId)
+      // Scope steckt im Store-Prädikat (s. o.) — hier reicht „nicht gefunden".
+      if (!found)
         return reply
           .code(404)
           .send({ error: "not found", requestId: requestIdOf(request) });
@@ -381,6 +395,10 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
         closedAt: null,
         // Fachliche Nutzlast unverändert durchreichen — der Server interpretiert sie NICHT.
         data: body.data ?? {},
+        // Diese Route ist die BEHÖRDEN-Anlage (case.decision.prepare): der entstehende Fall hat keinen
+        // Bürger-Eigentümer. Der Bürger-Antrag bekommt eine eigene Route, die `ownerActorId` aus der
+        // SESSION stempelt — niemals aus dem Body (sonst liesse sich fremde Zuordnung erschleichen).
+        ownerActorId: null,
       };
       try {
         await deps.caseStore.insertCase(created);
@@ -440,12 +458,16 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
         found = await deps.caseStore.getCase({
           tenantId: session.tenantId,
           caseId: request.params.id,
+          scope: "authority",
+          authorityId: session.authorityId,
         });
       } catch {
         return storeUnavailable(request, reply);
       }
-      // Behörden-Scope: eine Fremd-Behörde im selben Mandanten wird als 404 behandelt (keine Existenz-Leaks).
-      if (!found || found.authorityId !== session.authorityId)
+      // Der Behörden-Scope steckt im Store-PRÄDIKAT (getCase scope:"authority") — ein Fall einer
+      // Fremd-Behörde kommt gar nicht erst zurück. Die frühere Nachprüfung hier war eine an fünf
+      // Stellen duplizierte Handarbeit, die kein Gate deckte. 404 statt 403: kein Existenz-Orakel.
+      if (!found)
         return reply
           .code(404)
           .send({ error: "not found", requestId: requestIdOf(request) });

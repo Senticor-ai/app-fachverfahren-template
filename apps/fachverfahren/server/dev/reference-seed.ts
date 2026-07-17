@@ -114,6 +114,8 @@ async function seedDemoDossier(
     const already = await deps.caseStore.getCase({
       tenantId: DEFAULT_TENANT_ID,
       caseId: dossierDemo.caseId,
+      scope: "authority",
+      authorityId: DEFAULT_AUTHORITY_ID,
     });
     if (already) {
       log("info", "runtime.dev-seed.case.skipped", { reason: "exists" });
@@ -132,6 +134,8 @@ async function seedDemoDossier(
       subjectIds: [dossierDemo.subjectId],
       openedAt: dossierDemo.openedAt,
       closedAt: null,
+      // Behörden-initiiertes Dossier — kein Bürger-Eigentümer.
+      ownerActorId: null,
       // Ein DOSSIER-Fall trägt seine Fachlichkeit in Aufgaben/Zielen (app_tasks), nicht in der
       // Fall-Nutzlast — `data` bleibt leer. Gefüllt wird sie von der ANTRAGS-Art (Antragsdaten +
       // Berechnung), die den Fall als Akte nutzt.

@@ -28,6 +28,7 @@ function macheCase(over: Partial<AppCase> = {}): AppCase {
     openedAt: "2026-06-01T00:00:00.000Z",
     closedAt: null,
     data: {},
+    ownerActorId: null,
     ...over,
   };
 }
@@ -77,13 +78,23 @@ for (const impl of impls) {
     it("legt einen Fall an und liest ihn zurück (mandanten-scoped)", async () => {
       const c = macheCase();
       await store.insertCase(c);
-      const gelesen = await store.getCase({ tenantId: "t1", caseId: c.caseId });
+      const gelesen = await store.getCase({
+        tenantId: "t1",
+        caseId: c.caseId,
+        scope: "authority",
+        authorityId: "b1",
+      });
       expect(gelesen?.caseId).toBe(c.caseId);
       expect(gelesen?.subjectIds).toEqual(["subj-1"]);
       expect(gelesen?.state).toBe("aufgenommen");
       // Fremder Mandant sieht den Fall NICHT.
       expect(
-        await store.getCase({ tenantId: "fremd", caseId: c.caseId }),
+        await store.getCase({
+          tenantId: "fremd",
+          caseId: c.caseId,
+          scope: "authority",
+          authorityId: "b1",
+        }),
       ).toBeUndefined();
     });
 
@@ -102,7 +113,12 @@ for (const impl of impls) {
       };
       const c = macheCase({ data: daten });
       await store.insertCase(c);
-      const gelesen = await store.getCase({ tenantId: "t1", caseId: c.caseId });
+      const gelesen = await store.getCase({
+        tenantId: "t1",
+        caseId: c.caseId,
+        scope: "authority",
+        authorityId: "b1",
+      });
       expect(gelesen?.data).toEqual(daten);
     });
 
@@ -112,23 +128,109 @@ for (const impl of impls) {
       // solche stillen Divergenzen sind hier schon einmal erst im Live-Drive aufgefallen (closedAt).
       const c = macheCase({ data: { antragsdaten: { plz: "12345" } } });
       await store.insertCase(c);
-      const gelesen = await store.getCase({ tenantId: "t1", caseId: c.caseId });
+      const gelesen = await store.getCase({
+        tenantId: "t1",
+        caseId: c.caseId,
+        scope: "authority",
+        authorityId: "b1",
+      });
       (gelesen!.data["antragsdaten"] as Record<string, unknown>)["plz"] =
         "99999";
-      const nochmal = await store.getCase({ tenantId: "t1", caseId: c.caseId });
+      const nochmal = await store.getCase({
+        tenantId: "t1",
+        caseId: c.caseId,
+        scope: "authority",
+        authorityId: "b1",
+      });
       expect(nochmal?.data).toEqual({ antragsdaten: { plz: "12345" } });
     });
 
     it("data: fehlende Nutzlast ist ein leeres Objekt, nie undefined", async () => {
       const c = macheCase({ data: {} });
       await store.insertCase(c);
-      const gelesen = await store.getCase({ tenantId: "t1", caseId: c.caseId });
+      const gelesen = await store.getCase({
+        tenantId: "t1",
+        caseId: c.caseId,
+        scope: "authority",
+        authorityId: "b1",
+      });
       expect(gelesen?.data).toEqual({});
+    });
+
+    it("owner-Scope: die Bürgerin sieht NUR ihren eigenen Fall — nie den einer anderen", async () => {
+      const tenantId = `t-owner-${uid()}`;
+      const meiner = macheCase({ tenantId, ownerActorId: "actor.anna" });
+      const fremder = macheCase({ tenantId, ownerActorId: "actor.bodo" });
+      await store.insertCase(meiner);
+      await store.insertCase(fremder);
+
+      const meins = {
+        tenantId,
+        scope: "owner" as const,
+        actorId: "actor.anna",
+      };
+      expect((await store.listCases(meins)).map((c) => c.caseId)).toEqual([
+        meiner.caseId,
+      ]);
+      // Der FREMDE Fall ist über getCase nicht erreichbar — auch nicht mit korrekter caseId.
+      // Er kommt als `undefined` zurück → 404 ist die einzig mögliche Antwort, kein 403-Existenz-Orakel.
+      expect(
+        await store.getCase({ ...meins, caseId: fremder.caseId }),
+      ).toBeUndefined();
+      expect(
+        (await store.getCase({ ...meins, caseId: meiner.caseId }))?.caseId,
+      ).toBe(meiner.caseId);
+    });
+
+    it("owner-Scope: ein Fall OHNE Eigentümer (Behörden-Dossier) ist NIE „meins“", async () => {
+      // Die NULL-Regel: das Prädikat vergleicht auf Gleichheit, und `NULL = $1` ist in SQL nie wahr.
+      // Ein behörden-initiiertes Dossier darf niemals in „meine Anträge" auftauchen — fail-closed
+      // ohne Sonderfall im Code. Diese Prüfung läuft gegen BEIDE Laufzeiten (Parität).
+      const tenantId = `t-null-${uid()}`;
+      const dossier = macheCase({ tenantId, ownerActorId: null });
+      await store.insertCase(dossier);
+      const alsBuerger = {
+        tenantId,
+        scope: "owner" as const,
+        actorId: "actor.anna",
+      };
+      expect(await store.listCases(alsBuerger)).toEqual([]);
+      expect(
+        await store.getCase({ ...alsBuerger, caseId: dossier.caseId }),
+      ).toBeUndefined();
+      // Die Behörde sieht ihn sehr wohl.
+      expect(
+        (
+          await store.getCase({
+            tenantId,
+            caseId: dossier.caseId,
+            scope: "authority",
+            authorityId: "b1",
+          })
+        )?.caseId,
+      ).toBe(dossier.caseId);
+    });
+
+    it("owner-Scope respektiert den Mandanten-Riegel (fremder Mandant sieht nichts)", async () => {
+      const tenantId = `t-mand-${uid()}`;
+      const meiner = macheCase({ tenantId, ownerActorId: "actor.anna" });
+      await store.insertCase(meiner);
+      expect(
+        await store.listCases({
+          tenantId: "fremder-mandant",
+          scope: "owner",
+          actorId: "actor.anna",
+        }),
+      ).toEqual([]);
     });
 
     it("listCases filtert nach Mandant/Behörde/Status/Verfahren, opened_at DESC", async () => {
       const tenantId = `t-list-${uid()}`;
-      const scope = { tenantId, authorityId: "b1" };
+      const scope = {
+        tenantId,
+        scope: "authority" as const,
+        authorityId: "b1",
+      };
       await store.insertCase(
         macheCase({
           tenantId,

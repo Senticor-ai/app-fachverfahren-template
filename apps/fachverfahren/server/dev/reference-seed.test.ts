@@ -8,6 +8,7 @@ import {
   InMemoryKanbanStore,
   InMemoryTaskStore,
 } from "@senticor/app-store-postgres";
+import { DEFAULT_AUTHORITY_ID } from "../auth/bootstrap.js";
 import { dossierDemo, dossierProcedure } from "../procedure.config.js";
 import { seedReferenceDemo } from "./reference-seed.js";
 
@@ -42,6 +43,8 @@ describe("seedReferenceDemo (DEV/memory, aus der procedure.config-Naht)", () => 
     const found = await stores.caseStore.getCase({
       tenantId: TENANT,
       caseId: dossierDemo.caseId,
+      scope: "authority",
+      authorityId: DEFAULT_AUTHORITY_ID,
     });
     expect(found?.state).toBe(dossierDemo.initialState);
     expect(found?.procedureId).toBe(dossierProcedure.procedureId);
@@ -97,6 +100,8 @@ describe("seedReferenceDemo (DEV/memory, aus der procedure.config-Naht)", () => 
     const found = await stores.caseStore.getCase({
       tenantId: TENANT,
       caseId: dossierDemo.caseId,
+      scope: "authority",
+      authorityId: DEFAULT_AUTHORITY_ID,
     });
     expect(found?.state).toBe(dossierDemo.initialState);
     const audit = await stores.caseStore.listAuditEvents({

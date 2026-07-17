@@ -30,6 +30,7 @@ function macheCase(over: Partial<AppCase> = {}): AppCase {
     openedAt: "2026-06-01T00:00:00.000Z",
     closedAt: null,
     data: {},
+    ownerActorId: null,
     ...over,
   };
 }

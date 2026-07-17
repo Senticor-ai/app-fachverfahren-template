@@ -23,6 +23,19 @@ export interface AppCase {
   subjectIds: string[];
   openedAt: string;
   closedAt: string | null;
+  /**
+   * EIGENTÜMER des Falls — die Bürger:in, der/dem er gehört. `null` = behörden-initiierter Fall ohne
+   * Bürger-Eigentümer (Dossier).
+   *
+   * NUR AUS DER SESSION STEMPELN (`session.actorId`), NIE aus Query/Body — Präzedenz
+   * `app_mailbox_messages.owner_actor_id` (mailbox.ts). Bewusst NICHT `subjectIds`: das ist
+   * client-kontrolliert (das BFF übernimmt `body.subjectIds` ungeprüft) und damit als Auth-Material
+   * untauglich — Ownership daran zu hängen liesse sich über den Body erschleichen.
+   *
+   * `null` zählt NIE als „meins": das Store-Prädikat vergleicht auf Gleichheit, und `NULL = $1` ist in
+   * SQL nie wahr — fail-closed ohne Sonderfall.
+   */
+  ownerActorId: string | null;
   /** Frei-formige fachliche NUTZLAST des Falls (Konvention wie app_tasks.data) — z. B. Antragsdaten,
    *  Berechnung und Nachweis-Stand eines Antrags-Verfahrens.
    *
@@ -51,13 +64,37 @@ export interface AppAuditEvent {
   occurredAt: string;
 }
 
-export interface ListCasesQuery {
+/**
+ * WESSEN Fälle? — der Sichtbarkeits-Anker, als UNION statt als Flag.
+ *
+ * Warum ein Union und kein optionales `ownerActorId?` neben `authorityId?`: Der Union macht den
+ * gefährlichen Zustand UNAUSSPRECHBAR, statt ihn zu bewachen. Im `owner`-Zweig EXISTIERT `authorityId`
+ * nicht (der Bürger gehört keiner Behörde — er dürfte auch nicht danach gefiltert werden), im
+ * `authority`-Zweig existiert `actorId` nicht. Ein Aufrufer kann die beiden also nicht versehentlich
+ * mischen oder eines weglassen; der Compiler verlangt die Entscheidung.
+ *
+ * `tenantId` bleibt in BEIDEN Zweigen Pflicht — der Mandanten-Riegel ist nicht verhandelbar.
+ *
+ * Das ersetzt die bisher an FÜNF Stellen von Hand duplizierte Nachprüfung
+ * (`found.authorityId !== session.authorityId → 404`, cases.ts + tasks.ts), die von keinem Gate
+ * gedeckt war: Der Scope wandert ins PRÄDIKAT. Ein fremder Fall kommt gar nicht erst zurück
+ * (`undefined`) → 404 ist die einzig mögliche Antwort, und es entsteht kein 403-Existenz-Orakel.
+ */
+export type CaseScope =
+  | { scope: "authority"; authorityId: string }
+  | { scope: "owner"; actorId: string };
+
+export type ListCasesQuery = {
   tenantId: string;
-  authorityId: string;
   state?: string;
   procedureId?: string;
   limit?: number;
-}
+} & CaseScope;
+
+export type GetCaseInput = {
+  tenantId: string;
+  caseId: string;
+} & CaseScope;
 
 /** Optimistisch gesperrter Zustandswechsel: schreibt neuen `state`/`version`+1 (+ optional `closedAt`) UND das
  *  Audit-Ereignis ATOMAR in DERSELBEN Transaktion. `expectedVersion` erzwingt Optimistic-Locking. Der Aufrufer
@@ -73,10 +110,7 @@ export interface PatchCaseStateInput {
 
 export interface CaseStore {
   insertCase(input: AppCase): Promise<AppCase>;
-  getCase(input: {
-    tenantId: string;
-    caseId: string;
-  }): Promise<AppCase | undefined>;
+  getCase(input: GetCaseInput): Promise<AppCase | undefined>;
   listCases(query: ListCasesQuery): Promise<AppCase[]>;
   /** ATOMAR: Zustandswechsel (Optimistic-Locking) + append-only Audit in EINER Transaktion. Wirft
    *  `CaseNotFoundError` / `CaseVersionConflictError`. */
@@ -118,7 +152,7 @@ export class PostgresCaseStore implements CaseStore {
     return this.withClient(async (client) => {
       const result = await client.query<CaseRow>(
         `INSERT INTO app_cases (${CASE_COLS})
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12::jsonb)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12::jsonb,$13)
          RETURNING ${CASE_COLS}`,
         caseInsertParams(input),
       );
@@ -126,14 +160,21 @@ export class PostgresCaseStore implements CaseStore {
     });
   }
 
-  async getCase(input: {
-    tenantId: string;
-    caseId: string;
-  }): Promise<AppCase | undefined> {
+  async getCase(input: GetCaseInput): Promise<AppCase | undefined> {
     return this.withClient(async (client) => {
+      // Der Scope steckt im PRÄDIKAT, nicht in einer Nachprüfung beim Aufrufer: ein Fall ausserhalb
+      // des Scopes kommt gar nicht erst zurück. `owner_actor_id = $3` ist für NULL-Zeilen nie wahr
+      // (behörden-initiierte Dossiers sind damit nie „meins") — fail-closed ohne Sonderfall.
+      const scopeSql =
+        input.scope === "authority"
+          ? "authority_id = $3"
+          : "owner_actor_id = $3";
+      const scopeWert =
+        input.scope === "authority" ? input.authorityId : input.actorId;
       const result = await client.query<CaseRow>(
-        `SELECT ${CASE_COLS} FROM app_cases WHERE tenant_id = $1 AND case_id = $2`,
-        [input.tenantId, input.caseId],
+        `SELECT ${CASE_COLS} FROM app_cases
+         WHERE tenant_id = $1 AND case_id = $2 AND ${scopeSql}`,
+        [input.tenantId, input.caseId, scopeWert],
       );
       return result.rows[0] ? caseFromRow(result.rows[0]) : undefined;
     });
@@ -143,14 +184,18 @@ export class PostgresCaseStore implements CaseStore {
     return this.withClient(async (client) => {
       const result = await client.query<CaseRow>(
         `SELECT ${CASE_COLS} FROM app_cases
-         WHERE tenant_id = $1 AND authority_id = $2
+         WHERE tenant_id = $1 AND ${
+           query.scope === "authority"
+             ? "authority_id = $2"
+             : "owner_actor_id = $2"
+         }
            AND ($3::text IS NULL OR state = $3)
            AND ($4::text IS NULL OR procedure_id = $4)
          ORDER BY opened_at DESC
          LIMIT $5`,
         [
           query.tenantId,
-          query.authorityId,
+          query.scope === "authority" ? query.authorityId : query.actorId,
           query.state ?? null,
           query.procedureId ?? null,
           query.limit ?? 100,
@@ -242,6 +287,19 @@ export class PostgresCaseStore implements CaseStore {
   }
 }
 
+/**
+ * Das Scope-Prädikat des In-Memory-Zweigs — EINE Wahrheit für getCase UND listCases, damit die beiden
+ * nicht auseinanderlaufen können (im Postgres-Zweig erzwingt das die gemeinsame WHERE-Klausel).
+ *
+ * `ownerActorId === null` ist NIE „meins": das entspricht `NULL = $1` in SQL, das ebenfalls nie wahr
+ * ist. Diese Zeile IST die Postgres-Parität — sie darf nicht zu `?? ""`-Vergleichen o. Ä. aufweichen.
+ */
+function imScope(c: AppCase, scope: CaseScope): boolean {
+  return scope.scope === "authority"
+    ? c.authorityId === scope.authorityId
+    : c.ownerActorId !== null && c.ownerActorId === scope.actorId;
+}
+
 export class InMemoryCaseStore implements CaseStore {
   private readonly cases = new Map<string, AppCase>();
   private readonly audit: AppAuditEvent[] = [];
@@ -264,18 +322,14 @@ export class InMemoryCaseStore implements CaseStore {
     };
   }
 
-  async getCase(input: {
-    tenantId: string;
-    caseId: string;
-  }): Promise<AppCase | undefined> {
+  async getCase(input: GetCaseInput): Promise<AppCase | undefined> {
     const found = this.cases.get(this.key(input.tenantId, input.caseId));
-    return found
-      ? {
-          ...found,
-          subjectIds: [...found.subjectIds],
-          data: cloneData(found.data),
-        }
-      : undefined;
+    if (!found || !imScope(found, input)) return undefined;
+    return {
+      ...found,
+      subjectIds: [...found.subjectIds],
+      data: cloneData(found.data),
+    };
   }
 
   async listCases(query: ListCasesQuery): Promise<AppCase[]> {
@@ -283,7 +337,7 @@ export class InMemoryCaseStore implements CaseStore {
       .filter(
         (c) =>
           c.tenantId === query.tenantId &&
-          c.authorityId === query.authorityId &&
+          imScope(c, query) &&
           (query.state === undefined || c.state === query.state) &&
           (query.procedureId === undefined ||
             c.procedureId === query.procedureId),
@@ -403,7 +457,7 @@ function cloneData(data: Record<string, unknown>): Record<string, unknown> {
 
 // ── SQL + Row-Mapping ────────────────────────────────────────────────────────────────────────
 const CASE_COLS = `case_id, tenant_id, authority_id, jurisdiction_id, procedure_id,
-  procedure_version, state, version, subject_ids, opened_at, closed_at, data`;
+  procedure_version, state, version, subject_ids, opened_at, closed_at, data, owner_actor_id`;
 const AUDIT_COLS = `audit_event_id, case_id, tenant_id, authority_id, jurisdiction_id,
   actor_id, event_type, purpose, legal_basis_id, request_id, payload, occurred_at`;
 const AUDIT_INSERT_SQL = `INSERT INTO app_audit_events (${AUDIT_COLS})
@@ -423,6 +477,7 @@ function caseInsertParams(c: AppCase): unknown[] {
     c.openedAt,
     c.closedAt,
     JSON.stringify(c.data),
+    c.ownerActorId,
   ];
 }
 
@@ -456,6 +511,7 @@ interface CaseRow extends Record<string, unknown> {
   opened_at: Date | string;
   closed_at: Date | string | null;
   data: Record<string, unknown>;
+  owner_actor_id: string | null;
 }
 
 interface AuditRow extends Record<string, unknown> {
@@ -486,6 +542,8 @@ function caseFromRow(row: CaseRow): AppCase {
     subjectIds: Array.isArray(row.subject_ids) ? row.subject_ids : [],
     openedAt: toIsoString(row.opened_at),
     closedAt: row.closed_at === null ? null : toIsoString(row.closed_at),
+    // Alt-Zeilen (vor der owner-Migration) haben hier NULL → kein Eigentümer, nie „meins".
+    ownerActorId: row.owner_actor_id ?? null,
     // Defensiv gegen Zeilen aus der Zeit VOR der data-Migration (Spalte hat zwar DEFAULT '{}', aber ein
     // getrennt migrierter Read-Replica-/Altbestand darf hier keinen TypeError auslösen).
     data:
