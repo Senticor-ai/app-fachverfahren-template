@@ -18,6 +18,7 @@ import {
   Home,
   Inbox,
   LayoutGrid,
+  ListChecks,
   LineChart,
   ShieldCheck,
   type LucideIcon,
@@ -118,6 +119,13 @@ function navFor<T>(
           // Nav-Item ejectet den Nutzer (Audit D3-1: Shell-Nav ≠ App-Routen, 3/6 Items tot). Kanonisch: /buerger/anmelden.
           icon: FileText,
           href: "/buerger/anmelden",
+        });
+        // „Meine Anträge": die eigenen, server-persistierten Vorgänge (echte Route /buerger/antraege).
+        items.push({
+          key: "antraege",
+          label: "Meine Anträge",
+          icon: ListChecks,
+          href: "/buerger/antraege",
         });
       }
       items.push(boardsNavItem());

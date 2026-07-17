@@ -19,6 +19,9 @@ export const routeGates = {
   "/buerger": personaGate("buerger"),
   "/buerger/anmelden": personaGate("buerger"),
   "/buerger/bestaetigung/:id": personaGate("buerger"),
+  // „Meine Anträge": die eigenen, server-persistierten Vorgänge — Liste + Status-Detail.
+  "/buerger/antraege": personaGate("buerger"),
+  "/buerger/antrag/:id": personaGate("buerger"),
   "/amt": personaGate("sachbearbeitung"),
   "/amt/vorgang/:id": personaGate("sachbearbeitung"),
   // Fall/Dossier-Sicht (ADR-0001): Akten-Liste + 360°-Detail über der Fall/Task-API.
