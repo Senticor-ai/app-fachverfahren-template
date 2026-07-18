@@ -27,22 +27,25 @@ function freshStores() {
 }
 
 describe("seedReferenceDemo (DEV/memory, aus der procedure.config-Naht)", () => {
-  it("legt mit APP_DEV_SEED_PASSWORD ZWEI anmeldbare Konten (admin→caseworker + citizen) + das Demo-Dossier an", async () => {
+  it("legt mit APP_DEV_SEED_PASSWORD DREI anmeldbare Konten (admin→caseworker + citizen + zweiter caseworker) + das Demo-Dossier an", async () => {
     const stores = freshStores();
     await seedReferenceDemo({
       ...stores,
       env: { APP_DEV_SEED_PASSWORD: TEST_PASSWORD },
     });
 
-    // ZWEI Konten: die Sachbearbeitung (admin→caseworker) UND ein Bürger-Konto (citizen), damit der
-    // server-persistente Antrag-Flow demonstrierbar ist (caseworker hat kein case.own.submit).
-    expect(await stores.authStore.countUsers({ tenantId: TENANT })).toBe(2);
+    // DREI Konten: die Sachbearbeitung (admin→caseworker), ein Bürger (citizen, für den Antrag-Flow —
+    // caseworker hat kein case.own.submit) UND ein ZWEITER Caseworker (member, für den vollen Vier-Augen-
+    // Flow: die Festsetzung verlangt eine andere Person als den letzten Bearbeitungsschritt).
+    expect(await stores.authStore.countUsers({ tenantId: TENANT })).toBe(3);
     const users = await stores.authStore.listUsers({ tenantId: TENANT });
     const rollen = users.map((u) => u.role).sort();
-    expect(rollen).toEqual(["admin", "citizen"]);
+    expect(rollen).toEqual(["admin", "citizen", "member"]);
     const buerger = users.find((u) => u.role === "citizen");
     expect(buerger?.email).toBe("buerger@example.org");
     expect(buerger?.localPersonas).toEqual(["buerger"]);
+    const sb2 = users.find((u) => u.role === "member");
+    expect(sb2?.email).toBe("sachbearbeitung2@example.org");
 
     // Fall: aus der Naht (procedureId/version/initialState) — NICHT hier eingebrannt.
     const found = await stores.caseStore.getCase({
@@ -122,9 +125,9 @@ describe("seedReferenceDemo (DEV/memory, aus der procedure.config-Naht)", () => 
     await seedReferenceDemo(deps);
     await seedReferenceDemo(deps);
 
-    // Zwei Läufe → weiterhin GENAU zwei Konten (caseworker via countUsers-Guard, citizen via
-    // getUserByEmail-Guard) — keine Duplikate.
-    expect(await stores.authStore.countUsers({ tenantId: TENANT })).toBe(2);
+    // Zwei Läufe → weiterhin GENAU drei Konten (caseworker via countUsers-Guard, citizen + zweiter
+    // caseworker via getUserByEmail-Guard) — keine Duplikate.
+    expect(await stores.authStore.countUsers({ tenantId: TENANT })).toBe(3);
     const tasks = await stores.taskStore.listTasks({
       tenantId: TENANT,
       caseId: dossierDemo.caseId,

@@ -18,9 +18,12 @@ import type {
   AntragDto,
   AntragEinreichenRequestDto,
   AntragListDto,
+  VerwaltungsaktDto,
 } from "@senticor/app-bff-contracts";
 import type { Vorgang, VorgangPersistence } from "@senticor/fachverfahren-kit";
 import { apiPath, CaseRequestError } from "./case-client.js";
+
+export type { VerwaltungsaktDto };
 
 /** Die Vorgang-Felder, die NICHT in `data` gehören, weil sie oben am DTO stehen (id/status). Alles
  *  Übrige bildet die opake Nutzlast. */
@@ -49,13 +52,36 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await response.json()) as T;
 }
 
-/** AntragDto → Vorgang: id/status von oben, der Rest aus der opaken `data`-Nutzlast. */
+/**
+ * Lädt den EINGEFRORENEN Bescheid des eigenen Antrags (owner-scoped, server-seitig). Der Abruf ist
+ * bekanntgabe-relevant — der Server auditiert ihn als `case.disclosed`. Liefert `null`, wenn noch kein
+ * Bescheid erlassen wurde (404) oder der Antrag fremd/nicht vorhanden ist (404, kein Existenz-Orakel).
+ */
+export async function ladeBescheid(
+  antragId: string,
+): Promise<VerwaltungsaktDto | null> {
+  try {
+    return await request<VerwaltungsaktDto>(
+      `/api/buerger/antraege/${encodeURIComponent(antragId)}/bescheid`,
+    );
+  } catch (fehler) {
+    if (fehler instanceof CaseRequestError && fehler.status === 404)
+      return null;
+    throw fehler;
+  }
+}
+
+/** AntragDto → Vorgang: id/status von oben, der Rest aus der opaken `data`-Nutzlast. DEFENSIV gegen
+ *  partielle/fremd-erzeugte `data`: `history`/`nachweise` MÜSSEN Arrays sein (die Bausteine iterieren
+ *  sie) — ein fehlendes Feld darf die Bürger-Sicht nicht crashen. */
 function toVorgang<T>(dto: AntragDto): Vorgang<T> {
   const rumpf = dto.data as unknown as VorgangRumpf<T>;
   return {
     ...rumpf,
     id: dto.antragId,
     status: dto.state,
+    history: Array.isArray(rumpf.history) ? rumpf.history : [],
+    nachweise: Array.isArray(rumpf.nachweise) ? rumpf.nachweise : [],
   };
 }
 

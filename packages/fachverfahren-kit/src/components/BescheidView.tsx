@@ -3,23 +3,78 @@
 // Rendert aus EINEM Vorgang + der LeistungConfig ein verwaltungs-seriöses, druckbares Dokument: Briefkopf
 // (config.kommune/label), Aktenzeichen (vorgangsnummer + Datum aus eingangIso), Tenor/Festsetzung aus
 // vorgang.berechnung (Betrag/Label/Begründung/Positionen), Rechtsgrundlagen aus config.rechtsgrundlagen sowie
-// eine generische Rechtsbehelfsbelehrung. „Als PDF herunterladen" ruft window.print() — KEINE PDF-Lib, das
-// Druck-Layout entsteht ausschließlich über Tailwind print:-Modifier (Bildschirm-Chrome wird ausgeblendet).
+// eine REGIME-NEUTRALE Rechtsbehelfsbelehrung (Widerspruch/Einspruch/Klage). Ist ein eingefrorener
+// `belehrung`-Snapshot gesetzt (bestandskräftiger Bescheid), rendert die Belehrung DARAUS — nie aus der
+// lebenden Config. „Als PDF herunterladen" ruft window.print() — KEINE PDF-Lib, das Druck-Layout entsteht
+// ausschließlich über Tailwind print:-Modifier (Bildschirm-Chrome wird ausgeblendet).
 //
 // VOLLSTÄNDIG CONFIG-GETRIEBEN: keine Domänen-Literale. Alles kommt aus props/config/Vorgang. Ein zweites
 // Verfahren (Gewerbe/Parkausweis/Bauantrag) rendert ohne jede Änderung an dieser Datei einen gültigen Bescheid.
 import { useMemo, type ReactElement } from "react";
 import { Building2, Download, Scale } from "lucide-react";
 
-import type { Berechnung, LeistungConfig, Vorgang } from "../types.js";
+import type {
+  Berechnung,
+  LeistungConfig,
+  RechtsbehelfConfig,
+  Vorgang,
+} from "../types.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "../ui/button.js";
 import { Separator } from "../ui/separator.js";
 import { formatBetrag as formatBetragKit } from "../format.js";
 
+/** Die EINGEFRORENE Rechtsbehelfs-/Bekanntgabe-Belehrung, wie sie beim Erlass festgeschrieben wurde. */
+export interface BescheidBelehrung {
+  rechtsbehelf: RechtsbehelfConfig;
+  fiktionTage: number;
+  fiktionNorm: string;
+}
+
 export interface BescheidViewProps<T = Record<string, unknown>> {
   vorgang: Vorgang<T>;
   config: LeistungConfig<T>;
+  /**
+   * Die EINGEFRORENE Belehrung eines bestandskräftigen Bescheids. Ist sie gesetzt, rendert die
+   * Rechtsbehelfsbelehrung AUSSCHLIESSLICH aus diesem selbsttragenden Snapshot (regime-neutral:
+   * Widerspruch/Einspruch/Klage) — NIEMALS aus der (lebenden) `config`, sonst schriebe eine spätere
+   * Regime-/Fristen-Umstellung einen VA von 2024 rückwirkend um. Fehlt sie (SB-Vorschau vor Erlass),
+   * fällt die Belehrung auf den generischen, config-getriebenen Widerspruchs-Text zurück.
+   */
+  belehrung?: BescheidBelehrung;
+}
+
+/** Name des Rechtsbehelfs für den Belehrungstext. */
+function rechtsbehelfName(art: RechtsbehelfConfig["art"]): string {
+  return art === "einspruch"
+    ? "Einspruch"
+    : art === "klage"
+      ? "Klage"
+      : "Widerspruch";
+}
+
+/** Verb: „erhoben" (Widerspruch/Klage) bzw. „eingelegt" (Einspruch) — grammatisch korrekt je Regime. */
+function rechtsbehelfVerb(art: RechtsbehelfConfig["art"]): string {
+  return art === "einspruch" ? "eingelegt" : "erhoben";
+}
+
+/** Fristdauer als Text: „einem Monat", „zwei Wochen", „14 Tagen" (Dativ, für „innerhalb …"). */
+function fristText(
+  wert: number,
+  einheit: RechtsbehelfConfig["fristEinheit"],
+): string {
+  const eins = wert === 1;
+  const wortEins: Record<RechtsbehelfConfig["fristEinheit"], string> = {
+    monat: "einem Monat",
+    woche: "einer Woche",
+    tag: "einem Tag",
+  };
+  const wortPlural: Record<RechtsbehelfConfig["fristEinheit"], string> = {
+    monat: "Monaten",
+    woche: "Wochen",
+    tag: "Tagen",
+  };
+  return eins ? wortEins[einheit] : `${wert} ${wortPlural[einheit]}`;
 }
 
 // ── Anzeige-Helfer (generisch, leistungs-agnostisch) ─────────────────────────────────────────
@@ -58,12 +113,19 @@ function formatDatum(iso: string): string {
 export function BescheidView<T = Record<string, unknown>>({
   vorgang,
   config,
+  belehrung,
 }: BescheidViewProps<T>): ReactElement {
   const berechnung: Berechnung | undefined = vorgang.berechnung;
   const datum = useMemo(
     () => formatDatum(vorgang.eingangIso),
     [vorgang.eingangIso],
   );
+  // Die Belehrung stammt entweder aus dem EINGEFRORENEN Snapshot (bestandskräftiger Bescheid, regime-
+  // neutral) oder — nur als SB-Vorschau — aus der lebenden config.zustellung. Der eingefrorene Pfad
+  // gewinnt und liest NIE aus der config.
+  const rb = belehrung?.rechtsbehelf ?? config.zustellung?.rechtsbehelf;
+  const fiktionTage =
+    belehrung?.fiktionTage ?? config.zustellung?.fiktionTage ?? 4;
 
   return (
     <section className="mx-auto w-full max-w-3xl px-6 py-8 print:max-w-none print:px-0 print:py-0">
@@ -273,17 +335,33 @@ export function BescheidView<T = Record<string, unknown>>({
           >
             Rechtsbehelfsbelehrung
           </h2>
-          <p className="mt-3 text-sm leading-relaxed text-muted-foreground print:text-black">
-            Gegen diesen Bescheid kann innerhalb eines Monats nach Bekanntgabe
-            Widerspruch erhoben werden. Der Widerspruch ist schriftlich oder zur
-            Niederschrift bei der erlassenden Stelle ({config.kommune})
-            einzulegen. Die Frist beginnt mit dem Tag der Bekanntgabe dieses
-            Bescheides. Erfolgt die Bekanntgabe durch die Post im Inland, gilt
-            der Bescheid am {ordinalTag(config.zustellung?.fiktionTage ?? 4)}{" "}
-            Tag nach Aufgabe zur Post als bekannt gegeben. Wird der Widerspruch
-            nicht oder nicht fristgerecht erhoben, wird der Bescheid
-            bestandskräftig.
-          </p>
+          {rb ? (
+            // REGIME-NEUTRALER, data-driven Text — für ein AO-Verfahren „Einspruch" statt „Widerspruch".
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground print:text-black">
+              Gegen diesen Bescheid kann innerhalb von{" "}
+              {fristText(rb.fristWert, rb.fristEinheit)} nach Bekanntgabe{" "}
+              {rechtsbehelfName(rb.art)} bei {rb.stelle}{" "}
+              {rechtsbehelfVerb(rb.art)} werden ({rb.norm}). Die Frist beginnt
+              mit dem Tag der Bekanntgabe dieses Bescheides. Erfolgt die
+              Bekanntgabe durch die Post im Inland, gilt der Bescheid am{" "}
+              {ordinalTag(fiktionTage)} Tag nach Aufgabe zur Post als bekannt
+              gegeben. Wird der {rechtsbehelfName(rb.art)} nicht oder nicht
+              fristgerecht {rechtsbehelfVerb(rb.art)}, wird der Bescheid
+              bestandskräftig.
+            </p>
+          ) : (
+            // Fallback (keine Rechtsbehelf-Config): generische Widerspruchs-Belehrung wie bisher.
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground print:text-black">
+              Gegen diesen Bescheid kann innerhalb eines Monats nach Bekanntgabe
+              Widerspruch erhoben werden. Der Widerspruch ist schriftlich oder
+              zur Niederschrift bei der erlassenden Stelle ({config.kommune})
+              einzulegen. Die Frist beginnt mit dem Tag der Bekanntgabe dieses
+              Bescheides. Erfolgt die Bekanntgabe durch die Post im Inland, gilt
+              der Bescheid am {ordinalTag(fiktionTage)} Tag nach Aufgabe zur
+              Post als bekannt gegeben. Wird der Widerspruch nicht oder nicht
+              fristgerecht erhoben, wird der Bescheid bestandskräftig.
+            </p>
+          )}
         </section>
 
         {/* ── Unterschrift / Fußzeile ───────────────────────────────────────────────── */}

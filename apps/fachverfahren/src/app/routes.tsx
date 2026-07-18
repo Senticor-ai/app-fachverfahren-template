@@ -14,6 +14,7 @@ import { BoardsListPage } from "../pages/boards-list.js";
 import { BuergerAnmeldenPage } from "../pages/buerger-anmelden.js";
 import { BuergerAntragPage } from "../pages/buerger-antrag.js";
 import { BuergerAntraegePage } from "../pages/buerger-antraege.js";
+import { BuergerBescheidPage } from "../pages/buerger-bescheid.js";
 import { BuergerBestaetigungPage } from "../pages/buerger-bestaetigung.js";
 import { BuergerStartPage } from "../pages/buerger-start.js";
 import { KontoPasswortPage } from "../pages/konto-passwort.js";
@@ -28,6 +29,7 @@ const routeElements: Record<AppRoutePath, React.JSX.Element> = {
   "/buerger/bestaetigung/:id": <BuergerBestaetigungPage />,
   "/buerger/antraege": <BuergerAntraegePage />,
   "/buerger/antrag/:id": <BuergerAntragPage />,
+  "/buerger/bescheid/:id": <BuergerBescheidPage />,
   "/amt": <AmtEingangPage />,
   "/amt/vorgang/:id": <AmtVorgangPage />,
   "/amt/akten": <AmtAktenPage />,

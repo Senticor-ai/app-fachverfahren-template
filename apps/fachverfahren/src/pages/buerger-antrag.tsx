@@ -40,6 +40,18 @@ export function BuergerAntragPage(): React.JSX.Element {
         {v ? (
           <div className="mt-4">
             <StatusVerfolgung vorgang={v} config={store.config} />
+            {/* „Bescheid ansehen" NUR in einem Zustand, den ein bescheid-erlassender Übergang erreicht
+                — data-driven aus der Config (kein Zustands-Literal). */}
+            {store.config.statusMachine.transitions.some(
+              (t) => t.erlaesstBescheid && t.to === v.status,
+            ) ? (
+              <Link
+                to={`/buerger/bescheid/${v.id}`}
+                className="mt-6 inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+              >
+                Bescheid ansehen
+              </Link>
+            ) : null}
           </div>
         ) : laedt ? (
           <p className="mt-6 text-sm text-muted-foreground" aria-busy="true">

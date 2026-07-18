@@ -38,6 +38,11 @@ const DEV_NAME = "Demo-Sachbearbeitung";
 // Flow, wie im echten Verfahren. Nutzt dasselbe env-gegatete Passwort (kein committetes Secret).
 const DEV_CITIZEN_EMAIL = "buerger@example.org";
 const DEV_CITIZEN_NAME = "Demo-Bürger:in";
+// Ein ZWEITER Sachbearbeitungs-Account — damit der volle VIER-AUGEN-Flow demonstrierbar ist: die
+// Festsetzung (requiresFourEyes) verlangt eine ANDERE Person als den letzten Bearbeitungsschritt.
+// Rolle „member" → caseworker (wie admin), localPersonas [sachbearbeitung].
+const DEV_CASEWORKER2_EMAIL = "sachbearbeitung2@example.org";
+const DEV_CASEWORKER2_NAME = "Demo-Sachbearbeitung II";
 
 // Eröffnungs-Akteur des Demo-Falls: ein FESTER synthetischer Akteur, bewusst VERSCHIEDEN vom Login-Konto,
 // damit der Vier-Augen-Abschluss (jüngster-Audit-Akteur ≠ auslösender Akteur) vom Demo-Login ausübbar ist.
@@ -67,45 +72,70 @@ export async function seedReferenceDemo(
 ): Promise<void> {
   const log: SeedLog = deps.log ?? (() => undefined);
   await seedDevCaseworker(deps, log);
-  await seedDevCitizen(deps, log);
+  // Bürger-Konto (Rolle citizen) — für den server-persistenten Antrag-Flow.
+  await seedZusatzKonto(deps, log, {
+    email: DEV_CITIZEN_EMAIL,
+    name: DEV_CITIZEN_NAME,
+    actorId: "actor.dev-citizen",
+    role: "citizen",
+    personas: ["buerger"],
+    kind: "citizen",
+  });
+  // Zweites Sachbearbeitungs-Konto — für den vollen VIER-AUGEN-Flow (Festsetzung ≠ Vorbereiter).
+  await seedZusatzKonto(deps, log, {
+    email: DEV_CASEWORKER2_EMAIL,
+    name: DEV_CASEWORKER2_NAME,
+    actorId: "actor.dev-caseworker2",
+    role: "member",
+    personas: ["sachbearbeitung"],
+    kind: "caseworker2",
+  });
   // Das Demo-Dossier ist unabhängig vom Login und wird IMMER einem festen synthetischen Eröffnungs-Akteur
   // zugeschrieben (≠ Login-Konto) — so bleibt der Vier-Augen-Abschluss vom Demo-Login ausübbar.
   await seedDemoDossier(deps, SEED_AUDIT_ACTOR, log);
 }
 
-/** Legt — nur mit APP_DEV_SEED_PASSWORD und nur wenn noch nicht vorhanden — ein anmeldbares
- *  Bürger-Konto (Rolle citizen) an, damit der server-persistente Antrag-Flow demonstrierbar ist.
- *  Idempotent (getUserByEmail); wirft NIE. Nutzt createLocalUserWithCredential direkt (nicht
- *  bootstrapWorkspace — das ist dem ersten Konto/Workspace-Setup vorbehalten). */
-async function seedDevCitizen(
+/** Legt — nur mit APP_DEV_SEED_PASSWORD und nur wenn noch nicht vorhanden — ein anmeldbares Zusatz-Konto
+ *  an (Bürger bzw. zweiter Caseworker). Idempotent (getUserByEmail); wirft NIE. Nutzt
+ *  createLocalUserWithCredential direkt (nicht bootstrapWorkspace — das ist dem ersten Konto vorbehalten). */
+async function seedZusatzKonto(
   deps: ReferenceSeedDeps,
   log: SeedLog,
+  konto: {
+    email: string;
+    name: string;
+    actorId: string;
+    role: "citizen" | "member" | "admin";
+    personas: ("buerger" | "sachbearbeitung" | "aufsicht")[];
+    kind: string;
+  },
 ): Promise<void> {
   const password = deps.env?.[DEV_PASSWORD_ENV];
   if (password === undefined || password === "") return; // kein Login ohne bereitgestelltes Passwort
   try {
     const vorhanden = await deps.authStore.getUserByEmail({
       tenantId: DEFAULT_TENANT_ID,
-      email: DEV_CITIZEN_EMAIL,
+      email: konto.email,
     });
     if (vorhanden) {
-      log("info", "runtime.dev-seed.citizen.skipped", { reason: "exists" });
+      log("info", `runtime.dev-seed.${konto.kind}.skipped`, {
+        reason: "exists",
+      });
       return;
     }
     const nowIso = "2026-01-01T00:00:00.000Z";
-    const actorId = `actor.dev-citizen`;
     const passwordHash = await hashPassword(password);
     await deps.authStore.createLocalUserWithCredential({
       user: {
-        actorId,
+        actorId: konto.actorId,
         tenantId: DEFAULT_TENANT_ID,
         authorityId: DEFAULT_AUTHORITY_ID,
         jurisdictionId: DEFAULT_JURISDICTION_ID,
-        email: DEV_CITIZEN_EMAIL,
-        displayName: DEV_CITIZEN_NAME,
+        email: konto.email,
+        displayName: konto.name,
         status: "active",
-        role: "citizen",
-        localPersonas: ["buerger"],
+        role: konto.role,
+        localPersonas: konto.personas,
         oidcPersonas: [],
         personaManagementMode: "local",
         principalVersion: 1,
@@ -113,7 +143,7 @@ async function seedDevCitizen(
         updatedAt: nowIso,
       },
       credential: {
-        actorId,
+        actorId: konto.actorId,
         passwordHash,
         hashAlgo: "argon2id",
         passwordChangedAt: nowIso,
@@ -123,12 +153,12 @@ async function seedDevCitizen(
         updatedAt: nowIso,
       },
     });
-    log("info", "runtime.dev-seed.citizen.created", {
-      actorId,
-      email: DEV_CITIZEN_EMAIL,
+    log("info", `runtime.dev-seed.${konto.kind}.created`, {
+      actorId: konto.actorId,
+      email: konto.email,
     });
   } catch (error) {
-    log("error", "runtime.dev-seed.citizen.failed", {
+    log("error", `runtime.dev-seed.${konto.kind}.failed`, {
       reason: error instanceof Error ? error.message : String(error),
     });
   }
