@@ -14,7 +14,9 @@ import type {
   TaskDto,
   TaskPatchRequestDto,
   VermerkDto,
+  VermerkListDto,
   VermerkRequestDto,
+  VermerkReviewRequestDto,
 } from "@senticor/app-bff-contracts";
 
 /** Fall/Dossier-Zusammenfassung — 1:1 zur BFF-`CaseDto`. */
@@ -135,6 +137,14 @@ export interface CasePort {
   createKiVermerk(
     caseId: string,
     req: KiVermerkRequestDto,
+  ): Promise<VermerkDto>;
+  /** Die Aktenvermerke eines Falls lesen (chronologisch, mit abgeleitetem Prüfstatus). */
+  listVermerke(caseId: string): Promise<VermerkDto[]>;
+  /** Einen KI-Vermerk-Entwurf prüfen (bestätigen/verwerfen). */
+  reviewVermerk(
+    caseId: string,
+    vermerkId: string,
+    req: VermerkReviewRequestDto,
   ): Promise<VermerkDto>;
 }
 
@@ -301,6 +311,20 @@ export function createHttpCasePort(): CasePort {
     async createKiVermerk(caseId, req) {
       return await request<VermerkDto>(
         `/api/cases/${encodeURIComponent(caseId)}/vermerke/ki`,
+        { method: "POST", body: JSON.stringify(req) },
+      );
+    },
+
+    async listVermerke(caseId) {
+      const body = await request<VermerkListDto>(
+        `/api/cases/${encodeURIComponent(caseId)}/vermerke`,
+      );
+      return body.vermerke;
+    },
+
+    async reviewVermerk(caseId, vermerkId, req) {
+      return await request<VermerkDto>(
+        `/api/cases/${encodeURIComponent(caseId)}/vermerke/${encodeURIComponent(vermerkId)}/review`,
         { method: "POST", body: JSON.stringify(req) },
       );
     },

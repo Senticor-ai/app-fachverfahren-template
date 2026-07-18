@@ -4,20 +4,37 @@
 // Die KI erzeugt NUR einen Entwurf — die rechtsnahe Bewertung bleibt beim Menschen (HCAI).
 import { useId, useState } from "react";
 import { Button } from "@senticor/fachverfahren-kit";
+import type { VermerkDto } from "@senticor/app-bff-contracts";
 
 const feldClass =
   "w-full rounded-md border border-input bg-background p-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
+const REVIEW_LABEL: Record<VermerkDto["reviewStatus"], string> = {
+  "nicht-erforderlich": "",
+  offen: "prüfpflichtig",
+  bestaetigt: "bestätigt",
+  verworfen: "verworfen",
+};
+
 export interface VermerkAktionenProps {
+  /** Die vorhandenen Aktenvermerke (chronologisch, mit abgeleitetem Prüfstatus). */
+  vermerke: VermerkDto[];
   /** Menschlichen Aktenvermerk schreiben. */
   onVermerk: (text: string) => Promise<void>;
   /** KI-Aktenvermerk-Entwurf anfordern (task = worüber die KI vermerken soll). */
   onKiVermerk: (task: string) => Promise<void>;
+  /** Einen KI-Vermerk-Entwurf prüfen (bestätigen/verwerfen). */
+  onReview: (
+    vermerkId: string,
+    entscheidung: "bestaetigt" | "verworfen",
+  ) => Promise<void>;
 }
 
 export function VermerkAktionen({
+  vermerke,
   onVermerk,
   onKiVermerk,
+  onReview,
 }: VermerkAktionenProps): React.JSX.Element {
   const vermerkId = useId();
   const kiId = useId();
@@ -27,6 +44,19 @@ export function VermerkAktionen({
     "idle" | "sende-mensch" | "sende-ki" | "ki-fehler"
   >("idle");
   const [hinweis, setHinweis] = useState<string | null>(null);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+
+  async function pruefe(
+    vId: string,
+    entscheidung: "bestaetigt" | "verworfen",
+  ): Promise<void> {
+    setReviewingId(vId);
+    try {
+      await onReview(vId, entscheidung);
+    } finally {
+      setReviewingId(null);
+    }
+  }
 
   async function vermerkSpeichern(): Promise<void> {
     if (text.trim() === "") return;
@@ -64,6 +94,58 @@ export function VermerkAktionen({
         Vermerke sind unveränderlich (append-only). Eine Korrektur ist ein neuer
         Vermerk.
       </p>
+
+      {vermerke.length > 0 ? (
+        <ul className="mt-3 space-y-2">
+          {vermerke.map((vm) => (
+            <li
+              key={vm.vermerkId}
+              className="rounded-md border border-border p-2 text-sm"
+            >
+              <div className="flex items-center gap-2">
+                <span
+                  className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+                    vm.quelle === "ki"
+                      ? "bg-muted text-muted-foreground"
+                      : "bg-secondary text-secondary-foreground"
+                  }`}
+                >
+                  {vm.quelle === "ki" ? "KI" : "Mensch"}
+                </span>
+                {REVIEW_LABEL[vm.reviewStatus] ? (
+                  <span className="text-xs text-muted-foreground">
+                    {REVIEW_LABEL[vm.reviewStatus]}
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-1 whitespace-pre-wrap text-foreground">
+                {vm.text}
+              </p>
+              {vm.quelle === "ki" && vm.reviewStatus === "offen" ? (
+                <div className="mt-2 flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void pruefe(vm.vermerkId, "bestaetigt")}
+                    disabled={reviewingId === vm.vermerkId}
+                  >
+                    Bestätigen
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void pruefe(vm.vermerkId, "verworfen")}
+                    disabled={reviewingId === vm.vermerkId}
+                  >
+                    Verwerfen
+                  </Button>
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       <label
         htmlFor={vermerkId}

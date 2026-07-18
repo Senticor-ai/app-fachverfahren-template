@@ -13,6 +13,7 @@ import {
   ErrorState,
   SkeletonCard,
 } from "@senticor/fachverfahren-kit";
+import type { VermerkDto } from "@senticor/app-bff-contracts";
 import { casePort } from "../app/case-port.js";
 import type {
   CaseAllowedActions,
@@ -33,6 +34,7 @@ interface AkteDaten {
   progress: CaseZielFortschritt[];
   audit: CaseAuditEvent[];
   allowedActions: CaseAllowedActions;
+  vermerke: VermerkDto[];
 }
 
 type LoadState =
@@ -52,15 +54,17 @@ export function AmtAktePage(): React.JSX.Element {
   const fetchAkte = useCallback(async (): Promise<LoadState> => {
     const caseSummary = await casePort.getCase(id);
     if (!caseSummary) return { kind: "notFound" };
-    const [tasks, progress, audit, allowedActions] = await Promise.all([
-      casePort.listTasks(id),
-      casePort.getProgress(id),
-      casePort.listAudit(id),
-      casePort.listAllowedActions(id),
-    ]);
+    const [tasks, progress, audit, allowedActions, vermerke] =
+      await Promise.all([
+        casePort.listTasks(id),
+        casePort.getProgress(id),
+        casePort.listAudit(id),
+        casePort.listAllowedActions(id),
+        casePort.listVermerke(id),
+      ]);
     return {
       kind: "ready",
-      data: { caseSummary, tasks, progress, audit, allowedActions },
+      data: { caseSummary, tasks, progress, audit, allowedActions, vermerke },
     };
   }, [id]);
 
@@ -138,6 +142,13 @@ export function AmtAktePage(): React.JSX.Element {
     },
     [id, silentReload],
   );
+  const handleReview = useCallback(
+    async (vermerkId: string, entscheidung: "bestaetigt" | "verworfen") => {
+      await casePort.reviewVermerk(id, vermerkId, { entscheidung });
+      await silentReload();
+    },
+    [id, silentReload],
+  );
 
   return (
     <Shell persona="sachbearbeitung" activeNavKey="akten">
@@ -200,8 +211,10 @@ export function AmtAktePage(): React.JSX.Element {
               }
             />
             <VermerkAktionen
+              vermerke={state.data.vermerke}
               onVermerk={handleVermerkAdd}
               onKiVermerk={handleKiVermerk}
+              onReview={handleReview}
             />
           </>
         )}
