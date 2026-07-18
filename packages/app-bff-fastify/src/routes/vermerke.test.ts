@@ -6,6 +6,7 @@ import {
 } from "@senticor/public-sector-sdk";
 import {
   capabilityFailure,
+  capabilityOk,
   defaultSemantics,
   type AiAssistPort,
 } from "@senticor/platform-contracts";
@@ -258,6 +259,60 @@ describe("BFF Aktenvermerke (/api/cases/:id/vermerke)", () => {
     // Peer-Kennung: der Mensch ist ein Knoten `human:<rolle>`.
     expect(dto.urheber).toBe("human:caseworker");
     expect(dto.bezugVermerkId).toBeNull();
+    await app.close();
+  });
+
+  it("agentische Teilnahme: der KI-Agent LIEST die geteilte Akte (public-Zellen) als Kontext, private NICHT", async () => {
+    // Spy-Port: fängt den an den AiAssistPort übergebenen Input.
+    let eingabe: Record<string, unknown> | undefined;
+    const spy: AiAssistPort = {
+      descriptor: {
+        id: "ai-assist",
+        name: "Spy",
+        version: "0.0.0",
+        provider: "spy",
+        dataClassification: "confidential",
+        schemas: [],
+        semantics: defaultSemantics,
+      },
+      async suggest(_ctx, req) {
+        eingabe = req.input;
+        return capabilityOk({
+          value: "Sachstands-Zusammenfassung",
+          confidence: 0.5,
+          modelId: "spy:model",
+          rationale: "Test",
+          sources: [],
+          marking: "ki-vorschlag",
+          euAiActClass: "limited-risk",
+          reviewRequired: true,
+        });
+      },
+    };
+    const { app, caseId } = await amtMitFall(spy);
+    // Eine PUBLIC-Zelle (frage) + eine PRIVATE Zelle schreiben.
+    await app.inject({
+      method: "POST",
+      url: `/api/cases/${caseId}/vermerke`,
+      payload: { text: "Wie ist der Sachstand?", kind: "frage" },
+    });
+    await app.inject({
+      method: "POST",
+      url: `/api/cases/${caseId}/vermerke`,
+      payload: { text: "interner Entwurf", kind: "notiz", sichtbarkeit: "private" },
+    });
+    // KI-Beitrag anfordern → der Agent liest die geteilte Akte.
+    await app.inject({
+      method: "POST",
+      url: `/api/cases/${caseId}/vermerke/ki`,
+      payload: { task: "sachstand", input: {} },
+    });
+    const akte = eingabe?.["akte"] as { zellen: { text: string }[] } | undefined;
+    expect(akte?.zellen.some((z) => z.text === "Wie ist der Sachstand?")).toBe(
+      true,
+    );
+    // Private Zellen bleiben draußen.
+    expect(akte?.zellen.some((z) => z.text === "interner Entwurf")).toBe(false);
     await app.close();
   });
 

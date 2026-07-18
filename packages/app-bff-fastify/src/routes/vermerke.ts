@@ -275,7 +275,27 @@ export function registerVermerkRoutes(
           .code(404)
           .send({ error: "not found", requestId: requestIdOf(request) });
 
-      // Den (austauschbaren) AiAssistPort fragen — Kontext AUSSCHLIESSLICH aus der Sitzung.
+      // AGENTISCHE TEILNAHME (Blackboard-Retrieval): der Agent LIEST die geteilte Akte — die bisherigen
+      // PUBLIC-Zellen (der Blackboard-Stand) + Fall-Metadaten fließen als Kontext in den Vorschlag. So
+      // trägt der Agent zur LAUFENDEN Konversation bei, statt kontextfrei zu raten. PII-arm: nur die
+      // Zell-Kurzform (kind/urheber/text); private Entwürfe bleiben draußen; in PROD über neutralisierte
+      // Signale/Redaction. Die Sitzungs-Identität bleibt der einzige Autoritäts-Kontext.
+      let bisher: AppAuditEvent[];
+      try {
+        bisher = await deps.caseStore.listAuditEvents({
+          tenantId: session.tenantId,
+          caseId: appCase.caseId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      const blackboard = bisher
+        .filter((e) => e.eventType === NOTE_EVENT_TYPE)
+        .map((e) => toVermerkDto(e, appCase.caseId))
+        .filter((v) => v.sichtbarkeit === "public")
+        .map((v) => ({ kind: v.kind, urheber: v.urheber, text: v.text }));
+
+      // Den (austauschbaren) AiAssistPort fragen — Kontext AUSSCHLIESSLICH aus der Sitzung + geteilter Akte.
       const result = await deps.aiAssist.suggest(
         {
           requestId: requestIdOf(request),
@@ -287,7 +307,14 @@ export function registerVermerkRoutes(
         },
         {
           task: request.body.task,
-          input: request.body.input ?? {},
+          input: {
+            ...(request.body.input ?? {}),
+            akte: {
+              caseId: appCase.caseId,
+              state: appCase.state,
+              zellen: blackboard,
+            },
+          },
         },
       );
       if (!result.ok) {
