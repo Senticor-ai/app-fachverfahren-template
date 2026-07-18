@@ -126,6 +126,26 @@ Der Bürger-Antrag ist server-persistent (überlebt Reload): `/buerger/antraege`
 (Bescheid) sind fertige Sichten — sie erscheinen automatisch, sobald das
 Verfahren einen Bescheid erlässt.
 
+## Weitere Bürger-Journeys (GEBAUT)
+
+Über den Bescheid hinaus sind diese Bürger-Wege fertig verdrahtet (owner-scoped,
+Eigentümerschaft AUSSCHLIESSLICH aus der Session; DTOs in
+`@senticor/app-bff-contracts`, eine fremde/nicht vorhandene Kennung → 404):
+
+- **Rechtsbehelf einlegen**: `POST /api/buerger/antraege/:id/widerspruch`
+  (`case.own.submit`) — setzt einen erlassenen Bescheid voraus (sonst 404),
+  einmalig (409), hält den Rechtsbehelf append-only als `case.objection` fest
+  (Eingangszeitpunkt = Fristwahrung); Art/Norm aus dem EINGEFRORENEN Regime. UI:
+  „Widerspruch einlegen" auf `/buerger/bescheid/:id`.
+- **Nachweise hoch-/herunterladen**: `POST|GET /api/buerger/antraege/:id/nachweise`
+  (+ `…/:attachmentId`) — Byte-Transfer über den austauschbaren `BlobStoragePort`
+  (Größe + SHA-256 server-berechnet), Referenz append-only im
+  `nachweis.uploaded`-Audit (einzige Zuordnung Anlage↔Antrag). UI: Nachweis-Sektion
+  auf `/buerger/antrag/:id`.
+- **Postfach**: `GET /api/mailbox?box=inbox&scope=own` → die generische
+  `Postfach`-Kit-Komponente unter `/buerger/postfach` (Bescheide/Nachrichten der
+  Behörde inkl. Zustellnachweis/Bekanntgabe).
+
 ## Bürger-Sprache: Leichte Sprache und Fachbegriffe
 
 `FeldDef` trägt zwei optionale, ADDITIVE Sprachvarianten

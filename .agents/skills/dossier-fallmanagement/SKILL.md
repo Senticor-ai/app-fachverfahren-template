@@ -103,10 +103,37 @@ keine Existenz-Leaks). Store-Ausfall → 503 (`storeUnavailable`).
 | `GET /api/cases/:id/progress`        | `case.read`             | Fortschritt je `ziel` — compute-on-read aus den `checkliste-item`-Kindern mit `data.erledigt`.                                                                                                                                                                   |
 | `GET /api/cases/:id/audit`           | `case.read`             | Verlauf/Audit der Akte (append-only, chronologisch). Server-Topologie verborgen; treibt die Verlauf-Sektion.                                                                                                                                                     |
 | `GET /api/cases/:id/allowed-actions` | `case.read`             | Die im AKTUELLEN Zustand erlaubten Übergänge (aus dem Verfahren gefiltert: `from`=state). Der Client bekommt nur die `action`-Kennung + `version` (Ziel/Rechtsgrundlage/Vier-Augen server-autoritativ) → treibt die Aktionsleiste/Vier-Augen-Sicht.              |
+| `GET /api/cases/:id/vermerke`        | `case.read`             | Aktenvermerke (append-only, Mensch + KI) chronologisch; effektiver Prüfstatus wird aus den Prüf-Ereignissen abgeleitet.                                                                                                                                          |
+| `POST /api/cases/:id/vermerke`       | `case.note.write`       | Menschlichen Aktenvermerk schreiben — unveränderlich im Fall-Audit (`case.note.added`, `quelle=mensch`).                                                                                                                                                         |
+| `POST /api/cases/:id/vermerke/ki`    | `case.note.write`       | KI-Aktenvermerk-ENTWURF via `AiAssistPort` (`quelle=ki`, `ki-vorschlag`, `reviewStatus=offen`; high-risk→422, kein Modell→503, NIE fingiert).                                                                                                                     |
+| `POST /api/cases/:id/vermerke/:vermerkId/review` | `case.note.write` | KI-Entwurf prüfen: `bestaetigt`/`verworfen` (append-only `case.note.reviewed`; einmalig→409, Mensch-Vermerk→422).                                                                                                                           |
 
 **Vier-Augen** bei `POST …/transitions`: trägt der Übergang `requiresFourEyes`,
 darf der Akteur des jüngsten Audit-Eintrags ihn nicht selbst auslösen (→ 403).
 Details/Governance: siehe [[governance-vier-augen]].
+
+## Aktenvermerk — Mensch + KI, append-only (HCAI)
+
+Ein **Aktenvermerk** ist der UNVERÄNDERLICHE, attribuierbare Fall-Vermerk im
+append-only Fall-Audit (`app_audit_events`, DB-Trigger) — anders als die
+EDITIERBARE Arbeits-Notiz (`taskKind:"notiz"` im `TaskStore`, `PATCH`-bar). Eine
+Korrektur ist ein NEUER Vermerk. Verfasst von Mensch ODER KI:
+
+- **Mensch**: `POST …/vermerke` → `case.note.added`, Autor server-autoritativ aus
+  der Session.
+- **KI**: `POST …/vermerke/ki` ruft den austauschbaren `AiAssistPort`
+  ([[ki-assistenz]]) und hält den ENTWURF fest (`quelle=ki`, `modelId`,
+  `marking:"ki-vorschlag"`, `reviewStatus:"offen"`) — prüfpflichtig, die
+  rechtsnahe Bewertung bleibt beim Menschen (EU-AI-Act/HCAI). Das ist die EINE
+  Verbindung AiAssist→Fall im Template.
+- **Prüfung (HITL)**: `POST …/vermerke/:vermerkId/review` (`bestaetigt`/`verworfen`)
+  ist selbst append-only (`case.note.reviewed`); der effektive `reviewStatus`
+  wird beim Lesen daraus ABGELEITET (der Entwurf selbst bleibt unverändert).
+
+RBAC: eigene Permission `case.note.write` (getrennt von `case.decision.prepare` —
+vermerken ist nicht entscheiden). UI-Vorlage: `pages/vermerk-aktionen.tsx` (Liste
++ Schreib-/Prüf-Aktionen) unter `/amt/akte/:id`; im Verlauf sind offene
+KI-Entwürfe als Ton `warn` markiert (`case-akte-view.ts`).
 
 ## Verfahren als DATEN — `ProcedureRegistry` / `transitionCase`
 

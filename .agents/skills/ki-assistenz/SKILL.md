@@ -71,6 +71,23 @@ Abhängigkeit.
   `request.input`; Betreiber verantworten, dass diese PII-arm bzw. der Endpunkt
   lokal/vertrauenswürdig ist.
 
+## Am BFF verdrahtet (IST — nicht mehr nur Vertrag)
+
+Der Port ist jetzt end-to-end angebunden (früher nur als Vertrag beschrieben):
+
+- **Generische Route**: `POST /api/ai/assist` (RBAC `ai.assist`, nur
+  Sachbearbeitung) → `deps.aiAssist.suggest(...)`; Kontext AUSSCHLIESSLICH aus der
+  Session; ehrliches Mapping high-risk→422, kein Modell→503; KI-Nutzung auditiert.
+- **Port-Registry (Modul-Auswahl per Env)**: `createAiAssistPortFromEnv`
+  (`apps/fachverfahren/server/platform/ai-assist.ts`) wählt fail-closed zwischen
+  `AI_ASSIST_PROVIDER=local` (In-Memory-Fake) und `ollama` (echter Adapter
+  `@senticor/provider-ai-ollama`, `OLLAMA_BASE_URL`/`OLLAMA_MODEL`). Beide
+  bestehen dieselben `aiAssistContractScenarios` — Conformance = Austauschbarkeit.
+- **KI am Fall (Aktenvermerk)**: `POST /api/cases/:id/vermerke/ki` ist die EINE
+  Verbindung AiAssist→Fall: der Vorschlag wird als append-only, prüfpflichtiger
+  Aktenvermerk (`quelle=ki`, `reviewStatus:"offen"`) festgehalten; ein Mensch
+  bestätigt oder verwirft ihn (`…/review`). Siehe [[dossier-fallmanagement]].
+
 ## So bindest du KI an (Minimalbeispiel)
 
 Implementiere `AiAssistPort`, lege den fachlichen Vorschlag in `value`, lass die
