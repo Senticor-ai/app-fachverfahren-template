@@ -97,6 +97,14 @@ export const VerwaltungsaktDtoSchema = Type.Object(
     rechtsbehelf: RechtsbehelfDtoSchema,
     fiktionTage: Type.Integer({ minimum: 0 }),
     fiktionNorm: Type.String({ minLength: 1 }),
+    /** HERKUNFT des Tenor-Betrags: „client-berechnet" (server NICHT nachgerechnet, `berechne`-Escape-Hatch)
+     *  vs. „server-nachgerechnet" (deklarativer Tarif server-verifiziert). Ehrliche Provenienz statt
+     *  falscher Sicherheit — der Betrag ist eingefroren + hash-beweisbar-unverändert, aber die Herkunft
+     *  ist transparent. */
+    tenorHerkunft: Type.Union([
+      Type.Literal("client-berechnet"),
+      Type.Literal("server-nachgerechnet"),
+    ]),
     /** SHA-256 über die kanonisch serialisierten Bytes — das portable Beweis-Token. */
     checksumSha256: Type.String({ minLength: 64, maxLength: 64 }),
   },

@@ -586,6 +586,12 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
           rechtsbehelf: procedure.verwaltungsakt.rechtsbehelf,
           fiktionTage: procedure.verwaltungsakt.fiktionTage,
           fiktionNorm: procedure.verwaltungsakt.fiktionNorm,
+          // HERKUNFT DES TENORS — ehrlich statt falscher Sicherheit: der Betrag wurde CLIENT-seitig
+          // gerechnet (der `berechne`-Escape-Hatch ist Client-TS, server-seitig nicht ausführbar) und vom
+          // Server NICHT nachgerechnet. Er wird gefroren + gehasht (unveränderlich + beweisbar-unverändert),
+          // aber NICHT server-verifiziert. Ein data-driven `tarif` wäre server-nachrechenbar → dann
+          // „server-nachgerechnet" (deeperer Root Cause: Berechnung/Tarif-Move ins SDK, separate Scheibe).
+          tenorHerkunft: "client-berechnet" as const,
         };
         verwaltungsaktPayload = {
           content,

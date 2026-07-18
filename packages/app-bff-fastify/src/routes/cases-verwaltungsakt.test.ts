@@ -166,6 +166,8 @@ describe("Verwaltungsakt einfrieren am festsetzenden Übergang", () => {
     expect(canonicalSha256(content)).toBe(dto.checksumSha256);
     expect(dto.tenor).toEqual(berechnung);
     expect(dto.rechtsbehelf.art).toBe("widerspruch");
+    // EHRLICHE HERKUNFT: der Betrag wurde client-berechnet (berechne-Escape), server NICHT nachgerechnet.
+    expect(dto.tenorHerkunft).toBe("client-berechnet");
 
     // Der Abruf ist bekanntgabe-relevant → case.disclosed im Audit (Fristlauf-Anker).
     const { app: amtLese } = await buildBffApp({

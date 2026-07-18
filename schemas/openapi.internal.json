@@ -480,6 +480,12 @@
                         { "additionalProperties": {}, "type": "object" },
                         { "type": "null" }
                       ]
+                    },
+                    "tenorHerkunft": {
+                      "anyOf": [
+                        { "enum": ["client-berechnet"], "type": "string" },
+                        { "enum": ["server-nachgerechnet"], "type": "string" }
+                      ]
                     }
                   },
                   "required": [
@@ -490,6 +496,7 @@
                     "rechtsbehelf",
                     "fiktionTage",
                     "fiktionNorm",
+                    "tenorHerkunft",
                     "checksumSha256"
                   ],
                   "type": "object"
