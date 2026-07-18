@@ -113,6 +113,15 @@
       "extensionPoints": ["model-provider", "prompt-template", "confidence-policy"],
       "contractTests": ["test:ai-assist"],
       "forbidden": ["module-local-llm-client", "autonomous-legal-decision"]
+    },
+    {
+      "id": "blob-storage",
+      "version": 1,
+      "publicPackage": "@senticor/platform-contracts",
+      "documentation": "docs/capabilities/blob-storage.md",
+      "extensionPoints": ["storage-backend", "retention-policy", "virus-scan"],
+      "contractTests": ["test:platform-contracts"],
+      "forbidden": ["module-local-blob-store"]
     }
   ]
 }

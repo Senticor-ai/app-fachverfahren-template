@@ -258,6 +258,35 @@ export interface AiAssistPort {
   ): Promise<CapabilityResponse<AiSuggestion>>;
 }
 
+// ── BlobStoragePort — der fehlende BYTE-Transfer (Nachweis-/Dokument-Upload). ──────────────────────────
+// Die anderen Ports tragen nur `AttachmentRef` (eine Referenz: id/name/mime/size/checksum) — den echten
+// Inhalt bewegt NIEMAND. Dieser Port schliesst die Luecke: `put` nimmt Bytes und gibt die Referenz
+// (server-berechnete Groesse + SHA-256 ueber die Bytes = Integritaets-Token) zurueck; `get` liefert Bytes
+// + Referenz zurueck. Austauschbar (In-Memory-Fake / Dateisystem / Objekt-Store) hinter EINEM Vertrag.
+export interface BlobPutInput {
+  fileName: string;
+  mimeType: string;
+  /** Der Roh-Inhalt. Uint8Array ist browser- UND node-neutral (kein Buffer im SDK). */
+  bytes: Uint8Array;
+}
+
+export interface BlobObject {
+  ref: AttachmentRef;
+  bytes: Uint8Array;
+}
+
+export interface BlobStoragePort {
+  descriptor: CapabilityDescriptor;
+  put(
+    context: PortCallContext,
+    input: BlobPutInput,
+  ): Promise<CapabilityResponse<AttachmentRef>>;
+  get(
+    context: PortCallContext,
+    attachmentId: string,
+  ): Promise<CapabilityResponse<BlobObject>>;
+}
+
 export interface PlatformPorts {
   identityAndTrust: IdentityAndTrustPort;
   aiAssist: AiAssistPort;
@@ -271,4 +300,5 @@ export interface PlatformPorts {
   notification: NotificationPort;
   workflow: WorkflowPort;
   audit: AuditPort;
+  blobStorage: BlobStoragePort;
 }

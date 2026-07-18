@@ -7,8 +7,11 @@ import {
 import type {
   AiAssistPort,
   AiSuggestion,
+  AttachmentRef,
   AuditPort,
   AuthorityDirectoryPort,
+  BlobObject,
+  BlobStoragePort,
   DataExchangePort,
   EvidenceRetrievalPort,
   IdentityAndTrustPort,
@@ -38,6 +41,51 @@ function descriptor(
 
 function id(prefix: string) {
   return `${prefix}.${crypto.randomUUID()}`;
+}
+
+/** SHA-256 (Hex) über die Bytes — browser- UND node-neutral via WebCrypto (kein node:crypto im SDK).
+ *  Die ArrayBuffer-gestützte Kopie stellt einen gültigen `BufferSource` sicher (TS-6 schließt
+ *  SharedArrayBuffer-gestützte Views aus). */
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new Uint8Array(bytes));
+  return [...new Uint8Array(digest)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/**
+ * In-Memory-BlobStoragePort als eigenständige Fabrik (wie createLocalAiAssistPort): hält die Bytes in einer
+ * Map, berechnet Größe + SHA-256 server-seitig (das Integritäts-Token, nicht vom Client geliefert). Ein
+ * echter Adapter (Dateisystem/Objekt-Store) implementiert denselben Vertrag und besteht dieselbe Conformance.
+ */
+export function createLocalBlobStoragePort(): BlobStoragePort {
+  const blobs = new Map<string, BlobObject>();
+  return {
+    descriptor: descriptor("blob-storage", "Local Blob Storage", "confidential"),
+    async put(_context, input) {
+      const attachmentId = id("att");
+      const ref: AttachmentRef = {
+        attachmentId,
+        fileName: input.fileName,
+        mimeType: input.mimeType,
+        // Größe + Prüfsumme kommen vom SERVER über die Bytes — nie vom Client behauptet.
+        sizeBytes: input.bytes.byteLength,
+        checksumSha256: await sha256Hex(input.bytes),
+      };
+      blobs.set(attachmentId, { ref, bytes: input.bytes });
+      return capabilityOk(ref);
+    },
+    async get(_context, attachmentId) {
+      const found = blobs.get(attachmentId);
+      if (!found)
+        return capabilityFailure(
+          "blob-storage/not-found",
+          `unbekannte Anlage ${attachmentId}`,
+          { classification: "confidential" },
+        );
+      return capabilityOk(found);
+    },
+  };
 }
 
 /**
@@ -243,6 +291,7 @@ export function createLocalPlatformPorts(
   };
 
   const aiAssist = createLocalAiAssistPort(options);
+  const blobStorage = createLocalBlobStoragePort();
 
   return {
     identityAndTrust,
@@ -257,5 +306,6 @@ export function createLocalPlatformPorts(
     notification,
     workflow,
     audit,
+    blobStorage,
   };
 }

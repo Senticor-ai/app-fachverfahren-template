@@ -1,4 +1,9 @@
-import type { AiAssistPort, PlatformPorts, PaymentPort } from "./ports.js";
+import type {
+  AiAssistPort,
+  BlobStoragePort,
+  PlatformPorts,
+  PaymentPort,
+} from "./ports.js";
 import type { PortCallContext } from "./capabilities.js";
 
 export interface ContractScenario {
@@ -104,6 +109,50 @@ export function aiAssistContractScenarios(
   ];
 }
 
+/**
+ * Conformance-Szenarien für JEDE `BlobStoragePort`-Impl (In-Memory-Fake / Dateisystem / Objekt-Store): der
+ * Byte-Roundtrip muss die Bytes EXAKT erhalten, die server-berechnete SHA-256 muss über die gelieferten
+ * Bytes stimmen (Integritäts-Token), und ein `get` auf eine unbekannte Kennung scheitert sauber (kein leerer
+ * Erfolg). Wer das besteht, ist substituierbar.
+ */
+export function blobStorageContractScenarios(
+  blob: BlobStoragePort,
+): ContractScenario[] {
+  return [
+    {
+      name: "blob put/get roundtrip preserves bytes and checksum",
+      async run() {
+        const inhalt = "Nachweis-Inhalt (synthetisch)";
+        const bytes = new TextEncoder().encode(inhalt);
+        const put = await blob.put(sampleContext(), {
+          fileName: "nachweis.txt",
+          mimeType: "text/plain",
+          bytes,
+        });
+        if (!put.ok) throw new Error("blob put failed");
+        if (put.value.sizeBytes !== bytes.byteLength) {
+          throw new Error("blob size not computed from bytes");
+        }
+        const got = await blob.get(sampleContext(), put.value.attachmentId);
+        if (!got.ok) throw new Error("blob get failed");
+        if (new TextDecoder().decode(got.value.bytes) !== inhalt) {
+          throw new Error("blob bytes not preserved across roundtrip");
+        }
+        if (got.value.ref.checksumSha256 !== put.value.checksumSha256) {
+          throw new Error("blob checksum inconsistent across roundtrip");
+        }
+      },
+    },
+    {
+      name: "blob get of unknown id fails cleanly (no empty success)",
+      async run() {
+        const got = await blob.get(sampleContext(), "att.does-not-exist");
+        if (got.ok) throw new Error("blob get of unknown id must fail");
+      },
+    },
+  ];
+}
+
 export function platformContractScenarios(
   ports: PlatformPorts,
 ): ContractScenario[] {
@@ -120,5 +169,6 @@ export function platformContractScenarios(
       },
     },
     ...aiAssistContractScenarios(ports.aiAssist),
+    ...blobStorageContractScenarios(ports.blobStorage),
   ];
 }
