@@ -17,7 +17,9 @@ import type {
 } from "@senticor/public-sector-sdk";
 import {
   createLocalAiAssistPort,
+  createLocalBlobStoragePort,
   type AiAssistPort,
+  type BlobStoragePort,
 } from "@senticor/platform-contracts";
 import type { BffDeps } from "./deps.js";
 import { requestIdOf } from "./route-auth.js";
@@ -42,6 +44,8 @@ export interface AppBffOptions {
   /** KI-Assistenz-Port. OPTIONAL: fehlt er, nutzt der BFF den local-fake (deterministisch, ohne Netz) —
    *  eine App wählt in der Komposition per Env den echten Adapter. */
   aiAssist?: AiAssistPort;
+  /** Byte-Storage-Port. OPTIONAL: fehlt er, nutzt der BFF den In-Memory-Fake. */
+  blobStorage?: BlobStoragePort;
 }
 
 export async function appBff(
@@ -57,6 +61,7 @@ export async function appBff(
     auditSink: opts.auditSink,
     rbacRegistry: opts.rbacRegistry ?? builtInRbacRegistry,
     aiAssist: opts.aiAssist ?? createLocalAiAssistPort(),
+    blobStorage: opts.blobStorage ?? createLocalBlobStoragePort(),
   };
   app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error.validation) {

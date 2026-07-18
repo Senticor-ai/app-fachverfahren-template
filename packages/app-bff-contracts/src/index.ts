@@ -114,4 +114,16 @@ export {
   type VermerkListDto,
   type VermerkRequestDto,
 } from "./vermerke.js";
+export {
+  NachweisDownloadDtoSchema,
+  NachweisIdParamsSchema,
+  NachweisListDtoSchema,
+  NachweisRefDtoSchema,
+  NachweisUploadRequestSchema,
+  type NachweisDownloadDto,
+  type NachweisIdParamsDto,
+  type NachweisListDto,
+  type NachweisRefDto,
+  type NachweisUploadRequestDto,
+} from "./nachweise.js";
 export { openApiInfo, openApiTags } from "./openapi.js";

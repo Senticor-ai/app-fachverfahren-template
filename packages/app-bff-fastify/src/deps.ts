@@ -10,7 +10,10 @@ import type {
   ProcedureRegistry,
   RbacRegistry,
 } from "@senticor/public-sector-sdk";
-import type { AiAssistPort } from "@senticor/platform-contracts";
+import type {
+  AiAssistPort,
+  BlobStoragePort,
+} from "@senticor/platform-contracts";
 
 export interface BffDeps {
   appStore: AppStore;
@@ -26,4 +29,6 @@ export interface BffDeps {
   /** KI-Assistenz als PORT (austauschbar: local-fake ODER echter Adapter, z.B. Ollama). Die App-Komposition
    *  wählt die Impl per Env; der BFF konsumiert nur den Vertrag — nie einen konkreten Anbieter. */
   aiAssist: AiAssistPort;
+  /** Byte-Storage für Nachweise/Dokumente (austauschbar: In-Memory-Fake / Dateisystem / Objekt-Store). */
+  blobStorage: BlobStoragePort;
 }

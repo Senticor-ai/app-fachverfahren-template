@@ -22,10 +22,16 @@ import {
   AntragIdParamsSchema,
   AntragListDtoSchema,
   ErrorEnvelopeSchema,
+  NachweisDownloadDtoSchema,
+  NachweisIdParamsSchema,
+  NachweisListDtoSchema,
+  NachweisRefDtoSchema,
+  NachweisUploadRequestSchema,
   VerwaltungsaktDtoSchema,
   WiderspruchDtoSchema,
   WiderspruchRequestSchema,
   type AntragDto,
+  type NachweisRefDto,
   type VerwaltungsaktDto,
 } from "@senticor/app-bff-contracts";
 import type { AppAuditEvent, AppCase } from "@senticor/app-store-postgres";
@@ -70,6 +76,36 @@ function toVerwaltungsaktDto(va: GefrorenerVa): VerwaltungsaktDto {
     ...(va.content as Omit<VerwaltungsaktDto, "checksumSha256">),
     checksumSha256: va.checksumSha256,
   };
+}
+
+const NACHWEIS_EVENT_TYPE = "nachweis.uploaded";
+
+/** Ein `nachweis.uploaded`-Audit-Ereignis → NachweisRefDto (Metadaten aus der append-only payload). Der
+ *  Ref beweist zugleich die Zugehörigkeit einer Anlage zum Antrag: nur wer hier auftaucht, ist abrufbar. */
+function nachweisRefOf(e: AppAuditEvent): NachweisRefDto | undefined {
+  const p = e.payload;
+  const attachmentId = p["attachmentId"];
+  const fileName = p["fileName"];
+  const mimeType = p["mimeType"];
+  const sizeBytes = p["sizeBytes"];
+  const checksumSha256 = p["checksumSha256"];
+  if (
+    typeof attachmentId === "string" &&
+    typeof fileName === "string" &&
+    typeof mimeType === "string" &&
+    typeof sizeBytes === "number" &&
+    typeof checksumSha256 === "string"
+  ) {
+    return {
+      attachmentId,
+      fileName,
+      mimeType,
+      sizeBytes,
+      checksumSha256,
+      hochgeladenAm: e.occurredAt,
+    };
+  }
+  return undefined;
 }
 
 /** AppCase → AntragDto: die BÜRGER-Projektion. Interne Zuordnung (subjectIds) und Server-Topologie
@@ -476,6 +512,242 @@ export function registerBuergerRoutes(
         aktenzeichen: found.caseId,
         art,
         eingelegtAm: objection.occurredAt,
+      });
+    },
+  );
+
+  // ── NACHWEIS-UPLOAD (Byte-Transfer über den BlobStoragePort) ────────────────────────────────────
+  // Der Inhalt reist base64-kodiert; der Server dekodiert, legt die Bytes über den (austauschbaren)
+  // BlobStoragePort ab (Größe + SHA-256 SERVER-berechnet) und hält die Referenz append-only im Fall-Audit
+  // (`nachweis.uploaded`) fest — die einzige Zuordnung Anlage↔Antrag. Owner-scoped: nur der eigene Antrag.
+  typed.post(
+    "/api/buerger/antraege/:id/nachweise",
+    {
+      config: submitAuth.config,
+      preHandler: submitAuth.preHandler,
+      // ~10 MB Datei als base64 (Fastifys 1-MB-Default würde einen echten Nachweis ablehnen).
+      bodyLimit: 14_000_000,
+      schema: {
+        tags: ["buerger"],
+        summary: "Einen Nachweis zum eigenen Antrag hochladen",
+        params: AntragIdParamsSchema,
+        body: NachweisUploadRequestSchema,
+        response: { 201: NachweisRefDtoSchema, ...errorResponses },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      let found: AppCase | undefined;
+      try {
+        found = await deps.caseStore.getCase({
+          tenantId: session.tenantId,
+          caseId: request.params.id,
+          scope: "owner",
+          actorId: session.actorId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      if (!found)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+
+      const bytes = new Uint8Array(
+        Buffer.from(request.body.contentBase64, "base64"),
+      );
+      if (bytes.byteLength === 0)
+        return reply.code(400).send({
+          error: "leerer oder ungültiger Inhalt",
+          requestId: requestIdOf(request),
+        });
+
+      const put = await deps.blobStorage.put(
+        {
+          requestId: requestIdOf(request),
+          tenantId: session.tenantId,
+          authorityId: session.authorityId,
+          jurisdictionId: session.jurisdictionId,
+          actor: { actorId: session.actorId, actorType: "citizen" },
+          purpose: "nachweis-upload",
+        },
+        {
+          fileName: request.body.fileName,
+          mimeType: request.body.mimeType,
+          bytes,
+        },
+      );
+      if (!put.ok)
+        return reply
+          .code(503)
+          .send({ error: put.error.message, requestId: requestIdOf(request) });
+      const ref = put.value;
+
+      const legalBasisId =
+        deps.procedureRegistry.get(found.procedureId, found.procedureVersion)
+          ?.legalBasisIds[0] ?? "§ 26 VwVfG";
+      const event = createFachlicheAuditEvent({
+        eventType: NACHWEIS_EVENT_TYPE,
+        actorId: session.actorId,
+        actingAuthorityId: found.authorityId,
+        purpose: "nachweis",
+        legalBasisId,
+        caseId: found.caseId,
+        requestId: requestIdOf(request),
+        summary: `Nachweis „${ref.fileName}" zu ${found.caseId} hochgeladen`,
+      });
+      try {
+        await deps.caseStore.appendAuditEvent({
+          auditEventId: event.auditEventId,
+          caseId: found.caseId,
+          tenantId: session.tenantId,
+          authorityId: found.authorityId,
+          jurisdictionId: found.jurisdictionId,
+          actorId: session.actorId,
+          eventType: event.eventType,
+          purpose: event.purpose,
+          legalBasisId: event.legalBasisId,
+          requestId: requestIdOf(request),
+          payload: {
+            attachmentId: ref.attachmentId,
+            fileName: ref.fileName,
+            mimeType: ref.mimeType,
+            sizeBytes: ref.sizeBytes,
+            checksumSha256: ref.checksumSha256,
+            summary: event.summary,
+          },
+          occurredAt: event.occurredAt,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      return reply.code(201).send({
+        attachmentId: ref.attachmentId,
+        fileName: ref.fileName,
+        mimeType: ref.mimeType,
+        sizeBytes: ref.sizeBytes,
+        checksumSha256: ref.checksumSha256,
+        hochgeladenAm: event.occurredAt,
+      });
+    },
+  );
+
+  typed.get(
+    "/api/buerger/antraege/:id/nachweise",
+    {
+      config: readAuth.config,
+      preHandler: readAuth.preHandler,
+      schema: {
+        tags: ["buerger"],
+        summary: "Die eigenen Nachweise eines Antrags auflisten (Metadaten)",
+        params: AntragIdParamsSchema,
+        response: { 200: NachweisListDtoSchema, ...errorResponses },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      let found: AppCase | undefined;
+      try {
+        found = await deps.caseStore.getCase({
+          tenantId: session.tenantId,
+          caseId: request.params.id,
+          scope: "owner",
+          actorId: session.actorId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      if (!found)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+      let events: AppAuditEvent[];
+      try {
+        events = await deps.caseStore.listAuditEvents({
+          tenantId: session.tenantId,
+          caseId: found.caseId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      const nachweise = events
+        .filter((e) => e.eventType === NACHWEIS_EVENT_TYPE)
+        .map(nachweisRefOf)
+        .filter((r): r is NachweisRefDto => r !== undefined);
+      return reply.send({ nachweise });
+    },
+  );
+
+  typed.get(
+    "/api/buerger/antraege/:id/nachweise/:attachmentId",
+    {
+      config: readAuth.config,
+      preHandler: readAuth.preHandler,
+      schema: {
+        tags: ["buerger"],
+        summary: "Einen eigenen Nachweis herunterladen (base64)",
+        params: NachweisIdParamsSchema,
+        response: { 200: NachweisDownloadDtoSchema, ...errorResponses },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      let found: AppCase | undefined;
+      try {
+        found = await deps.caseStore.getCase({
+          tenantId: session.tenantId,
+          caseId: request.params.id,
+          scope: "owner",
+          actorId: session.actorId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      if (!found)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+      let events: AppAuditEvent[];
+      try {
+        events = await deps.caseStore.listAuditEvents({
+          tenantId: session.tenantId,
+          caseId: found.caseId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      // Die Anlage MUSS zu diesem Antrag gehören (im append-only Audit belegt) — sonst 404 (kein
+      // Cross-Case-Zugriff über eine fremde attachmentId).
+      const ref = events
+        .filter((e) => e.eventType === NACHWEIS_EVENT_TYPE)
+        .map(nachweisRefOf)
+        .find((r) => r?.attachmentId === request.params.attachmentId);
+      if (!ref)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+
+      const got = await deps.blobStorage.get(
+        {
+          requestId: requestIdOf(request),
+          tenantId: session.tenantId,
+          authorityId: session.authorityId,
+          jurisdictionId: session.jurisdictionId,
+          actor: { actorId: session.actorId, actorType: "citizen" },
+          purpose: "nachweis-download",
+        },
+        request.params.attachmentId,
+      );
+      if (!got.ok)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+      return reply.send({
+        fileName: ref.fileName,
+        mimeType: ref.mimeType,
+        sizeBytes: got.value.ref.sizeBytes,
+        checksumSha256: got.value.ref.checksumSha256,
+        contentBase64: Buffer.from(got.value.bytes).toString("base64"),
       });
     },
   );
