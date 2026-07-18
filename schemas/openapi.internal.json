@@ -2361,6 +2361,500 @@
         "tags": ["cases"]
       }
     },
+    "/api/cases/{id}/vermerke": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "vermerke": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "autorActorId": { "minLength": 1, "type": "string" },
+                          "caseId": { "minLength": 1, "type": "string" },
+                          "erstelltAm": { "minLength": 1, "type": "string" },
+                          "modelId": {
+                            "anyOf": [
+                              { "minLength": 1, "type": "string" },
+                              { "type": "null" }
+                            ]
+                          },
+                          "quelle": {
+                            "anyOf": [
+                              { "enum": ["mensch"], "type": "string" },
+                              { "enum": ["ki"], "type": "string" }
+                            ]
+                          },
+                          "reviewStatus": {
+                            "anyOf": [
+                              {
+                                "enum": ["nicht-erforderlich"],
+                                "type": "string"
+                              },
+                              { "enum": ["offen"], "type": "string" },
+                              { "enum": ["bestaetigt"], "type": "string" },
+                              { "enum": ["verworfen"], "type": "string" }
+                            ]
+                          },
+                          "text": { "type": "string" },
+                          "vermerkId": { "minLength": 1, "type": "string" }
+                        },
+                        "required": [
+                          "vermerkId",
+                          "caseId",
+                          "text",
+                          "quelle",
+                          "autorActorId",
+                          "modelId",
+                          "reviewStatus",
+                          "erstelltAm"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["vermerke"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Aktenvermerke eines Falls lesen (chronologisch)",
+        "tags": ["vermerke"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "text": {
+                    "maxLength": 20000,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": ["text"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "autorActorId": { "minLength": 1, "type": "string" },
+                    "caseId": { "minLength": 1, "type": "string" },
+                    "erstelltAm": { "minLength": 1, "type": "string" },
+                    "modelId": {
+                      "anyOf": [
+                        { "minLength": 1, "type": "string" },
+                        { "type": "null" }
+                      ]
+                    },
+                    "quelle": {
+                      "anyOf": [
+                        { "enum": ["mensch"], "type": "string" },
+                        { "enum": ["ki"], "type": "string" }
+                      ]
+                    },
+                    "reviewStatus": {
+                      "anyOf": [
+                        { "enum": ["nicht-erforderlich"], "type": "string" },
+                        { "enum": ["offen"], "type": "string" },
+                        { "enum": ["bestaetigt"], "type": "string" },
+                        { "enum": ["verworfen"], "type": "string" }
+                      ]
+                    },
+                    "text": { "type": "string" },
+                    "vermerkId": { "minLength": 1, "type": "string" }
+                  },
+                  "required": [
+                    "vermerkId",
+                    "caseId",
+                    "text",
+                    "quelle",
+                    "autorActorId",
+                    "modelId",
+                    "reviewStatus",
+                    "erstelltAm"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Aktenvermerk schreiben (Mensch) — append-only",
+        "tags": ["vermerke"]
+      }
+    },
+    "/api/cases/{id}/vermerke/ki": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "input": { "additionalProperties": {}, "type": "object" },
+                  "task": { "minLength": 1, "type": "string" }
+                },
+                "required": ["task"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "autorActorId": { "minLength": 1, "type": "string" },
+                    "caseId": { "minLength": 1, "type": "string" },
+                    "erstelltAm": { "minLength": 1, "type": "string" },
+                    "modelId": {
+                      "anyOf": [
+                        { "minLength": 1, "type": "string" },
+                        { "type": "null" }
+                      ]
+                    },
+                    "quelle": {
+                      "anyOf": [
+                        { "enum": ["mensch"], "type": "string" },
+                        { "enum": ["ki"], "type": "string" }
+                      ]
+                    },
+                    "reviewStatus": {
+                      "anyOf": [
+                        { "enum": ["nicht-erforderlich"], "type": "string" },
+                        { "enum": ["offen"], "type": "string" },
+                        { "enum": ["bestaetigt"], "type": "string" },
+                        { "enum": ["verworfen"], "type": "string" }
+                      ]
+                    },
+                    "text": { "type": "string" },
+                    "vermerkId": { "minLength": 1, "type": "string" }
+                  },
+                  "required": [
+                    "vermerkId",
+                    "caseId",
+                    "text",
+                    "quelle",
+                    "autorActorId",
+                    "modelId",
+                    "reviewStatus",
+                    "erstelltAm"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "KI-Aktenvermerk-Entwurf erzeugen (prüfpflichtig, ki-vorschlag)",
+        "tags": ["vermerke"]
+      }
+    },
     "/api/mailbox": {
       "get": {
         "parameters": [

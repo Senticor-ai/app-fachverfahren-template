@@ -1,0 +1,303 @@
+// AKTENVERMERK-Routen — der unveränderliche, attribuierbare Fall-Vermerk. Anders als die editierbare
+// Arbeits-Notiz (taskKind "notiz" in app_tasks) lebt ein Vermerk im APPEND-ONLY Fall-Audit
+// (app_audit_events, DB-Trigger-gesichert): einmal geschrieben, nie geändert — eine Korrektur ist ein
+// NEUER Vermerk. Verfasst von MENSCH oder KI:
+//  - Mensch: POST /vermerke → `case.note.added` mit quelle="mensch".
+//  - KI: POST /vermerke/ki → ruft den (austauschbaren) AiAssistPort, hält den ENTWURF als `case.note.added`
+//    mit quelle="ki", modelId, marking="ki-vorschlag", reviewStatus="offen" fest — prüfpflichtig, die
+//    rechtsnahe Bewertung bleibt beim Menschen (HCAI/EU-AI-Act). ERSTE Verbindung AiAssist ↔ Fall.
+// Mandant/Behörde/Akteur kommen AUSSCHLIESSLICH aus der Sitzung; jede Route prüft zuerst die Behörden-
+// Zugehörigkeit des Falls (404 sonst, kein Existenz-Orakel).
+import type { FastifyInstance } from "fastify";
+import type { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
+import {
+  CaseIdParamsSchema,
+  ErrorEnvelopeSchema,
+  KiVermerkRequestSchema,
+  VermerkDtoSchema,
+  VermerkListDtoSchema,
+  VermerkRequestSchema,
+  type VermerkDto,
+} from "@senticor/app-bff-contracts";
+import type { AppAuditEvent, AppCase } from "@senticor/app-store-postgres";
+import {
+  builtInPermissions,
+  createFachlicheAuditEvent,
+} from "@senticor/public-sector-sdk";
+import type { BffDeps } from "../deps.js";
+import { bffRouteAuth, requestIdOf, sessionOf } from "../route-auth.js";
+import { storeUnavailable } from "../store-error.js";
+
+const NOTE_EVENT_TYPE = "case.note.added";
+/** Rechtsgrundlage der Aktenführung, falls das Verfahren keine eigene liefert (Aktenmäßigkeitsprinzip). */
+const DEFAULT_NOTE_LEGAL_BASIS = "§ 29 VwVfG";
+
+/** Ein `case.note.added`-Audit-Ereignis → VermerkDto (Provenienz/Review aus der frei-formigen payload). */
+function toVermerkDto(e: AppAuditEvent, fallbackCaseId: string): VermerkDto {
+  const p = e.payload;
+  const quelle = p["quelle"] === "ki" ? "ki" : "mensch";
+  const rs = p["reviewStatus"];
+  const reviewStatus =
+    rs === "offen" ||
+    rs === "bestaetigt" ||
+    rs === "verworfen" ||
+    rs === "nicht-erforderlich"
+      ? rs
+      : quelle === "ki"
+        ? "offen"
+        : "nicht-erforderlich";
+  return {
+    vermerkId: e.auditEventId,
+    caseId: e.caseId ?? fallbackCaseId,
+    text: typeof p["text"] === "string" ? p["text"] : "",
+    quelle,
+    autorActorId: e.actorId,
+    modelId: typeof p["modelId"] === "string" ? p["modelId"] : null,
+    reviewStatus,
+    erstelltAm: e.occurredAt,
+  };
+}
+
+export function registerVermerkRoutes(
+  app: FastifyInstance,
+  deps: BffDeps,
+): void {
+  const typed = app.withTypeProvider<TypeBoxTypeProvider>();
+  const readAuth = bffRouteAuth(
+    { kind: "rbac", permission: builtInPermissions.caseRead.permission },
+    deps,
+  );
+  const writeAuth = bffRouteAuth(
+    { kind: "rbac", permission: builtInPermissions.caseNoteWrite.permission },
+    deps,
+  );
+  const errorResponses = {
+    400: ErrorEnvelopeSchema,
+    401: ErrorEnvelopeSchema,
+    403: ErrorEnvelopeSchema,
+    404: ErrorEnvelopeSchema,
+    503: ErrorEnvelopeSchema,
+  };
+
+  /** Akte im BEHÖRDEN-Scope laden (Prädikat, keine Nachprüfung); undefined ⇒ 404. */
+  async function loadOwnedCase(
+    session: ReturnType<typeof sessionOf>,
+    caseId: string,
+  ): Promise<AppCase | undefined> {
+    return deps.caseStore.getCase({
+      tenantId: session.tenantId,
+      caseId,
+      scope: "authority",
+      authorityId: session.authorityId,
+    });
+  }
+
+  /** Rechtsgrundlage aus dem Verfahren (Verfahren = DATEN); Fallback Aktenmäßigkeit. */
+  function legalBasisFor(appCase: AppCase): string {
+    const procedure = deps.procedureRegistry.get(
+      appCase.procedureId,
+      appCase.procedureVersion,
+    );
+    return procedure?.legalBasisIds[0] ?? DEFAULT_NOTE_LEGAL_BASIS;
+  }
+
+  /** Schreibt EIN `case.note.added`-Ereignis append-only + liefert das DTO. */
+  async function appendVermerk(
+    appCase: AppCase,
+    session: ReturnType<typeof sessionOf>,
+    requestId: string,
+    payload: Record<string, unknown>,
+    summary: string,
+  ): Promise<VermerkDto> {
+    const event = createFachlicheAuditEvent({
+      eventType: NOTE_EVENT_TYPE,
+      actorId: session.actorId,
+      actingAuthorityId: appCase.authorityId,
+      purpose: "aktenvermerk",
+      legalBasisId: legalBasisFor(appCase),
+      caseId: appCase.caseId,
+      requestId,
+      summary,
+    });
+    const stored: AppAuditEvent = {
+      auditEventId: event.auditEventId,
+      caseId: appCase.caseId,
+      tenantId: session.tenantId,
+      authorityId: appCase.authorityId,
+      jurisdictionId: appCase.jurisdictionId,
+      actorId: session.actorId,
+      eventType: event.eventType,
+      purpose: event.purpose,
+      legalBasisId: event.legalBasisId,
+      requestId,
+      payload: { ...payload, summary },
+      occurredAt: event.occurredAt,
+    };
+    await deps.caseStore.appendAuditEvent(stored);
+    return toVermerkDto(stored, appCase.caseId);
+  }
+
+  // ── Menschlicher Aktenvermerk ─────────────────────────────────────────────────────────────────
+  typed.post(
+    "/api/cases/:id/vermerke",
+    {
+      config: writeAuth.config,
+      preHandler: writeAuth.preHandler,
+      schema: {
+        tags: ["vermerke"],
+        summary: "Aktenvermerk schreiben (Mensch) — append-only",
+        params: CaseIdParamsSchema,
+        body: VermerkRequestSchema,
+        response: { 201: VermerkDtoSchema, ...errorResponses },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      const appCase = await loadOwnedCase(session, request.params.id).catch(
+        () => "error" as const,
+      );
+      if (appCase === "error") return storeUnavailable(request, reply);
+      if (!appCase)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+      let dto: VermerkDto;
+      try {
+        dto = await appendVermerk(
+          appCase,
+          session,
+          requestIdOf(request),
+          {
+            text: request.body.text,
+            quelle: "mensch",
+            reviewStatus: "nicht-erforderlich",
+          },
+          `Aktenvermerk (Mensch) zu ${appCase.caseId}`,
+        );
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      return reply.code(201).send(dto);
+    },
+  );
+
+  // ── KI-Aktenvermerk-Entwurf (via AiAssistPort) ────────────────────────────────────────────────
+  typed.post(
+    "/api/cases/:id/vermerke/ki",
+    {
+      config: writeAuth.config,
+      preHandler: writeAuth.preHandler,
+      schema: {
+        tags: ["vermerke"],
+        summary: "KI-Aktenvermerk-Entwurf erzeugen (prüfpflichtig, ki-vorschlag)",
+        params: CaseIdParamsSchema,
+        body: KiVermerkRequestSchema,
+        response: {
+          201: VermerkDtoSchema,
+          422: ErrorEnvelopeSchema,
+          ...errorResponses,
+        },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      const appCase = await loadOwnedCase(session, request.params.id).catch(
+        () => "error" as const,
+      );
+      if (appCase === "error") return storeUnavailable(request, reply);
+      if (!appCase)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+
+      // Den (austauschbaren) AiAssistPort fragen — Kontext AUSSCHLIESSLICH aus der Sitzung.
+      const result = await deps.aiAssist.suggest(
+        {
+          requestId: requestIdOf(request),
+          tenantId: session.tenantId,
+          authorityId: session.authorityId,
+          jurisdictionId: session.jurisdictionId,
+          actor: { actorId: session.actorId, actorType: "employee" },
+          purpose: "aktenvermerk",
+        },
+        {
+          task: request.body.task,
+          input: request.body.input ?? {},
+        },
+      );
+      if (!result.ok) {
+        // Ehrliches Mapping: high-risk-Ablehnung → 422, kein Modell → 503; NIE ein fingierter Vermerk.
+        const status =
+          result.error.code === "ai-assist/high-risk-refused" ? 422 : 503;
+        return reply.code(status).send({
+          error: result.error.message,
+          requestId: requestIdOf(request),
+        });
+      }
+      const entwurf =
+        typeof result.value.value === "string"
+          ? result.value.value
+          : JSON.stringify(result.value.value);
+      let dto: VermerkDto;
+      try {
+        dto = await appendVermerk(
+          appCase,
+          session,
+          requestIdOf(request),
+          {
+            text: entwurf,
+            quelle: "ki",
+            modelId: result.value.modelId,
+            marking: "ki-vorschlag",
+            reviewRequired: true,
+            reviewStatus: "offen",
+            angefordertVon: session.actorId,
+          },
+          `KI-Aktenvermerk-Entwurf (${result.value.modelId}) zu ${appCase.caseId}`,
+        );
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      return reply.code(201).send(dto);
+    },
+  );
+
+  // ── Aktenvermerke lesen ───────────────────────────────────────────────────────────────────────
+  typed.get(
+    "/api/cases/:id/vermerke",
+    {
+      config: readAuth.config,
+      preHandler: readAuth.preHandler,
+      schema: {
+        tags: ["vermerke"],
+        summary: "Aktenvermerke eines Falls lesen (chronologisch)",
+        params: CaseIdParamsSchema,
+        response: { 200: VermerkListDtoSchema, ...errorResponses },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      const appCase = await loadOwnedCase(session, request.params.id).catch(
+        () => "error" as const,
+      );
+      if (appCase === "error") return storeUnavailable(request, reply);
+      if (!appCase)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+      let events: AppAuditEvent[];
+      try {
+        events = await deps.caseStore.listAuditEvents({
+          tenantId: session.tenantId,
+          caseId: appCase.caseId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      const vermerke = events
+        .filter((e) => e.eventType === NOTE_EVENT_TYPE)
+        .map((e) => toVermerkDto(e, appCase.caseId));
+      return reply.send({ vermerke });
+    },
+  );
+}

@@ -164,6 +164,22 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           url: "/api/cases/:id/transitions",
           policy: "rbac:case.decision.prepare",
         },
+        // Aktenvermerke (append-only): Lesen = case.read; Schreiben (Mensch + KI) = eigene case.note.write.
+        {
+          method: "GET",
+          url: "/api/cases/:id/vermerke",
+          policy: "rbac:case.read",
+        },
+        {
+          method: "POST",
+          url: "/api/cases/:id/vermerke",
+          policy: "rbac:case.note.write",
+        },
+        {
+          method: "POST",
+          url: "/api/cases/:id/vermerke/ki",
+          policy: "rbac:case.note.write",
+        },
         {
           method: "PATCH",
           url: "/api/tasks/:id",

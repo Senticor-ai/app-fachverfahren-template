@@ -29,6 +29,7 @@ import { registerMailboxRoutes } from "./routes/mailbox.js";
 import { registerPreferencesRoutes } from "./routes/preferences.js";
 import { registerSessionRoute } from "./routes/session.js";
 import { registerTaskRoutes } from "./routes/tasks.js";
+import { registerVermerkRoutes } from "./routes/vermerke.js";
 
 export interface AppBffOptions {
   appStore: AppStore;
@@ -82,6 +83,7 @@ export async function appBff(
   registerMailboxRoutes(app, deps);
   registerCaseRoutes(app, deps);
   registerTaskRoutes(app, deps);
+  registerVermerkRoutes(app, deps);
   // Bürger-Sicht auf die EIGENEN Anträge (eigene Familie: der Scope ist durch die Route impliziert).
   registerBuergerRoutes(app, deps);
 }

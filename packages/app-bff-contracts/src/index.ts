@@ -102,4 +102,16 @@ export {
   type AiAssistRequestDto,
   type AiSuggestionDto,
 } from "./ai-assist.js";
+export {
+  KiVermerkRequestSchema,
+  VermerkDtoSchema,
+  VermerkListDtoSchema,
+  VermerkQuelleSchema,
+  VermerkRequestSchema,
+  VermerkReviewStatusSchema,
+  type KiVermerkRequestDto,
+  type VermerkDto,
+  type VermerkListDto,
+  type VermerkRequestDto,
+} from "./vermerke.js";
 export { openApiInfo, openApiTags } from "./openapi.js";

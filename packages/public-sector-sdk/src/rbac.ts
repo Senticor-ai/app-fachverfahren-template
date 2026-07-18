@@ -75,6 +75,14 @@ export const builtInPermissions = {
     permission: "ai.assist",
     description: "KI-Assistenz (Vorschläge) anfordern",
   },
+  // ── Aktenvermerk (append-only, attribuierbar Mensch/KI) ──────────────────────────────────────────
+  // Einen unveränderlichen Aktenvermerk an einen Fall schreiben (Mensch ODER KI-Entwurf). EIGENE
+  // Permission, getrennt von `case.decision.prepare`: Vermerke dokumentieren, sie entscheiden nicht —
+  // ein Recht zu vermerken darf nicht auf dem Entscheidungs-Vorbereitungsrecht mitreiten.
+  caseNoteWrite: {
+    permission: "case.note.write",
+    description: "Aktenvermerk an einen Fall schreiben",
+  },
 } as const satisfies Record<string, RbacPermission>;
 
 export const builtInRbacRegistry = {
@@ -111,6 +119,8 @@ export const builtInRbacRegistry = {
         builtInPermissions.casePrepareDecision,
         // KI-Assistenz ist ein Sachbearbeitungs-Werkzeug (Bürger:innen erhalten sie in dieser Scheibe nicht).
         builtInPermissions.aiAssist,
+        // Aktenvermerke schreiben (Mensch-Vermerk + KI-Vermerk-Entwurf am Fall).
+        builtInPermissions.caseNoteWrite,
       ],
       builtIn: true,
     },
