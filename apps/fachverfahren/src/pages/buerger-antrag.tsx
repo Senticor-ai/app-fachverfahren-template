@@ -7,6 +7,7 @@ import { StatusVerfolgung } from "@senticor/fachverfahren-kit";
 import { Shell } from "../app/shell.js";
 import { useStoreVersion } from "../app/use-store-version.js";
 import { store } from "../store.js";
+import { NachweisSektion } from "./nachweis-sektion.js";
 
 export function BuergerAntragPage(): React.JSX.Element {
   useStoreVersion();
@@ -52,6 +53,8 @@ export function BuergerAntragPage(): React.JSX.Element {
                 Bescheid ansehen
               </Link>
             ) : null}
+            {/* Nachweise zum eigenen Antrag hoch-/herunterladen (die caseId existiert hier). */}
+            <NachweisSektion antragId={v.id} />
           </div>
         ) : laedt ? (
           <p className="mt-6 text-sm text-muted-foreground" aria-busy="true">

@@ -18,13 +18,47 @@ import type {
   AntragDto,
   AntragEinreichenRequestDto,
   AntragListDto,
+  NachweisDownloadDto,
+  NachweisListDto,
+  NachweisRefDto,
   VerwaltungsaktDto,
   WiderspruchDto,
 } from "@senticor/app-bff-contracts";
 import type { Vorgang, VorgangPersistence } from "@senticor/fachverfahren-kit";
 import { apiPath, CaseRequestError } from "./case-client.js";
 
-export type { VerwaltungsaktDto, WiderspruchDto };
+export type { NachweisDownloadDto, NachweisRefDto, VerwaltungsaktDto, WiderspruchDto };
+
+/** Die eigenen Nachweise eines Antrags auflisten (nur Metadaten). */
+export async function ladeNachweise(
+  antragId: string,
+): Promise<NachweisRefDto[]> {
+  const body = await request<NachweisListDto>(
+    `/api/buerger/antraege/${encodeURIComponent(antragId)}/nachweise`,
+  );
+  return body.nachweise;
+}
+
+/** Einen Nachweis (base64-kodiert) zum eigenen Antrag hochladen. */
+export async function nachweisHochladen(
+  antragId: string,
+  datei: { fileName: string; mimeType: string; contentBase64: string },
+): Promise<NachweisRefDto> {
+  return request<NachweisRefDto>(
+    `/api/buerger/antraege/${encodeURIComponent(antragId)}/nachweise`,
+    { method: "POST", body: JSON.stringify(datei) },
+  );
+}
+
+/** Einen eigenen Nachweis herunterladen (Metadaten + base64-Inhalt). */
+export async function nachweisHerunterladen(
+  antragId: string,
+  attachmentId: string,
+): Promise<NachweisDownloadDto> {
+  return request<NachweisDownloadDto>(
+    `/api/buerger/antraege/${encodeURIComponent(antragId)}/nachweise/${encodeURIComponent(attachmentId)}`,
+  );
+}
 
 /** Die Vorgang-Felder, die NICHT in `data` gehören, weil sie oben am DTO stehen (id/status). Alles
  *  Übrige bildet die opake Nutzlast. */
