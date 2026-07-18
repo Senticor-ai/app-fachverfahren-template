@@ -24,6 +24,7 @@ import type {
 import { Shell } from "../app/shell.js";
 import { CaseAktionen } from "./case-aktionen.js";
 import { toAkteProps, toVerlauf } from "./case-akte-view.js";
+import { VermerkAktionen } from "./vermerk-aktionen.js";
 
 /** Die roh geladenen Akten-Daten (die Sicht hält keinen abgeleiteten Zustand — Props werden im Render gerechnet). */
 interface AkteDaten {
@@ -121,6 +122,23 @@ export function AmtAktePage(): React.JSX.Element {
     [id, silentReload],
   );
 
+  // Unveränderlicher Aktenvermerk (append-only im Fall-Audit) — Mensch ODER KI-Entwurf. Danach ohne
+  // Skeleton neu laden, damit der Vermerk im Verlauf erscheint (KI-Entwürfe dort als prüfpflichtig).
+  const handleVermerkAdd = useCallback(
+    async (text: string) => {
+      await casePort.createVermerk(id, { text });
+      await silentReload();
+    },
+    [id, silentReload],
+  );
+  const handleKiVermerk = useCallback(
+    async (task: string) => {
+      await casePort.createKiVermerk(id, { task });
+      await silentReload();
+    },
+    [id, silentReload],
+  );
+
   return (
     <Shell persona="sachbearbeitung" activeNavKey="akten">
       <section className="mx-auto w-full max-w-5xl px-6 py-6">
@@ -161,25 +179,31 @@ export function AmtAktePage(): React.JSX.Element {
             }}
           />
         ) : (
-          <DossierAkte360
-            {...toAkteProps(
-              state.data.caseSummary,
-              state.data.tasks,
-              state.data.progress,
-            )}
-            verlauf={toVerlauf(state.data.audit)}
-            onSchrittToggle={handleSchrittToggle}
-            onNotizAdd={handleNotizAdd}
-            kopfAktion={
-              <CaseAktionen
-                caseId={id}
-                state={state.data.allowedActions.state}
-                version={state.data.allowedActions.version}
-                actions={state.data.allowedActions.actions}
-                onDone={silentReload}
-              />
-            }
-          />
+          <>
+            <DossierAkte360
+              {...toAkteProps(
+                state.data.caseSummary,
+                state.data.tasks,
+                state.data.progress,
+              )}
+              verlauf={toVerlauf(state.data.audit)}
+              onSchrittToggle={handleSchrittToggle}
+              onNotizAdd={handleNotizAdd}
+              kopfAktion={
+                <CaseAktionen
+                  caseId={id}
+                  state={state.data.allowedActions.state}
+                  version={state.data.allowedActions.version}
+                  actions={state.data.allowedActions.actions}
+                  onDone={silentReload}
+                />
+              }
+            />
+            <VermerkAktionen
+              onVermerk={handleVermerkAdd}
+              onKiVermerk={handleKiVermerk}
+            />
+          </>
         )}
       </section>
     </Shell>

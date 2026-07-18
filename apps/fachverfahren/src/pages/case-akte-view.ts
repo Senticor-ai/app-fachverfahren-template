@@ -17,6 +17,7 @@ import type {
   DossierZiel,
   DossierZielSchritt,
   TimelineItem,
+  TimelineTone,
 } from "@senticor/fachverfahren-kit";
 
 const TASK_KIND_ZIEL = "ziel";
@@ -127,25 +128,55 @@ function toNotizen(tasks: readonly CaseTask[]): DossierNotiz[] {
 // ── Verlauf/Audit → Timeline (rein, verfahrens-agnostisch) ───────────────────────────────────────
 // Generische, deutsche Chrome-Titel je Ereignistyp; die fachliche Wahrheit (Zustände, Rechtsgrundlage,
 // Akteur) steht im append-only Audit-`payload` — hier wird NICHTS erfunden, nur lesbar gemacht.
+const NOTE_EVENT_TYPE = "case.note.added";
+
 const AUDIT_TITEL: Record<string, string> = {
   "case.opened": "Fall eröffnet",
   "case.transitioned": "Zustandswechsel",
+  "case.submitted": "Antrag eingereicht",
+  "case.disclosed": "Bescheid bekanntgegeben",
+  "case.objection": "Rechtsbehelf eingelegt",
+  [NOTE_EVENT_TYPE]: "Aktenvermerk",
 };
 
-const AUDIT_TONE: Record<string, TimelineItem["tone"]> = {
+const AUDIT_TONE: Record<string, TimelineTone> = {
   "case.opened": "info",
   "case.transitioned": "ok",
+  "case.submitted": "info",
+  "case.disclosed": "ok",
+  "case.objection": "warn",
 };
 
-/** Bevorzugt die im Audit hinterlegte `summary`, sonst ein generischer Titel je Ereignistyp. */
+/** Ist das Ereignis ein KI-Aktenvermerk (quelle="ki" in der payload)? */
+function istKiVermerk(event: CaseAuditEvent): boolean {
+  return (
+    event.eventType === NOTE_EVENT_TYPE && event.payload["quelle"] === "ki"
+  );
+}
+
+/** Bevorzugt bei Vermerken den Vermerktext, sonst die `summary`, sonst ein generischer Titel. */
 function verlaufTitel(event: CaseAuditEvent): string {
+  if (event.eventType === NOTE_EVENT_TYPE) {
+    const text = event.payload["text"];
+    if (typeof text === "string" && text.length > 0) return text;
+  }
   const summary = event.payload["summary"];
   if (typeof summary === "string" && summary.length > 0) return summary;
   return AUDIT_TITEL[event.eventType] ?? event.eventType;
 }
 
-/** Zustandswechsel (previousState → newState), optionaler Vermerk + der (pseudonyme) Akteur. */
+/** Zustandswechsel (previousState → newState) oder Vermerk-Provenienz (Mensch/KI) + der Akteur. */
 function verlaufBeschreibung(event: CaseAuditEvent): string {
+  if (event.eventType === NOTE_EVENT_TYPE) {
+    if (istKiVermerk(event)) {
+      const model = event.payload["modelId"];
+      const review = event.payload["reviewStatus"];
+      const modelStr = typeof model === "string" ? ` (${model})` : "";
+      // KI-Vermerk EHRLICH als prüfpflichtiger Entwurf gekennzeichnet — nie als amtlich beschlossen.
+      return `KI-Vermerk${modelStr} · prüfpflichtig: ${typeof review === "string" ? review : "offen"} · Akteur: ${event.actorId}`;
+    }
+    return `Aktenvermerk · Mensch · Akteur: ${event.actorId}`;
+  }
   const teile: string[] = [];
   const prev = event.payload["previousState"];
   const next = event.payload["newState"];
@@ -160,13 +191,23 @@ function verlaufBeschreibung(event: CaseAuditEvent): string {
   return teile.join(" · ");
 }
 
+/** Ton je Ereignis; ein noch offener KI-Vermerk sticht als „warn" heraus (braucht menschliche Prüfung). */
+function verlaufTon(event: CaseAuditEvent): TimelineTone {
+  if (event.eventType === NOTE_EVENT_TYPE) {
+    if (istKiVermerk(event) && event.payload["reviewStatus"] === "offen")
+      return "warn";
+    return "info";
+  }
+  return AUDIT_TONE[event.eventType] ?? "muted";
+}
+
 /** Append-only Audit-Ereignisse (chronologisch) → `TimelineItem[]` für die Verlauf-Sektion. */
 export function toVerlauf(events: readonly CaseAuditEvent[]): TimelineItem[] {
   return events.map((event): TimelineItem => ({
     id: event.auditEventId,
     title: verlaufTitel(event),
     time: asZeit(event.occurredAt),
-    tone: AUDIT_TONE[event.eventType] ?? "muted",
+    tone: verlaufTon(event),
     description: verlaufBeschreibung(event),
   }));
 }

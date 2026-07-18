@@ -214,6 +214,41 @@ describe("toVerlauf", () => {
     expect(item?.tone).toBe("muted");
     expect(item?.description).toBe("Akteur: actor.1");
   });
+
+  it("Aktenvermerk (Mensch): Titel = Text, Beschreibung Mensch-provenient, Ton info", () => {
+    const [item] = toVerlauf([
+      auditEvent({
+        auditEventId: "n1",
+        eventType: "case.note.added",
+        actorId: "actor.sb",
+        payload: { text: "Rücksprache geführt.", quelle: "mensch" },
+      }),
+    ]);
+    expect(item?.title).toBe("Rücksprache geführt.");
+    expect(item?.tone).toBe("info");
+    expect(item?.description).toBe("Aktenvermerk · Mensch · Akteur: actor.sb");
+  });
+
+  it("KI-Vermerk (offen): prüfpflichtig gekennzeichnet, Ton warn (braucht menschliche Prüfung)", () => {
+    const [item] = toVerlauf([
+      auditEvent({
+        auditEventId: "n2",
+        eventType: "case.note.added",
+        actorId: "actor.sb",
+        payload: {
+          text: "Zusammenfassung des Falls …",
+          quelle: "ki",
+          modelId: "ollama:qwen3",
+          reviewStatus: "offen",
+        },
+      }),
+    ]);
+    expect(item?.title).toBe("Zusammenfassung des Falls …");
+    expect(item?.tone).toBe("warn");
+    expect(item?.description).toBe(
+      "KI-Vermerk (ollama:qwen3) · prüfpflichtig: offen · Akteur: actor.sb",
+    );
+  });
 });
 
 describe("formatDate", () => {

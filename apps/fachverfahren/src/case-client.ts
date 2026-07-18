@@ -9,9 +9,12 @@ import type {
   CaseCreateRequestDto,
   CaseDto,
   CaseTransitionRequestDto,
+  KiVermerkRequestDto,
   TaskCreateRequestDto,
   TaskDto,
   TaskPatchRequestDto,
+  VermerkDto,
+  VermerkRequestDto,
 } from "@senticor/app-bff-contracts";
 
 /** Fall/Dossier-Zusammenfassung — 1:1 zur BFF-`CaseDto`. */
@@ -126,6 +129,13 @@ export interface CasePort {
   ): Promise<CaseDto>;
   createTask(caseId: string, req: TaskCreateRequestDto): Promise<TaskDto>;
   patchTask(taskId: string, req: TaskPatchRequestDto): Promise<TaskDto>;
+  /** Einen unveränderlichen Aktenvermerk schreiben (Mensch). */
+  createVermerk(caseId: string, req: VermerkRequestDto): Promise<VermerkDto>;
+  /** Einen KI-Aktenvermerk-ENTWURF anfordern (prüfpflichtig, ki-vorschlag). */
+  createKiVermerk(
+    caseId: string,
+    req: KiVermerkRequestDto,
+  ): Promise<VermerkDto>;
 }
 
 /** Nicht-OK-Antworten mit Status — `getCase` unterscheidet damit 404 (Akte existiert nicht bzw.
@@ -278,6 +288,20 @@ export function createHttpCasePort(): CasePort {
       return await request<TaskDto>(
         `/api/tasks/${encodeURIComponent(taskId)}`,
         { method: "PATCH", body: JSON.stringify(req) },
+      );
+    },
+
+    async createVermerk(caseId, req) {
+      return await request<VermerkDto>(
+        `/api/cases/${encodeURIComponent(caseId)}/vermerke`,
+        { method: "POST", body: JSON.stringify(req) },
+      );
+    },
+
+    async createKiVermerk(caseId, req) {
+      return await request<VermerkDto>(
+        `/api/cases/${encodeURIComponent(caseId)}/vermerke/ki`,
+        { method: "POST", body: JSON.stringify(req) },
       );
     },
   };
