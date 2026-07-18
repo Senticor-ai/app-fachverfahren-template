@@ -2823,6 +2823,8 @@
                               { "enum": ["reflexion"], "type": "string" },
                               { "enum": ["metadatum"], "type": "string" },
                               { "enum": ["evidenz"], "type": "string" },
+                              { "enum": ["wissen"], "type": "string" },
+                              { "enum": ["faehigkeit"], "type": "string" },
                               { "enum": ["notiz"], "type": "string" }
                             ]
                           },
@@ -3002,6 +3004,8 @@
                       { "enum": ["reflexion"], "type": "string" },
                       { "enum": ["metadatum"], "type": "string" },
                       { "enum": ["evidenz"], "type": "string" },
+                      { "enum": ["wissen"], "type": "string" },
+                      { "enum": ["faehigkeit"], "type": "string" },
                       { "enum": ["notiz"], "type": "string" }
                     ]
                   },
@@ -3051,6 +3055,8 @@
                         { "enum": ["reflexion"], "type": "string" },
                         { "enum": ["metadatum"], "type": "string" },
                         { "enum": ["evidenz"], "type": "string" },
+                        { "enum": ["wissen"], "type": "string" },
+                        { "enum": ["faehigkeit"], "type": "string" },
                         { "enum": ["notiz"], "type": "string" }
                       ]
                     },
@@ -3236,6 +3242,8 @@
                               { "enum": ["reflexion"], "type": "string" },
                               { "enum": ["metadatum"], "type": "string" },
                               { "enum": ["evidenz"], "type": "string" },
+                              { "enum": ["wissen"], "type": "string" },
+                              { "enum": ["faehigkeit"], "type": "string" },
                               { "enum": ["notiz"], "type": "string" }
                             ]
                           },
@@ -3408,6 +3416,8 @@
                       { "enum": ["reflexion"], "type": "string" },
                       { "enum": ["metadatum"], "type": "string" },
                       { "enum": ["evidenz"], "type": "string" },
+                      { "enum": ["wissen"], "type": "string" },
+                      { "enum": ["faehigkeit"], "type": "string" },
                       { "enum": ["notiz"], "type": "string" }
                     ]
                   },
@@ -3447,6 +3457,8 @@
                         { "enum": ["reflexion"], "type": "string" },
                         { "enum": ["metadatum"], "type": "string" },
                         { "enum": ["evidenz"], "type": "string" },
+                        { "enum": ["wissen"], "type": "string" },
+                        { "enum": ["faehigkeit"], "type": "string" },
                         { "enum": ["notiz"], "type": "string" }
                       ]
                     },
@@ -3670,6 +3682,8 @@
                         { "enum": ["reflexion"], "type": "string" },
                         { "enum": ["metadatum"], "type": "string" },
                         { "enum": ["evidenz"], "type": "string" },
+                        { "enum": ["wissen"], "type": "string" },
+                        { "enum": ["faehigkeit"], "type": "string" },
                         { "enum": ["notiz"], "type": "string" }
                       ]
                     },
@@ -4828,6 +4842,576 @@
         },
         "summary": "Aufgabe patchen (Metadaten + data-Merge, Optimistic-Locking)",
         "tags": ["tasks"]
+      }
+    },
+    "/api/verfahren/{procedureId}/{version}/wissen": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "procedureId",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "eintraege": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "eintragId": { "minLength": 1, "type": "string" },
+                          "erstelltAm": { "minLength": 1, "type": "string" },
+                          "kind": {
+                            "anyOf": [
+                              { "enum": ["hypothese"], "type": "string" },
+                              { "enum": ["teilergebnis"], "type": "string" },
+                              { "enum": ["frage"], "type": "string" },
+                              { "enum": ["befund"], "type": "string" },
+                              { "enum": ["entscheidung"], "type": "string" },
+                              { "enum": ["reflexion"], "type": "string" },
+                              { "enum": ["metadatum"], "type": "string" },
+                              { "enum": ["evidenz"], "type": "string" },
+                              { "enum": ["wissen"], "type": "string" },
+                              { "enum": ["faehigkeit"], "type": "string" },
+                              { "enum": ["notiz"], "type": "string" }
+                            ]
+                          },
+                          "metadaten": {
+                            "additionalProperties": {},
+                            "type": "object"
+                          },
+                          "procedureId": { "minLength": 1, "type": "string" },
+                          "procedureVersion": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "quelle": {
+                            "anyOf": [
+                              { "enum": ["mensch"], "type": "string" },
+                              { "enum": ["ki"], "type": "string" }
+                            ]
+                          },
+                          "text": { "type": "string" },
+                          "urheber": { "minLength": 1, "type": "string" },
+                          "verdacht": { "type": "boolean" }
+                        },
+                        "required": [
+                          "eintragId",
+                          "procedureId",
+                          "procedureVersion",
+                          "kind",
+                          "quelle",
+                          "urheber",
+                          "text",
+                          "metadaten",
+                          "verdacht",
+                          "erstelltAm"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["eintraege"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Das Wissen eines Verfahrens lesen (chronologisch, behörden-scoped)",
+        "tags": ["verfahren-wissen"]
+      },
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "procedureId",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "anyOf": [
+                      { "enum": ["hypothese"], "type": "string" },
+                      { "enum": ["teilergebnis"], "type": "string" },
+                      { "enum": ["frage"], "type": "string" },
+                      { "enum": ["befund"], "type": "string" },
+                      { "enum": ["entscheidung"], "type": "string" },
+                      { "enum": ["reflexion"], "type": "string" },
+                      { "enum": ["metadatum"], "type": "string" },
+                      { "enum": ["evidenz"], "type": "string" },
+                      { "enum": ["wissen"], "type": "string" },
+                      { "enum": ["faehigkeit"], "type": "string" },
+                      { "enum": ["notiz"], "type": "string" }
+                    ]
+                  },
+                  "metadaten": { "additionalProperties": {}, "type": "object" },
+                  "text": {
+                    "maxLength": 20000,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": ["text"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "eintragId": { "minLength": 1, "type": "string" },
+                    "erstelltAm": { "minLength": 1, "type": "string" },
+                    "kind": {
+                      "anyOf": [
+                        { "enum": ["hypothese"], "type": "string" },
+                        { "enum": ["teilergebnis"], "type": "string" },
+                        { "enum": ["frage"], "type": "string" },
+                        { "enum": ["befund"], "type": "string" },
+                        { "enum": ["entscheidung"], "type": "string" },
+                        { "enum": ["reflexion"], "type": "string" },
+                        { "enum": ["metadatum"], "type": "string" },
+                        { "enum": ["evidenz"], "type": "string" },
+                        { "enum": ["wissen"], "type": "string" },
+                        { "enum": ["faehigkeit"], "type": "string" },
+                        { "enum": ["notiz"], "type": "string" }
+                      ]
+                    },
+                    "metadaten": {
+                      "additionalProperties": {},
+                      "type": "object"
+                    },
+                    "procedureId": { "minLength": 1, "type": "string" },
+                    "procedureVersion": { "minLength": 1, "type": "string" },
+                    "quelle": {
+                      "anyOf": [
+                        { "enum": ["mensch"], "type": "string" },
+                        { "enum": ["ki"], "type": "string" }
+                      ]
+                    },
+                    "text": { "type": "string" },
+                    "urheber": { "minLength": 1, "type": "string" },
+                    "verdacht": { "type": "boolean" }
+                  },
+                  "required": [
+                    "eintragId",
+                    "procedureId",
+                    "procedureVersion",
+                    "kind",
+                    "quelle",
+                    "urheber",
+                    "text",
+                    "metadaten",
+                    "verdacht",
+                    "erstelltAm"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Verfahrens-Wissen schreiben (Mensch) — append-only",
+        "tags": ["verfahren-wissen"]
+      }
+    },
+    "/api/verfahren/{procedureId}/{version}/wissen/ki": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "procedureId",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "input": { "additionalProperties": {}, "type": "object" },
+                  "kind": {
+                    "anyOf": [
+                      { "enum": ["hypothese"], "type": "string" },
+                      { "enum": ["teilergebnis"], "type": "string" },
+                      { "enum": ["frage"], "type": "string" },
+                      { "enum": ["befund"], "type": "string" },
+                      { "enum": ["entscheidung"], "type": "string" },
+                      { "enum": ["reflexion"], "type": "string" },
+                      { "enum": ["metadatum"], "type": "string" },
+                      { "enum": ["evidenz"], "type": "string" },
+                      { "enum": ["wissen"], "type": "string" },
+                      { "enum": ["faehigkeit"], "type": "string" },
+                      { "enum": ["notiz"], "type": "string" }
+                    ]
+                  },
+                  "task": { "minLength": 1, "type": "string" }
+                },
+                "required": ["task"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "eintragId": { "minLength": 1, "type": "string" },
+                    "erstelltAm": { "minLength": 1, "type": "string" },
+                    "kind": {
+                      "anyOf": [
+                        { "enum": ["hypothese"], "type": "string" },
+                        { "enum": ["teilergebnis"], "type": "string" },
+                        { "enum": ["frage"], "type": "string" },
+                        { "enum": ["befund"], "type": "string" },
+                        { "enum": ["entscheidung"], "type": "string" },
+                        { "enum": ["reflexion"], "type": "string" },
+                        { "enum": ["metadatum"], "type": "string" },
+                        { "enum": ["evidenz"], "type": "string" },
+                        { "enum": ["wissen"], "type": "string" },
+                        { "enum": ["faehigkeit"], "type": "string" },
+                        { "enum": ["notiz"], "type": "string" }
+                      ]
+                    },
+                    "metadaten": {
+                      "additionalProperties": {},
+                      "type": "object"
+                    },
+                    "procedureId": { "minLength": 1, "type": "string" },
+                    "procedureVersion": { "minLength": 1, "type": "string" },
+                    "quelle": {
+                      "anyOf": [
+                        { "enum": ["mensch"], "type": "string" },
+                        { "enum": ["ki"], "type": "string" }
+                      ]
+                    },
+                    "text": { "type": "string" },
+                    "urheber": { "minLength": 1, "type": "string" },
+                    "verdacht": { "type": "boolean" }
+                  },
+                  "required": [
+                    "eintragId",
+                    "procedureId",
+                    "procedureVersion",
+                    "kind",
+                    "quelle",
+                    "urheber",
+                    "text",
+                    "metadaten",
+                    "verdacht",
+                    "erstelltAm"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "KI-Verfahrens-Wissen erzeugen (liest das bisherige Wiki als Kontext)",
+        "tags": ["verfahren-wissen"]
       }
     }
   },

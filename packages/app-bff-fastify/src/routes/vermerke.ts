@@ -49,6 +49,8 @@ const VERMERK_KINDS = new Set<VermerkDto["kind"]>([
   "reflexion",
   "metadatum",
   "evidenz",
+  "wissen",
+  "faehigkeit",
   "notiz",
 ]);
 

@@ -12,9 +12,11 @@ import {
   InMemoryAppStore,
   InMemoryCaseStore,
   InMemoryTaskStore,
+  InMemoryWissenStore,
   type AppStore,
   type CaseStore,
   type TaskStore,
+  type WissenStore,
 } from "@senticor/app-store-postgres";
 import {
   createInMemoryProcedureRegistry,
@@ -60,6 +62,7 @@ export async function buildBffApp({
   taskStore = new InMemoryTaskStore(),
   procedureRegistry = createInMemoryProcedureRegistry([]),
   aiAssist = createLocalAiAssistPort(),
+  wissenStore = new InMemoryWissenStore(),
 }: {
   session?: ResolvedSession;
   appStore?: AppStore;
@@ -67,6 +70,7 @@ export async function buildBffApp({
   taskStore?: TaskStore;
   procedureRegistry?: ProcedureRegistry;
   aiAssist?: AiAssistPort;
+  wissenStore?: WissenStore;
 } = {}): Promise<{
   app: FastifyInstance;
   auditSink: MemoryAuditSink;
@@ -84,6 +88,7 @@ export async function buildBffApp({
     sessionResolver: session ? stubResolver(session) : new NoSessionResolver(),
     auditSink,
     aiAssist,
+    wissenStore,
   });
   return { app, auditSink, appStore, caseStore, taskStore };
 }

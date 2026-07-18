@@ -5,6 +5,7 @@ import type {
   AppStore,
   CaseStore,
   TaskStore,
+  WissenStore,
 } from "@senticor/app-store-postgres";
 import type {
   ProcedureRegistry,
@@ -31,4 +32,6 @@ export interface BffDeps {
   aiAssist: AiAssistPort;
   /** Byte-Storage für Nachweise/Dokumente (austauschbar: In-Memory-Fake / Dateisystem / Objekt-Store). */
   blobStorage: BlobStoragePort;
+  /** Verfahrens-weites Wiki (generelles Wissen + Fähigkeiten je Verfahren) — die durable Wiki-Ebene. */
+  wissenStore: WissenStore;
 }

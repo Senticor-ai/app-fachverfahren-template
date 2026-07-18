@@ -6,10 +6,12 @@
 import type { FastifyError, FastifyInstance } from "fastify";
 import { builtInRbacRegistry } from "@senticor/public-sector-sdk";
 import type { AuditSink, SessionResolver } from "@senticor/app-runtime-fastify";
-import type {
-  AppStore,
-  CaseStore,
-  TaskStore,
+import {
+  InMemoryWissenStore,
+  type AppStore,
+  type CaseStore,
+  type TaskStore,
+  type WissenStore,
 } from "@senticor/app-store-postgres";
 import type {
   ProcedureRegistry,
@@ -31,6 +33,7 @@ import { registerMailboxRoutes } from "./routes/mailbox.js";
 import { registerPreferencesRoutes } from "./routes/preferences.js";
 import { registerSessionRoute } from "./routes/session.js";
 import { registerTaskRoutes } from "./routes/tasks.js";
+import { registerVerfahrenWissenRoutes } from "./routes/verfahren-wissen.js";
 import { registerVermerkRoutes } from "./routes/vermerke.js";
 
 export interface AppBffOptions {
@@ -46,6 +49,8 @@ export interface AppBffOptions {
   aiAssist?: AiAssistPort;
   /** Byte-Storage-Port. OPTIONAL: fehlt er, nutzt der BFF den In-Memory-Fake. */
   blobStorage?: BlobStoragePort;
+  /** Verfahrens-Wiki-Store. OPTIONAL: fehlt er, nutzt der BFF den In-Memory-Store. */
+  wissenStore?: WissenStore;
 }
 
 export async function appBff(
@@ -62,6 +67,7 @@ export async function appBff(
     rbacRegistry: opts.rbacRegistry ?? builtInRbacRegistry,
     aiAssist: opts.aiAssist ?? createLocalAiAssistPort(),
     blobStorage: opts.blobStorage ?? createLocalBlobStoragePort(),
+    wissenStore: opts.wissenStore ?? new InMemoryWissenStore(),
   };
   app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error.validation) {
@@ -89,6 +95,7 @@ export async function appBff(
   registerCaseRoutes(app, deps);
   registerTaskRoutes(app, deps);
   registerVermerkRoutes(app, deps);
+  registerVerfahrenWissenRoutes(app, deps);
   // Bürger-Sicht auf die EIGENEN Anträge (eigene Familie: der Scope ist durch die Route impliziert).
   registerBuergerRoutes(app, deps);
 }

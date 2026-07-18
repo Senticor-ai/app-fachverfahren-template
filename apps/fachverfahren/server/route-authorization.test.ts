@@ -269,6 +269,22 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           policy: "rbac:preferences.write",
         },
         { method: "GET", url: "/api/session", policy: "rbac:session.read" },
+        // Verfahrens-Wiki: Lesen = case.read; Schreiben (Mensch + KI) = case.note.write.
+        {
+          method: "GET",
+          url: "/api/verfahren/:procedureId/:version/wissen",
+          policy: "rbac:case.read",
+        },
+        {
+          method: "POST",
+          url: "/api/verfahren/:procedureId/:version/wissen",
+          policy: "rbac:case.note.write",
+        },
+        {
+          method: "POST",
+          url: "/api/verfahren/:procedureId/:version/wissen/ki",
+          policy: "rbac:case.note.write",
+        },
         // Workspace-APIs brauchen Permissions — nie nur „eingeloggt".
         {
           method: "GET",

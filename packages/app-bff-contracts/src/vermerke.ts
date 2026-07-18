@@ -26,6 +26,9 @@ export const VermerkKindSchema = Type.Union([
   Type.Literal("reflexion"),
   Type.Literal("metadatum"),
   Type.Literal("evidenz"),
+  // Verfahrens-Ebene: generelles Wissen + Fähigkeiten (die durable Wiki-Dimension).
+  Type.Literal("wissen"),
+  Type.Literal("faehigkeit"),
   Type.Literal("notiz"),
 ]);
 export type VermerkKind = Static<typeof VermerkKindSchema>;

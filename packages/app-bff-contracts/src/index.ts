@@ -137,4 +137,16 @@ export {
   type NachweisRefDto,
   type NachweisUploadRequestDto,
 } from "./nachweise.js";
+export {
+  KiWissenRequestSchema,
+  VerfahrenWissenParamsSchema,
+  WissenEintragRequestSchema,
+  WissenViewDtoSchema,
+  WissenViewListDtoSchema,
+  type KiWissenRequestDto,
+  type VerfahrenWissenParamsDto,
+  type WissenEintragRequestDto,
+  type WissenViewDto,
+  type WissenViewListDto,
+} from "./verfahren-wissen.js";
 export { openApiInfo, openApiTags } from "./openapi.js";
