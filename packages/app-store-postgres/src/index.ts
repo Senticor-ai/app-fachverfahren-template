@@ -106,6 +106,16 @@ export type {
   TaskState,
   TaskStore,
 } from "./task-store.js";
+export {
+  createWissenStoreFromEnv,
+  InMemoryWissenStore,
+  UnavailableWissenStore,
+} from "./wissen-store.js";
+export type {
+  VerfahrensWissenEintrag,
+  WissenQuery,
+  WissenStore,
+} from "./wissen-store.js";
 export { nextPositionKey } from "./position.js";
 export {
   defaultMigrationOptionsFromEnv,
