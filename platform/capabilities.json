@@ -104,6 +104,15 @@
       "extensionPoints": ["event-type", "legal-basis", "case-context"],
       "contractTests": ["test:authorization"],
       "forbidden": ["module-local-audit-log"]
+    },
+    {
+      "id": "ai-assist",
+      "version": 1,
+      "publicPackage": "@senticor/platform-contracts",
+      "documentation": "docs/capabilities/ai-assist.md",
+      "extensionPoints": ["model-provider", "prompt-template", "confidence-policy"],
+      "contractTests": ["test:ai-assist"],
+      "forbidden": ["module-local-llm-client", "autonomous-legal-decision"]
     }
   ]
 }

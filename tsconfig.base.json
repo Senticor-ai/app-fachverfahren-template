@@ -36,6 +36,9 @@
       "@senticor/provider-dvc-generic": [
         "packages/provider-dvc-generic/src/index.ts"
       ],
+      "@senticor/provider-ai-ollama": [
+        "packages/provider-ai-ollama/src/index.ts"
+      ],
       "@senticor/conformance-kit": ["packages/conformance-kit/src/index.ts"],
       "@senticor/migration-kit": ["packages/migration-kit/src/index.ts"],
       "@senticor/app-store-postgres": [

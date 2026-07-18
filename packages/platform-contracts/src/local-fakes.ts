@@ -40,6 +40,47 @@ function id(prefix: string) {
   return `${prefix}.${crypto.randomUUID()}`;
 }
 
+/**
+ * Der lokale AI-Assist-Fake als EIGENSTÄNDIGE Fabrik (nicht nur als Feld im 12-Port-Bündel), damit die
+ * Port-Registry ihn im „local"-Modus direkt nutzen kann, OHNE elf ungenutzte Ports zu konstruieren.
+ * OSS-first: das Modell setzt der Provider/die Runtime (lokales Ollama als Default), KEIN Inline-Key.
+ * Wahrt die HCAI-Invarianten (Kennzeichnung, `reviewRequired`, `limited-risk`, high-risk-Ablehnung).
+ */
+export function createLocalAiAssistPort(
+  options: { aiAssistModel?: string } = {},
+): AiAssistPort {
+  return {
+    descriptor: descriptor(
+      "ai-assist",
+      "Local AI Assist (OSS-first)",
+      "confidential",
+    ),
+    async suggest(_context, request) {
+      // OSS-first: Modell vom Provider/Runtime gesetzt (lokales Ollama als Default), KEIN Inline-Key.
+      const modelId = options.aiAssistModel ?? "ollama:qwen3";
+      // KI assistiert nie rechtsnah autonom: high-risk-Aufgaben werden abgelehnt.
+      if (request.maxClass === "high-risk") {
+        return capabilityFailure(
+          "ai-assist/high-risk-refused",
+          "KI darf rechtsnahe Entscheidungen nicht autonom treffen (assistiv/limited-risk).",
+          { retryable: false, classification: "confidential" },
+        );
+      }
+      const suggestion: AiSuggestion = {
+        value: request.input,
+        confidence: 0.5,
+        modelId,
+        rationale: `Lokaler OSS-Vorschlag (${modelId}) für Aufgabe '${request.task}' — synthetisch, menschlich zu prüfen.`,
+        sources: ["local-fake"],
+        marking: "ki-vorschlag",
+        euAiActClass: "limited-risk",
+        reviewRequired: true,
+      };
+      return capabilityOk(suggestion);
+    },
+  };
+}
+
 export function createLocalPlatformPorts(
   options: { aiAssistModel?: string } = {},
 ): PlatformPorts {
@@ -201,36 +242,7 @@ export function createLocalPlatformPorts(
     },
   };
 
-  const aiAssist: AiAssistPort = {
-    descriptor: descriptor(
-      "ai-assist",
-      "Local AI Assist (OSS-first)",
-      "confidential",
-    ),
-    async suggest(_context, request) {
-      // OSS-first: Modell vom Provider/Runtime gesetzt (lokales Ollama als Default), KEIN Inline-Key.
-      const modelId = options.aiAssistModel ?? "ollama:qwen3";
-      // KI assistiert nie rechtsnah autonom: high-risk-Aufgaben werden abgelehnt.
-      if (request.maxClass === "high-risk") {
-        return capabilityFailure(
-          "ai-assist/high-risk-refused",
-          "KI darf rechtsnahe Entscheidungen nicht autonom treffen (assistiv/limited-risk).",
-          { retryable: false, classification: "confidential" },
-        );
-      }
-      const suggestion: AiSuggestion = {
-        value: request.input,
-        confidence: 0.5,
-        modelId,
-        rationale: `Lokaler OSS-Vorschlag (${modelId}) für Aufgabe '${request.task}' — synthetisch, menschlich zu prüfen.`,
-        sources: ["local-fake"],
-        marking: "ki-vorschlag",
-        euAiActClass: "limited-risk",
-        reviewRequired: true,
-      };
-      return capabilityOk(suggestion);
-    },
-  };
+  const aiAssist = createLocalAiAssistPort(options);
 
   return {
     identityAndTrust,

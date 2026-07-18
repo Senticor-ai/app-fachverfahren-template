@@ -38,6 +38,7 @@
     "test:storybook": "vitest run --project storybook",
     "test:storybook:coverage": "vitest run --project storybook --coverage",
     "test:platform-contracts": "vitest run packages/platform-contracts",
+    "test:ai-assist": "vitest run packages/platform-contracts packages/provider-ai-ollama",
     "test:provider-codesphere": "vitest run packages/provider-codesphere",
     "test:service-portability": "vitest run packages/provider-local packages/provider-codesphere packages/provider-dvc-generic",
     "test:api-compatibility": "vitest run packages/platform-contracts",
