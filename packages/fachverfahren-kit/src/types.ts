@@ -150,6 +150,10 @@ export interface Transition {
    *  `vierAugen`. Die server-seitige Ableitung (statusMachineToProcedureVersion) mappt es auf
    *  CaseTransition.issuesVerwaltungsakt; das Drift-Gate check:antrag-procedure sichert die Deckung. */
   erlaesstBescheid?: boolean;
+  /** DATA-DRIVEN GUARD: der Übergang ist nur erlaubt, wenn die Bedingung über die Falldaten (case.data)
+   *  erfüllt ist. Der Server (transitionCase) wertet ihn autoritativ aus (→ CaseTransition.guard). Erzwingt
+   *  WORKFLOW-KONSISTENZ über die deklarierte Datenlage, KEINE Autorisierung (case.data ist client-geliefert). */
+  guard?: Bedingung;
 }
 export interface StatusMachine {
   initial: string; // Status bei Antrags-Eingang ("eingegangen")
@@ -394,40 +398,16 @@ export interface NormRef {
   status: "belegt" | "annahme";
 }
 
-/** Vergleichsoperator einer Feld-Bedingung. `gesetzt`/`nicht-gesetzt` prüfen nur Anwesenheit (ohne `wert`). */
-export type BedingungOperator =
-  | "=="
-  | "!="
-  | ">"
-  | ">="
-  | "<"
-  | "<="
-  | "in"
-  | "nicht-in"
-  | "gesetzt"
-  | "nicht-gesetzt";
-
-/** Prädikat über EIN Antragsfeld (Feldpfad wie in `FeldDef.name`). Der reine Interpreter wertet es tolerant gegen
- *  die Antragsdaten aus (Zahl/String/Boolean-Koerzierung), sodass die Subsumtion — z. B. Schwelle `>= 3` — greift. */
-export interface FeldBedingung {
-  feld: string;
-  op: BedingungOperator;
-  /** Vergleichswert (bei `in`/`nicht-in` eine Menge); entfällt bei `gesetzt`/`nicht-gesetzt`. */
-  wert?: string | number | boolean | (string | number)[];
-}
-
-/** Boolesche Verknüpfung von Bedingungen (rekursiv). Genau EINE Kombinator-Angabe je Gruppe. */
-export interface BedingungGruppe {
-  /** UND — alle Teil-Bedingungen müssen erfüllt sein. */
-  alle?: Bedingung[];
-  /** ODER — mindestens eine Teil-Bedingung muss erfüllt sein. */
-  eine?: Bedingung[];
-  /** NICHT — die Teil-Bedingung muss NICHT erfüllt sein. */
-  nicht?: Bedingung;
-}
-
-/** Generische, verfahrensfreie Bedingung — Blatt (`FeldBedingung`) oder Gruppe. Vom Interpreter ausgewertet. */
-export type Bedingung = FeldBedingung | BedingungGruppe;
+// Bedingungs-Typen leben jetzt im SDK (EINE Wahrheit für Client-Antrag UND server-autoritativen Fall-Guard,
+// packages/public-sector-sdk/src/rules.ts). Hier importiert (damit die übrigen Typen dieser Datei `Bedingung`
+// nutzen) UND re-exportiert (damit bestehende Kit-Importe unverändert gültig bleiben).
+import type {
+  BedingungOperator,
+  FeldBedingung,
+  BedingungGruppe,
+  Bedingung,
+} from "@senticor/public-sector-sdk";
+export type { BedingungOperator, FeldBedingung, BedingungGruppe, Bedingung };
 
 /** Eine Staffel/Stufe einer Gebühren-/Tariftabelle. Greift, wenn `bedingung` über die Antragsdaten erfüllt ist;
  *  fehlt `bedingung`, ist die Staffel der Auffang/Default. `betrag` in der NATÜRLICHEN Haupteinheit (kein Cent). */

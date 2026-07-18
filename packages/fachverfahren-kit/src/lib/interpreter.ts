@@ -7,11 +7,10 @@
 // Default. Rein (kein Datum/Random/DOM), deterministisch, testbar. Die Bedingungs-Auswertung ist bewusst
 // TYP-TOLERANT (Zahl/String/Boolean-Koerzierung), damit die Subsumtion sowohl über typisierte als auch über rohe
 // Antragsdaten greift.
+import { alsZahl, evalBedingung, gleich } from "@senticor/public-sector-sdk";
 import type {
-  Bedingung,
   Berechnung,
   Codeliste,
-  FeldBedingung,
   FeldDef,
   FeldRegel,
   LeistungConfig,
@@ -30,100 +29,17 @@ import {
   type Antragsdaten,
 } from "./antrag-felder.js";
 
+// evalBedingung lebt jetzt im SDK (EINE Wahrheit, geteilt mit dem server-autoritativen Fall-Guard) — hier
+// re-exportiert, damit bestehende Kit-Importe (`import { evalBedingung } from ".../interpreter"`) gültig bleiben.
+export { evalBedingung };
+
 /** Kontext, den regelbasierte Prüfungen brauchen (Codelisten für `erlaubte-werte`-Regeln mit `codelisteRef`). */
 export type RegelKontext = {
   codelisten?: Record<string, Codeliste> | undefined;
 };
 
-// ── Bedingungs-Auswertung (das Herz der Subsumtion) ──────────────────────────────────────────────
-/** Ist die Bedingung über die Antragsdaten erfüllt? Fehlende Bedingung = immer erfüllt (Auffang/Default). */
-export function evalBedingung(
-  bedingung: Bedingung | undefined,
-  daten: Antragsdaten,
-): boolean {
-  if (!bedingung) return true;
-  if (istFeldBedingung(bedingung)) return evalFeldBedingung(bedingung, daten);
-  // BedingungGruppe: genau EIN Kombinator; leere Gruppe ist neutral erfüllt.
-  if (bedingung.alle)
-    return bedingung.alle.every((c) => evalBedingung(c, daten));
-  if (bedingung.eine)
-    return bedingung.eine.some((c) => evalBedingung(c, daten));
-  if (bedingung.nicht) return !evalBedingung(bedingung.nicht, daten);
-  return true;
-}
-
-function istFeldBedingung(b: Bedingung): b is FeldBedingung {
-  return "feld" in b && "op" in b;
-}
-
-function evalFeldBedingung(b: FeldBedingung, daten: Antragsdaten): boolean {
-  const wert = getPath(daten, b.feld);
-  switch (b.op) {
-    case "gesetzt":
-      return asString(wert).trim().length > 0;
-    case "nicht-gesetzt":
-      return asString(wert).trim().length === 0;
-    case "==":
-      return gleich(wert, b.wert);
-    case "!=":
-      return !gleich(wert, b.wert);
-    case ">":
-      return zahlVergleich(wert, b.wert, (a, c) => a > c);
-    case ">=":
-      return zahlVergleich(wert, b.wert, (a, c) => a >= c);
-    case "<":
-      return zahlVergleich(wert, b.wert, (a, c) => a < c);
-    case "<=":
-      return zahlVergleich(wert, b.wert, (a, c) => a <= c);
-    case "in":
-      return alsMenge(b.wert).some((z) => gleich(wert, z));
-    case "nicht-in":
-      return !alsMenge(b.wert).some((z) => gleich(wert, z));
-    default:
-      return false;
-  }
-}
-
-function alsMenge(wert: FeldBedingung["wert"]): (string | number | boolean)[] {
-  return Array.isArray(wert) ? wert : wert === undefined ? [] : [wert];
-}
-
-/** Gleichheit typ-tolerant: Boolean gegen Boolean, sonst numerisch wenn beide zu Zahlen werden, sonst String. */
-function gleich(a: unknown, b: unknown): boolean {
-  if (typeof a === "boolean" || typeof b === "boolean") {
-    return alsBool(a) === alsBool(b);
-  }
-  const na = alsZahl(a);
-  const nb = alsZahl(b);
-  if (na !== undefined && nb !== undefined) return na === nb;
-  return asString(a) === asString(b);
-}
-
-function zahlVergleich(
-  wert: unknown,
-  ziel: unknown,
-  cmp: (a: number, c: number) => boolean,
-): boolean {
-  const a = alsZahl(wert);
-  const c = alsZahl(ziel);
-  if (a === undefined || c === undefined) return false;
-  return cmp(a, c);
-}
-
-/** Wert → Zahl oder `undefined` (leerer String / NaN / null zählen NICHT als Zahl). Toleriert de-DE-Dezimalkomma. */
-function alsZahl(v: unknown): number | undefined {
-  if (typeof v === "number") return Number.isNaN(v) ? undefined : v;
-  if (typeof v === "boolean" || v === null || v === undefined) return undefined;
-  const s = String(v).trim();
-  if (s === "") return undefined;
-  const n = Number(s.replace(",", "."));
-  return Number.isNaN(n) ? undefined : n;
-}
-
-function alsBool(v: unknown): boolean {
-  if (typeof v === "boolean") return v;
-  return v === "true" || v === "ja" || v === 1 || v === "1";
-}
+// evalBedingung + seine Helfer (istFeldBedingung/evalFeldBedingung/alsMenge/gleich/zahlVergleich/alsZahl/alsBool)
+// leben jetzt im SDK (packages/public-sector-sdk/src/rules.ts) — siehe Re-Export oben.
 
 // ── M1: Abgeleitete Felder (Codelisten-Merkmal → Antragsfeld, VOR der Berechnung) ─────────────────
 /** Wendet die `ableitungen` aller Codelisten auf die Antragsdaten an: für jedes Feld mit `optionsRef` auf eine

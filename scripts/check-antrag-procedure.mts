@@ -74,6 +74,7 @@ const quelle: StatusMachineSource = {
     label: t.label,
     ...(t.vierAugen ? { vierAugen: true } : {}),
     ...(t.erlaesstBescheid ? { erlaesstBescheid: true } : {}),
+    ...(t.guard ? { guard: t.guard } : {}),
   })),
 };
 

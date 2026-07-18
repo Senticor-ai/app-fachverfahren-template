@@ -247,4 +247,73 @@ describe("BFF POST /api/cases/:id/transitions", () => {
     expect(res.statusCode).toBe(403);
     await app.close();
   });
+
+  it("422 wenn der data-driven GUARD über case.data nicht erfüllt ist; 200 wenn erfüllt", async () => {
+    const guarded: ProcedureVersion = {
+      procedureId: "guarded",
+      version: "1",
+      effectiveFrom: "2026-01-01T00:00:00.000Z",
+      legalBasisIds: ["VwV-IGM-2023"],
+      allowedStates: ["offen", "eskaliert"],
+      allowedTransitions: [
+        {
+          from: "offen",
+          to: "eskaliert",
+          action: "eskalieren",
+          requiredPermission: "case.decision.prepare",
+          guard: { feld: "berechnung.betrag", op: ">", wert: 1000 },
+        },
+      ],
+    };
+    const store = new InMemoryCaseStore();
+    const { app } = await buildBffApp({
+      session: caseworkerSession(),
+      caseStore: store,
+      procedureRegistry: createInMemoryProcedureRegistry([guarded]),
+    });
+    // Fall mit betrag=500 → Guard NICHT erfüllt.
+    const klein = (
+      await app.inject({
+        method: "POST",
+        url: "/api/cases",
+        payload: {
+          procedureId: "guarded",
+          procedureVersion: "1",
+          state: "offen",
+          subjectIds: ["s"],
+          data: { berechnung: { betrag: 500 } },
+        },
+      })
+    ).json();
+    const abgelehnt = await app.inject({
+      method: "POST",
+      url: `/api/cases/${klein.caseId}/transitions`,
+      payload: { action: "eskalieren", expectedVersion: klein.version },
+    });
+    expect(abgelehnt.statusCode).toBe(422);
+    expect(abgelehnt.json().error).toMatch(/guard/);
+
+    // Fall mit betrag=1500 → Guard erfüllt.
+    const gross = (
+      await app.inject({
+        method: "POST",
+        url: "/api/cases",
+        payload: {
+          procedureId: "guarded",
+          procedureVersion: "1",
+          state: "offen",
+          subjectIds: ["s"],
+          data: { berechnung: { betrag: 1500 } },
+        },
+      })
+    ).json();
+    const erlaubt = await app.inject({
+      method: "POST",
+      url: `/api/cases/${gross.caseId}/transitions`,
+      payload: { action: "eskalieren", expectedVersion: gross.version },
+    });
+    expect(erlaubt.statusCode).toBe(200);
+    expect(erlaubt.json().state).toBe("eskaliert");
+    await app.close();
+  });
 });

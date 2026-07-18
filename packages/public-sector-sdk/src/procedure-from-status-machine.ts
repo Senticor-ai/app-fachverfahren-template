@@ -16,6 +16,7 @@ import type {
   ProcedureVersion,
   VerwaltungsaktConfig,
 } from "./domain-kernel.js";
+import type { Bedingung } from "./rules.js";
 
 /** Ein Zustand der Antrags-Maschine (nur die für die Ableitung nötigen Felder). */
 export interface StatusMachineStateSource {
@@ -34,6 +35,8 @@ export interface StatusMachineTransitionSource {
   vierAugen?: boolean;
   /** Erlässt dieser Übergang einen förmlichen Verwaltungsakt? → issuesVerwaltungsakt. */
   erlaesstBescheid?: boolean;
+  /** Data-driven Guard (Bedingung über case.data) → CaseTransition.guard. */
+  guard?: Bedingung;
 }
 
 /** Die strukturelle Quelle der Ableitung — bewusst NICHT der Kit-`LeistungConfig`-Typ (kein UI-Dep). */
@@ -96,6 +99,8 @@ export function statusMachineToProcedureVersion(
       ...(terminals.has(t.to) ? { closesCase: true } : {}),
       // Erlässt dieser Übergang einen Verwaltungsakt? → der Server friert beim Übergang den Bescheid ein.
       ...(t.erlaesstBescheid ? { issuesVerwaltungsakt: true } : {}),
+      // Data-driven Guard (Bedingung über case.data) — der Server lässt den Übergang nur bei Erfüllung zu.
+      ...(t.guard ? { guard: t.guard } : {}),
     };
   });
   return {

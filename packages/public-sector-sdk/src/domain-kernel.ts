@@ -1,3 +1,5 @@
+import { evalBedingung, type Bedingung } from "./rules.js";
+
 export interface Actor {
   actorId: string;
   actorType: "citizen" | "employee" | "service" | "organization";
@@ -111,6 +113,16 @@ export interface CaseTransition {
    *  Bescheid (Tenor aus case.data + Rechtsbehelf-Snapshot + Hash) im append-only Audit ein — data-driven,
    *  symmetrisch zu `closesCase`/`requiresFourEyes`. */
   issuesVerwaltungsakt?: boolean;
+  /**
+   * DATA-DRIVEN GUARD: dieser Übergang ist nur erlaubt, wenn die Bedingung über `case.data` erfüllt ist
+   * (z. B. „Betrag > 1000" oder „Kategorie in [a,b]"). `transitionCase` wertet ihn server-autoritativ aus.
+   *
+   * WICHTIG zur SEMANTIK: `case.data` ist client-geliefert und server-seitig NICHT als Faktum validiert. Der
+   * Guard erzwingt damit WORKFLOW-KONSISTENZ über die DEKLARIERTE Datenlage — er ist KEINE Autorisierungs-/
+   * Betrugsschranke. Echte Server-Autorität bräuchte guard-relevante Werte aus verifizierten Quellen
+   * (Register-Abruf, geprüfter Nachweis, Task-Ergebnis).
+   */
+  guard?: Bedingung;
 }
 
 export interface Task {
@@ -197,6 +209,10 @@ export function transitionCase(
   procedureVersion: ProcedureVersion,
   action: string,
   expectedVersion: number,
+  // Der Datenkontext des Falls (case.data) für die Guard-Auswertung. Default {} nur für Standalone-/Test-
+  // Aufrufe OHNE Guard — es ist KEIN Sicherheitsnetz: die einzige guard-tragende Route (BFF) reicht immer
+  // die echten Falldaten durch.
+  data: Record<string, unknown> = {},
 ): Case {
   if (currentCase.version !== expectedVersion) {
     throw new Error("case version conflict");
@@ -210,6 +226,11 @@ export function transitionCase(
   );
   if (!transition) {
     throw new Error(`invalid case transition: ${currentCase.state}/${action}`);
+  }
+  // DATA-DRIVEN GUARD (server-autoritativ über die DEKLARIERTE Datenlage, s. CaseTransition.guard): ist die
+  // Bedingung über case.data nicht erfüllt, ist der Übergang unzulässig.
+  if (!evalBedingung(transition.guard, data)) {
+    throw new Error("guard not satisfied");
   }
   const next: Case = {
     ...currentCase,

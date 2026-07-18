@@ -447,7 +447,12 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
           "Zustandswechsel eines Falls (Übergang aus dem Verfahren, atomar + Vier-Augen)",
         params: CaseIdParamsSchema,
         body: CaseTransitionRequestSchema,
-        response: { 200: CaseDtoSchema, ...errorResponses },
+        // 422 = data-driven Guard über case.data nicht erfüllt (nur diese Route kennt Guards).
+        response: {
+          200: CaseDtoSchema,
+          422: ErrorEnvelopeSchema,
+          ...errorResponses,
+        },
       },
     },
     async (request, reply) => {
@@ -536,7 +541,9 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
           });
       }
 
-      // Zielzustand über den reinen SDK-Reducer rechnen (Guards + Optimistic-Locking). Konflikt → 409, sonst 400.
+      // Zielzustand über den reinen SDK-Reducer rechnen (Zustands-/Data-Guard + Optimistic-Locking). Der
+      // data-driven Guard wird gegen `appCase.data` ausgewertet (server-autoritativ über die deklarierte
+      // Datenlage). Konflikt → 409, Guard nicht erfüllt → 422, unzulässiger Übergang → 400.
       let reduced: DomainCase;
       try {
         reduced = transitionCase(
@@ -544,12 +551,17 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
           procedure,
           body.action,
           body.expectedVersion,
+          appCase.data,
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (message === "case version conflict")
           return reply
             .code(409)
+            .send({ error: message, requestId: requestIdOf(request) });
+        if (message === "guard not satisfied")
+          return reply
+            .code(422)
             .send({ error: message, requestId: requestIdOf(request) });
         return badRequest(reply, request, message);
       }

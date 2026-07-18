@@ -96,4 +96,82 @@ describe("domain kernel", () => {
     expect(wiederaufgenommen.state).toBe("aktiv");
     expect(wiederaufgenommen.closedAt).toBeUndefined();
   });
+
+  it("data-driven GUARD: der Übergang ist nur bei erfüllter Bedingung über case.data erlaubt", () => {
+    const procedureVersion: ProcedureVersion = {
+      procedureId: "procedure.test",
+      version: "1",
+      effectiveFrom: "2026-01-01",
+      legalBasisIds: ["legal.test"],
+      allowedStates: ["offen", "eskaliert"],
+      allowedTransitions: [
+        {
+          from: "offen",
+          to: "eskaliert",
+          action: "eskalieren",
+          requiredPermission: "case.decision.prepare",
+          // Nur eskalieren, wenn der Betrag über 1000 liegt.
+          guard: { feld: "berechnung.betrag", op: ">", wert: 1000 },
+        },
+      ],
+    };
+    const basis: Case = {
+      caseId: "c1",
+      procedureId: "procedure.test",
+      procedureVersion: "1",
+      tenantId: "t",
+      authorityId: "a",
+      jurisdictionId: "de",
+      state: "offen",
+      version: 1,
+      subjectIds: [],
+      openedAt: "2026-01-02T00:00:00.000Z",
+    };
+
+    // Bedingung erfüllt (1500 > 1000) → Übergang erlaubt.
+    expect(
+      transitionCase(basis, procedureVersion, "eskalieren", 1, {
+        berechnung: { betrag: 1500 },
+      }).state,
+    ).toBe("eskaliert");
+
+    // Bedingung NICHT erfüllt (500) → wirft „guard not satisfied".
+    expect(() =>
+      transitionCase(basis, procedureVersion, "eskalieren", 1, {
+        berechnung: { betrag: 500 },
+      }),
+    ).toThrow(/guard not satisfied/);
+
+    // Fehlende Daten → Bedingung nicht erfüllt → wirft.
+    expect(() =>
+      transitionCase(basis, procedureVersion, "eskalieren", 1, {}),
+    ).toThrow(/guard not satisfied/);
+  });
+
+  it("ohne guard bleibt der Übergang unverändert erlaubt (rückwärtskompatibel)", () => {
+    const pv: ProcedureVersion = {
+      procedureId: "p",
+      version: "1",
+      effectiveFrom: "2026-01-01",
+      legalBasisIds: ["l"],
+      allowedStates: ["a", "b"],
+      allowedTransitions: [
+        { from: "a", to: "b", action: "go", requiredPermission: "x" },
+      ],
+    };
+    const c: Case = {
+      caseId: "c",
+      procedureId: "p",
+      procedureVersion: "1",
+      tenantId: "t",
+      authorityId: "a",
+      jurisdictionId: "de",
+      state: "a",
+      version: 1,
+      subjectIds: [],
+      openedAt: "2026-01-02T00:00:00.000Z",
+    };
+    // Kein guard, kein data-Argument → wie bisher erlaubt.
+    expect(transitionCase(c, pv, "go", 1).state).toBe("b");
+  });
 });
