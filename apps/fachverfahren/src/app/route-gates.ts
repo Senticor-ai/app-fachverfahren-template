@@ -24,6 +24,8 @@ export const routeGates = {
   "/buerger/antrag/:id": personaGate("buerger"),
   // Der eigene, eingefrorene Bescheid (owner-scoped; Abruf = Bekanntgabe).
   "/buerger/bescheid/:id": personaGate("buerger"),
+  // Das eigene Postfach: Bescheide/Nachrichten der Behörde (owner-scoped).
+  "/buerger/postfach": personaGate("buerger"),
   "/amt": personaGate("sachbearbeitung"),
   "/amt/vorgang/:id": personaGate("sachbearbeitung"),
   // Fall/Dossier-Sicht (ADR-0001): Akten-Liste + 360°-Detail über der Fall/Task-API.

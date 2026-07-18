@@ -16,6 +16,7 @@ import { BuergerAntragPage } from "../pages/buerger-antrag.js";
 import { BuergerAntraegePage } from "../pages/buerger-antraege.js";
 import { BuergerBescheidPage } from "../pages/buerger-bescheid.js";
 import { BuergerBestaetigungPage } from "../pages/buerger-bestaetigung.js";
+import { BuergerPostfachPage } from "../pages/buerger-postfach.js";
 import { BuergerStartPage } from "../pages/buerger-start.js";
 import { KontoPasswortPage } from "../pages/konto-passwort.js";
 import type { AppRouteDefinition } from "./route-definition.js";
@@ -30,6 +31,7 @@ const routeElements: Record<AppRoutePath, React.JSX.Element> = {
   "/buerger/antraege": <BuergerAntraegePage />,
   "/buerger/antrag/:id": <BuergerAntragPage />,
   "/buerger/bescheid/:id": <BuergerBescheidPage />,
+  "/buerger/postfach": <BuergerPostfachPage />,
   "/amt": <AmtEingangPage />,
   "/amt/vorgang/:id": <AmtVorgangPage />,
   "/amt/akten": <AmtAktenPage />,

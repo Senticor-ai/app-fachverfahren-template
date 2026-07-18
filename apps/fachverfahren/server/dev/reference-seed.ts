@@ -10,6 +10,7 @@
 import type {
   AppAuditEvent,
   AppCase,
+  AppStore,
   AppTask,
   AuthStore,
   CaseStore,
@@ -59,6 +60,8 @@ export interface ReferenceSeedDeps {
   kanbanStore: KanbanStore;
   caseStore: CaseStore;
   taskStore: TaskStore;
+  /** Optional: die App-Daten-Schicht (Postfach) — gesetzt seedet ein Demo eine Postfach-Nachricht. */
+  appStore?: AppStore;
   env?: NodeJS.ProcessEnv;
   log?: SeedLog;
 }
@@ -93,6 +96,42 @@ export async function seedReferenceDemo(
   // Das Demo-Dossier ist unabhängig vom Login und wird IMMER einem festen synthetischen Eröffnungs-Akteur
   // zugeschrieben (≠ Login-Konto) — so bleibt der Vier-Augen-Abschluss vom Demo-Login ausübbar.
   await seedDemoDossier(deps, SEED_AUDIT_ACTOR, log);
+  // Eine synthetische Postfach-Nachricht für die Demo-Bürger:in — damit die gemountete Postfach-Seite
+  // im Preview Inhalt zeigt (statt nur des Leerzustands). Nur, wenn appStore verdrahtet ist.
+  if (deps.appStore) await seedDemoPostfach(deps.appStore, log);
+}
+
+/** Idempotent: legt der Demo-Bürger:in eine synthetische Willkommens-Nachricht ins Postfach (nur wenn leer). */
+async function seedDemoPostfach(appStore: AppStore, log: SeedLog): Promise<void> {
+  try {
+    const vorhanden = await appStore.listMailboxMessages({
+      box: "inbox",
+      audience: "citizen",
+      tenantId: DEFAULT_TENANT_ID,
+      authorityId: DEFAULT_AUTHORITY_ID,
+      actorId: "actor.dev-citizen",
+      scope: "owner",
+    });
+    if (vorhanden.length > 0) return;
+    await appStore.saveMailboxMessage({
+      messageId: "msg.dev-willkommen",
+      box: "inbox",
+      audience: "citizen",
+      tenantId: DEFAULT_TENANT_ID,
+      authorityId: DEFAULT_AUTHORITY_ID,
+      jurisdictionId: DEFAULT_JURISDICTION_ID,
+      ownerActorId: "actor.dev-citizen",
+      caseId: null,
+      subject: "Willkommen in Ihrem Postfach",
+      bodyPreview:
+        "Hier erhalten Sie Bescheide und Nachrichten der Behörde. Diese Demo-Nachricht ist synthetisch.",
+      status: "unread",
+      createdAt: new Date().toISOString(),
+    });
+    log("info", "dev.seed.postfach", { ownerActorId: "actor.dev-citizen" });
+  } catch (error) {
+    log("error", "dev.seed.postfach.failed", { error: String(error) });
+  }
 }
 
 /** Legt — nur mit APP_DEV_SEED_PASSWORD und nur wenn noch nicht vorhanden — ein anmeldbares Zusatz-Konto

@@ -289,6 +289,7 @@ export async function startRuntime(
           kanbanStore,
           caseStore: bff.caseStore,
           taskStore: bff.taskStore,
+          appStore: bff.appStore,
           env,
           log,
         });

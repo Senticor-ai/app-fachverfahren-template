@@ -20,6 +20,7 @@ import {
   LayoutGrid,
   ListChecks,
   LineChart,
+  Mail,
   ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
@@ -128,6 +129,14 @@ function navFor<T>(
           href: "/buerger/antraege",
         });
       }
+      // Postfach: Bescheide/Nachrichten der Behörde — IMMER verfügbar (jedes Verfahren hat ein Postfach),
+      // unabhängig von antrag.steps. Echte App-Route /buerger/postfach (Shell-Nav == App-Routen, Audit D3-1).
+      items.push({
+        key: "postfach",
+        label: "Postfach",
+        icon: Mail,
+        href: "/buerger/postfach",
+      });
       items.push(boardsNavItem());
       return items;
     }
