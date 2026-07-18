@@ -129,8 +129,8 @@ export function AmtAktePage(): React.JSX.Element {
   // Unveränderlicher Aktenvermerk (append-only im Fall-Audit) — Mensch ODER KI-Entwurf. Danach ohne
   // Skeleton neu laden, damit der Vermerk im Verlauf erscheint (KI-Entwürfe dort als prüfpflichtig).
   const handleVermerkAdd = useCallback(
-    async (text: string) => {
-      await casePort.createVermerk(id, { text });
+    async (req: { text: string; kind: VermerkDto["kind"] }) => {
+      await casePort.createVermerk(id, req);
       await silentReload();
     },
     [id, silentReload],

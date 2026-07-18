@@ -16,11 +16,28 @@ const REVIEW_LABEL: Record<VermerkDto["reviewStatus"], string> = {
   verworfen: "verworfen",
 };
 
+/** Zell-Typen des Blackboards (für Mensch UND Agent dieselben, verständlichen Kategorien). */
+const KIND_LABEL: Record<VermerkDto["kind"], string> = {
+  hypothese: "Hypothese",
+  teilergebnis: "Teilergebnis",
+  frage: "Frage",
+  befund: "Befund",
+  entscheidung: "Entscheidung",
+  notiz: "Notiz",
+};
+const KIND_OPTIONS: VermerkDto["kind"][] = [
+  "notiz",
+  "hypothese",
+  "frage",
+  "befund",
+  "entscheidung",
+];
+
 export interface VermerkAktionenProps {
   /** Die vorhandenen Aktenvermerke (chronologisch, mit abgeleitetem Prüfstatus). */
   vermerke: VermerkDto[];
-  /** Menschlichen Aktenvermerk schreiben. */
-  onVermerk: (text: string) => Promise<void>;
+  /** Menschlichen Blackboard-Beitrag schreiben (Text + Zell-Typ). */
+  onVermerk: (req: { text: string; kind: VermerkDto["kind"] }) => Promise<void>;
   /** KI-Aktenvermerk-Entwurf anfordern (task = worüber die KI vermerken soll). */
   onKiVermerk: (task: string) => Promise<void>;
   /** Einen KI-Vermerk-Entwurf prüfen (bestätigen/verwerfen). */
@@ -37,8 +54,10 @@ export function VermerkAktionen({
   onReview,
 }: VermerkAktionenProps): React.JSX.Element {
   const vermerkId = useId();
+  const kindId = useId();
   const kiId = useId();
   const [text, setText] = useState("");
+  const [kind, setKind] = useState<VermerkDto["kind"]>("notiz");
   const [task, setTask] = useState("");
   const [status, setStatus] = useState<
     "idle" | "sende-mensch" | "sende-ki" | "ki-fehler"
@@ -63,8 +82,9 @@ export function VermerkAktionen({
     setStatus("sende-mensch");
     setHinweis(null);
     try {
-      await onVermerk(text.trim());
+      await onVermerk({ text: text.trim(), kind });
       setText("");
+      setKind("notiz");
       setHinweis("Aktenvermerk gespeichert.");
     } finally {
       setStatus("idle");
@@ -102,7 +122,10 @@ export function VermerkAktionen({
               key={vm.vermerkId}
               className="rounded-md border border-border p-2 text-sm"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+                  {KIND_LABEL[vm.kind]}
+                </span>
                 <span
                   className={`rounded px-1.5 py-0.5 text-xs font-medium ${
                     vm.quelle === "ki"
@@ -112,9 +135,16 @@ export function VermerkAktionen({
                 >
                   {vm.quelle === "ki" ? "KI" : "Mensch"}
                 </span>
+                {/* Peer-Kennung: human:<rolle> ODER Modell/Agent — beide gleichrangig. */}
+                <span className="text-xs text-muted-foreground">
+                  {vm.urheber}
+                </span>
+                {vm.bezugVermerkId ? (
+                  <span className="text-xs text-muted-foreground">↳ Antwort</span>
+                ) : null}
                 {REVIEW_LABEL[vm.reviewStatus] ? (
                   <span className="text-xs text-muted-foreground">
-                    {REVIEW_LABEL[vm.reviewStatus]}
+                    · {REVIEW_LABEL[vm.reviewStatus]}
                   </span>
                 ) : null}
               </div>
@@ -162,7 +192,22 @@ export function VermerkAktionen({
         className={`mt-1 ${feldClass}`}
         placeholder="Was ist zur Akte festzuhalten?"
       />
-      <div className="mt-2">
+      <div className="mt-2 flex items-center gap-2">
+        <label htmlFor={kindId} className="text-xs text-muted-foreground">
+          Art
+        </label>
+        <select
+          id={kindId}
+          value={kind}
+          onChange={(e) => setKind(e.target.value as VermerkDto["kind"])}
+          className="rounded-md border border-input bg-background p-1 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {KIND_OPTIONS.map((k) => (
+            <option key={k} value={k}>
+              {KIND_LABEL[k]}
+            </option>
+          ))}
+        </select>
         <Button
           type="button"
           size="sm"
