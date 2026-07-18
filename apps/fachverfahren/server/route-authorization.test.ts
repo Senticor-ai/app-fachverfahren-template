@@ -200,6 +200,11 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           policy: "rbac:case.own.read",
         },
         {
+          method: "POST",
+          url: "/api/buerger/antraege/:id/widerspruch",
+          policy: "rbac:case.own.submit",
+        },
+        {
           method: "GET",
           url: "/api/mailbox",
           policy:

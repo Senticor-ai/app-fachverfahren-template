@@ -82,13 +82,18 @@ export {
   AntragEinreichenRequestSchema,
   AntragIdParamsSchema,
   AntragListDtoSchema,
+  RechtsbehelfArtSchema,
   RechtsbehelfDtoSchema,
   VerwaltungsaktDtoSchema,
+  WiderspruchDtoSchema,
+  WiderspruchRequestSchema,
   type AntragDto,
   type AntragEinreichenRequestDto,
   type AntragIdParamsDto,
   type AntragListDto,
   type VerwaltungsaktDto,
+  type WiderspruchDto,
+  type WiderspruchRequestDto,
 } from "./buerger.js";
 export {
   AiAssistClassSchema,

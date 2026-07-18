@@ -3,12 +3,118 @@
 // rendert ihn über BescheidView. Der Tenor und die Rechtsbehelfsbelehrung kommen AUSSCHLIESSLICH aus
 // dem gefrorenen Snapshot (nicht aus der lebenden Config) — so ändert eine spätere Tarif-/Regime-
 // Umstellung den bereits erlassenen Bescheid NICHT.
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { BescheidView, type Vorgang } from "@senticor/fachverfahren-kit";
+import { BescheidView, Button, type Vorgang } from "@senticor/fachverfahren-kit";
 import { Shell } from "../app/shell.js";
 import { store } from "../store.js";
-import { ladeBescheid, type VerwaltungsaktDto } from "../antrag-client.js";
+import { CaseRequestError } from "../case-client.js";
+import {
+  ladeBescheid,
+  legeWiderspruchEin,
+  type VerwaltungsaktDto,
+} from "../antrag-client.js";
+
+/** Regime-neutrale Beschriftung des Rechtsbehelfs (aus dem eingefrorenen Regime des Bescheids). */
+const RECHTSBEHELF_LABEL: Record<
+  "widerspruch" | "einspruch" | "klage",
+  { name: string; verb: string }
+> = {
+  widerspruch: { name: "Widerspruch", verb: "Widerspruch einlegen" },
+  einspruch: { name: "Einspruch", verb: "Einspruch einlegen" },
+  klage: { name: "Klage", verb: "Klage erheben" },
+};
+
+/**
+ * Die Rechtsbehelfs-HANDLUNG zur Belehrung: den Widerspruch/Einspruch/die Klage gegen den eigenen
+ * Bescheid einlegen. Die Begründung ist optional (fristwahrend darf zunächst unbegründet). Der Server
+ * lässt den Rechtsbehelf nur EINMAL zu (409) — die UI zeigt das ehrlich an.
+ */
+function WiderspruchAktion({
+  antragId,
+  art,
+}: {
+  antragId: string;
+  art: "widerspruch" | "einspruch" | "klage";
+}): React.JSX.Element {
+  const label = RECHTSBEHELF_LABEL[art];
+  const feldId = useId();
+  const [begruendung, setBegruendung] = useState("");
+  const [status, setStatus] = useState<
+    "idle" | "sende" | "erledigt" | "bereits" | "fehler"
+  >("idle");
+  const [eingelegtAm, setEingelegtAm] = useState<string | null>(null);
+
+  async function einlegen(): Promise<void> {
+    setStatus("sende");
+    try {
+      const dto = await legeWiderspruchEin(
+        antragId,
+        begruendung.trim() === "" ? undefined : begruendung.trim(),
+      );
+      setEingelegtAm(dto.eingelegtAm);
+      setStatus("erledigt");
+    } catch (fehler) {
+      setStatus(
+        fehler instanceof CaseRequestError && fehler.status === 409
+          ? "bereits"
+          : "fehler",
+      );
+    }
+  }
+
+  if (status === "erledigt" || status === "bereits") {
+    return (
+      <div
+        className="mt-6 rounded-md border border-border bg-muted/40 p-4 text-sm"
+        role="status"
+      >
+        <p className="font-medium text-foreground">
+          {label.name} eingelegt.
+        </p>
+        <p className="mt-1 text-muted-foreground">
+          {status === "bereits"
+            ? `Für diesen Bescheid wurde bereits ein ${label.name} eingelegt.`
+            : `Ihr ${label.name} ist am ${eingelegtAm ? new Date(eingelegtAm).toLocaleString("de-DE") : ""} eingegangen (Fristwahrung).`}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-6 rounded-md border border-border p-4">
+      <h2 className="text-sm font-semibold text-foreground">
+        Mit dem Bescheid nicht einverstanden?
+      </h2>
+      <label htmlFor={feldId} className="mt-2 block text-sm text-muted-foreground">
+        Begründung (optional)
+      </label>
+      <textarea
+        id={feldId}
+        value={begruendung}
+        onChange={(e) => setBegruendung(e.target.value)}
+        rows={3}
+        maxLength={5000}
+        className="mt-1 w-full rounded-md border border-input bg-background p-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        placeholder="Warum sind Sie nicht einverstanden? (kann später nachgereicht werden)"
+      />
+      <div className="mt-3 flex items-center gap-3">
+        <Button
+          type="button"
+          onClick={() => void einlegen()}
+          disabled={status === "sende"}
+        >
+          {label.verb}
+        </Button>
+        {status === "fehler" ? (
+          <span className="text-sm text-destructive" role="alert">
+            {label.name} konnte nicht eingelegt werden. Bitte erneut versuchen.
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 /** Der gefrorene VA → ein Vorgang-Objekt, das BescheidView rendert (Tenor = eingefrorene Berechnung). */
 function toVorgang(va: VerwaltungsaktDto): Vorgang {
@@ -75,6 +181,8 @@ export function BuergerBescheidPage(): React.JSX.Element {
                 fiktionNorm: va.fiktionNorm,
               }}
             />
+            {/* Die HANDLUNG zur Belehrung: den Rechtsbehelf tatsächlich einlegen (Art aus dem Regime). */}
+            <WiderspruchAktion antragId={id} art={va.rechtsbehelf.art} />
           </div>
         ) : (
           <p className="mt-6 text-sm text-muted-foreground">

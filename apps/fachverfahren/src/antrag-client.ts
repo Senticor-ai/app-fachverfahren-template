@@ -19,11 +19,12 @@ import type {
   AntragEinreichenRequestDto,
   AntragListDto,
   VerwaltungsaktDto,
+  WiderspruchDto,
 } from "@senticor/app-bff-contracts";
 import type { Vorgang, VorgangPersistence } from "@senticor/fachverfahren-kit";
 import { apiPath, CaseRequestError } from "./case-client.js";
 
-export type { VerwaltungsaktDto };
+export type { VerwaltungsaktDto, WiderspruchDto };
 
 /** Die Vorgang-Felder, die NICHT in `data` gehören, weil sie oben am DTO stehen (id/status). Alles
  *  Übrige bildet die opake Nutzlast. */
@@ -69,6 +70,27 @@ export async function ladeBescheid(
       return null;
     throw fehler;
   }
+}
+
+/**
+ * Legt einen Rechtsbehelf (Widerspruch/Einspruch/Klage) gegen den eigenen Bescheid ein — die
+ * Rechtsbehelfs-HANDLUNG zur Belehrung. Der Server setzt einen erlassenen Bescheid voraus (404) und lässt
+ * den Rechtsbehelf nur EINMAL zu (409). Wirft `CaseRequestError` mit dem Status, damit die UI „bereits
+ * eingelegt" (409) von „kein Bescheid/fremd" (404) unterscheiden kann.
+ */
+export async function legeWiderspruchEin(
+  antragId: string,
+  begruendung?: string,
+): Promise<WiderspruchDto> {
+  return request<WiderspruchDto>(
+    `/api/buerger/antraege/${encodeURIComponent(antragId)}/widerspruch`,
+    {
+      method: "POST",
+      body: JSON.stringify(
+        begruendung !== undefined ? { begruendung } : {},
+      ),
+    },
+  );
 }
 
 /** AntragDto → Vorgang: id/status von oben, der Rest aus der opaken `data`-Nutzlast. DEFENSIV gegen

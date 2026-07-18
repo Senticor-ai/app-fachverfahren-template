@@ -23,6 +23,8 @@ import {
   AntragListDtoSchema,
   ErrorEnvelopeSchema,
   VerwaltungsaktDtoSchema,
+  WiderspruchDtoSchema,
+  WiderspruchRequestSchema,
   type AntragDto,
   type VerwaltungsaktDto,
 } from "@senticor/app-bff-contracts";
@@ -354,6 +356,127 @@ export function registerBuergerRoutes(
         return storeUnavailable(request, reply);
       }
       return reply.code(201).send(toAntragDto(created));
+    },
+  );
+
+  // WIDERSPRUCH/EINSPRUCH/KLAGE gegen den eigenen Bescheid einlegen — die fehlende Rechtsbehelfs-HANDLUNG
+  // (die Belehrung existierte nur als Anzeige). Setzt einen erlassenen Bescheid VORAUS (sonst 404: es gibt
+  // nichts, wogegen man widerspricht). Der Rechtsbehelf ist EINMALIG (zweiter Versuch → 409). Er wird als
+  // eigenes, owner-scoped Audit-Ereignis `case.objection` festgehalten — der Eingangszeitpunkt ist der
+  // Fristwahrungs-Nachweis. Bewusst KEIN Zustandsübergang (nicht jedes Verfahren hat einen Widerspruchs-
+  // Zustand; die Abhilfe-/Nichtabhilfe-Prüfung durch die Behörde ist ein späterer, eigener Schritt).
+  typed.post(
+    "/api/buerger/antraege/:id/widerspruch",
+    {
+      config: submitAuth.config,
+      preHandler: submitAuth.preHandler,
+      schema: {
+        tags: ["buerger"],
+        summary: "Rechtsbehelf (Widerspruch/Einspruch/Klage) gegen den eigenen Bescheid einlegen",
+        params: AntragIdParamsSchema,
+        body: WiderspruchRequestSchema,
+        response: {
+          200: WiderspruchDtoSchema,
+          409: ErrorEnvelopeSchema,
+          ...errorResponses,
+        },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      let found: AppCase | undefined;
+      try {
+        found = await deps.caseStore.getCase({
+          tenantId: session.tenantId,
+          caseId: request.params.id,
+          scope: "owner",
+          actorId: session.actorId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      // Fremder/nicht vorhandener Fall ⇒ 404 (kein Existenz-Orakel), wie beim Bescheid-Abruf.
+      if (!found)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+
+      let events: AppAuditEvent[];
+      try {
+        events = await deps.caseStore.listAuditEvents({
+          tenantId: session.tenantId,
+          caseId: found.caseId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      // Ohne erlassenen Bescheid gibt es keinen Rechtsbehelf ⇒ 404.
+      const va = findVerwaltungsakt(events);
+      if (!va)
+        return reply
+          .code(404)
+          .send({ error: "kein Bescheid", requestId: requestIdOf(request) });
+
+      // Einmaligkeit: ein bereits eingelegter Rechtsbehelf ⇒ 409 (kein Doppel-Eintrag im append-only Audit).
+      if (events.some((e) => e.eventType === "case.objection"))
+        return reply.code(409).send({
+          error: "Widerspruch bereits eingelegt",
+          requestId: requestIdOf(request),
+        });
+
+      // Art + Norm aus dem EINGEFRORENEN Regime (regime-neutral) — nicht aus dem Body, nicht erfunden.
+      const rechtsbehelf = va.content["rechtsbehelf"] as
+        | { art?: unknown; norm?: unknown }
+        | undefined;
+      const art: "widerspruch" | "einspruch" | "klage" =
+        rechtsbehelf?.art === "einspruch" || rechtsbehelf?.art === "klage"
+          ? rechtsbehelf.art
+          : "widerspruch";
+      const norm =
+        typeof rechtsbehelf?.norm === "string"
+          ? rechtsbehelf.norm
+          : "§ 68 ff. VwGO";
+
+      const objection = createFachlicheAuditEvent({
+        eventType: "case.objection",
+        actorId: session.actorId,
+        actingAuthorityId: found.authorityId,
+        purpose: "rechtsbehelf",
+        legalBasisId: norm,
+        caseId: found.caseId,
+        requestId: requestIdOf(request),
+        summary: `Rechtsbehelf (${art}) gegen Bescheid ${found.caseId} durch die/den Eigentümer:in eingelegt`,
+      });
+      try {
+        await deps.caseStore.appendAuditEvent({
+          auditEventId: objection.auditEventId,
+          caseId: found.caseId,
+          tenantId: session.tenantId,
+          authorityId: found.authorityId,
+          jurisdictionId: found.jurisdictionId,
+          actorId: session.actorId,
+          eventType: objection.eventType,
+          purpose: objection.purpose,
+          legalBasisId: objection.legalBasisId,
+          requestId: objection.requestId,
+          // Die Begründung (optional) reist in der payload — der Server interpretiert sie nicht.
+          payload: {
+            art,
+            summary: objection.summary,
+            ...(request.body.begruendung !== undefined
+              ? { begruendung: request.body.begruendung }
+              : {}),
+          },
+          occurredAt: objection.occurredAt,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      return reply.send({
+        aktenzeichen: found.caseId,
+        art,
+        eingelegtAm: objection.occurredAt,
+      });
     },
   );
 }

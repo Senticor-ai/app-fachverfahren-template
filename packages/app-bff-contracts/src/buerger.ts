@@ -57,14 +57,38 @@ export const AntragIdParamsSchema = Type.Object(
 );
 export type AntragIdParamsDto = Static<typeof AntragIdParamsSchema>;
 
+/** Die Art des Rechtsbehelfs — regime-neutral (Widerspruch/Einspruch/Klage). Eine Wahrheit für das
+ *  eingefrorene Regime im Bescheid UND für den eingelegten Rechtsbehelf. */
+export const RechtsbehelfArtSchema = Type.Union([
+  Type.Literal("widerspruch"),
+  Type.Literal("einspruch"),
+  Type.Literal("klage"),
+]);
+
+/** Einen Rechtsbehelf (Widerspruch/Einspruch/Klage) gegen den EIGENEN Bescheid einlegen. Die Begründung
+ *  ist optional (ein fristwahrender Widerspruch darf zunächst unbegründet sein). */
+export const WiderspruchRequestSchema = Type.Object(
+  { begruendung: Type.Optional(Type.String({ maxLength: 5000 })) },
+  { additionalProperties: false },
+);
+export type WiderspruchRequestDto = Static<typeof WiderspruchRequestSchema>;
+
+/** Bestätigung des eingelegten Rechtsbehelfs: Aktenzeichen, Art (aus dem eingefrorenen Regime) und der
+ *  Zeitpunkt des Eingangs (Fristwahrungs-Nachweis für die/den Bürger:in). */
+export const WiderspruchDtoSchema = Type.Object(
+  {
+    aktenzeichen: Type.String({ minLength: 1 }),
+    art: RechtsbehelfArtSchema,
+    eingelegtAm: Type.String({ minLength: 1 }),
+  },
+  { additionalProperties: false },
+);
+export type WiderspruchDto = Static<typeof WiderspruchDtoSchema>;
+
 /** Das Rechtsbehelfs-Regime, wie es beim Erlass EINGEFROREN wurde (regime-neutral). */
 export const RechtsbehelfDtoSchema = Type.Object(
   {
-    art: Type.Union([
-      Type.Literal("widerspruch"),
-      Type.Literal("einspruch"),
-      Type.Literal("klage"),
-    ]),
+    art: RechtsbehelfArtSchema,
     fristWert: Type.Integer({ minimum: 1 }),
     fristEinheit: Type.Union([
       Type.Literal("monat"),
