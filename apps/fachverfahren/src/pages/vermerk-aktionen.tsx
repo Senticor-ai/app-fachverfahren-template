@@ -23,6 +23,9 @@ const KIND_LABEL: Record<VermerkDto["kind"], string> = {
   frage: "Frage",
   befund: "Befund",
   entscheidung: "Entscheidung",
+  reflexion: "Reflexion",
+  metadatum: "Metadatum",
+  evidenz: "Evidenz",
   notiz: "Notiz",
 };
 const KIND_OPTIONS: VermerkDto["kind"][] = [
@@ -30,6 +33,8 @@ const KIND_OPTIONS: VermerkDto["kind"][] = [
   "hypothese",
   "frage",
   "befund",
+  "reflexion",
+  "evidenz",
   "entscheidung",
 ];
 

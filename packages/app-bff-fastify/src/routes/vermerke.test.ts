@@ -372,6 +372,39 @@ describe("BFF Aktenvermerke (/api/cases/:id/vermerke)", () => {
     await app.close();
   });
 
+  it("Wiki-Eintrag: Mensch schreibt eine Evidenz-Zelle mit strukturierten Metadaten (agenten-konsumierbar)", async () => {
+    const { app, caseId } = await amtMitFall();
+    const dto = (
+      await app.inject({
+        method: "POST",
+        url: `/api/cases/${caseId}/vermerke`,
+        payload: {
+          text: "Meldebescheinigung liegt vor.",
+          kind: "evidenz",
+          metadaten: { nachweisId: "att.123", norm: "§ 26 VwVfG", geprueft: true },
+        },
+      })
+    ).json();
+    expect(dto.kind).toBe("evidenz");
+    expect(dto.metadaten.nachweisId).toBe("att.123");
+    expect(dto.metadaten.geprueft).toBe(true);
+    await app.close();
+  });
+
+  it("KI-Wiki-Eintrag trägt die AI-Provenienz (Konfidenz/Quellen) als Metadaten", async () => {
+    const { app, caseId } = await amtMitFall();
+    const dto = (
+      await app.inject({
+        method: "POST",
+        url: `/api/cases/${caseId}/vermerke/ki`,
+        payload: { task: "sachstand", input: {} },
+      })
+    ).json();
+    expect(typeof dto.metadaten.konfidenz).toBe("number");
+    expect(Array.isArray(dto.metadaten.quellen)).toBe(true);
+    await app.close();
+  });
+
   it("Blackboard-Threading: KI antwortet als teilergebnis auf eine menschliche frage (bezugVermerkId)", async () => {
     const { app, caseId } = await amtMitFall();
     const frage = (

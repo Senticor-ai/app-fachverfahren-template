@@ -44,6 +44,9 @@ const VERMERK_KINDS = new Set<VermerkDto["kind"]>([
   "frage",
   "befund",
   "entscheidung",
+  "reflexion",
+  "metadatum",
+  "evidenz",
   "notiz",
 ]);
 
@@ -101,6 +104,11 @@ function toVermerkDto(
         ? (modelId ?? "ki")
         : `human:${e.actorId}`;
   const text = typeof p["text"] === "string" ? p["text"] : "";
+  const md = p["metadaten"];
+  const metadaten =
+    typeof md === "object" && md !== null && !Array.isArray(md)
+      ? (md as Record<string, unknown>)
+      : {};
   return {
     vermerkId: e.auditEventId,
     caseId: e.caseId ?? fallbackCaseId,
@@ -114,6 +122,7 @@ function toVermerkDto(
     bezugVermerkId:
       typeof p["bezugVermerkId"] === "string" ? p["bezugVermerkId"] : null,
     reviewStatus,
+    metadaten,
     // Injektions-Verdacht compute-on-read (immer konsistent zum Text; die Zelle bleibt unverändert).
     verdacht: scanInjection(text).suspicious,
     erstelltAm: e.occurredAt,
@@ -240,6 +249,9 @@ export function registerVermerkRoutes(
             ...(request.body.bezugVermerkId !== undefined
               ? { bezugVermerkId: request.body.bezugVermerkId }
               : {}),
+            ...(request.body.metadaten !== undefined
+              ? { metadaten: request.body.metadaten }
+              : {}),
           },
           `Aktenvermerk (Mensch) zu ${appCase.caseId}`,
         );
@@ -361,6 +373,14 @@ export function registerVermerkRoutes(
             reviewStatus: "offen",
             sichtbarkeit: "public",
             angefordertVon: session.actorId,
+            // Der KI-Wiki-Eintrag trägt die STRUKTURIERTE AI-Provenienz als agenten-konsumierbare Metadaten
+            // (Konfidenz/Quellen/Rationale) — genau, was ein nachgelagerter Agent zur Weiterverarbeitung braucht.
+            metadaten: {
+              ...(request.body.metadaten ?? {}),
+              konfidenz: result.value.confidence,
+              quellen: result.value.sources,
+              rationale: result.value.rationale,
+            },
             ...(request.body.bezugVermerkId !== undefined
               ? { bezugVermerkId: request.body.bezugVermerkId }
               : {}),

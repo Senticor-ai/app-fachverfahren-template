@@ -630,6 +630,32 @@ export interface VoiceConfig {
   euResidenzErforderlich?: boolean;
 }
 
+/** GENERISCHE, sichere DATENANBINDUNG als DATEN (ein Baustein / eine zuständige Stelle): verallgemeinert das heute
+ *  verstreute `register`/`registerRefs`/`fimRefs`/`nachweise` zu EINER zweckgebundenen, sicherheits-klassifizierten
+ *  Sicht. Der `art`-Flavor unterscheidet Register (NOOTS/Registermodernisierung) · interne Systeme (E-Akte/HR/Vergabe)
+ *  · externe Dienste (Zahlung/Zustellung) — als DATEN, kein Sonderweg im Code. `verbindungsklasse` = Sicherheitsstufe
+ *  nach BSI TR-03190; `zweck` = DSGVO-Zweckbindung (Pflicht). Optional/additiv — der Kit-Code liest sie noch nicht. */
+export interface Datenanbindung {
+  /** Name der Quelle/des Systems (z. B. „Melderegister", „E-Akte", „HR-System", „ePayBL"). */
+  quelle: string;
+  /** Ausprägung (Flavor) — als DATEN. */
+  art: "register" | "intern" | "extern";
+  /** Interop-Richtung: abruf (inbound-Nachweis, Once-Only) vs. meldung (outbound). */
+  richtung: "abruf" | "meldung";
+  /** Zweckbindung (Pflicht, DSGVO): WOFÜR die Daten angebunden werden. */
+  zweck: string;
+  /** BSI-TR-03190-Verbindungsklasse (Sicherheitsstufe der Anbindung; höher = mehr Nachweis/Prüfung). */
+  verbindungsklasse?: 1 | 2 | 3 | 4;
+  /** Schutzbedarf der Daten (BSI IT-Grundschutz). */
+  schutzbedarf?: "offen" | "intern" | "vertraulich" | "streng-vertraulich";
+  /** Antragsfelder, die über diese Anbindung abgerufen/gemeldet werden. */
+  felder?: string[];
+  /** Datenformat/Schema des Austauschs (z. B. „XMeld", „XGewerbe", ein FIM-Datenschema). */
+  datenformat?: string;
+  /** Norm-/Rechtsgrundlage der Anbindung. */
+  normRef?: NormRef;
+}
+
 export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   id: string; // slug, z.B. "leistung"
   label: string; // Anzeigename der Leistung
@@ -662,6 +688,10 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   fimRefs?: FimRef[];
   /** FRISTEN-TYPEN als DATEN (Norm-Regel „X ab Ankerdatum") — unabhängig von konkreten Frist-Instanzen. */
   fristenTypen?: FristTyp[];
+  /** GENERISCHE DATENANBINDUNG als DATEN (Baustein): Register/NOOTS · interne Systeme · externe Dienste —
+   *  verallgemeinert `register`/`registerRefs`/`fimRefs`/`nachweise` zu EINER zweckgebundenen, sicherheits-
+   *  klassifizierten Sicht. OPTIONAL/additiv — bestehende Configs bleiben unverändert. */
+  datenanbindung?: Datenanbindung[];
   statusMachine: StatusMachine;
   /** ESCAPE-HATCH für nicht-tabellarische Subsumtion (Tatbestand→Rechtsfolge): reine, testbare, deterministische
    *  Berechnung (kein Datum/Random). OPTIONAL — fehlt sie, ist die Daten-Auswertung von `tarif` durch den reinen

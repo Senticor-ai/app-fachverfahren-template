@@ -13,15 +13,19 @@ export const VermerkQuelleSchema = Type.Union([
   Type.Literal("ki"),
 ]);
 
-/** Die Art einer Blackboard-Zelle (typisierter Beitrag zur gemeinsamen Akte) — nicht jeder Beitrag ist eine
- *  „Notiz": eine Hypothese, ein Teilergebnis, eine Rückfrage, ein Befund oder eine Entscheidung sind
- *  eigenständige, für Mensch UND Agent verständliche Zell-Typen. */
+/** Die Art einer Wiki-/Blackboard-Zelle — der Fall-Wiki ist die Brücke zwischen Mensch, KI-Agent und
+ *  Composable: nicht jeder Beitrag ist eine „Notiz". Neben Hypothese/Teilergebnis/Frage/Befund/Entscheidung
+ *  tragen `reflexion` (Selbst-/Prozess-Reflexion für spätere Agenten), `metadatum` (strukturierte Metadaten)
+ *  und `evidenz` (Beleg/Nachweis-Bezug) genau das, was ein KI-Agent zur Weiterverarbeitung braucht. */
 export const VermerkKindSchema = Type.Union([
   Type.Literal("hypothese"),
   Type.Literal("teilergebnis"),
   Type.Literal("frage"),
   Type.Literal("befund"),
   Type.Literal("entscheidung"),
+  Type.Literal("reflexion"),
+  Type.Literal("metadatum"),
+  Type.Literal("evidenz"),
   Type.Literal("notiz"),
 ]);
 export type VermerkKind = Static<typeof VermerkKindSchema>;
@@ -50,6 +54,9 @@ export const VermerkRequestSchema = Type.Object(
     sichtbarkeit: Type.Optional(VermerkSichtbarkeitSchema),
     /** Bezug auf einen anderen Beitrag (Threading `re:`) — z.B. Antwort auf eine `frage`. */
     bezugVermerkId: Type.Optional(Type.String({ minLength: 1 })),
+    /** Strukturierte, agenten-konsumierbare Metadaten (z.B. Norm-Bezug, Konfidenz, Tags, Evidenz-Kennungen)
+     *  — der maschinenlesbare Teil des Wiki-Eintrags, den ein KI-Agent weiterverarbeitet. */
+    metadaten: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
   },
   { additionalProperties: false },
 );
@@ -64,6 +71,7 @@ export const KiVermerkRequestSchema = Type.Object(
     input: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
     kind: Type.Optional(VermerkKindSchema),
     bezugVermerkId: Type.Optional(Type.String({ minLength: 1 })),
+    metadaten: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
   },
   { additionalProperties: false },
 );
@@ -112,6 +120,8 @@ export const VermerkDtoSchema = Type.Object(
     /** Bezug auf einen anderen Beitrag (Threading), sonst null. */
     bezugVermerkId: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
     reviewStatus: VermerkReviewStatusSchema,
+    /** Strukturierte, agenten-konsumierbare Metadaten des Eintrags (leer {}, wenn keine gesetzt). */
+    metadaten: Type.Record(Type.String(), Type.Unknown()),
     /** true = der Text trägt ein mögliches Prompt-Injektions-Muster (Heuristik) — für Prüfer sichtbar
      *  markiert; beim Lesen durch einen Agenten wird die Zelle ohnehin neutralisiert. */
     verdacht: Type.Boolean(),
