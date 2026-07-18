@@ -13,6 +13,8 @@ export * from "./lib/interpreter.js";
 export * from "./lib/dokument-extraktion.js";
 // Nachweis-Upload-Regeln als DATEN: accept-Attribut, Einschränkungs-Text + reine Fail-Fast-Vorprüfung (Typ/Größe).
 export * from "./lib/nachweis-pruefung.js";
+// Generische, sichere Datenanbindung (Register/intern/extern): Selector + Gruppierung + Zweckbindungs-/BSI-Prüfung.
+export * from "./lib/datenanbindung.js";
 
 // UI-Bausteine (Tailwind + shadcn/ui OSS) — konsumieren ausschließlich den Vertrag (config/port/vorgang).
 export * from "./ui/badge.js";
