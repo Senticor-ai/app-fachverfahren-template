@@ -176,4 +176,67 @@ describe("BFF Aktenvermerke (/api/cases/:id/vermerke)", () => {
     expect(res.statusCode).toBe(404);
     await fremd.close();
   });
+
+  it("KI-Vermerk PRÜFEN: reviewStatus wandert offen → bestaetigt (append-only); zweiter Review → 409", async () => {
+    const { app, caseId } = await amtMitFall();
+    const vermerkId = (
+      await app.inject({
+        method: "POST",
+        url: `/api/cases/${caseId}/vermerke/ki`,
+        payload: { task: "zusammenfassung", input: {} },
+      })
+    ).json().vermerkId;
+
+    const review = await app.inject({
+      method: "POST",
+      url: `/api/cases/${caseId}/vermerke/${vermerkId}/review`,
+      payload: { entscheidung: "bestaetigt" },
+    });
+    expect(review.statusCode).toBe(200);
+    expect(review.json().reviewStatus).toBe("bestaetigt");
+
+    // Der abgeleitete Status ist auch beim erneuten Lesen bestaetigt.
+    const liste = (
+      await app.inject({ method: "GET", url: `/api/cases/${caseId}/vermerke` })
+    ).json();
+    expect(liste.vermerke[0].reviewStatus).toBe("bestaetigt");
+
+    // Zweiter Review desselben Entwurfs → 409.
+    const zweit = await app.inject({
+      method: "POST",
+      url: `/api/cases/${caseId}/vermerke/${vermerkId}/review`,
+      payload: { entscheidung: "verworfen" },
+    });
+    expect(zweit.statusCode).toBe(409);
+    await app.close();
+  });
+
+  it("Review eines MENSCH-Vermerks → 422 (nur KI-Entwürfe sind prüfpflichtig)", async () => {
+    const { app, caseId } = await amtMitFall();
+    const vermerkId = (
+      await app.inject({
+        method: "POST",
+        url: `/api/cases/${caseId}/vermerke`,
+        payload: { text: "menschlicher Vermerk" },
+      })
+    ).json().vermerkId;
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/cases/${caseId}/vermerke/${vermerkId}/review`,
+      payload: { entscheidung: "bestaetigt" },
+    });
+    expect(res.statusCode).toBe(422);
+    await app.close();
+  });
+
+  it("Review einer unbekannten vermerkId → 404", async () => {
+    const { app, caseId } = await amtMitFall();
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/cases/${caseId}/vermerke/audit.gibtsnicht/review`,
+      payload: { entscheidung: "verworfen" },
+    });
+    expect(res.statusCode).toBe(404);
+    await app.close();
+  });
 });

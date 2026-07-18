@@ -217,6 +217,7 @@ describe("BFF-Verdrahtung im App-Server", () => {
         "/api/cases/{id}/transitions",
         "/api/cases/{id}/vermerke",
         "/api/cases/{id}/vermerke/ki",
+        "/api/cases/{id}/vermerke/{vermerkId}/review",
         "/api/mailbox",
         "/api/preferences",
         "/api/procedures",

@@ -3277,6 +3277,208 @@
         "tags": ["vermerke"]
       }
     },
+    "/api/cases/{id}/vermerke/{vermerkId}/review": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "vermerkId",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "entscheidung": {
+                    "anyOf": [
+                      { "enum": ["bestaetigt"], "type": "string" },
+                      { "enum": ["verworfen"], "type": "string" }
+                    ]
+                  }
+                },
+                "required": ["entscheidung"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "autorActorId": { "minLength": 1, "type": "string" },
+                    "caseId": { "minLength": 1, "type": "string" },
+                    "erstelltAm": { "minLength": 1, "type": "string" },
+                    "modelId": {
+                      "anyOf": [
+                        { "minLength": 1, "type": "string" },
+                        { "type": "null" }
+                      ]
+                    },
+                    "quelle": {
+                      "anyOf": [
+                        { "enum": ["mensch"], "type": "string" },
+                        { "enum": ["ki"], "type": "string" }
+                      ]
+                    },
+                    "reviewStatus": {
+                      "anyOf": [
+                        { "enum": ["nicht-erforderlich"], "type": "string" },
+                        { "enum": ["offen"], "type": "string" },
+                        { "enum": ["bestaetigt"], "type": "string" },
+                        { "enum": ["verworfen"], "type": "string" }
+                      ]
+                    },
+                    "text": { "type": "string" },
+                    "vermerkId": { "minLength": 1, "type": "string" }
+                  },
+                  "required": [
+                    "vermerkId",
+                    "caseId",
+                    "text",
+                    "quelle",
+                    "autorActorId",
+                    "modelId",
+                    "reviewStatus",
+                    "erstelltAm"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Einen KI-Vermerk-Entwurf prüfen (bestätigen/verwerfen)",
+        "tags": ["vermerke"]
+      }
+    },
     "/api/mailbox": {
       "get": {
         "parameters": [

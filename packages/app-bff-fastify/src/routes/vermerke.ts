@@ -15,8 +15,10 @@ import {
   ErrorEnvelopeSchema,
   KiVermerkRequestSchema,
   VermerkDtoSchema,
+  VermerkIdParamsSchema,
   VermerkListDtoSchema,
   VermerkRequestSchema,
+  VermerkReviewRequestSchema,
   type VermerkDto,
 } from "@senticor/app-bff-contracts";
 import type { AppAuditEvent, AppCase } from "@senticor/app-store-postgres";
@@ -29,15 +31,42 @@ import { bffRouteAuth, requestIdOf, sessionOf } from "../route-auth.js";
 import { storeUnavailable } from "../store-error.js";
 
 const NOTE_EVENT_TYPE = "case.note.added";
+const REVIEW_EVENT_TYPE = "case.note.reviewed";
 /** Rechtsgrundlage der Aktenführung, falls das Verfahren keine eigene liefert (Aktenmäßigkeitsprinzip). */
 const DEFAULT_NOTE_LEGAL_BASIS = "§ 29 VwVfG";
 
-/** Ein `case.note.added`-Audit-Ereignis → VermerkDto (Provenienz/Review aus der frei-formigen payload). */
-function toVermerkDto(e: AppAuditEvent, fallbackCaseId: string): VermerkDto {
+type ReviewEntscheidung = "bestaetigt" | "verworfen";
+
+/** Baut die Abbildung vermerkId → Prüf-Entscheidung aus den append-only `case.note.reviewed`-Ereignissen
+ *  (die erste Entscheidung gilt; ein zweiter Review wird server-seitig abgelehnt). */
+function reviewMapOf(events: AppAuditEvent[]): Map<string, ReviewEntscheidung> {
+  const map = new Map<string, ReviewEntscheidung>();
+  for (const e of events) {
+    if (e.eventType !== REVIEW_EVENT_TYPE) continue;
+    const vermerkId = e.payload["vermerkId"];
+    const entscheidung = e.payload["entscheidung"];
+    if (
+      typeof vermerkId === "string" &&
+      (entscheidung === "bestaetigt" || entscheidung === "verworfen") &&
+      !map.has(vermerkId)
+    ) {
+      map.set(vermerkId, entscheidung);
+    }
+  }
+  return map;
+}
+
+/** Ein `case.note.added`-Audit-Ereignis → VermerkDto. Der effektive Prüfstatus kommt (bei KI-Vermerken)
+ *  aus den `case.note.reviewed`-Ereignissen (`override`), NICHT aus der unveränderlichen Notiz-payload. */
+function toVermerkDto(
+  e: AppAuditEvent,
+  fallbackCaseId: string,
+  override?: ReviewEntscheidung,
+): VermerkDto {
   const p = e.payload;
   const quelle = p["quelle"] === "ki" ? "ki" : "mensch";
   const rs = p["reviewStatus"];
-  const reviewStatus =
+  const gespeichert =
     rs === "offen" ||
     rs === "bestaetigt" ||
     rs === "verworfen" ||
@@ -46,6 +75,7 @@ function toVermerkDto(e: AppAuditEvent, fallbackCaseId: string): VermerkDto {
       : quelle === "ki"
         ? "offen"
         : "nicht-erforderlich";
+  const reviewStatus = override ?? gespeichert;
   return {
     vermerkId: e.auditEventId,
     caseId: e.caseId ?? fallbackCaseId,
@@ -294,10 +324,115 @@ export function registerVermerkRoutes(
       } catch {
         return storeUnavailable(request, reply);
       }
+      const reviews = reviewMapOf(events);
       const vermerke = events
         .filter((e) => e.eventType === NOTE_EVENT_TYPE)
-        .map((e) => toVermerkDto(e, appCase.caseId));
+        .map((e) =>
+          toVermerkDto(e, appCase.caseId, reviews.get(e.auditEventId)),
+        );
       return reply.send({ vermerke });
+    },
+  );
+
+  // ── KI-Vermerk-Entwurf PRÜFEN (bestätigen/verwerfen) ──────────────────────────────────────────
+  // Schließt den HITL-Kreis: ein KI-Entwurf (reviewStatus "offen") wird von einem Menschen bestätigt
+  // (in die Akte übernommen) oder verworfen. Die Prüfung ist selbst append-only (`case.note.reviewed`);
+  // der effektive Status des (unveränderlichen) Vermerks wird beim Lesen daraus abgeleitet. Einmalig (409).
+  typed.post(
+    "/api/cases/:id/vermerke/:vermerkId/review",
+    {
+      config: writeAuth.config,
+      preHandler: writeAuth.preHandler,
+      schema: {
+        tags: ["vermerke"],
+        summary: "Einen KI-Vermerk-Entwurf prüfen (bestätigen/verwerfen)",
+        params: VermerkIdParamsSchema,
+        body: VermerkReviewRequestSchema,
+        response: {
+          200: VermerkDtoSchema,
+          409: ErrorEnvelopeSchema,
+          422: ErrorEnvelopeSchema,
+          ...errorResponses,
+        },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      const appCase = await loadOwnedCase(session, request.params.id).catch(
+        () => "error" as const,
+      );
+      if (appCase === "error") return storeUnavailable(request, reply);
+      if (!appCase)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+      let events: AppAuditEvent[];
+      try {
+        events = await deps.caseStore.listAuditEvents({
+          tenantId: session.tenantId,
+          caseId: appCase.caseId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      const note = events.find(
+        (e) =>
+          e.eventType === NOTE_EVENT_TYPE &&
+          e.auditEventId === request.params.vermerkId,
+      );
+      // Kein solcher Vermerk an DIESEM Fall → 404 (kein Cross-Case-Zugriff über eine fremde vermerkId).
+      if (!note)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+      // Nur KI-Entwürfe sind prüfpflichtig; ein menschlicher Vermerk hat keinen Review-Zustand.
+      if (note.payload["quelle"] !== "ki")
+        return reply.code(422).send({
+          error: "nur KI-Vermerke sind prüfpflichtig",
+          requestId: requestIdOf(request),
+        });
+      // Einmalig: ein bereits geprüfter Entwurf → 409 (append-only, keine zweite Entscheidung).
+      if (reviewMapOf(events).has(note.auditEventId))
+        return reply.code(409).send({
+          error: "Vermerk bereits geprüft",
+          requestId: requestIdOf(request),
+        });
+
+      const event = createFachlicheAuditEvent({
+        eventType: REVIEW_EVENT_TYPE,
+        actorId: session.actorId,
+        actingAuthorityId: appCase.authorityId,
+        purpose: "aktenvermerk-pruefung",
+        legalBasisId: legalBasisFor(appCase),
+        caseId: appCase.caseId,
+        requestId: requestIdOf(request),
+        summary: `KI-Vermerk ${note.auditEventId} ${request.body.entscheidung}`,
+      });
+      try {
+        await deps.caseStore.appendAuditEvent({
+          auditEventId: event.auditEventId,
+          caseId: appCase.caseId,
+          tenantId: session.tenantId,
+          authorityId: appCase.authorityId,
+          jurisdictionId: appCase.jurisdictionId,
+          actorId: session.actorId,
+          eventType: event.eventType,
+          purpose: event.purpose,
+          legalBasisId: event.legalBasisId,
+          requestId: requestIdOf(request),
+          payload: {
+            vermerkId: note.auditEventId,
+            entscheidung: request.body.entscheidung,
+            summary: event.summary,
+          },
+          occurredAt: event.occurredAt,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      return reply.send(
+        toVermerkDto(note, appCase.caseId, request.body.entscheidung),
+      );
     },
   );
 }

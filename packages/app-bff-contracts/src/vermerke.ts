@@ -34,6 +34,28 @@ export const KiVermerkRequestSchema = Type.Object(
 );
 export type KiVermerkRequestDto = Static<typeof KiVermerkRequestSchema>;
 
+/** Einen KI-Vermerk-Entwurf prüfen: bestätigen (in die Akte übernehmen) oder verwerfen. */
+export const VermerkReviewRequestSchema = Type.Object(
+  {
+    entscheidung: Type.Union([
+      Type.Literal("bestaetigt"),
+      Type.Literal("verworfen"),
+    ]),
+  },
+  { additionalProperties: false },
+);
+export type VermerkReviewRequestDto = Static<typeof VermerkReviewRequestSchema>;
+
+/** Route-Parameter für die Prüfung EINES Vermerks (Fall + Vermerk). */
+export const VermerkIdParamsSchema = Type.Object(
+  {
+    id: Type.String({ minLength: 1 }),
+    vermerkId: Type.String({ minLength: 1 }),
+  },
+  { additionalProperties: false },
+);
+export type VermerkIdParamsDto = Static<typeof VermerkIdParamsSchema>;
+
 /** Ein Aktenvermerk aus dem append-only Fall-Audit. */
 export const VermerkDtoSchema = Type.Object(
   {

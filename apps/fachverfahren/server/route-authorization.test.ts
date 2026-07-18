@@ -181,6 +181,11 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           policy: "rbac:case.note.write",
         },
         {
+          method: "POST",
+          url: "/api/cases/:id/vermerke/:vermerkId/review",
+          policy: "rbac:case.note.write",
+        },
+        {
           method: "PATCH",
           url: "/api/tasks/:id",
           policy: "rbac:case.decision.prepare",

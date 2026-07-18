@@ -105,14 +105,18 @@ export {
 export {
   KiVermerkRequestSchema,
   VermerkDtoSchema,
+  VermerkIdParamsSchema,
   VermerkListDtoSchema,
   VermerkQuelleSchema,
   VermerkRequestSchema,
+  VermerkReviewRequestSchema,
   VermerkReviewStatusSchema,
   type KiVermerkRequestDto,
   type VermerkDto,
+  type VermerkIdParamsDto,
   type VermerkListDto,
   type VermerkRequestDto,
+  type VermerkReviewRequestDto,
 } from "./vermerke.js";
 export {
   NachweisDownloadDtoSchema,
