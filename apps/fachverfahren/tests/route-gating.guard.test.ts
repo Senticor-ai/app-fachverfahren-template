@@ -48,6 +48,10 @@ describe("App-Routen — Session-Gate", () => {
       "/amt/vorgang/:id": { kind: "persona", persona: "sachbearbeitung" },
       "/amt/akten": { kind: "persona", persona: "sachbearbeitung" },
       "/amt/akte/:id": { kind: "persona", persona: "sachbearbeitung" },
+      "/amt/verfahren/:procedureId/:version/wiki": {
+        kind: "persona",
+        persona: "sachbearbeitung",
+      },
       "/aufsicht": { kind: "persona", persona: "aufsicht" },
       "/boards": {
         kind: "permission",
@@ -107,6 +111,7 @@ describe("App-Routen — Session-Gate", () => {
       "/amt/vorgang/:id",
       "/amt/akten",
       "/amt/akte/:id",
+      "/amt/verfahren/:procedureId/:version/wiki",
     ]);
     expect(childPaths(personaGroups[2] as RouteObject)).toEqual(["/aufsicht"]);
 

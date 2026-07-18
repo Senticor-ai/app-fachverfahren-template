@@ -4,7 +4,7 @@
 // Rendering im Kit; hier steckt die Lade-Orchestrierung, die Lade-/Fehler-/Nicht-gefunden-Zustände UND
 // das interaktive Abhaken eines Schritts (patchTask → Fortschritt server-seitig neu gerechnet → neu geladen).
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, FileQuestion } from "lucide-react";
 import {
   Button,
@@ -191,6 +191,15 @@ export function AmtAktePage(): React.JSX.Element {
           />
         ) : (
           <>
+            {/* Einstieg ins Verfahrens-Wiki (generelles Wissen des Verfahrens dieser Akte). */}
+            <div className="mb-3">
+              <Link
+                to={`/amt/verfahren/${encodeURIComponent(state.data.caseSummary.procedureId)}/${encodeURIComponent(state.data.caseSummary.procedureVersion)}/wiki`}
+                className="text-sm text-primary hover:underline"
+              >
+                Verfahrens-Wiki öffnen →
+              </Link>
+            </div>
             <DossierAkte360
               {...toAkteProps(
                 state.data.caseSummary,

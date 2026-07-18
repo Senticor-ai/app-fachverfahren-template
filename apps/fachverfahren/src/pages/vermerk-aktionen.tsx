@@ -26,6 +26,8 @@ const KIND_LABEL: Record<VermerkDto["kind"], string> = {
   reflexion: "Reflexion",
   metadatum: "Metadatum",
   evidenz: "Evidenz",
+  wissen: "Wissen",
+  faehigkeit: "Fähigkeit",
   notiz: "Notiz",
 };
 const KIND_OPTIONS: VermerkDto["kind"][] = [

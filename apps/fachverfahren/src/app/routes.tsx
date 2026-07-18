@@ -6,6 +6,7 @@ import { LandingPage } from "../LandingPage.js";
 import { AdminUsersRoute } from "../pages/admin-users.js";
 import { AmtAktePage } from "../pages/amt-akte.js";
 import { AmtAktenPage } from "../pages/amt-akten.js";
+import { AmtVerfahrenWikiPage } from "../pages/amt-verfahren-wiki.js";
 import { AmtEingangPage } from "../pages/amt-eingang.js";
 import { AmtVorgangPage } from "../pages/amt-vorgang.js";
 import { AufsichtPage } from "../pages/aufsicht.js";
@@ -36,6 +37,7 @@ const routeElements: Record<AppRoutePath, React.JSX.Element> = {
   "/amt/vorgang/:id": <AmtVorgangPage />,
   "/amt/akten": <AmtAktenPage />,
   "/amt/akte/:id": <AmtAktePage />,
+  "/amt/verfahren/:procedureId/:version/wiki": <AmtVerfahrenWikiPage />,
   "/aufsicht": <AufsichtPage />,
   "/boards": <BoardsListPage />,
   "/boards/:boardId": <BoardDetailPage />,
