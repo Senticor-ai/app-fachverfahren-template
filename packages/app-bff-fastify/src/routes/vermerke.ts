@@ -37,6 +37,22 @@ const DEFAULT_NOTE_LEGAL_BASIS = "§ 29 VwVfG";
 
 type ReviewEntscheidung = "bestaetigt" | "verworfen";
 
+const VERMERK_KINDS = new Set<VermerkDto["kind"]>([
+  "hypothese",
+  "teilergebnis",
+  "frage",
+  "befund",
+  "entscheidung",
+  "notiz",
+]);
+
+/** Frei-formigen payload-Wert → gültigen Zell-Typ (Default `notiz`). */
+function asKind(v: unknown): VermerkDto["kind"] {
+  return typeof v === "string" && VERMERK_KINDS.has(v as VermerkDto["kind"])
+    ? (v as VermerkDto["kind"])
+    : "notiz";
+}
+
 /** Baut die Abbildung vermerkId → Prüf-Entscheidung aus den append-only `case.note.reviewed`-Ereignissen
  *  (die erste Entscheidung gilt; ein zweiter Review wird server-seitig abgelehnt). */
 function reviewMapOf(events: AppAuditEvent[]): Map<string, ReviewEntscheidung> {
@@ -76,13 +92,25 @@ function toVermerkDto(
         ? "offen"
         : "nicht-erforderlich";
   const reviewStatus = override ?? gespeichert;
+  const modelId = typeof p["modelId"] === "string" ? p["modelId"] : null;
+  const urheber =
+    typeof p["urheber"] === "string" && p["urheber"].length > 0
+      ? p["urheber"]
+      : quelle === "ki"
+        ? (modelId ?? "ki")
+        : `human:${e.actorId}`;
   return {
     vermerkId: e.auditEventId,
     caseId: e.caseId ?? fallbackCaseId,
     text: typeof p["text"] === "string" ? p["text"] : "",
+    kind: asKind(p["kind"]),
     quelle,
+    urheber,
     autorActorId: e.actorId,
-    modelId: typeof p["modelId"] === "string" ? p["modelId"] : null,
+    modelId,
+    sichtbarkeit: p["sichtbarkeit"] === "private" ? "private" : "public",
+    bezugVermerkId:
+      typeof p["bezugVermerkId"] === "string" ? p["bezugVermerkId"] : null,
     reviewStatus,
     erstelltAm: e.occurredAt,
   };
@@ -199,8 +227,15 @@ export function registerVermerkRoutes(
           requestIdOf(request),
           {
             text: request.body.text,
+            kind: request.body.kind ?? "notiz",
             quelle: "mensch",
+            // Peer-Kennung: der Mensch schreibt als `human:<rolle>` (Rolle aus der Sitzung).
+            urheber: `human:${session.rbacRoles[0] ?? "mitarbeitend"}`,
+            sichtbarkeit: request.body.sichtbarkeit ?? "public",
             reviewStatus: "nicht-erforderlich",
+            ...(request.body.bezugVermerkId !== undefined
+              ? { bezugVermerkId: request.body.bezugVermerkId }
+              : {}),
           },
           `Aktenvermerk (Mensch) zu ${appCase.caseId}`,
         );
@@ -276,12 +311,20 @@ export function registerVermerkRoutes(
           requestIdOf(request),
           {
             text: entwurf,
+            // Ein KI-Beitrag ist typischerweise ein Zwischenergebnis; der Aufrufer kann den Zell-Typ steuern.
+            kind: request.body.kind ?? "teilergebnis",
             quelle: "ki",
+            // Peer-Kennung des Agenten = die Modell-Kennung (Mensch und Agent sind gleichrangige Knoten).
+            urheber: result.value.modelId,
             modelId: result.value.modelId,
             marking: "ki-vorschlag",
             reviewRequired: true,
             reviewStatus: "offen",
+            sichtbarkeit: "public",
             angefordertVon: session.actorId,
+            ...(request.body.bezugVermerkId !== undefined
+              ? { bezugVermerkId: request.body.bezugVermerkId }
+              : {}),
           },
           `KI-Aktenvermerk-Entwurf (${result.value.modelId}) zu ${appCase.caseId}`,
         );

@@ -239,4 +239,51 @@ describe("BFF Aktenvermerke (/api/cases/:id/vermerke)", () => {
     expect(res.statusCode).toBe(404);
     await app.close();
   });
+
+  it("Blackboard-Zelle: Mensch schreibt eine typisierte, private Zelle mit Peer-Kennung", async () => {
+    const { app, caseId } = await amtMitFall();
+    const dto = (
+      await app.inject({
+        method: "POST",
+        url: `/api/cases/${caseId}/vermerke`,
+        payload: {
+          text: "Betrag erscheint zu hoch — bitte prüfen.",
+          kind: "hypothese",
+          sichtbarkeit: "private",
+        },
+      })
+    ).json();
+    expect(dto.kind).toBe("hypothese");
+    expect(dto.sichtbarkeit).toBe("private");
+    // Peer-Kennung: der Mensch ist ein Knoten `human:<rolle>`.
+    expect(dto.urheber).toBe("human:caseworker");
+    expect(dto.bezugVermerkId).toBeNull();
+    await app.close();
+  });
+
+  it("Blackboard-Threading: KI antwortet als teilergebnis auf eine menschliche frage (bezugVermerkId)", async () => {
+    const { app, caseId } = await amtMitFall();
+    const frage = (
+      await app.inject({
+        method: "POST",
+        url: `/api/cases/${caseId}/vermerke`,
+        payload: { text: "Wie ist der Sachstand?", kind: "frage" },
+      })
+    ).json();
+    expect(frage.kind).toBe("frage");
+
+    const antwort = (
+      await app.inject({
+        method: "POST",
+        url: `/api/cases/${caseId}/vermerke/ki`,
+        payload: { task: "sachstand", input: {}, bezugVermerkId: frage.vermerkId },
+      })
+    ).json();
+    expect(antwort.quelle).toBe("ki");
+    expect(antwort.kind).toBe("teilergebnis");
+    // Peer-Kennung des Agenten = das Modell; und der Beitrag bezieht sich auf die Frage.
+    expect(typeof antwort.urheber).toBe("string");
+    expect(antwort.bezugVermerkId).toBe(frage.vermerkId);
+    await app.close();
+  });
 });

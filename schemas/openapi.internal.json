@@ -2805,8 +2805,24 @@
                         "additionalProperties": false,
                         "properties": {
                           "autorActorId": { "minLength": 1, "type": "string" },
+                          "bezugVermerkId": {
+                            "anyOf": [
+                              { "minLength": 1, "type": "string" },
+                              { "type": "null" }
+                            ]
+                          },
                           "caseId": { "minLength": 1, "type": "string" },
                           "erstelltAm": { "minLength": 1, "type": "string" },
+                          "kind": {
+                            "anyOf": [
+                              { "enum": ["hypothese"], "type": "string" },
+                              { "enum": ["teilergebnis"], "type": "string" },
+                              { "enum": ["frage"], "type": "string" },
+                              { "enum": ["befund"], "type": "string" },
+                              { "enum": ["entscheidung"], "type": "string" },
+                              { "enum": ["notiz"], "type": "string" }
+                            ]
+                          },
                           "modelId": {
                             "anyOf": [
                               { "minLength": 1, "type": "string" },
@@ -2830,16 +2846,27 @@
                               { "enum": ["verworfen"], "type": "string" }
                             ]
                           },
+                          "sichtbarkeit": {
+                            "anyOf": [
+                              { "enum": ["public"], "type": "string" },
+                              { "enum": ["private"], "type": "string" }
+                            ]
+                          },
                           "text": { "type": "string" },
+                          "urheber": { "minLength": 1, "type": "string" },
                           "vermerkId": { "minLength": 1, "type": "string" }
                         },
                         "required": [
                           "vermerkId",
                           "caseId",
                           "text",
+                          "kind",
                           "quelle",
+                          "urheber",
                           "autorActorId",
                           "modelId",
+                          "sichtbarkeit",
+                          "bezugVermerkId",
                           "reviewStatus",
                           "erstelltAm"
                         ],
@@ -2954,6 +2981,23 @@
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "bezugVermerkId": { "minLength": 1, "type": "string" },
+                  "kind": {
+                    "anyOf": [
+                      { "enum": ["hypothese"], "type": "string" },
+                      { "enum": ["teilergebnis"], "type": "string" },
+                      { "enum": ["frage"], "type": "string" },
+                      { "enum": ["befund"], "type": "string" },
+                      { "enum": ["entscheidung"], "type": "string" },
+                      { "enum": ["notiz"], "type": "string" }
+                    ]
+                  },
+                  "sichtbarkeit": {
+                    "anyOf": [
+                      { "enum": ["public"], "type": "string" },
+                      { "enum": ["private"], "type": "string" }
+                    ]
+                  },
                   "text": {
                     "maxLength": 20000,
                     "minLength": 1,
@@ -2975,8 +3019,24 @@
                   "additionalProperties": false,
                   "properties": {
                     "autorActorId": { "minLength": 1, "type": "string" },
+                    "bezugVermerkId": {
+                      "anyOf": [
+                        { "minLength": 1, "type": "string" },
+                        { "type": "null" }
+                      ]
+                    },
                     "caseId": { "minLength": 1, "type": "string" },
                     "erstelltAm": { "minLength": 1, "type": "string" },
+                    "kind": {
+                      "anyOf": [
+                        { "enum": ["hypothese"], "type": "string" },
+                        { "enum": ["teilergebnis"], "type": "string" },
+                        { "enum": ["frage"], "type": "string" },
+                        { "enum": ["befund"], "type": "string" },
+                        { "enum": ["entscheidung"], "type": "string" },
+                        { "enum": ["notiz"], "type": "string" }
+                      ]
+                    },
                     "modelId": {
                       "anyOf": [
                         { "minLength": 1, "type": "string" },
@@ -2997,16 +3057,27 @@
                         { "enum": ["verworfen"], "type": "string" }
                       ]
                     },
+                    "sichtbarkeit": {
+                      "anyOf": [
+                        { "enum": ["public"], "type": "string" },
+                        { "enum": ["private"], "type": "string" }
+                      ]
+                    },
                     "text": { "type": "string" },
+                    "urheber": { "minLength": 1, "type": "string" },
                     "vermerkId": { "minLength": 1, "type": "string" }
                   },
                   "required": [
                     "vermerkId",
                     "caseId",
                     "text",
+                    "kind",
                     "quelle",
+                    "urheber",
                     "autorActorId",
                     "modelId",
+                    "sichtbarkeit",
+                    "bezugVermerkId",
                     "reviewStatus",
                     "erstelltAm"
                   ],
@@ -3117,7 +3188,18 @@
               "schema": {
                 "additionalProperties": false,
                 "properties": {
+                  "bezugVermerkId": { "minLength": 1, "type": "string" },
                   "input": { "additionalProperties": {}, "type": "object" },
+                  "kind": {
+                    "anyOf": [
+                      { "enum": ["hypothese"], "type": "string" },
+                      { "enum": ["teilergebnis"], "type": "string" },
+                      { "enum": ["frage"], "type": "string" },
+                      { "enum": ["befund"], "type": "string" },
+                      { "enum": ["entscheidung"], "type": "string" },
+                      { "enum": ["notiz"], "type": "string" }
+                    ]
+                  },
                   "task": { "minLength": 1, "type": "string" }
                 },
                 "required": ["task"],
@@ -3135,8 +3217,24 @@
                   "additionalProperties": false,
                   "properties": {
                     "autorActorId": { "minLength": 1, "type": "string" },
+                    "bezugVermerkId": {
+                      "anyOf": [
+                        { "minLength": 1, "type": "string" },
+                        { "type": "null" }
+                      ]
+                    },
                     "caseId": { "minLength": 1, "type": "string" },
                     "erstelltAm": { "minLength": 1, "type": "string" },
+                    "kind": {
+                      "anyOf": [
+                        { "enum": ["hypothese"], "type": "string" },
+                        { "enum": ["teilergebnis"], "type": "string" },
+                        { "enum": ["frage"], "type": "string" },
+                        { "enum": ["befund"], "type": "string" },
+                        { "enum": ["entscheidung"], "type": "string" },
+                        { "enum": ["notiz"], "type": "string" }
+                      ]
+                    },
                     "modelId": {
                       "anyOf": [
                         { "minLength": 1, "type": "string" },
@@ -3157,16 +3255,27 @@
                         { "enum": ["verworfen"], "type": "string" }
                       ]
                     },
+                    "sichtbarkeit": {
+                      "anyOf": [
+                        { "enum": ["public"], "type": "string" },
+                        { "enum": ["private"], "type": "string" }
+                      ]
+                    },
                     "text": { "type": "string" },
+                    "urheber": { "minLength": 1, "type": "string" },
                     "vermerkId": { "minLength": 1, "type": "string" }
                   },
                   "required": [
                     "vermerkId",
                     "caseId",
                     "text",
+                    "kind",
                     "quelle",
+                    "urheber",
                     "autorActorId",
                     "modelId",
+                    "sichtbarkeit",
+                    "bezugVermerkId",
                     "reviewStatus",
                     "erstelltAm"
                   ],
@@ -3321,8 +3430,24 @@
                   "additionalProperties": false,
                   "properties": {
                     "autorActorId": { "minLength": 1, "type": "string" },
+                    "bezugVermerkId": {
+                      "anyOf": [
+                        { "minLength": 1, "type": "string" },
+                        { "type": "null" }
+                      ]
+                    },
                     "caseId": { "minLength": 1, "type": "string" },
                     "erstelltAm": { "minLength": 1, "type": "string" },
+                    "kind": {
+                      "anyOf": [
+                        { "enum": ["hypothese"], "type": "string" },
+                        { "enum": ["teilergebnis"], "type": "string" },
+                        { "enum": ["frage"], "type": "string" },
+                        { "enum": ["befund"], "type": "string" },
+                        { "enum": ["entscheidung"], "type": "string" },
+                        { "enum": ["notiz"], "type": "string" }
+                      ]
+                    },
                     "modelId": {
                       "anyOf": [
                         { "minLength": 1, "type": "string" },
@@ -3343,16 +3468,27 @@
                         { "enum": ["verworfen"], "type": "string" }
                       ]
                     },
+                    "sichtbarkeit": {
+                      "anyOf": [
+                        { "enum": ["public"], "type": "string" },
+                        { "enum": ["private"], "type": "string" }
+                      ]
+                    },
                     "text": { "type": "string" },
+                    "urheber": { "minLength": 1, "type": "string" },
                     "vermerkId": { "minLength": 1, "type": "string" }
                   },
                   "required": [
                     "vermerkId",
                     "caseId",
                     "text",
+                    "kind",
                     "quelle",
+                    "urheber",
                     "autorActorId",
                     "modelId",
+                    "sichtbarkeit",
+                    "bezugVermerkId",
                     "reviewStatus",
                     "erstelltAm"
                   ],
