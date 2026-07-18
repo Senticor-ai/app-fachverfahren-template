@@ -42,6 +42,14 @@ pnpm --filter @senticor/fachverfahren emit:contract
 Vertrag und Vorgehen: `.agents/skills/fachverfahren-app/SKILL.md` (Front Door),
 Naht-Typ `packages/fachverfahren-kit/src/types.ts`.
 
+**Bescheid/Verwaltungsakt:** Erlässt das Verfahren einen förmlichen Bescheid,
+setze `erlaesstBescheid: true` am festsetzenden Übergang und `zustellung.rechtsbehelf`
+(Regime `widerspruch`/`einspruch`/`klage`, data-driven) in der `LeistungConfig`, und
+spiegle `verwaltungsakt` + `erlaesstBescheid` in `procedure.config.ts` (Gate
+`check:antrag-procedure` sichert die Deckung). Der Bescheid wird beim Übergang
+server-seitig EINGEFROREN (Hash im append-only Audit) und ist owner-scoped über
+`/buerger/bescheid/:id` abrufbar — Details in der Skill unter „Bescheid / Verwaltungsakt".
+
 ## Fall/Dossier/Case-Management → Skill `dossier-fallmanagement`
 
 Fülle GENAU die eine Naht `apps/fachverfahren/server/procedure.config.ts`

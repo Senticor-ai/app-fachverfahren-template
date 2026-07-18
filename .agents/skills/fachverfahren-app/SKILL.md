@@ -96,6 +96,36 @@ oder erfundene Variante (`dog-tax` o. Ä.); ein abweichender Slug driftet den Bu
    (Default `dev-setup`, nur lokal). Die login-freie Sichtprüfung der
    Bausteine läuft über `pnpm run storybook`.
 
+## Bescheid / Verwaltungsakt (der Anspruchs-Lebenszyklus)
+
+Erlässt das Verfahren einen förmlichen Bescheid, ist er ein **eingefrorener
+Verwaltungsakt** — der Bürger kann ihn selbst herunterladen, und er ist
+bestandskraft-fest (er darf NICHT aus der lebenden Config neu gerendert werden;
+sonst änderte eine Tarif-/Regime-Umstellung rückwirkend einen VA von 2024). Der
+gesamte Mechanismus (Einfrieren am Übergang, Bekanntgabe als `case.disclosed`,
+Bürger-Download `GET /api/buerger/antraege/:id/bescheid` mit Hash-Beweis) ist im
+Template GEBAUT — als Agent deklarierst du nur DATEN in `leistung.config.ts`:
+
+1. Der bescheid-erlassende Übergang der `statusMachine` trägt
+   `erlaesstBescheid: true` (neben `vierAugen: true` — eine Festsetzung ist
+   vier-augen-pflichtig). Der Tenor wird aus `berechne` (der Berechnung des
+   Vorgangs) eingefroren; du lieferst keinen Bescheid-Text.
+2. `zustellung.rechtsbehelf` setzt das REGIME der Belehrung — **data-driven,
+   nicht hart kodiert**: `art: "widerspruch"` (VwGO/VwVfG, allgemeines
+   Verfahren), `"einspruch"` (AO — für ein Abgaben-/Steuerverfahren ist
+   Widerspruch FALSCH) oder `"klage"`, plus `fristWert/fristEinheit/stelle/norm`
+   und `fiktionTage/fiktionNorm` (Bekanntgabefiktion, Default 4 Tage PostModG).
+3. Der Server braucht dieselbe Zustandsmaschine (er kann `leistung.config` nicht
+   importieren — rootDir-Mauer). Spiegle `verwaltungsakt` +
+   `erlaesstBescheid` in `apps/fachverfahren/server/procedure.config.ts`; das
+   Gate `pnpm run check:antrag-procedure` erzwingt die Deckung (schlägt bei
+   Drift an).
+
+Der Bürger-Antrag ist server-persistent (überlebt Reload): `/buerger/antraege`
+(Meine Anträge), `/buerger/antrag/:id` (Status) und `/buerger/bescheid/:id`
+(Bescheid) sind fertige Sichten — sie erscheinen automatisch, sobald das
+Verfahren einen Bescheid erlässt.
+
 ## Bürger-Sprache: Leichte Sprache und Fachbegriffe
 
 `FeldDef` trägt zwei optionale, ADDITIVE Sprachvarianten
