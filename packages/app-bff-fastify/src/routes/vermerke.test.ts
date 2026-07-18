@@ -351,6 +351,13 @@ describe("BFF Aktenvermerke (/api/cases/:id/vermerke)", () => {
         kind: "notiz",
       },
     });
+    // Die boshafte Zelle ist fuer Pruefer als Verdacht markiert (compute-on-read).
+    const liste = (
+      await app.inject({ method: "GET", url: `/api/cases/${caseId}/vermerke` })
+    ).json();
+    expect(liste.vermerke.some((v: { verdacht: boolean }) => v.verdacht)).toBe(
+      true,
+    );
     await app.inject({
       method: "POST",
       url: `/api/cases/${caseId}/vermerke/ki`,

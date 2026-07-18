@@ -112,6 +112,9 @@ export const VermerkDtoSchema = Type.Object(
     /** Bezug auf einen anderen Beitrag (Threading), sonst null. */
     bezugVermerkId: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
     reviewStatus: VermerkReviewStatusSchema,
+    /** true = der Text trägt ein mögliches Prompt-Injektions-Muster (Heuristik) — für Prüfer sichtbar
+     *  markiert; beim Lesen durch einen Agenten wird die Zelle ohnehin neutralisiert. */
+    verdacht: Type.Boolean(),
     erstelltAm: Type.String({ minLength: 1 }),
   },
   { additionalProperties: false },

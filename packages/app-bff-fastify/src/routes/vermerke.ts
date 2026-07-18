@@ -100,10 +100,11 @@ function toVermerkDto(
       : quelle === "ki"
         ? (modelId ?? "ki")
         : `human:${e.actorId}`;
+  const text = typeof p["text"] === "string" ? p["text"] : "";
   return {
     vermerkId: e.auditEventId,
     caseId: e.caseId ?? fallbackCaseId,
-    text: typeof p["text"] === "string" ? p["text"] : "",
+    text,
     kind: asKind(p["kind"]),
     quelle,
     urheber,
@@ -113,6 +114,8 @@ function toVermerkDto(
     bezugVermerkId:
       typeof p["bezugVermerkId"] === "string" ? p["bezugVermerkId"] : null,
     reviewStatus,
+    // Injektions-Verdacht compute-on-read (immer konsistent zum Text; die Zelle bleibt unverändert).
+    verdacht: scanInjection(text).suspicious,
     erstelltAm: e.occurredAt,
   };
 }

@@ -2854,6 +2854,7 @@
                           },
                           "text": { "type": "string" },
                           "urheber": { "minLength": 1, "type": "string" },
+                          "verdacht": { "type": "boolean" },
                           "vermerkId": { "minLength": 1, "type": "string" }
                         },
                         "required": [
@@ -2868,6 +2869,7 @@
                           "sichtbarkeit",
                           "bezugVermerkId",
                           "reviewStatus",
+                          "verdacht",
                           "erstelltAm"
                         ],
                         "type": "object"
@@ -3065,6 +3067,7 @@
                     },
                     "text": { "type": "string" },
                     "urheber": { "minLength": 1, "type": "string" },
+                    "verdacht": { "type": "boolean" },
                     "vermerkId": { "minLength": 1, "type": "string" }
                   },
                   "required": [
@@ -3079,6 +3082,7 @@
                     "sichtbarkeit",
                     "bezugVermerkId",
                     "reviewStatus",
+                    "verdacht",
                     "erstelltAm"
                   ],
                   "type": "object"
@@ -3263,6 +3267,7 @@
                     },
                     "text": { "type": "string" },
                     "urheber": { "minLength": 1, "type": "string" },
+                    "verdacht": { "type": "boolean" },
                     "vermerkId": { "minLength": 1, "type": "string" }
                   },
                   "required": [
@@ -3277,6 +3282,7 @@
                     "sichtbarkeit",
                     "bezugVermerkId",
                     "reviewStatus",
+                    "verdacht",
                     "erstelltAm"
                   ],
                   "type": "object"
@@ -3476,6 +3482,7 @@
                     },
                     "text": { "type": "string" },
                     "urheber": { "minLength": 1, "type": "string" },
+                    "verdacht": { "type": "boolean" },
                     "vermerkId": { "minLength": 1, "type": "string" }
                   },
                   "required": [
@@ -3490,6 +3497,7 @@
                     "sichtbarkeit",
                     "bezugVermerkId",
                     "reviewStatus",
+                    "verdacht",
                     "erstelltAm"
                   ],
                   "type": "object"

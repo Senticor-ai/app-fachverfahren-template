@@ -147,6 +147,14 @@ export function VermerkAktionen({
                     · {REVIEW_LABEL[vm.reviewStatus]}
                   </span>
                 ) : null}
+                {vm.verdacht ? (
+                  <span
+                    className="text-xs font-medium text-destructive"
+                    title="Möglicher Prompt-Injektions-Inhalt — beim Lesen durch einen Agenten neutralisiert."
+                  >
+                    ⚠ Injektionsverdacht
+                  </span>
+                ) : null}
               </div>
               <p className="mt-1 whitespace-pre-wrap text-foreground">
                 {vm.text}
