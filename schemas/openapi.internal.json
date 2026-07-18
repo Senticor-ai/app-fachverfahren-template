@@ -3196,6 +3196,190 @@
         "tags": ["vermerke"]
       }
     },
+    "/api/cases/{id}/vermerke/export": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "caseId": { "minLength": 1, "type": "string" },
+                    "eintraege": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bezugEintragId": {
+                            "anyOf": [
+                              { "minLength": 1, "type": "string" },
+                              { "type": "null" }
+                            ]
+                          },
+                          "eintragId": { "minLength": 1, "type": "string" },
+                          "erstelltAm": { "minLength": 1, "type": "string" },
+                          "kind": {
+                            "anyOf": [
+                              { "enum": ["hypothese"], "type": "string" },
+                              { "enum": ["teilergebnis"], "type": "string" },
+                              { "enum": ["frage"], "type": "string" },
+                              { "enum": ["befund"], "type": "string" },
+                              { "enum": ["entscheidung"], "type": "string" },
+                              { "enum": ["reflexion"], "type": "string" },
+                              { "enum": ["metadatum"], "type": "string" },
+                              { "enum": ["evidenz"], "type": "string" },
+                              { "enum": ["notiz"], "type": "string" }
+                            ]
+                          },
+                          "metadaten": {
+                            "additionalProperties": {},
+                            "type": "object"
+                          },
+                          "quelle": {
+                            "anyOf": [
+                              { "enum": ["mensch"], "type": "string" },
+                              { "enum": ["ki"], "type": "string" }
+                            ]
+                          },
+                          "reviewStatus": {
+                            "anyOf": [
+                              {
+                                "enum": ["nicht-erforderlich"],
+                                "type": "string"
+                              },
+                              { "enum": ["offen"], "type": "string" },
+                              { "enum": ["bestaetigt"], "type": "string" },
+                              { "enum": ["verworfen"], "type": "string" }
+                            ]
+                          },
+                          "text": { "type": "string" },
+                          "urheber": { "minLength": 1, "type": "string" }
+                        },
+                        "required": [
+                          "eintragId",
+                          "kind",
+                          "quelle",
+                          "urheber",
+                          "text",
+                          "metadaten",
+                          "bezugEintragId",
+                          "reviewStatus",
+                          "erstelltAm"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "procedureId": { "minLength": 1, "type": "string" },
+                    "procedureVersion": { "minLength": 1, "type": "string" },
+                    "state": { "minLength": 1, "type": "string" }
+                  },
+                  "required": [
+                    "caseId",
+                    "procedureId",
+                    "procedureVersion",
+                    "state",
+                    "eintraege"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Kontext-Bundle der Akte für die agentische Weiterverarbeitung (public, neutralisiert)",
+        "tags": ["vermerke"]
+      }
+    },
     "/api/cases/{id}/vermerke/ki": {
       "post": {
         "parameters": [

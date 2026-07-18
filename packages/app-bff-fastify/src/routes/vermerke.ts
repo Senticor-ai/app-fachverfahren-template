@@ -19,7 +19,9 @@ import {
   VermerkListDtoSchema,
   VermerkRequestSchema,
   VermerkReviewRequestSchema,
+  WissenExportDtoSchema,
   type VermerkDto,
+  type WissenEintragDto,
 } from "@senticor/app-bff-contracts";
 import type { AppAuditEvent, AppCase } from "@senticor/app-store-postgres";
 import {
@@ -126,6 +128,24 @@ function toVermerkDto(
     // Injektions-Verdacht compute-on-read (immer konsistent zum Text; die Zelle bleibt unverändert).
     verdacht: scanInjection(text).suspicious,
     erstelltAm: e.occurredAt,
+  };
+}
+
+/** VermerkDto → WissenEintragDto (Export-Form): der Text wird injektions-NEUTRALISIERT (ein
+ *  weiterverarbeitender Agent darf nicht über eine manipulierte Zelle gekapert werden). */
+function toWissenEintrag(v: VermerkDto): WissenEintragDto {
+  return {
+    eintragId: v.vermerkId,
+    kind: v.kind,
+    quelle: v.quelle,
+    urheber: v.urheber,
+    text: v.verdacht
+      ? "[Inhalt ausgelassen: mögliche Prompt-Injektion]"
+      : v.text,
+    metadaten: v.metadaten,
+    bezugEintragId: v.bezugVermerkId,
+    reviewStatus: v.reviewStatus,
+    erstelltAm: v.erstelltAm,
   };
 }
 
@@ -433,6 +453,54 @@ export function registerVermerkRoutes(
           toVermerkDto(e, appCase.caseId, reviews.get(e.auditEventId)),
         );
       return reply.send({ vermerke });
+    },
+  );
+
+  // ── Wissens-/Kontext-EXPORT (die Brücke für die agentische Weiterverarbeitung) ────────────────
+  typed.get(
+    "/api/cases/:id/vermerke/export",
+    {
+      config: readAuth.config,
+      preHandler: readAuth.preHandler,
+      schema: {
+        tags: ["vermerke"],
+        summary: "Kontext-Bundle der Akte für die agentische Weiterverarbeitung (public, neutralisiert)",
+        params: CaseIdParamsSchema,
+        response: { 200: WissenExportDtoSchema, ...errorResponses },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      const appCase = await loadOwnedCase(session, request.params.id).catch(
+        () => "error" as const,
+      );
+      if (appCase === "error") return storeUnavailable(request, reply);
+      if (!appCase)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+      let events: AppAuditEvent[];
+      try {
+        events = await deps.caseStore.listAuditEvents({
+          tenantId: session.tenantId,
+          caseId: appCase.caseId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      const reviews = reviewMapOf(events);
+      const eintraege = events
+        .filter((e) => e.eventType === NOTE_EVENT_TYPE)
+        .map((e) => toVermerkDto(e, appCase.caseId, reviews.get(e.auditEventId)))
+        .filter((v) => v.sichtbarkeit === "public")
+        .map(toWissenEintrag);
+      return reply.send({
+        caseId: appCase.caseId,
+        procedureId: appCase.procedureId,
+        procedureVersion: appCase.procedureVersion,
+        state: appCase.state,
+        eintraege,
+      });
     },
   );
 

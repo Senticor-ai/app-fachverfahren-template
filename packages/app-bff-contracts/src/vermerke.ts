@@ -136,3 +136,40 @@ export const VermerkListDtoSchema = Type.Object(
   { additionalProperties: false },
 );
 export type VermerkListDto = Static<typeof VermerkListDtoSchema>;
+
+// ── Wissens-/Kontext-EXPORT — die BRÜCKE zwischen Mensch, KI-Agent und Composable ──────────────────────
+// Der stabile, agenten-konsumierbare Kontext-Bundle einer Akte: ein nachgelagerter KI-Agent (z.B. chos-code)
+// liest ihn und übersetzt ihn in Skills + Kontext für die Weiterverarbeitung. Nur PUBLIC-Zellen; der Text ist
+// injektions-NEUTRALISIERT (ein konsumierender Agent darf nicht über eine manipulierte Zelle gekapert werden).
+
+/** Ein Wissens-Eintrag im Export (die maschinenlesbare Form einer Wiki-Zelle). */
+export const WissenEintragDtoSchema = Type.Object(
+  {
+    eintragId: Type.String({ minLength: 1 }),
+    kind: VermerkKindSchema,
+    quelle: VermerkQuelleSchema,
+    urheber: Type.String({ minLength: 1 }),
+    /** Injektions-neutralisierter Text (safe für die Weiterverarbeitung durch einen Agenten). */
+    text: Type.String(),
+    metadaten: Type.Record(Type.String(), Type.Unknown()),
+    bezugEintragId: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+    reviewStatus: VermerkReviewStatusSchema,
+    erstelltAm: Type.String({ minLength: 1 }),
+  },
+  { additionalProperties: false },
+);
+export type WissenEintragDto = Static<typeof WissenEintragDtoSchema>;
+
+/** Der Kontext-Bundle einer Akte für die agentische Weiterverarbeitung. */
+export const WissenExportDtoSchema = Type.Object(
+  {
+    caseId: Type.String({ minLength: 1 }),
+    procedureId: Type.String({ minLength: 1 }),
+    procedureVersion: Type.String({ minLength: 1 }),
+    state: Type.String({ minLength: 1 }),
+    /** Chronologisch; nur public, Text neutralisiert. */
+    eintraege: Type.Array(WissenEintragDtoSchema),
+  },
+  { additionalProperties: false },
+);
+export type WissenExportDto = Static<typeof WissenExportDtoSchema>;

@@ -113,6 +113,8 @@ export {
   VermerkReviewRequestSchema,
   VermerkReviewStatusSchema,
   VermerkSichtbarkeitSchema,
+  WissenEintragDtoSchema,
+  WissenExportDtoSchema,
   type KiVermerkRequestDto,
   type VermerkDto,
   type VermerkIdParamsDto,
@@ -120,6 +122,8 @@ export {
   type VermerkListDto,
   type VermerkRequestDto,
   type VermerkReviewRequestDto,
+  type WissenEintragDto,
+  type WissenExportDto,
 } from "./vermerke.js";
 export {
   NachweisDownloadDtoSchema,
