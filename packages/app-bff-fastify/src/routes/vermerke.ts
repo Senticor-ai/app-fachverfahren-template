@@ -25,6 +25,7 @@ import type { AppAuditEvent, AppCase } from "@senticor/app-store-postgres";
 import {
   builtInPermissions,
   createFachlicheAuditEvent,
+  scanInjection,
 } from "@senticor/public-sector-sdk";
 import type { BffDeps } from "../deps.js";
 import { bffRouteAuth, requestIdOf, sessionOf } from "../route-auth.js";
@@ -293,7 +294,15 @@ export function registerVermerkRoutes(
         .filter((e) => e.eventType === NOTE_EVENT_TYPE)
         .map((e) => toVermerkDto(e, appCase.caseId))
         .filter((v) => v.sichtbarkeit === "public")
-        .map((v) => ({ kind: v.kind, urheber: v.urheber, text: v.text }));
+        .map((v) => ({
+          kind: v.kind,
+          urheber: v.urheber,
+          // SOTA-Guardrail: eine Zelle mit Prompt-Injektions-Muster darf den lesenden Agenten nicht kapern
+          // — neutralisiert statt roh weitergereicht (die Zelle selbst bleibt unverändert in der Akte).
+          text: scanInjection(v.text).suspicious
+            ? "[Inhalt ausgelassen: mögliche Prompt-Injektion]"
+            : v.text,
+        }));
 
       // Den (austauschbaren) AiAssistPort fragen — Kontext AUSSCHLIESSLICH aus der Sitzung + geteilter Akte.
       const result = await deps.aiAssist.suggest(
