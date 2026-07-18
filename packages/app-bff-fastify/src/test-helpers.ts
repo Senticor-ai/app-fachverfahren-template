@@ -20,6 +20,10 @@ import {
   createInMemoryProcedureRegistry,
   type ProcedureRegistry,
 } from "@senticor/public-sector-sdk";
+import {
+  createLocalAiAssistPort,
+  type AiAssistPort,
+} from "@senticor/platform-contracts";
 import { appBff } from "./plugin.js";
 
 export function stubResolver(session: ResolvedSession): SessionResolver {
@@ -55,12 +59,14 @@ export async function buildBffApp({
   caseStore = new InMemoryCaseStore(),
   taskStore = new InMemoryTaskStore(),
   procedureRegistry = createInMemoryProcedureRegistry([]),
+  aiAssist = createLocalAiAssistPort(),
 }: {
   session?: ResolvedSession;
   appStore?: AppStore;
   caseStore?: CaseStore;
   taskStore?: TaskStore;
   procedureRegistry?: ProcedureRegistry;
+  aiAssist?: AiAssistPort;
 } = {}): Promise<{
   app: FastifyInstance;
   auditSink: MemoryAuditSink;
@@ -77,6 +83,7 @@ export async function buildBffApp({
     procedureRegistry,
     sessionResolver: session ? stubResolver(session) : new NoSessionResolver(),
     auditSink,
+    aiAssist,
   });
   return { app, auditSink, appStore, caseStore, taskStore };
 }

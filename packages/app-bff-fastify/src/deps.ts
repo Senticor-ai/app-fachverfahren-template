@@ -10,6 +10,7 @@ import type {
   ProcedureRegistry,
   RbacRegistry,
 } from "@senticor/public-sector-sdk";
+import type { AiAssistPort } from "@senticor/platform-contracts";
 
 export interface BffDeps {
   appStore: AppStore;
@@ -22,4 +23,7 @@ export interface BffDeps {
   sessionResolver: SessionResolver;
   auditSink: AuditSink;
   rbacRegistry: RbacRegistry;
+  /** KI-Assistenz als PORT (austauschbar: local-fake ODER echter Adapter, z.B. Ollama). Die App-Komposition
+   *  wählt die Impl per Env; der BFF konsumiert nur den Vertrag — nie einen konkreten Anbieter. */
+  aiAssist: AiAssistPort;
 }

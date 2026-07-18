@@ -44,8 +44,10 @@ import {
   createInMemoryProcedureRegistry,
   type ProcedureRegistry,
 } from "@senticor/public-sector-sdk";
+import type { AiAssistPort } from "@senticor/platform-contracts";
 import type { FastifyInstance } from "fastify";
 import { registerAuditRoutes } from "./audit/routes.js";
+import { createAiAssistPortFromEnv } from "./platform/ai-assist.js";
 import { autoBootstrapAdminFromEnv } from "./auth/auto-bootstrap.js";
 import { registerAuthPolicyGuard } from "./auth/authorization.js";
 import { registerAuthRoutes, type RegistrationMode } from "./auth/routes.js";
@@ -105,6 +107,8 @@ interface BffWiring {
   procedureRegistry: ProcedureRegistry;
   sessionResolver: SessionResolver;
   auditSink: AuditSink;
+  /** KI-Assistenz-Port, per Env gewählt (local-fake ODER echter Adapter). */
+  aiAssist: AiAssistPort;
 }
 
 function registerAppRoutes(
@@ -153,6 +157,7 @@ export function buildPublicServer({
   procedureRegistry = createInMemoryProcedureRegistry([]),
   sessionResolver,
   auditSink = createAuditSinkFromEnv(),
+  aiAssist = createAiAssistPortFromEnv(),
   bootstrapToken = process.env["BOOTSTRAP_TOKEN"],
   registrationMode = parseRegistrationMode(
     process.env["AUTH_REGISTRATION_MODE"],
@@ -170,6 +175,7 @@ export function buildPublicServer({
   procedureRegistry?: ProcedureRegistry;
   sessionResolver?: SessionResolver;
   auditSink?: AuditSink;
+  aiAssist?: AiAssistPort;
   bootstrapToken?: string | undefined;
   registrationMode?: RegistrationMode;
 } = {}): FastifyInstance {
@@ -192,6 +198,7 @@ export function buildPublicServer({
           sessionResolver:
             sessionResolver ?? createCookieSessionResolver(authStore),
           auditSink,
+          aiAssist,
         },
       ),
   });
@@ -246,6 +253,8 @@ export async function startRuntime(
     ]),
     sessionResolver: createCookieSessionResolver(authStore),
     auditSink: createAuditSinkFromEnv(env),
+    // Port-Registry: KI-Anbieter per Env (local-fake default; AI_ASSIST_PROVIDER=ollama für den echten Adapter).
+    aiAssist: createAiAssistPortFromEnv(env),
   };
   return startRuntimeBase({
     env,

@@ -67,6 +67,14 @@ export const builtInPermissions = {
     permission: "case.own.submit",
     description: "Eigenen Antrag einreichen",
   },
+  // ── KI-Assistenz (assistiv, HCAI) ─────────────────────────────────────────────────────────────
+  // Die Sachbearbeitung darf KI-VORSCHLÄGE anfordern (Triage, Vollständigkeit, Zusammenfassung).
+  // Die KI entscheidet NIE rechtsnah; jeder Vorschlag trägt reviewRequired=true (serverseitig erzwungen,
+  // Vier-Augen). Eine EIGENE Permission (nicht `case.read`), damit KI-Nutzung getrennt entziehbar ist.
+  aiAssist: {
+    permission: "ai.assist",
+    description: "KI-Assistenz (Vorschläge) anfordern",
+  },
 } as const satisfies Record<string, RbacPermission>;
 
 export const builtInRbacRegistry = {
@@ -101,6 +109,8 @@ export const builtInRbacRegistry = {
         builtInPermissions.mailboxAuthorityWrite,
         builtInPermissions.caseRead,
         builtInPermissions.casePrepareDecision,
+        // KI-Assistenz ist ein Sachbearbeitungs-Werkzeug (Bürger:innen erhalten sie in dieser Scheibe nicht).
+        builtInPermissions.aiAssist,
       ],
       builtIn: true,
     },

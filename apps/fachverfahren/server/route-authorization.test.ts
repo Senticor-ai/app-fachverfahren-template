@@ -169,6 +169,12 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           url: "/api/tasks/:id",
           policy: "rbac:case.decision.prepare",
         },
+        // KI-Assistenz (assistiv, HCAI): eigene ai.assist-Permission (nur Sachbearbeitung).
+        {
+          method: "POST",
+          url: "/api/ai/assist",
+          policy: "rbac:ai.assist",
+        },
         // Bürger-Sicht auf die EIGENEN Anträge: eine eigene Routen-Familie mit EIGENEN Permissions.
         // Bewusst `rbac:` und NICHT `rbac-scoped:` wie die Mailbox — hier gibt es keine Scope-WAHL:
         // die Route IST der Scope, er kommt nicht von der Leitung (scopeOf läse Query/Body).

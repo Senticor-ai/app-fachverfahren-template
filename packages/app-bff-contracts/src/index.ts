@@ -90,4 +90,11 @@ export {
   type AntragListDto,
   type VerwaltungsaktDto,
 } from "./buerger.js";
+export {
+  AiAssistClassSchema,
+  AiAssistRequestSchema,
+  AiSuggestionDtoSchema,
+  type AiAssistRequestDto,
+  type AiSuggestionDto,
+} from "./ai-assist.js";
 export { openApiInfo, openApiTags } from "./openapi.js";

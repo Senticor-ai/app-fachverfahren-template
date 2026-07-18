@@ -15,8 +15,13 @@ import type {
   ProcedureRegistry,
   RbacRegistry,
 } from "@senticor/public-sector-sdk";
+import {
+  createLocalAiAssistPort,
+  type AiAssistPort,
+} from "@senticor/platform-contracts";
 import type { BffDeps } from "./deps.js";
 import { requestIdOf } from "./route-auth.js";
+import { registerAiAssistRoutes } from "./routes/ai-assist.js";
 import { registerCapabilitiesRoute } from "./routes/capabilities.js";
 import { registerBuergerRoutes } from "./routes/buerger.js";
 import { registerCaseRoutes } from "./routes/cases.js";
@@ -33,6 +38,9 @@ export interface AppBffOptions {
   sessionResolver: SessionResolver;
   auditSink: AuditSink;
   rbacRegistry?: RbacRegistry;
+  /** KI-Assistenz-Port. OPTIONAL: fehlt er, nutzt der BFF den local-fake (deterministisch, ohne Netz) —
+   *  eine App wählt in der Komposition per Env den echten Adapter. */
+  aiAssist?: AiAssistPort;
 }
 
 export async function appBff(
@@ -47,6 +55,7 @@ export async function appBff(
     sessionResolver: opts.sessionResolver,
     auditSink: opts.auditSink,
     rbacRegistry: opts.rbacRegistry ?? builtInRbacRegistry,
+    aiAssist: opts.aiAssist ?? createLocalAiAssistPort(),
   };
   app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error.validation) {
@@ -68,6 +77,7 @@ export async function appBff(
   });
   registerSessionRoute(app, deps);
   registerCapabilitiesRoute(app, deps);
+  registerAiAssistRoutes(app, deps);
   registerPreferencesRoutes(app, deps);
   registerMailboxRoutes(app, deps);
   registerCaseRoutes(app, deps);

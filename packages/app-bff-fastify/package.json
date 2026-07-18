@@ -21,6 +21,7 @@
     "@senticor/app-bff-contracts": "workspace:*",
     "@senticor/app-runtime-fastify": "workspace:*",
     "@senticor/app-store-postgres": "workspace:*",
+    "@senticor/platform-contracts": "workspace:*",
     "@senticor/public-sector-sdk": "workspace:*",
     "@sinclair/typebox": "catalog:",
     "fastify": "catalog:"

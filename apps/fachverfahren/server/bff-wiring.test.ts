@@ -200,6 +200,7 @@ describe("BFF-Verdrahtung im App-Server", () => {
       });
       expect(internal.statusCode).toBe(200);
       expect(Object.keys(internal.json().paths).sort()).toEqual([
+        "/api/ai/assist",
         "/api/buerger/antraege",
         "/api/buerger/antraege/{id}",
         "/api/buerger/antraege/{id}/bescheid",

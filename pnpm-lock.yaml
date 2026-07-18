@@ -170,6 +170,12 @@ importers:
       '@senticor/fachverfahren-kit':
         specifier: workspace:*
         version: link:../../packages/fachverfahren-kit
+      '@senticor/platform-contracts':
+        specifier: workspace:*
+        version: link:../../packages/platform-contracts
+      '@senticor/provider-ai-ollama':
+        specifier: workspace:*
+        version: link:../../packages/provider-ai-ollama
       '@senticor/provider-local-auth':
         specifier: workspace:*
         version: link:../../packages/provider-local-auth
@@ -288,6 +294,9 @@ importers:
       '@senticor/app-store-postgres':
         specifier: workspace:*
         version: link:../app-store-postgres
+      '@senticor/platform-contracts':
+        specifier: workspace:*
+        version: link:../platform-contracts
       '@senticor/public-sector-sdk':
         specifier: workspace:*
         version: link:../public-sector-sdk

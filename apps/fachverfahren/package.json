@@ -28,6 +28,8 @@
     "@senticor/app-runtime-fastify": "workspace:*",
     "@senticor/app-store-postgres": "workspace:*",
     "@senticor/fachverfahren-kit": "workspace:*",
+    "@senticor/platform-contracts": "workspace:*",
+    "@senticor/provider-ai-ollama": "workspace:*",
     "@senticor/provider-local-auth": "workspace:*",
     "@senticor/public-sector-sdk": "workspace:*",
     "class-variance-authority": "^0.7.1",

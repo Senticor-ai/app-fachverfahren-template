@@ -12,6 +12,7 @@
     { "path": "../app-bff-contracts" },
     { "path": "../app-runtime-fastify" },
     { "path": "../app-store-postgres" },
+    { "path": "../platform-contracts" },
     { "path": "../public-sector-sdk" }
   ],
   "include": ["src/**/*.ts"]
