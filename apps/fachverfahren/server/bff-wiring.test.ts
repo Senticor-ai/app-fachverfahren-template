@@ -227,6 +227,7 @@ describe("BFF-Verdrahtung im App-Server", () => {
         "/api/verfahren/{procedureId}/{version}/wissen",
         "/api/verfahren/{procedureId}/{version}/wissen/export",
         "/api/verfahren/{procedureId}/{version}/wissen/ki",
+        "/api/verfahren/{procedureId}/{version}/wissen/{eintragId}/review",
       ]);
     } finally {
       await publicApp.close();

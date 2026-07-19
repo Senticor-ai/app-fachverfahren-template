@@ -10,6 +10,7 @@ import { Shell } from "../app/shell.js";
 import {
   kiVerfahrenWissen,
   ladeVerfahrenWissen,
+  pruefeVerfahrenWissen,
   schreibeVerfahrenWissen,
 } from "../verfahren-wissen-client.js";
 
@@ -34,6 +35,14 @@ const KIND_OPTIONS: VermerkKind[] = [
   "reflexion",
   "notiz",
 ];
+
+// Prüfstatus als TEXT (BITV: Farbe allein trägt keine Bedeutung); leere Labels = keine Anzeige.
+const REVIEW_LABEL: Record<WissenViewDto["reviewStatus"], string> = {
+  "nicht-erforderlich": "",
+  offen: "prüfpflichtig",
+  bestaetigt: "✓ bestätigt",
+  verworfen: "verworfen",
+};
 
 export function AmtVerfahrenWikiPage(): React.JSX.Element {
   const { procedureId = "", version = "" } = useParams();
@@ -94,6 +103,22 @@ export function AmtVerfahrenWikiPage(): React.JSX.Element {
     }
   }
 
+  async function pruefen(
+    eintragId: string,
+    entscheidung: "bestaetigt" | "verworfen",
+  ): Promise<void> {
+    setStatus("sende");
+    try {
+      await pruefeVerfahrenWissen(procedureId, version, eintragId, {
+        entscheidung,
+      });
+      await neuLaden();
+      setStatus("idle");
+    } catch {
+      setStatus("fehler");
+    }
+  }
+
   return (
     <Shell persona="sachbearbeitung" activeNavKey="akten">
       <section className="mx-auto w-full max-w-4xl px-6 py-6">
@@ -141,10 +166,39 @@ export function AmtVerfahrenWikiPage(): React.JSX.Element {
                       ⚠ Injektionsverdacht
                     </span>
                   ) : null}
+                  {REVIEW_LABEL[e.reviewStatus] ? (
+                    <span className="text-xs text-muted-foreground">
+                      · {REVIEW_LABEL[e.reviewStatus]}
+                    </span>
+                  ) : null}
                 </div>
                 <p className="mt-1 whitespace-pre-wrap text-foreground">
                   {e.text}
                 </p>
+                {e.reviewStatus === "offen" ? (
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      KI-Entwurf prüfen:
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => void pruefen(e.eintragId, "bestaetigt")}
+                      disabled={status === "sende"}
+                    >
+                      Bestätigen
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => void pruefen(e.eintragId, "verworfen")}
+                      disabled={status === "sende"}
+                    >
+                      Verwerfen
+                    </Button>
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

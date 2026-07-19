@@ -9,8 +9,10 @@ import type { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 import {
   ErrorEnvelopeSchema,
   KiWissenRequestSchema,
+  VerfahrenWissenEintragParamsSchema,
   VerfahrenWissenParamsSchema,
   WissenEintragRequestSchema,
+  WissenReviewRequestSchema,
   WissenVerfahrenExportDtoSchema,
   WissenViewDtoSchema,
   WissenViewListDtoSchema,
@@ -46,33 +48,88 @@ function asKind(v: string): WissenViewDto["kind"] {
     : "notiz";
 }
 
+/** Marker-`art` der append-only Prüfung. Diese Einträge sind KEIN Wissen — sie werden beim Lesen aus
+ *  der Wissens-Liste gefiltert und tragen nur die Ableitung des Prüfstatus. */
+const REVIEW_ART = "wissen.reviewed";
+type ReviewEntscheidung = "bestaetigt" | "verworfen";
+
+/** Ein KI-Peer (nicht `human:` → Modell/Agent). Nur KI-Wissen ist prüfpflichtig. */
+function istKi(urheber: string): boolean {
+  return !urheber.startsWith("human:");
+}
+
+/** eintragId → Prüf-Entscheidung aus den append-only `wissen.reviewed`-Markern (erste Entscheidung gilt). */
+function reviewMapOf(
+  eintraege: VerfahrensWissenEintrag[],
+): Map<string, ReviewEntscheidung> {
+  const map = new Map<string, ReviewEntscheidung>();
+  for (const e of eintraege) {
+    if (e.art !== REVIEW_ART) continue;
+    const bezug = e.metadaten["bezugEintragId"];
+    const entscheidung = e.metadaten["entscheidung"];
+    if (
+      typeof bezug === "string" &&
+      (entscheidung === "bestaetigt" || entscheidung === "verworfen") &&
+      !map.has(bezug)
+    ) {
+      map.set(bezug, entscheidung);
+    }
+  }
+  return map;
+}
+
+/** Prüfstatus EINES Eintrags: menschliches Wissen ist nicht prüfpflichtig; KI-Wissen ist `offen` bis eine
+ *  Prüf-Entscheidung vorliegt (append-only abgeleitet, NICHT im unveränderlichen Eintrag gespeichert). */
+function reviewStatusOf(
+  e: VerfahrensWissenEintrag,
+  reviews: Map<string, ReviewEntscheidung>,
+): WissenViewDto["reviewStatus"] {
+  if (!istKi(e.urheber)) return "nicht-erforderlich";
+  return reviews.get(e.eintragId) ?? "offen";
+}
+
 /** Store-Eintrag → Ansicht (quelle aus dem urheber-Peer abgeleitet; Injektions-Verdacht compute-on-read). */
-function toWissenView(e: VerfahrensWissenEintrag): WissenViewDto {
+function toWissenView(
+  e: VerfahrensWissenEintrag,
+  reviews: Map<string, ReviewEntscheidung>,
+): WissenViewDto {
   return {
     eintragId: e.eintragId,
     procedureId: e.procedureId,
     procedureVersion: e.procedureVersion,
     kind: asKind(e.art),
-    quelle: e.urheber.startsWith("human:") ? "mensch" : "ki",
+    quelle: istKi(e.urheber) ? "ki" : "mensch",
     urheber: e.urheber,
     text: e.text,
     metadaten: e.metadaten,
     verdacht: scanInjection(e.text).suspicious,
+    reviewStatus: reviewStatusOf(e, reviews),
     erstelltAm: e.occurredAt,
   };
 }
 
 /** Store-Eintrag → Export-Form (Text injektions-NEUTRALISIERT für die Agent-Weiterverarbeitung). */
-function toExportEintrag(e: VerfahrensWissenEintrag): WissenExportEintragDto {
+function toExportEintrag(
+  e: VerfahrensWissenEintrag,
+  reviews: Map<string, ReviewEntscheidung>,
+): WissenExportEintragDto {
   return {
     eintragId: e.eintragId,
     kind: asKind(e.art),
-    quelle: e.urheber.startsWith("human:") ? "mensch" : "ki",
+    quelle: istKi(e.urheber) ? "ki" : "mensch",
     urheber: e.urheber,
     text: neutralisiereInjektion(e.text),
     metadaten: e.metadaten,
+    reviewStatus: reviewStatusOf(e, reviews),
     erstelltAm: e.occurredAt,
   };
+}
+
+/** Nur die eigentlichen Wissens-Einträge (Prüf-Marker herausgefiltert). */
+function nurWissen(
+  eintraege: VerfahrensWissenEintrag[],
+): VerfahrensWissenEintrag[] {
+  return eintraege.filter((e) => e.art !== REVIEW_ART);
 }
 
 export function registerVerfahrenWissenRoutes(
@@ -151,7 +208,8 @@ export function registerVerfahrenWissenRoutes(
       } catch {
         return storeUnavailable(request, reply);
       }
-      return reply.code(201).send(toWissenView(eintrag));
+      // Menschliches Wissen ist nicht prüfpflichtig; frischer Eintrag hat keine Prüf-Marker.
+      return reply.code(201).send(toWissenView(eintrag, new Map()));
     },
   );
 
@@ -187,7 +245,7 @@ export function registerVerfahrenWissenRoutes(
       } catch {
         return storeUnavailable(request, reply);
       }
-      const wiki = bisher.map((e) => ({
+      const wiki = nurWissen(bisher).map((e) => ({
         art: e.art,
         urheber: e.urheber,
         text: neutralisiereInjektion(e.text),
@@ -244,7 +302,8 @@ export function registerVerfahrenWissenRoutes(
       } catch {
         return storeUnavailable(request, reply);
       }
-      return reply.code(201).send(toWissenView(eintrag));
+      // Frischer KI-Entwurf: prüfpflichtig, reviewStatus leitet zu "offen" ab (kein Marker vorhanden).
+      return reply.code(201).send(toWissenView(eintrag, new Map()));
     },
   );
 
@@ -274,7 +333,10 @@ export function registerVerfahrenWissenRoutes(
       } catch {
         return storeUnavailable(request, reply);
       }
-      return reply.send({ eintraege: eintraege.map(toWissenView) });
+      const reviews = reviewMapOf(eintraege);
+      return reply.send({
+        eintraege: nurWissen(eintraege).map((e) => toWissenView(e, reviews)),
+      });
     },
   );
 
@@ -304,11 +366,96 @@ export function registerVerfahrenWissenRoutes(
       } catch {
         return storeUnavailable(request, reply);
       }
+      // Verworfenes Wissen darf sich NICHT über die Brücke in Agent-Skills/Kontext fortpflanzen (fail-safe);
+      // bestätigtes/offenes Wissen wird mit seinem Prüfstatus exportiert, damit der Konsument gewichten kann.
+      const reviews = reviewMapOf(eintraege);
       return reply.send({
         procedureId: request.params.procedureId,
         procedureVersion: request.params.version,
-        eintraege: eintraege.map(toExportEintrag),
+        eintraege: nurWissen(eintraege)
+          .filter((e) => reviewStatusOf(e, reviews) !== "verworfen")
+          .map((e) => toExportEintrag(e, reviews)),
       });
+    },
+  );
+
+  // ── KI-Wissens-Entwurf PRÜFEN (bestätigen/verwerfen) ─────────────────────────────────────────────
+  // Zwei-Ebenen-Symmetrie zum Fall-Blackboard: KI-Wissen ist prüfpflichtig, weil sein Blast-Radius ALLE
+  // künftigen Fälle des Verfahrens ist. Die Prüfung ist selbst append-only (`wissen.reviewed`-Marker); der
+  // effektive Status des unveränderlichen Eintrags wird beim Lesen abgeleitet. Einmalig (409).
+  typed.post(
+    "/api/verfahren/:procedureId/:version/wissen/:eintragId/review",
+    {
+      config: writeAuth.config,
+      preHandler: writeAuth.preHandler,
+      schema: {
+        tags: ["verfahren-wissen"],
+        summary: "Einen KI-Wissens-Entwurf prüfen (bestätigen/verwerfen)",
+        params: VerfahrenWissenEintragParamsSchema,
+        body: WissenReviewRequestSchema,
+        response: {
+          200: WissenViewDtoSchema,
+          409: ErrorEnvelopeSchema,
+          422: ErrorEnvelopeSchema,
+          ...errorResponses,
+        },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      let eintraege: VerfahrensWissenEintrag[];
+      try {
+        eintraege = await deps.wissenStore.listEintraege({
+          tenantId: session.tenantId,
+          authorityId: session.authorityId,
+          procedureId: request.params.procedureId,
+          procedureVersion: request.params.version,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      const ziel = eintraege.find(
+        (e) => e.eintragId === request.params.eintragId && e.art !== REVIEW_ART,
+      );
+      // Kein solcher Eintrag in DIESEM Verfahren → 404 (kein Zugriff über eine fremde eintragId).
+      if (!ziel)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+      // Nur KI-Wissen ist prüfpflichtig; menschliches Wissen hat keinen Prüf-Zustand.
+      if (!istKi(ziel.urheber))
+        return reply.code(422).send({
+          error: "nur KI-Wissen ist prüfpflichtig",
+          requestId: requestIdOf(request),
+        });
+      // Einmalig: ein bereits geprüfter Entwurf → 409 (append-only, keine zweite Entscheidung).
+      if (reviewMapOf(eintraege).has(ziel.eintragId))
+        return reply.code(409).send({
+          error: "Wissens-Eintrag bereits geprüft",
+          requestId: requestIdOf(request),
+        });
+
+      try {
+        await append(
+          session,
+          request.params.procedureId,
+          request.params.version,
+          REVIEW_ART,
+          `human:${session.rbacRoles[0] ?? "mitarbeitend"}`,
+          "",
+          {
+            bezugEintragId: ziel.eintragId,
+            entscheidung: request.body.entscheidung,
+          },
+        );
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      // Den geprüften Eintrag mit dem NEUEN abgeleiteten Status zurückgeben.
+      const reviews = new Map<string, ReviewEntscheidung>([
+        [ziel.eintragId, request.body.entscheidung],
+      ]);
+      return reply.send(toWissenView(ziel, reviews));
     },
   );
 }

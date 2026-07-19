@@ -3,7 +3,12 @@
 // (Zwei-Ebenen-Symmetrie); Mensch UND Agent hinterlassen hier Wissen/Fähigkeiten/Reflexionen mit
 // strukturierten, agenten-konsumierbaren Metadaten. Append-only, behörden-scoped.
 import { Type, type Static } from "@sinclair/typebox";
-import { VermerkKindSchema, VermerkQuelleSchema } from "./vermerke.js";
+import {
+  VermerkKindSchema,
+  VermerkQuelleSchema,
+  VermerkReviewRequestSchema,
+  VermerkReviewStatusSchema,
+} from "./vermerke.js";
 
 /** Einen Wissens-Eintrag schreiben (Mensch). Urheber/Peer kommt server-seitig aus der Sitzung. */
 export const WissenEintragRequestSchema = Type.Object(
@@ -42,6 +47,9 @@ export const WissenViewDtoSchema = Type.Object(
     metadaten: Type.Record(Type.String(), Type.Unknown()),
     /** true = möglicher Prompt-Injektions-Inhalt (Heuristik); beim Agenten-Konsum neutralisiert. */
     verdacht: Type.Boolean(),
+    /** Prüfstatus: KI-Wissen ist prüfpflichtig (`offen` bis ein Mensch bestätigt/verwirft) — der Blast-
+     *  Radius verfahrens-weiten Wissens ist ALLE künftigen Fälle, daher dieselbe HITL-Naht wie im Fall. */
+    reviewStatus: VermerkReviewStatusSchema,
     erstelltAm: Type.String({ minLength: 1 }),
   },
   { additionalProperties: false },
@@ -65,6 +73,9 @@ export const WissenExportEintragSchema = Type.Object(
     urheber: Type.String({ minLength: 1 }),
     text: Type.String(),
     metadaten: Type.Record(Type.String(), Type.Unknown()),
+    /** Prüfstatus mitgeliefert, damit der konsumierende Agent bestätigtes Wissen als autoritativ und
+     *  `offen` als vorläufig gewichten kann. Verworfenes Wissen wird gar nicht erst exportiert. */
+    reviewStatus: VermerkReviewStatusSchema,
     erstelltAm: Type.String({ minLength: 1 }),
   },
   { additionalProperties: false },
@@ -94,3 +105,21 @@ export const VerfahrenWissenParamsSchema = Type.Object(
 export type VerfahrenWissenParamsDto = Static<
   typeof VerfahrenWissenParamsSchema
 >;
+
+/** Route-Parameter für die Prüfung EINES Wissens-Eintrags (Verfahren + Version + Eintrag). */
+export const VerfahrenWissenEintragParamsSchema = Type.Object(
+  {
+    procedureId: Type.String({ minLength: 1 }),
+    version: Type.String({ minLength: 1 }),
+    eintragId: Type.String({ minLength: 1 }),
+  },
+  { additionalProperties: false },
+);
+export type VerfahrenWissenEintragParamsDto = Static<
+  typeof VerfahrenWissenEintragParamsSchema
+>;
+
+/** Einen KI-Wissens-Entwurf prüfen: bestätigen (verfahrens-weit autoritativ) oder verwerfen.
+ *  Dieselbe Form wie der Fall-Blackboard-Review (Zwei-Ebenen-Symmetrie). */
+export const WissenReviewRequestSchema = VermerkReviewRequestSchema;
+export type WissenReviewRequestDto = Static<typeof WissenReviewRequestSchema>;

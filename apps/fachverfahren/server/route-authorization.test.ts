@@ -290,6 +290,11 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           url: "/api/verfahren/:procedureId/:version/wissen/ki",
           policy: "rbac:case.note.write",
         },
+        {
+          method: "POST",
+          url: "/api/verfahren/:procedureId/:version/wissen/:eintragId/review",
+          policy: "rbac:case.note.write",
+        },
         // Workspace-APIs brauchen Permissions — nie nur „eingeloggt".
         {
           method: "GET",

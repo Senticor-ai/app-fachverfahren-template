@@ -163,7 +163,20 @@ hinaus:
 **Verfahrens-Wiki** — generelles Wissen + Fähigkeiten EINES Verfahrens, dieselbe
 Zellform, verfahrens-scoped im `WissenStore` (`app-store-postgres`, append-only,
 behörden-scoped). Routen `GET|POST /api/verfahren/:procedureId/:version/wissen`
-(+ `/ki`, `/export`); UI `pages/amt-verfahren-wiki.tsx`, erreichbar aus der Akte.
+(+ `/ki`, `/export`, `/:eintragId/review`); UI `pages/amt-verfahren-wiki.tsx`,
+erreichbar aus der Akte.
+
+- **KI-Wissen ist prüfpflichtig** (dieselbe HITL-Naht wie im Fall, weil sein
+  Blast-Radius ALLE künftigen Fälle des Verfahrens ist): ein KI-Eintrag startet
+  `reviewStatus:"offen"`; `POST …/wissen/:eintragId/review` (`bestaetigt`/`verworfen`)
+  ist selbst append-only (`wissen.reviewed`-Marker), der Status wird beim Lesen
+  ABGELEITET (einmalig→409, Mensch-Wissen→422, unbekannt→404).
+- **Fail-safe Export**: `GET …/wissen/export` schließt `verworfen`-Wissen AUS (kein
+  Fortpflanzen verworfenen Wissens in Agent-Skills) und liefert `reviewStatus` mit,
+  damit der Konsument `bestaetigt` als autoritativ, `offen` als vorläufig gewichtet.
+- **Neutralisierung als eine Wahrheit**: jeder Pfad, der frei-formigen Zell-/Wiki-Text
+  an ein Sprachmodell weiterreicht, nutzt `neutralisiereInjektion`/`INJEKTION_PLATZHALTER`
+  (`@senticor/public-sector-sdk`) — kein dupliziertes Guardrail.
 
 ## Verfahren als DATEN — `ProcedureRegistry` / `transitionCase`
 

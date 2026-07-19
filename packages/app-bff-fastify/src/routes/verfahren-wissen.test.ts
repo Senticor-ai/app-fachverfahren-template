@@ -104,6 +104,130 @@ describe("BFF Verfahrens-Wiki (/api/verfahren/:procedureId/:version/wissen)", ()
     await app.close();
   });
 
+  it("KI-Wissen ist prüfpflichtig (reviewStatus offen); ein Mensch bestätigt es", async () => {
+    const { app } = await buildBffApp({
+      session: caseworkerSession(),
+      wissenStore: new InMemoryWissenStore(),
+    });
+    const ki = (
+      await app.inject({
+        method: "POST",
+        url: `${BASE}/ki`,
+        payload: { task: "auslegung", input: {} },
+      })
+    ).json();
+    expect(ki.reviewStatus).toBe("offen");
+
+    const bestaetigt = (
+      await app.inject({
+        method: "POST",
+        url: `${BASE}/${ki.eintragId}/review`,
+        payload: { entscheidung: "bestaetigt" },
+      })
+    ).json();
+    expect(bestaetigt.reviewStatus).toBe("bestaetigt");
+
+    // Beim erneuten Lesen ist der abgeleitete Status stabil (append-only, keine Mutation des Eintrags).
+    const liste = (await app.inject({ method: "GET", url: BASE })).json();
+    const wieder = liste.eintraege.find(
+      (e: { eintragId: string }) => e.eintragId === ki.eintragId,
+    );
+    expect(wieder.reviewStatus).toBe("bestaetigt");
+    // Der Prüf-Marker selbst ist KEIN Wissens-Eintrag.
+    expect(liste.eintraege).toHaveLength(1);
+    await app.close();
+  });
+
+  it("menschliches Wissen ist nicht prüfpflichtig (nicht-erforderlich)", async () => {
+    const { app } = await buildBffApp({
+      session: caseworkerSession(),
+      wissenStore: new InMemoryWissenStore(),
+    });
+    const dto = (
+      await app.inject({
+        method: "POST",
+        url: BASE,
+        payload: { text: "gefestigte Auslegung", kind: "wissen" },
+      })
+    ).json();
+    expect(dto.reviewStatus).toBe("nicht-erforderlich");
+    const res = await app.inject({
+      method: "POST",
+      url: `${BASE}/${dto.eintragId}/review`,
+      payload: { entscheidung: "bestaetigt" },
+    });
+    expect(res.statusCode).toBe(422);
+    await app.close();
+  });
+
+  it("verworfenes KI-Wissen pflanzt sich NICHT über den Export fort (fail-safe)", async () => {
+    const { app } = await buildBffApp({
+      session: caseworkerSession(),
+      wissenStore: new InMemoryWissenStore(),
+    });
+    const ki = (
+      await app.inject({
+        method: "POST",
+        url: `${BASE}/ki`,
+        payload: { task: "auslegung", input: {} },
+      })
+    ).json();
+    await app.inject({
+      method: "POST",
+      url: `${BASE}/${ki.eintragId}/review`,
+      payload: { entscheidung: "verworfen" },
+    });
+    const exp = (
+      await app.inject({ method: "GET", url: `${BASE}/export` })
+    ).json();
+    expect(
+      exp.eintraege.some(
+        (e: { eintragId: string }) => e.eintragId === ki.eintragId,
+      ),
+    ).toBe(false);
+    await app.close();
+  });
+
+  it("eine zweite Prüfung wird abgelehnt (409, append-only)", async () => {
+    const { app } = await buildBffApp({
+      session: caseworkerSession(),
+      wissenStore: new InMemoryWissenStore(),
+    });
+    const ki = (
+      await app.inject({
+        method: "POST",
+        url: `${BASE}/ki`,
+        payload: { task: "auslegung", input: {} },
+      })
+    ).json();
+    await app.inject({
+      method: "POST",
+      url: `${BASE}/${ki.eintragId}/review`,
+      payload: { entscheidung: "bestaetigt" },
+    });
+    const zweite = await app.inject({
+      method: "POST",
+      url: `${BASE}/${ki.eintragId}/review`,
+      payload: { entscheidung: "verworfen" },
+    });
+    expect(zweite.statusCode).toBe(409);
+    await app.close();
+  });
+
+  it("Prüfung einer unbekannten eintragId → 404", async () => {
+    const { app } = await buildBffApp({
+      session: caseworkerSession(),
+      wissenStore: new InMemoryWissenStore(),
+    });
+    const res = await app.inject({
+      method: "POST",
+      url: `${BASE}/wissen.gibt-es-nicht/review`,
+      payload: { entscheidung: "bestaetigt" },
+    });
+    expect(res.statusCode).toBe(404);
+    await app.close();
+  });
+
   it("403 ohne case.note.write beim Schreiben (Bürger-Session)", async () => {
     const { app } = await buildBffApp({
       session: {

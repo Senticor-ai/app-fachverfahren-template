@@ -4903,6 +4903,17 @@
                               { "enum": ["ki"], "type": "string" }
                             ]
                           },
+                          "reviewStatus": {
+                            "anyOf": [
+                              {
+                                "enum": ["nicht-erforderlich"],
+                                "type": "string"
+                              },
+                              { "enum": ["offen"], "type": "string" },
+                              { "enum": ["bestaetigt"], "type": "string" },
+                              { "enum": ["verworfen"], "type": "string" }
+                            ]
+                          },
                           "text": { "type": "string" },
                           "urheber": { "minLength": 1, "type": "string" },
                           "verdacht": { "type": "boolean" }
@@ -4917,6 +4928,7 @@
                           "text",
                           "metadaten",
                           "verdacht",
+                          "reviewStatus",
                           "erstelltAm"
                         ],
                         "type": "object"
@@ -5101,6 +5113,14 @@
                         { "enum": ["ki"], "type": "string" }
                       ]
                     },
+                    "reviewStatus": {
+                      "anyOf": [
+                        { "enum": ["nicht-erforderlich"], "type": "string" },
+                        { "enum": ["offen"], "type": "string" },
+                        { "enum": ["bestaetigt"], "type": "string" },
+                        { "enum": ["verworfen"], "type": "string" }
+                      ]
+                    },
                     "text": { "type": "string" },
                     "urheber": { "minLength": 1, "type": "string" },
                     "verdacht": { "type": "boolean" }
@@ -5115,6 +5135,7 @@
                     "text",
                     "metadaten",
                     "verdacht",
+                    "reviewStatus",
                     "erstelltAm"
                   ],
                   "type": "object"
@@ -5262,6 +5283,17 @@
                               { "enum": ["ki"], "type": "string" }
                             ]
                           },
+                          "reviewStatus": {
+                            "anyOf": [
+                              {
+                                "enum": ["nicht-erforderlich"],
+                                "type": "string"
+                              },
+                              { "enum": ["offen"], "type": "string" },
+                              { "enum": ["bestaetigt"], "type": "string" },
+                              { "enum": ["verworfen"], "type": "string" }
+                            ]
+                          },
                           "text": { "type": "string" },
                           "urheber": { "minLength": 1, "type": "string" }
                         },
@@ -5272,6 +5304,7 @@
                           "urheber",
                           "text",
                           "metadaten",
+                          "reviewStatus",
                           "erstelltAm"
                         ],
                         "type": "object"
@@ -5456,6 +5489,14 @@
                         { "enum": ["ki"], "type": "string" }
                       ]
                     },
+                    "reviewStatus": {
+                      "anyOf": [
+                        { "enum": ["nicht-erforderlich"], "type": "string" },
+                        { "enum": ["offen"], "type": "string" },
+                        { "enum": ["bestaetigt"], "type": "string" },
+                        { "enum": ["verworfen"], "type": "string" }
+                      ]
+                    },
                     "text": { "type": "string" },
                     "urheber": { "minLength": 1, "type": "string" },
                     "verdacht": { "type": "boolean" }
@@ -5470,6 +5511,7 @@
                     "text",
                     "metadaten",
                     "verdacht",
+                    "reviewStatus",
                     "erstelltAm"
                   ],
                   "type": "object"
@@ -5576,6 +5618,232 @@
           }
         },
         "summary": "KI-Verfahrens-Wissen erzeugen (liest das bisherige Wiki als Kontext)",
+        "tags": ["verfahren-wissen"]
+      }
+    },
+    "/api/verfahren/{procedureId}/{version}/wissen/{eintragId}/review": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "procedureId",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "eintragId",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "entscheidung": {
+                    "anyOf": [
+                      { "enum": ["bestaetigt"], "type": "string" },
+                      { "enum": ["verworfen"], "type": "string" }
+                    ]
+                  }
+                },
+                "required": ["entscheidung"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "eintragId": { "minLength": 1, "type": "string" },
+                    "erstelltAm": { "minLength": 1, "type": "string" },
+                    "kind": {
+                      "anyOf": [
+                        { "enum": ["hypothese"], "type": "string" },
+                        { "enum": ["teilergebnis"], "type": "string" },
+                        { "enum": ["frage"], "type": "string" },
+                        { "enum": ["befund"], "type": "string" },
+                        { "enum": ["entscheidung"], "type": "string" },
+                        { "enum": ["reflexion"], "type": "string" },
+                        { "enum": ["metadatum"], "type": "string" },
+                        { "enum": ["evidenz"], "type": "string" },
+                        { "enum": ["wissen"], "type": "string" },
+                        { "enum": ["faehigkeit"], "type": "string" },
+                        { "enum": ["notiz"], "type": "string" }
+                      ]
+                    },
+                    "metadaten": {
+                      "additionalProperties": {},
+                      "type": "object"
+                    },
+                    "procedureId": { "minLength": 1, "type": "string" },
+                    "procedureVersion": { "minLength": 1, "type": "string" },
+                    "quelle": {
+                      "anyOf": [
+                        { "enum": ["mensch"], "type": "string" },
+                        { "enum": ["ki"], "type": "string" }
+                      ]
+                    },
+                    "reviewStatus": {
+                      "anyOf": [
+                        { "enum": ["nicht-erforderlich"], "type": "string" },
+                        { "enum": ["offen"], "type": "string" },
+                        { "enum": ["bestaetigt"], "type": "string" },
+                        { "enum": ["verworfen"], "type": "string" }
+                      ]
+                    },
+                    "text": { "type": "string" },
+                    "urheber": { "minLength": 1, "type": "string" },
+                    "verdacht": { "type": "boolean" }
+                  },
+                  "required": [
+                    "eintragId",
+                    "procedureId",
+                    "procedureVersion",
+                    "kind",
+                    "quelle",
+                    "urheber",
+                    "text",
+                    "metadaten",
+                    "verdacht",
+                    "reviewStatus",
+                    "erstelltAm"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Einen KI-Wissens-Entwurf prüfen (bestätigen/verwerfen)",
         "tags": ["verfahren-wissen"]
       }
     }

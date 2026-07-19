@@ -4,6 +4,7 @@
 import type {
   KiWissenRequestDto,
   WissenEintragRequestDto,
+  WissenReviewRequestDto,
   WissenViewDto,
   WissenViewListDto,
 } from "@senticor/app-bff-contracts";
@@ -60,4 +61,17 @@ export async function kiVerfahrenWissen(
     method: "POST",
     body: JSON.stringify(eintrag),
   });
+}
+
+/** Einen KI-Wissens-Entwurf prüfen (bestätigen/verwerfen) — schließt den HITL-Kreis verfahrens-weit. */
+export async function pruefeVerfahrenWissen(
+  procedureId: string,
+  version: string,
+  eintragId: string,
+  review: WissenReviewRequestDto,
+): Promise<WissenViewDto> {
+  return request<WissenViewDto>(
+    `${basis(procedureId, version)}/${encodeURIComponent(eintragId)}/review`,
+    { method: "POST", body: JSON.stringify(review) },
+  );
 }
