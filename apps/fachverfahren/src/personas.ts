@@ -10,12 +10,21 @@ import {
 } from "@senticor/fachverfahren-kit";
 import type { SessionCapabilities, SessionPrincipal } from "./session-state.js";
 
-/** Kanonische Reihenfolge — identisch zu USER_PERSONAS im Store-Paket. */
+/** Kanonische Reihenfolge der DEFAULT-Personas (Fallback für die unveränderte Vorlage / Alt-Apps). */
 export const PERSONA_KEYS: readonly Persona[] = [
   "buerger",
   "sachbearbeitung",
   "aufsicht",
 ];
+
+/** Die Persona-Keys DIESES Verfahrens — daten-getrieben aus der Config abgeleitet (mergePersonas: eigene
+ *  Personas ANGEHÄNGT, s. Kit), Fallback = die 3 Default-Keys. So kann ein Fachverfahren beliebige Personas
+ *  definieren, ohne diese Datei umzuschreiben. Reihenfolge = mergePersonas (Defaults, dann eigene). */
+export function personaKeys(
+  config: Pick<LeistungConfig, "personas"> = {},
+): Persona[] {
+  return mergePersonas(config.personas).map((p) => p.key);
+}
 
 /** Home-Route je Arbeitsbereich (URL bleibt die Wahrheit über die aktive Persona) — die ROUTEN-KONVENTION dieser App
  *  (routes.tsx montiert genau diese Präfixe). Sie ist der FALLBACK: trägt ein Config-Persona eine eigene `home`, führt
@@ -32,8 +41,10 @@ export function personaRoute(
   persona: Persona,
   config: Pick<LeistungConfig, "personas">,
 ): string {
-  const home = config.personas?.find((p) => p.key === persona)?.home?.trim();
-  return home?.startsWith("/") ? home : PERSONA_HOME[persona];
+  const desc = config.personas?.find((p) => p.key === persona);
+  // Config `home` > `routePrefix` > Default-Konvention (3 kanonische) > neutrale Wurzel (fail-open, kein toter Link).
+  const home = desc?.home?.trim() ?? desc?.routePrefix?.trim();
+  return home?.startsWith("/") ? home : (PERSONA_HOME[persona] ?? "/");
 }
 
 /** Zugewiesene Arbeitsbereiche des Principals — capability-gesteuerter Fallback:
@@ -44,14 +55,14 @@ export function personaRoute(
 export function allowedPersonas(
   principal: SessionPrincipal | null,
   capabilities: SessionCapabilities | undefined,
+  config: Pick<LeistungConfig, "personas"> = {},
 ): Persona[] {
   if (!principal) return [];
+  const keys = personaKeys(config);
   if (principal.personas === undefined) {
-    return capabilities?.userPersonas === true ? [] : [...PERSONA_KEYS];
+    return capabilities?.userPersonas === true ? [] : [...keys];
   }
-  return PERSONA_KEYS.filter((persona) =>
-    principal.personas?.includes(persona),
-  );
+  return keys.filter((persona) => principal.personas?.includes(persona));
 }
 
 /** Wohin nach Login/Bounce? Erster zugewiesener Arbeitsbereich (kanonische
@@ -62,7 +73,7 @@ export function personaHome(
   permissions: readonly string[] | undefined,
   config: Pick<LeistungConfig, "personas"> = {},
 ): string {
-  const first = PERSONA_KEYS.find((persona) => allowed.includes(persona));
+  const first = personaKeys(config).find((persona) => allowed.includes(persona));
   if (first) return personaRoute(first, config);
   if (permissions?.includes("boards.collaborate")) return "/boards";
   return "/";

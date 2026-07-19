@@ -118,7 +118,7 @@ export function mergePersonas(
 ): readonly PersonaDescriptor[] {
   if (!config?.length) return defaults;
   const byKey = new Map(config.map((p) => [p.key, p]));
-  return defaults.map((d) => {
+  const gemerged = defaults.map((d) => {
     const aus = byKey.get(d.key);
     if (aus === undefined) return d;
     // Feldweise fail-open: ein Eintrag ohne `sub`/`initials` erbt sie vom Default statt sie zu verlieren.
@@ -133,6 +133,12 @@ export function mergePersonas(
       ...(initials !== undefined ? { initials } : {}),
     };
   });
+  // VERFAHRENS-EIGENE Personas (Keys, die NICHT zu den kanonischen Defaults gehoeren) ANHAENGEN — so kann ein
+  // Fachverfahren beliebige Personas (Requester/Approver/Einkauf/Lieferant…) ergaenzen, nicht nur die 3
+  // umbenennen. Reihenfolge: erst die (ggf. umbenannten) Defaults, dann die eigenen (config-Reihenfolge).
+  const defaultKeys = new Set(defaults.map((d) => d.key));
+  const eigene = config.filter((p) => !defaultKeys.has(p.key));
+  return [...gemerged, ...eigene];
 }
 
 export interface PersonaSwitcherProps {

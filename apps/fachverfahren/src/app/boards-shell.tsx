@@ -53,7 +53,7 @@ export function BoardsShell({
       // die zugewiesenen Arbeitsbereiche als Einstiege.
       onPersonaChange={(next) => navigate(personaRoute(next, store.config))}
       personas={personaDescriptors(
-        allowedPersonas(principal, capabilities),
+        allowedPersonas(principal, capabilities, store.config),
         store.config,
       )}
       activeNavKey={activeNavKey}

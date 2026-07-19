@@ -76,7 +76,7 @@ export function RequirePersonaExperience({
   const { status, principal, capabilities } = useSession();
   if (status === "loading") return null;
   if (status === "unauthenticated") return <Navigate to="/" replace />;
-  const allowed = allowedPersonas(principal, capabilities);
+  const allowed = allowedPersonas(principal, capabilities, store.config);
   if (!allowed.includes(persona)) {
     return (
       <Navigate
