@@ -11,8 +11,15 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import type { ResolvedSession } from "@senticor/app-runtime-fastify";
+import type { ProcedureVersion } from "@senticor/public-sector-sdk";
 import type { FastifyInstance } from "fastify";
+import { antragProcedure, dossierProcedure } from "../procedure.config.js";
 import { buildSeededMeshApp } from "./mesh-harness.js";
+
+const PROCEDURES: readonly ProcedureVersion[] = [
+  dossierProcedure,
+  antragProcedure,
+];
 
 export interface MeshCommandResult {
   ok: boolean;
@@ -298,6 +305,121 @@ async function executeDump(
   };
 }
 
+/** REIN: kürzester Pfad (BFS über allowedTransitions) vom Initialzustand zu einem `closesCase`-Übergang.
+ *  Liefert die Aktions-Folge oder null (kein Abschluss-Pfad — ein echter Defekt des Verfahrens). */
+function findClosingPath(procedure: ProcedureVersion): string[] | null {
+  const initial = procedure.allowedStates[0];
+  if (initial === undefined) return null;
+  const visited = new Set<string>([initial]);
+  const queue: { state: string; path: string[] }[] = [
+    { state: initial, path: [] },
+  ];
+  while (queue.length > 0) {
+    const cur = queue.shift();
+    if (cur === undefined) break;
+    for (const t of procedure.allowedTransitions) {
+      if (t.from !== cur.state) continue;
+      const nextPath = [...cur.path, t.action];
+      if (t.closesCase === true) return nextPath;
+      if (!visited.has(t.to)) {
+        visited.add(t.to);
+        queue.push({ state: t.to, path: nextPath });
+      }
+    }
+  }
+  return null;
+}
+
+/** `smoke [procedureId]` — SELBSTVERIFIKATION eines Verfahrens zur LAUFZEIT: legt einen Fall im Initial-
+ *  zustand an und fährt den kürzesten Abschluss-Pfad über die ECHTEN Übergangs-Routen (je Schritt ein
+ *  ANDERER Akteur → Vier-Augen passiert). Beweist: das (ggf. neu geschriebene) Verfahren ist fahrbar bis
+ *  zum Abschluss — mehr als der strukturelle check:procedure-contract-Gate. */
+async function executeSmoke(
+  app: FastifyInstance,
+  procedureId: string | undefined,
+): Promise<MeshCommandResult> {
+  const command = `smoke ${procedureId ?? ""}`.trim();
+  const procedure =
+    procedureId === undefined
+      ? dossierProcedure
+      : PROCEDURES.find((p) => p.procedureId === procedureId);
+  if (procedure === undefined) {
+    return {
+      ok: false,
+      status: 400,
+      command,
+      data: { error: `unbekanntes Verfahren: ${procedureId}` },
+    };
+  }
+  const initial = procedure.allowedStates[0];
+  const path = findClosingPath(procedure);
+  const created = await app.inject({
+    method: "POST",
+    url: "/api/cases",
+    payload: {
+      procedureId: procedure.procedureId,
+      procedureVersion: procedure.version,
+      state: initial,
+    },
+  });
+  if (created.statusCode >= 400) {
+    return {
+      ok: false,
+      status: created.statusCode,
+      command,
+      data: created.body.length > 0 ? created.json() : null,
+    };
+  }
+  const kase = created.json() as { caseId: string; version: number };
+  const steps: {
+    action: string;
+    ok: boolean;
+    status: number;
+    state?: string;
+  }[] = [];
+  let version = kase.version;
+  for (let i = 0; path !== null && i < path.length; i++) {
+    const action = path[i] ?? "";
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/cases/${encodeURIComponent(kase.caseId)}/transitions`,
+      // Je Schritt ein ANDERER synthetischer Akteur → der requiresFourEyes-Abschluss passiert.
+      headers: { "x-mesh-actor": `actor.smoke-${i}` },
+      payload: { action, expectedVersion: version },
+    });
+    const ok = res.statusCode < 400;
+    const body = ok ? (res.json() as { state: string; version: number }) : null;
+    steps.push({
+      action,
+      ok,
+      status: res.statusCode,
+      ...(body ? { state: body.state } : {}),
+    });
+    if (!ok) break;
+    version = body?.version ?? version;
+  }
+  const finalRes = await app.inject({
+    method: "GET",
+    url: `/api/cases/${encodeURIComponent(kase.caseId)}`,
+  });
+  const final = finalRes.json() as { state: string; closedAt: string | null };
+  const closed = final.closedAt !== null;
+  return {
+    ok: path !== null && steps.every((s) => s.ok) && closed,
+    status: 200,
+    command,
+    data: {
+      procedureId: procedure.procedureId,
+      caseId: kase.caseId,
+      initialState: initial,
+      plannedPath: path,
+      steps,
+      finalState: final.state,
+      closedAt: final.closedAt,
+    },
+  };
+}
+
 async function executeOne(
   app: FastifyInstance,
   tokens: string[],
@@ -307,6 +429,11 @@ async function executeOne(
   const asActor = parseArgs(tokens).options["as"];
   const headers =
     asActor !== undefined ? { "x-mesh-actor": asActor } : undefined;
+  // `smoke [procedureId]` fährt einen kompletten Abschluss-Pfad (Selbstverifikation, kein Route-Treffer).
+  if (tokens[0] === "smoke") {
+    const { positionals } = parseArgs(tokens.slice(1));
+    return executeSmoke(app, positionals[0]);
+  }
   // `case dump <caseId>` ist ein Composite über mehrere Routen (kein einzelner Route-Treffer).
   if (tokens[0] === "case" && tokens[1] === "dump") {
     const { positionals } = parseArgs(tokens.slice(1));
@@ -409,6 +536,7 @@ const USAGE = `mesh — Agenten-CLI fuer das Fachverfahren-Mesh (Golden Fixture,
   wissen add <procedureId> <version> --text T [--kind K]
   wissen ki <procedureId> <version> --task T
   wissen review <procedureId> <version> <eintragId> --entscheidung bestaetigt|verworfen
+  smoke [procedureId]                          Selbstverifikation: faehrt das Verfahren create -> Abschluss (ist es fahrbar?)
   script --file plan.json                     Batch: JSON string[][], STATEFUL in einem App-Boot
 
 Global: --as <actorId> setzt den Akteur dieses Kommandos (Zwei-Personen-Fluss / Vier-Augen).

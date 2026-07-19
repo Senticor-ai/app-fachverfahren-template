@@ -184,6 +184,27 @@ describe("Agenten-CLI (mesh-cli)", () => {
     expect(dump?.status).toBe(404);
   });
 
+  it("smoke: faehrt das Musterverfahren create -> Abschluss (fahrbar, closesCase erreicht)", async () => {
+    const [smoke] = await executeMeshCommands([["smoke"]]);
+    expect(smoke?.ok).toBe(true);
+    const d = smoke?.data as {
+      plannedPath: string[];
+      finalState: string;
+      closedAt: string | null;
+      steps: { ok: boolean }[];
+    };
+    // Kuerzester Abschluss-Pfad des Musterverfahrens: annehmen -> abschliessen.
+    expect(d.plannedPath).toEqual(["annehmen", "abschließen"]);
+    expect(d.steps.every((s) => s.ok)).toBe(true);
+    expect(d.finalState).toBe("abgeschlossen");
+    expect(d.closedAt).not.toBeNull();
+  });
+
+  it("smoke unbekanntes Verfahren -> ok:false", async () => {
+    const [smoke] = await executeMeshCommands([["smoke", "gibtsnicht"]]);
+    expect(smoke?.ok).toBe(false);
+  });
+
   it("Fehlbedienung -> ok:false, klare Meldung, Exit-Code 1", async () => {
     const { exitCode, results } = await runMeshCommand([
       "vermerk",

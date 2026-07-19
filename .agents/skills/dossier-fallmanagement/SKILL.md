@@ -198,7 +198,11 @@ Vorlage muss sich **ohne finalen Build** selbst testen lassen. Beides speist EIN
   `procedures · cases · case create|show|export|tasks|actions|progress|transition|dump ·
   task list|add|notiz|done|reopen|state · vermerk list|add|ki|review · wissen list|export|add|ki|review`.
   `task done|reopen <taskId>` hakt einen Checklisten-Schritt ab (data.erledigt); `task notiz` legt eine
-  Arbeits-Notiz an (Autor server-seitig). `case dump <caseId>` liefert
+  Arbeits-Notiz an (Autor server-seitig). **`smoke [procedureId]`** ist die LAUFZEIT-Selbstverifikation:
+  BFS findet den kürzesten `closesCase`-Pfad, legt einen Fall im Initialzustand an und fährt ihn über die
+  echten Übergangs-Routen bis zum Abschluss (je Schritt ein anderer Akteur → Vier-Augen passiert) — beweist,
+  dass ein (neu geschriebenes) Verfahren fahrbar ist, mehr als der strukturelle `check:procedure-contract`.
+  `case dump <caseId>` liefert
   den KOMPLETTEN Entscheidungs-Kontext (Fall+Übergänge+Fortschritt+Blackboard+Aufgaben+Verfahrens-
   Wissen) in EINEM JSON — der konkrete „Mesh→Kontext"-Bundle für einen Agenten. `case transition` treibt
   die Fall-Zustandsmaschine (Vier-Augen serverseitig erzwungen → 403 bei Selbstfreigabe; die
