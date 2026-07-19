@@ -117,6 +117,28 @@ danach den Vertrags-Snapshot aktualisieren:
 pnpm --filter @senticor/fachverfahren emit:contract
 ```
 
+### Mesh selbst testen + per Agenten-CLI steuern (ohne finalen Build)
+
+Eine deterministische **Golden Fixture** seedet den vollen Mesh-Zustand (Fall +
+Blackboard-Vermerke inkl. offenem KI-Entwurf + Verfahrens-Wiki). Der Selbsttest
+fährt lesen · prüfen · exportieren in-process, ohne Server/Netz:
+
+```bash
+pnpm --filter @senticor/fachverfahren build:server
+pnpm --filter @senticor/fachverfahren exec vitest run golden-fixture mesh-cli
+```
+
+Die **Agenten-CLI** lässt KI-Agenten (oder Menschen) das Mesh direkt steuern
+(JSON-Ausgabe, echte Routen inkl. RBAC/Review/Fail-safe):
+
+```bash
+node apps/fachverfahren/dist-server/dev/mesh-cli.js vermerk list case.demo-0001
+node apps/fachverfahren/dist-server/dev/mesh-cli.js script --file plan.json   # Batch, stateful
+```
+
+Details in der Skill `.agents/skills/dossier-fallmanagement/SKILL.md`
+(Abschnitt „Agenten-CLI + Golden Fixture").
+
 Die verbindliche Arbeitsanweisung für Menschen und Coding Agents steht in
 `AGENTS.md` (inklusive kanonischer Pfad-Karte und PLAN-vs-IST-Markierungen).
 `pnpm install` richtet in Git-Checkouts Husky ein; die Hook-Details stehen in

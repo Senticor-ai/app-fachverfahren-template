@@ -178,6 +178,31 @@ erreichbar aus der Akte.
   an ein Sprachmodell weiterreicht, nutzt `neutralisiereInjektion`/`INJEKTION_PLATZHALTER`
   (`@senticor/public-sector-sdk`) — kein dupliziertes Guardrail.
 
+## Agenten-CLI + Golden Fixture — das Mesh DIREKT steuern + selbst testen (ohne Build)
+
+Ein KI-Agent muss das Mesh **direkt** fahren können (nicht nur über die Browser-UX) und die
+Vorlage muss sich **ohne finalen Build** selbst testen lassen. Beides speist EINE Wahrheit:
+
+- **Golden Fixture** (`apps/fachverfahren/server/dev/golden-fixture.ts`): deterministische,
+  verfahrens-NEUTRALE Mesh-Seed-Daten — self-contained (Demo-Fall aus derselben `procedure.config`-
+  Naht wie der reference-seed, byte-identisch) + 2 Mensch-Vermerke + 1 KI-Entwurf (offen) +
+  1 Mensch-Wissen + 1 KI-Wissen (offen). `seedGoldenMesh({caseStore, wissenStore})` ist idempotent.
+  Sie speist DREI Verbraucher: den Selbsttest, die Agenten-CLI und (im memory-Modus) den DEV-Server.
+- **Mesh-Harness** (`dev/mesh-harness.ts`): `buildSeededMeshApp()` bootet `appBff` IN-PROCESS gegen
+  In-Memory-Stores + Golden Seed + feste Caseworker-Sitzung → `app.inject(...)` fährt die ECHTEN
+  Routen (RBAC · Review · Fail-safe · Guardrail bleiben eine Wahrheit; nichts reimplementiert).
+- **Selbsttest** (`dev/golden-fixture.test.ts`): fährt den vollen Fluss (lesen · prüfen · exportieren)
+  ohne Server/Netz/Build — die Zusage „ohne finalen Build selbst testen".
+- **Agenten-CLI** (`dev/mesh-cli.ts`, Package-Script `mesh`): JSON-Ausgabe, Kommandos
+  `procedures · cases · case show|export|tasks · vermerk list|add|ki|review · wissen list|export|add|ki|review`.
+  Zwei Modi: **Einzel** (`node dist-server/dev/mesh-cli.js vermerk review <case> <id> --entscheidung bestaetigt`)
+  und **Batch/STATEFUL** (`script --file plan.json`, `plan.json` = `string[][]`, EIN App-Boot →
+  `add` danach in `list` sichtbar). Der Batch-Modus ist der agentische Steuer-Pfad: ein Agent schreibt
+  einen JSON-Plan, erhält ein JSON-Transkript. Baue vorher `pnpm --filter @senticor/fachverfahren build:server`.
+- **Warum server-seitig (`apps/*/server/dev/`):** der einzige Kompositions-Nachbar, der Stores UND BFF
+  vereint (wie `buildPublicServer`/`reference-seed`). Template-owned → jeder generierte Consumer erbt
+  CLI + Fixture. Der `wissenStore` wird jetzt durch `buildPublicServer` geThreadet (folgt `APP_STORE_MODE`).
+
 ## Verfahren als DATEN — `ProcedureRegistry` / `transitionCase`
 
 Der Prozess ist DATEN, kein Code (`packages/public-sector-sdk/src/domain-kernel.ts`).

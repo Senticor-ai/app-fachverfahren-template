@@ -60,7 +60,10 @@ Was das Template davon HEUTE trägt (der OSS-Runtime-Anteil):
   Modell/Agent), Sichtbarkeit und Threading — append-only im Fall-Audit, KI-Zellen
   prüfpflichtig (HITL). Routen unter `/api/cases/:id/vermerke*` (Skill
   `dossier-fallmanagement`). Damit dokumentieren Mensch und Agent DASSELBE, für
-  beide les- und nutzbar.
+  beide les- und nutzbar. Ein Agent **steuert** dieses Mesh headless über die
+  **Agenten-CLI** (`apps/fachverfahren/server/dev/mesh-cli.ts`, Package-Script
+  `mesh`) gegen eine deterministische **Golden Fixture** — ohne Browser/Server/
+  finalen Build, über dieselben Routen (die CLI reimplementiert nichts).
 - **FÄHIGKEIT — austauschbare Ports** *(teilweise)*. Capabilities sind Ports mit
   Conformance-Vertrag und per Env wählbaren Anbietern (`AiAssistPort` local↔ollama,
   `BlobStoragePort`); ein Baustein konsumiert sie governt (RBAC), nie einen
