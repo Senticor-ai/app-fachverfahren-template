@@ -203,6 +203,56 @@ function routeFor(tokens: string[]): Route {
   }
 }
 
+/** `case dump <caseId>` — der KOMPLETTE Entscheidungs-Kontext eines Falls in EINEM JSON (Fall · mögliche
+ *  Übergänge · Fortschritt · Blackboard-Export · Aufgaben · Verfahrens-Wissen-Export). Ein Composite über
+ *  bestehende Routen: ein Agent bekommt alles in einem Aufruf, statt fünf — der konkrete „Mesh→Kontext"-Bundle. */
+async function executeDump(
+  app: FastifyInstance,
+  caseId: string,
+  headers: Record<string, string> | undefined,
+): Promise<MeshCommandResult> {
+  const command = `case dump ${caseId}`;
+  const enc = encodeURIComponent;
+  const get = async (
+    url: string,
+  ): Promise<{ status: number; data: unknown }> => {
+    const r = await app.inject({
+      method: "GET",
+      url,
+      ...(headers ? { headers } : {}),
+    });
+    return { status: r.statusCode, data: r.body.length > 0 ? r.json() : null };
+  };
+  const kase = await get(`/api/cases/${enc(caseId)}`);
+  if (kase.status >= 400) {
+    return { ok: false, status: kase.status, command, data: kase.data };
+  }
+  const c = kase.data as { procedureId: string; procedureVersion: string };
+  const [actions, progress, blackboard, tasks, verfahrensWissen] =
+    await Promise.all([
+      get(`/api/cases/${enc(caseId)}/allowed-actions`),
+      get(`/api/cases/${enc(caseId)}/progress`),
+      get(`/api/cases/${enc(caseId)}/vermerke/export`),
+      get(`/api/cases/${enc(caseId)}/tasks`),
+      get(
+        `/api/verfahren/${enc(c.procedureId)}/${enc(c.procedureVersion)}/wissen/export`,
+      ),
+    ]);
+  return {
+    ok: true,
+    status: 200,
+    command,
+    data: {
+      case: kase.data,
+      actions: actions.data,
+      progress: progress.data,
+      blackboard: blackboard.data,
+      tasks: tasks.data,
+      verfahrensWissen: verfahrensWissen.data,
+    },
+  };
+}
+
 async function executeOne(
   app: FastifyInstance,
   tokens: string[],
@@ -212,6 +262,20 @@ async function executeOne(
   const asActor = parseArgs(tokens).options["as"];
   const headers =
     asActor !== undefined ? { "x-mesh-actor": asActor } : undefined;
+  // `case dump <caseId>` ist ein Composite über mehrere Routen (kein einzelner Route-Treffer).
+  if (tokens[0] === "case" && tokens[1] === "dump") {
+    const { positionals } = parseArgs(tokens.slice(1));
+    const caseId = positionals[1];
+    if (caseId === undefined) {
+      return {
+        ok: false,
+        status: 400,
+        command,
+        data: { error: "fehlender Parameter: <caseId>" },
+      };
+    }
+    return executeDump(app, caseId, headers);
+  }
   let route: Route;
   try {
     route = routeFor(tokens);
@@ -284,6 +348,7 @@ const USAGE = `mesh — Agenten-CLI fuer das Fachverfahren-Mesh (Golden Fixture,
   cases                                       Faelle auflisten
   case create <procedureId> <version> --state S [--subject id]   Fall/Akte anlegen
   case show|export|tasks|actions|progress <caseId>              Akte lesen / Export / Aufgaben / Uebergaenge / Fortschritt
+  case dump <caseId>                          Kompletter Entscheidungs-Kontext in EINEM JSON (Fall+Uebergaenge+Fortschritt+Blackboard+Aufgaben+Wissen)
   case transition <caseId> --action A [--detail D] [--expected-version N]
                                               Zustandsuebergang (Vier-Augen serverseitig; Version wird sonst selbst geholt)
   vermerk list <caseId>                       Blackboard lesen

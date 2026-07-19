@@ -139,6 +139,31 @@ describe("Agenten-CLI (mesh-cli)", () => {
     expect((exp?.data as { caseId: string }).caseId).toBe(CASE);
   });
 
+  it("case dump: kompletter Entscheidungs-Kontext in EINEM JSON", async () => {
+    const [dump] = await executeMeshCommands([["case", "dump", CASE]]);
+    expect(dump?.ok).toBe(true);
+    const d = dump?.data as {
+      case: { caseId: string };
+      actions: unknown;
+      progress: unknown;
+      blackboard: { eintraege: unknown[] };
+      tasks: unknown;
+      verfahrensWissen: { eintraege: unknown[] };
+    };
+    expect(d.case.caseId).toBe(CASE);
+    // Blackboard (Fixture: 3 Vermerke) + Verfahrens-Wissen (Fixture: 2 Eintraege) sind enthalten.
+    expect(d.blackboard.eintraege.length).toBeGreaterThanOrEqual(3);
+    expect(d.verfahrensWissen.eintraege.length).toBeGreaterThanOrEqual(2);
+    expect(d.actions).not.toBeNull();
+    expect(d.progress).not.toBeNull();
+  });
+
+  it("case dump eines unbekannten Falls -> ok:false, 404", async () => {
+    const [dump] = await executeMeshCommands([["case", "dump", "case.gibtsnicht"]]);
+    expect(dump?.ok).toBe(false);
+    expect(dump?.status).toBe(404);
+  });
+
   it("Fehlbedienung -> ok:false, klare Meldung, Exit-Code 1", async () => {
     const { exitCode, results } = await runMeshCommand([
       "vermerk",
