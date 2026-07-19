@@ -115,6 +115,24 @@ describe("Agenten-CLI (mesh-cli)", () => {
     expect(results[2]?.status).toBe(403);
   });
 
+  it("Vier-Augen POSITIV: bereitet Person A vor, gibt Person B (--as) frei -> abgeschlossen", async () => {
+    const results = await executeMeshCommands([
+      ["case", "transition", CASE, "--action", "pausieren", "--as", "actor.a"],
+      ["case", "transition", CASE, "--action", "fortsetzen", "--as", "actor.a"],
+      [
+        "case",
+        "transition",
+        CASE,
+        "--action",
+        "abschließen",
+        "--as",
+        "actor.b",
+      ],
+    ]);
+    expect(results[2]?.ok).toBe(true);
+    expect((results[2]?.data as { state: string }).state).toBe("abgeschlossen");
+  });
+
   it("Kontext-Export der Akte ist agenten-konsumierbar", async () => {
     const [exp] = await executeMeshCommands([["case", "export", CASE]]);
     expect(exp?.ok).toBe(true);

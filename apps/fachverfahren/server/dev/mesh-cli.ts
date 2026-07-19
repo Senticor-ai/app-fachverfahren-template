@@ -208,6 +208,10 @@ async function executeOne(
   tokens: string[],
 ): Promise<MeshCommandResult> {
   const command = tokens.join(" ");
+  // `--as <actor>` überschreibt die Akteurs-Kennung dieses Kommandos (Zwei-Personen-Fluss, Vier-Augen).
+  const asActor = parseArgs(tokens).options["as"];
+  const headers =
+    asActor !== undefined ? { "x-mesh-actor": asActor } : undefined;
   let route: Route;
   try {
     route = routeFor(tokens);
@@ -224,6 +228,7 @@ async function executeOne(
     const cur = await app.inject({
       method: "GET",
       url: `/api/cases/${encodeURIComponent(route.needsVersion)}`,
+      ...(headers ? { headers } : {}),
     });
     if (cur.statusCode >= 400) {
       return {
@@ -240,6 +245,7 @@ async function executeOne(
     method: route.method,
     url: route.url,
     ...(route.body ? { payload: route.body } : {}),
+    ...(headers ? { headers } : {}),
   });
   const data =
     res.body.length > 0
@@ -290,6 +296,7 @@ const USAGE = `mesh — Agenten-CLI fuer das Fachverfahren-Mesh (Golden Fixture,
   wissen review <procedureId> <version> <eintragId> --entscheidung bestaetigt|verworfen
   script --file plan.json                     Batch: JSON string[][], STATEFUL in einem App-Boot
 
+Global: --as <actorId> setzt den Akteur dieses Kommandos (Zwei-Personen-Fluss / Vier-Augen).
 Jedes Kommando startet frisch aus der Golden Fixture; nutze 'script' fuer stateful Folgen.`;
 
 /** CLI-Einstieg: parst argv (Einzel-Kommando ODER 'script --file'), fuehrt aus, liefert Text + Exit-Code. */

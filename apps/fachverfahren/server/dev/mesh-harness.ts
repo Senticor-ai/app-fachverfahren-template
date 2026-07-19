@@ -59,7 +59,17 @@ export async function buildSeededMeshApp(
     await seedGoldenMesh({ caseStore, wissenStore });
   }
   const session = opts.session ?? meshCaseworkerSession();
-  const resolver: SessionResolver = { resolve: async () => session };
+  // Actor-bewusst: ein Request-Header `x-mesh-actor` überschreibt die Akteurs-Kennung (Rolle/Mandant bleiben).
+  // So kann die CLI (`--as`) einen ZWEI-PERSONEN-Fluss fahren und den POSITIVEN Vier-Augen-Abschluss zeigen —
+  // NUR für dieses DEV-Harness; PROD authentifiziert echte Sitzungen (Cookie/AuthStore), nie per Header.
+  const resolver: SessionResolver = {
+    resolve: async (request) => {
+      const override = request.headers["x-mesh-actor"];
+      return typeof override === "string" && override.length > 0
+        ? { ...session, actorId: override }
+        : session;
+    },
+  };
   const app = fastify({ logger: false });
   await app.register(appBff, {
     appStore,

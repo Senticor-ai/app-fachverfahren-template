@@ -197,7 +197,10 @@ Vorlage muss sich **ohne finalen Build** selbst testen lassen. Beides speist EIN
   `procedures · cases · case create|show|export|tasks|actions|progress|transition ·
   vermerk list|add|ki|review · wissen list|export|add|ki|review`. `case transition` treibt
   die Fall-Zustandsmaschine (Vier-Augen serverseitig erzwungen → 403 bei Selbstfreigabe; die
-  Optimistic-Locking-Version zieht die CLI selbst, wenn `--expected-version` fehlt).
+  Optimistic-Locking-Version zieht die CLI selbst, wenn `--expected-version` fehlt). Die globale
+  Option `--as <actorId>` setzt den Akteur EINES Kommandos → ein Batch kann den POSITIVEN
+  Zwei-Personen-Vier-Augen-Abschluss fahren (A bereitet vor, B gibt frei → abgeschlossen). NUR
+  DEV-Harness (Header-Override); PROD authentifiziert echte Sitzungen, nie per Header.
   Zwei Modi: **Einzel** (`node dist-server/dev/mesh-cli.js vermerk review <case> <id> --entscheidung bestaetigt`)
   und **Batch/STATEFUL** (`script --file plan.json`, `plan.json` = `string[][]`, EIN App-Boot →
   `add` danach in `list` sichtbar). Der Batch-Modus ist der agentische Steuer-Pfad: ein Agent schreibt
