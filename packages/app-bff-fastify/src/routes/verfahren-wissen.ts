@@ -18,7 +18,11 @@ import {
   type WissenViewDto,
 } from "@senticor/app-bff-contracts";
 import type { VerfahrensWissenEintrag } from "@senticor/app-store-postgres";
-import { builtInPermissions, scanInjection } from "@senticor/public-sector-sdk";
+import {
+  builtInPermissions,
+  neutralisiereInjektion,
+  scanInjection,
+} from "@senticor/public-sector-sdk";
 import type { BffDeps } from "../deps.js";
 import { bffRouteAuth, requestIdOf, sessionOf } from "../route-auth.js";
 import { storeUnavailable } from "../store-error.js";
@@ -65,9 +69,7 @@ function toExportEintrag(e: VerfahrensWissenEintrag): WissenExportEintragDto {
     kind: asKind(e.art),
     quelle: e.urheber.startsWith("human:") ? "mensch" : "ki",
     urheber: e.urheber,
-    text: scanInjection(e.text).suspicious
-      ? "[Inhalt ausgelassen: mögliche Prompt-Injektion]"
-      : e.text,
+    text: neutralisiereInjektion(e.text),
     metadaten: e.metadaten,
     erstelltAm: e.occurredAt,
   };
@@ -188,9 +190,7 @@ export function registerVerfahrenWissenRoutes(
       const wiki = bisher.map((e) => ({
         art: e.art,
         urheber: e.urheber,
-        text: scanInjection(e.text).suspicious
-          ? "[Inhalt ausgelassen: mögliche Prompt-Injektion]"
-          : e.text,
+        text: neutralisiereInjektion(e.text),
       }));
 
       const result = await deps.aiAssist.suggest(

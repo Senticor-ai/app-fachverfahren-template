@@ -27,6 +27,8 @@ import type { AppAuditEvent, AppCase } from "@senticor/app-store-postgres";
 import {
   builtInPermissions,
   createFachlicheAuditEvent,
+  INJEKTION_PLATZHALTER,
+  neutralisiereInjektion,
   scanInjection,
 } from "@senticor/public-sector-sdk";
 import type { BffDeps } from "../deps.js";
@@ -141,9 +143,7 @@ function toWissenEintrag(v: VermerkDto): WissenEintragDto {
     kind: v.kind,
     quelle: v.quelle,
     urheber: v.urheber,
-    text: v.verdacht
-      ? "[Inhalt ausgelassen: mögliche Prompt-Injektion]"
-      : v.text,
+    text: v.verdacht ? INJEKTION_PLATZHALTER : v.text,
     metadaten: v.metadaten,
     bezugEintragId: v.bezugVermerkId,
     reviewStatus: v.reviewStatus,
@@ -336,9 +336,7 @@ export function registerVermerkRoutes(
           urheber: v.urheber,
           // SOTA-Guardrail: eine Zelle mit Prompt-Injektions-Muster darf den lesenden Agenten nicht kapern
           // — neutralisiert statt roh weitergereicht (die Zelle selbst bleibt unverändert in der Akte).
-          text: scanInjection(v.text).suspicious
-            ? "[Inhalt ausgelassen: mögliche Prompt-Injektion]"
-            : v.text,
+          text: neutralisiereInjektion(v.text),
         }));
 
       // Den (austauschbaren) AiAssistPort fragen — Kontext AUSSCHLIESSLICH aus der Sitzung + geteilter Akte.

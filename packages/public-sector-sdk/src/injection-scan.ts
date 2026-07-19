@@ -42,3 +42,13 @@ export function scanInjection(text: string): InjectionScanResult {
   }
   return { suspicious: matched.length > 0, matched };
 }
+
+/** Der Platzhalter, der einen verdächtigen Text ersetzt, bevor er einen Agenten erreicht. */
+export const INJEKTION_PLATZHALTER =
+  "[Inhalt ausgelassen: mögliche Prompt-Injektion]";
+
+/** EINE Wahrheit: verdächtigen Text neutralisieren (Platzhalter), sonst durchreichen. Für JEDEN Pfad,
+ *  der frei-formigen Zell-/Wiki-Text an ein Sprachmodell weiterreicht. */
+export function neutralisiereInjektion(text: string): string {
+  return scanInjection(text).suspicious ? INJEKTION_PLATZHALTER : text;
+}
