@@ -194,7 +194,10 @@ Vorlage muss sich **ohne finalen Build** selbst testen lassen. Beides speist EIN
 - **Selbsttest** (`dev/golden-fixture.test.ts`): fährt den vollen Fluss (lesen · prüfen · exportieren)
   ohne Server/Netz/Build — die Zusage „ohne finalen Build selbst testen".
 - **Agenten-CLI** (`dev/mesh-cli.ts`, Package-Script `mesh`): JSON-Ausgabe, Kommandos
-  `procedures · cases · case show|export|tasks · vermerk list|add|ki|review · wissen list|export|add|ki|review`.
+  `procedures · cases · case create|show|export|tasks|actions|progress|transition ·
+  vermerk list|add|ki|review · wissen list|export|add|ki|review`. `case transition` treibt
+  die Fall-Zustandsmaschine (Vier-Augen serverseitig erzwungen → 403 bei Selbstfreigabe; die
+  Optimistic-Locking-Version zieht die CLI selbst, wenn `--expected-version` fehlt).
   Zwei Modi: **Einzel** (`node dist-server/dev/mesh-cli.js vermerk review <case> <id> --entscheidung bestaetigt`)
   und **Batch/STATEFUL** (`script --file plan.json`, `plan.json` = `string[][]`, EIN App-Boot →
   `add` danach in `list` sichtbar). Der Batch-Modus ist der agentische Steuer-Pfad: ein Agent schreibt

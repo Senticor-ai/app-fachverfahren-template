@@ -71,6 +71,50 @@ describe("Agenten-CLI (mesh-cli)", () => {
     );
   });
 
+  it("legt einen Fall an (case create -> 201, server-generierte caseId)", async () => {
+    const [created] = await executeMeshCommands([
+      ["case", "create", "musterverfahren", "1.0.0", "--state", "eingegangen"],
+    ]);
+    expect(created?.ok).toBe(true);
+    expect(created?.status).toBe(201);
+    const data = created?.data as { caseId: string; state: string };
+    expect(data.caseId.startsWith("case.")).toBe(true);
+    expect(data.state).toBe("eingegangen");
+  });
+
+  it("zeigt die moeglichen Uebergaenge (case actions)", async () => {
+    const [actions] = await executeMeshCommands([
+      ["case", "actions", CASE],
+    ]);
+    expect(actions?.ok).toBe(true);
+    // Der Demo-Fall steht in „in-bearbeitung": pausieren + abschliessen sind moeglich.
+    expect(JSON.stringify(actions?.data)).toContain("pausieren");
+  });
+
+  it("treibt den Zustandsuebergang (auto-version): in-bearbeitung -> pausiert -> in-bearbeitung", async () => {
+    const results = await executeMeshCommands([
+      ["case", "transition", CASE, "--action", "pausieren"],
+      ["case", "transition", CASE, "--action", "fortsetzen"],
+      ["case", "show", CASE],
+    ]);
+    expect(results[0]?.ok).toBe(true);
+    expect((results[0]?.data as { state: string }).state).toBe("pausiert");
+    expect(results[1]?.ok).toBe(true);
+    expect((results[2]?.data as { state: string }).state).toBe("in-bearbeitung");
+  });
+
+  it("Vier-Augen serverseitig: derselbe Akteur darf den Abschluss nicht selbst freigeben (403)", async () => {
+    // pausieren + fortsetzen (beide vom CLI-Akteur) machen ihn zum letzten Bearbeitungsschritt; der
+    // requiresFourEyes-Abschluss durch DENSELBEN Akteur wird dann serverseitig mit 403 geblockt.
+    const results = await executeMeshCommands([
+      ["case", "transition", CASE, "--action", "pausieren"],
+      ["case", "transition", CASE, "--action", "fortsetzen"],
+      ["case", "transition", CASE, "--action", "abschließen"],
+    ]);
+    expect(results[2]?.ok).toBe(false);
+    expect(results[2]?.status).toBe(403);
+  });
+
   it("Kontext-Export der Akte ist agenten-konsumierbar", async () => {
     const [exp] = await executeMeshCommands([["case", "export", CASE]]);
     expect(exp?.ok).toBe(true);

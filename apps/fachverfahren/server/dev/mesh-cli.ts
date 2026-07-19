@@ -51,6 +51,10 @@ interface Route {
   method: "GET" | "POST";
   url: string;
   body?: Record<string, unknown>;
+  /** caseId, dessen aktuelle `version` vor dem Request geholt wird (Transition ohne --expected-version):
+   *  ein Agent muss die Optimistic-Locking-Version nicht kennen — in einem statischen Batch-Plan kann er
+   *  sie ohnehin nicht zwischen Kommandos durchreichen. */
+  needsVersion?: string;
 }
 
 /** Bildet ein Kommando (Token-Liste) auf eine Route ab. Wirft mit einer klaren Meldung bei Fehlbedienung. */
@@ -77,13 +81,51 @@ function routeFor(tokens: string[]): Route {
       return { method: "GET", url: "/api/cases" };
     case "case": {
       const sub = positionals[0] ?? "";
+      if (sub === "create") {
+        const procedureId = p(1, "procedureId");
+        const version = p(2, "version");
+        return {
+          method: "POST",
+          url: "/api/cases",
+          body: {
+            procedureId,
+            procedureVersion: version,
+            state: opt("state"),
+            ...(options["subject"]
+              ? { subjectIds: [options["subject"]] }
+              : {}),
+          },
+        };
+      }
       const id = p(1, "caseId");
       if (sub === "show") return { method: "GET", url: `/api/cases/${enc(id)}` };
       if (sub === "export")
         return { method: "GET", url: `/api/cases/${enc(id)}/vermerke/export` };
       if (sub === "tasks")
         return { method: "GET", url: `/api/cases/${enc(id)}/tasks` };
-      throw new Error(`unbekanntes case-Kommando: ${sub} (show|export|tasks)`);
+      if (sub === "actions")
+        return { method: "GET", url: `/api/cases/${enc(id)}/allowed-actions` };
+      if (sub === "progress")
+        return { method: "GET", url: `/api/cases/${enc(id)}/progress` };
+      if (sub === "transition") {
+        const detail = options["detail"];
+        const ev = options["expected-version"];
+        const body: Record<string, unknown> = {
+          action: opt("action"),
+          ...(detail ? { detail } : {}),
+        };
+        const url = `/api/cases/${enc(id)}/transitions`;
+        if (ev !== undefined)
+          return {
+            method: "POST",
+            url,
+            body: { ...body, expectedVersion: Number(ev) },
+          };
+        return { method: "POST", url, body, needsVersion: id };
+      }
+      throw new Error(
+        `unbekanntes case-Kommando: ${sub} (create|show|export|tasks|actions|progress|transition)`,
+      );
     }
     case "vermerk": {
       const sub = positionals[0] ?? "";
@@ -177,6 +219,23 @@ async function executeOne(
       data: { error: error instanceof Error ? error.message : String(error) },
     };
   }
+  // Transition ohne --expected-version: die aktuelle Version selbst holen (Agenten-Ergonomie).
+  if (route.needsVersion !== undefined) {
+    const cur = await app.inject({
+      method: "GET",
+      url: `/api/cases/${encodeURIComponent(route.needsVersion)}`,
+    });
+    if (cur.statusCode >= 400) {
+      return {
+        ok: false,
+        status: cur.statusCode,
+        command,
+        data: cur.body.length > 0 ? cur.json() : null,
+      };
+    }
+    const version = (cur.json() as { version: number }).version;
+    route.body = { ...route.body, expectedVersion: version };
+  }
   const res = await app.inject({
     method: route.method,
     url: route.url,
@@ -217,7 +276,10 @@ const USAGE = `mesh — Agenten-CLI fuer das Fachverfahren-Mesh (Golden Fixture,
 
   procedures                                  Verfahren auflisten
   cases                                       Faelle auflisten
-  case show|export|tasks <caseId>             Akte lesen / Kontext-Export / Aufgaben
+  case create <procedureId> <version> --state S [--subject id]   Fall/Akte anlegen
+  case show|export|tasks|actions|progress <caseId>              Akte lesen / Export / Aufgaben / Uebergaenge / Fortschritt
+  case transition <caseId> --action A [--detail D] [--expected-version N]
+                                              Zustandsuebergang (Vier-Augen serverseitig; Version wird sonst selbst geholt)
   vermerk list <caseId>                       Blackboard lesen
   vermerk add <caseId> --text T [--kind K] [--sichtbarkeit public|private]
   vermerk ki <caseId> --task T                KI-Entwurf (offen, pruefpflichtig)
