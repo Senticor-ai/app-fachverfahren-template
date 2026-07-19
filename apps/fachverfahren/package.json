@@ -13,7 +13,8 @@
     "start": "node dist-server/index.js",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json",
     "emit:contract": "node --experimental-strip-types ./scripts/emit-contract.mts",
-    "emit:procedure-contract": "node --experimental-strip-types ./scripts/emit-procedure-contract.mts"
+    "emit:procedure-contract": "node --experimental-strip-types ./scripts/emit-procedure-contract.mts",
+    "emit:docs": "node --experimental-strip-types ./scripts/emit-docs-manifest.mts"
   },
   "dependencies": {
     "@fastify/cookie": "catalog:",

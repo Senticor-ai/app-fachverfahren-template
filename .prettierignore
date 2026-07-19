@@ -12,4 +12,6 @@ pnpm-lock.yaml
 **/leistung.contract.json
 # GENERIERT via `pnpm --filter @senticor/fachverfahren emit:procedure-contract` — Format ist der emit-Output, nie Prettier
 **/procedure.contract.json
+# GENERIERT via `pnpm --filter @senticor/fachverfahren emit:docs` — komplette Repo-Doku, Format ist der emit-Output
+**/docs-manifest.generated.ts
 **/deploy/helm/**/templates/**

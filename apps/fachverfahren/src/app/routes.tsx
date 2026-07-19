@@ -1,6 +1,7 @@
 // routes — bindet jede klassifizierte Route (route-gates.ts) an ihre Sicht (src/pages/*).
 // Record<AppRoutePath, …> erzwingt Vollständigkeit in beide Richtungen: ein Gate ohne
 // Sicht oder eine Sicht ohne Gate ist ein Typfehler, kein Laufzeit-Loch.
+import { lazy, Suspense } from "react";
 import { Navigate } from "react-router-dom";
 import { LandingPage } from "../LandingPage.js";
 import { AdminUsersRoute } from "../pages/admin-users.js";
@@ -23,9 +24,20 @@ import { KontoPasswortPage } from "../pages/konto-passwort.js";
 import type { AppRouteDefinition } from "./route-definition.js";
 import { routeGates, type AppRoutePath } from "./route-gates.js";
 
+// Doku-Wiki lazy: das generierte docs-manifest ist gross (komplette Repo-Doku) — eigener Chunk statt
+// Haupt-Bundle-Bloat. Named export via .then-Mapping (App-Konvention sind benannte Exporte).
+const HilfePage = lazy(() =>
+  import("../pages/hilfe.js").then((m) => ({ default: m.HilfePage })),
+);
+
 const routeElements: Record<AppRoutePath, React.JSX.Element> = {
   "/": <LandingPage />,
   "/login": <Navigate to="/" replace />,
+  "/hilfe": (
+    <Suspense fallback={<div className="p-6 text-sm">Lade Doku…</div>}>
+      <HilfePage />
+    </Suspense>
+  ),
   "/buerger": <BuergerStartPage />,
   "/buerger/anmelden": <BuergerAnmeldenPage />,
   "/buerger/bestaetigung/:id": <BuergerBestaetigungPage />,

@@ -81,6 +81,7 @@
     "check:domain-contracts": "node scripts/check-domain-contracts.mjs",
     "check:leistung-contract": "node --experimental-strip-types ./scripts/check-leistung-contract.mts",
     "check:procedure-contract": "node --experimental-strip-types ./scripts/check-procedure-contract.mts",
+    "check:docs-manifest": "pnpm --filter @senticor/fachverfahren emit:docs && git diff --exit-code -- apps/fachverfahren/src/docs/docs-manifest.generated.ts",
     "check:bpmn-example": "node --experimental-strip-types ./scripts/check-bpmn-example.mts",
     "check:antrag-procedure": "node --experimental-strip-types ./scripts/check-antrag-procedure.mts",
     "check:storybook": "node scripts/check-storybook-coverage.mjs",

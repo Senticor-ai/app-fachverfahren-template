@@ -1,5 +1,5 @@
-// route-gating.guard.test.ts — Vertrag des Routen-Baums: die Landing ("/") ist die EINZIGE
-// unauthentifizierte Route (plus /login-Alias); ALLE Persona- und Workspace-Routen liegen
+// route-gating.guard.test.ts — Vertrag des Routen-Baums: unauthentifiziert sind nur die Landing ("/"),
+// der /login-Alias und das Doku-Wiki ("/hilfe", nicht sensibel); ALLE Persona- und Workspace-Routen liegen
 // hinter GENAU EINEM Session-Gate (RequireSessionOutlet-Layout-Route). Seit Issue #35 ist
 // der Vertrag STRUKTURELL statt Quelltext-Grep: die abgenommene Klassifizierung lebt als
 // pure Daten in src/app/route-gates.ts, und der aus den Deskriptoren gebaute react-router-
@@ -37,6 +37,7 @@ describe("App-Routen — Session-Gate", () => {
     expect(routeGates).toEqual({
       "/": { kind: "public" },
       "/login": { kind: "public" },
+      "/hilfe": { kind: "public" },
       "/buerger": { kind: "persona", persona: "buerger" },
       "/buerger/anmelden": { kind: "persona", persona: "buerger" },
       "/buerger/bestaetigung/:id": { kind: "persona", persona: "buerger" },
@@ -77,14 +78,16 @@ describe("App-Routen — Session-Gate", () => {
     }
   });
 
-  it("es gibt genau EINE RequireSessionOutlet-Layout-Route — und nur / + /login davor", () => {
+  it("es gibt genau EINE RequireSessionOutlet-Layout-Route — davor nur die öffentlichen /, /login, /hilfe", () => {
     const gates = tree.filter(
       (route) => gateType(route) === RequireSessionOutlet,
     );
     expect(gates).toHaveLength(1);
 
+    // /hilfe (Doku-Wiki) ist bewusst öffentlich: Doku ist nicht sensibel und soll im Golden Template ohne
+    // Login aufrufbar sein (fuer Mensch + Agent). Die einzige weitere Ausnahme zur „alles hinter Session"-Regel.
     const topLevelPaths = tree.map((route) => route.path ?? "(layout)");
-    expect(topLevelPaths).toEqual(["/", "/login", "(layout)", "*"]);
+    expect(topLevelPaths).toEqual(["/", "/login", "/hilfe", "(layout)", "*"]);
   });
 
   it("alle Persona- und Workspace-Routen stehen INNERHALB des Gates", () => {

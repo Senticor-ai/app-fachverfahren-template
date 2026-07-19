@@ -138,6 +138,16 @@ export function LandingPage(): React.ReactElement | null {
             )}
           </section>
         </div>
+        <footer className="border-t border-border pt-6 text-center text-sm text-muted-foreground">
+          <Link
+            to="/hilfe"
+            className="text-primary underline-offset-4 hover:underline"
+          >
+            Doku-Wiki öffnen
+          </Link>{" "}
+          — die komplette Dokumentation im laufenden Template (für Mensch und
+          KI-Agent)
+        </footer>
       </div>
     </main>
   );

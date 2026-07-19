@@ -1360,6 +1360,12 @@ async function validateDomainLeakage(root: string) {
       if (rel.startsWith(spec.module.destination)) {
         continue;
       }
+      // Das generierte Doc-Wiki-Manifest aggregiert Repo-Doku (inkl. Skills, die Beispiel-Verfahren wie
+      // Hundesteuer NENNEN) — Dokumentation, kein Runtime-Domaenencode. Der Leckage-Gate schuetzt AUTHORED
+      // Code vor hart kodiertem Domaenen-Vokabular; ein generiertes Doku-Aggregat ist bewusst ausgenommen.
+      if (rel.endsWith("docs-manifest.generated.ts")) {
+        continue;
+      }
       const text = await readFile(file, "utf8").catch(() => "");
       for (const term of terms) {
         // Wortgenau (\b…\b): sonst matcht „Hund" innerhalb von „Hundesteuer" und meldet die App-

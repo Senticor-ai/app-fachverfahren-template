@@ -15,6 +15,9 @@ export const routeGates = {
   // für Bookmarks und Doku bestehen.
   "/": publicGate,
   "/login": publicGate,
+  // Doku-Wiki: die komplette Repo-Doku im laufenden Template — oeffentlich (Doku ist nicht sensibel),
+  // fuer Mensch UND KI-Agent. Lazy geladen (grosses Manifest).
+  "/hilfe": publicGate,
   // Arbeitsbereichs-Gates (nur Erlebnis/Navigation, keine Autorisierung).
   "/buerger": personaGate("buerger"),
   "/buerger/anmelden": personaGate("buerger"),

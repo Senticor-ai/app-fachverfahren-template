@@ -32,6 +32,8 @@ import { isRenderedRepoPath } from "./render.ts";
 const updateUnmanagedPaths: string[] = [
   // Repo-/Editor-/Toolchain-Konfiguration der Konsumenten: nach dem Scaffold deren Hoheit.
   ".dockerignore",
+  // Lokales Dev-Postgres (Ein-Kommando-Start): Konsumenten betreiben ihre DB selbst (Compose/k8s/Cloud).
+  "docker-compose.yml",
   ".editorconfig",
   ".env.example",
   ".gitignore",
