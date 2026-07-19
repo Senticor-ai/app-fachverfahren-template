@@ -139,6 +139,26 @@ describe("Agenten-CLI (mesh-cli)", () => {
     expect((exp?.data as { caseId: string }).caseId).toBe(CASE);
   });
 
+  it("Aufgaben-Steuerung: einen Checklisten-Schritt abhaken (stateful)", async () => {
+    const results = await executeMeshCommands([
+      ["task", "done", "golden.schritt-1"],
+      ["task", "list", CASE],
+    ]);
+    expect(results[0]?.ok).toBe(true);
+    const tasks = (results[1]?.data as { tasks: { taskId: string; data?: { erledigt?: boolean } }[] }).tasks;
+    const schritt = tasks.find((t) => t.taskId === "golden.schritt-1");
+    expect(schritt?.data?.erledigt).toBe(true);
+  });
+
+  it("Arbeits-Notiz anlegen (task notiz -> 201, taskKind notiz)", async () => {
+    const [notiz] = await executeMeshCommands([
+      ["task", "notiz", CASE, "--text", "Aktenvermerk-Notiz aus der CLI"],
+    ]);
+    expect(notiz?.ok).toBe(true);
+    expect(notiz?.status).toBe(201);
+    expect((notiz?.data as { taskKind: string }).taskKind).toBe("notiz");
+  });
+
   it("case dump: kompletter Entscheidungs-Kontext in EINEM JSON", async () => {
     const [dump] = await executeMeshCommands([["case", "dump", CASE]]);
     expect(dump?.ok).toBe(true);

@@ -10,7 +10,9 @@
 import type {
   AppAuditEvent,
   AppCase,
+  AppTask,
   CaseStore,
+  TaskStore,
   VerfahrensWissenEintrag,
   WissenStore,
 } from "@senticor/app-store-postgres";
@@ -86,8 +88,62 @@ export interface GoldenMeshFixture {
   opened: AppAuditEvent;
   /** Blackboard-Vermerke auf dem Demo-Dossier (case.note.added). */
   vermerke: AppAuditEvent[];
+  /** Aufgaben des Demo-Falls: ein Ziel mit 2 Checklisten-Schritten (einer offen) + ein Termin. */
+  tasks: AppTask[];
   /** Verfahrens-Wissen (verfahrens-scoped). */
   wissen: VerfahrensWissenEintrag[];
+}
+
+/** Deterministische Aufgaben des Demo-Falls (Ziel + Checklisten-Schritte + Termin) — verfahrens-neutral,
+ *  feste IDs/Zeitstempel. Ein offener Schritt (`erledigt:false`) macht die Task-Steuerung demonstrierbar. */
+function buildGoldenTasks(): AppTask[] {
+  const base = (
+    o: Partial<AppTask> & Pick<AppTask, "taskId" | "title" | "taskKind">,
+  ): AppTask => ({
+    caseId: dossierDemo.caseId,
+    tenantId: DEFAULT_TENANT_ID,
+    authorityId: DEFAULT_AUTHORITY_ID,
+    jurisdictionId: DEFAULT_JURISDICTION_ID,
+    state: "open",
+    assignedTo: null,
+    dueAt: null,
+    parentTaskId: null,
+    data: {},
+    sortRank: "a",
+    version: 1,
+    createdAt: dossierDemo.openedAt,
+    updatedAt: dossierDemo.openedAt,
+    ...o,
+  });
+  return [
+    base({
+      taskId: "golden.ziel-1",
+      title: "Musterziel bearbeiten",
+      taskKind: "ziel",
+      data: { status: "laufend" },
+    }),
+    base({
+      taskId: "golden.schritt-1",
+      title: "Erster Schritt",
+      taskKind: "checkliste-item",
+      parentTaskId: "golden.ziel-1",
+      data: { erledigt: false },
+    }),
+    base({
+      taskId: "golden.schritt-2",
+      title: "Zweiter Schritt",
+      taskKind: "checkliste-item",
+      parentTaskId: "golden.ziel-1",
+      sortRank: "b",
+      data: { erledigt: true },
+    }),
+    base({
+      taskId: "golden.termin-1",
+      title: "Gespraechstermin",
+      taskKind: "termin",
+      dueAt: "2026-07-20T10:00:00.000Z",
+    }),
+  ];
 }
 
 /** Der Demo-Fall + sein Eroeffnungs-Audit, aus derselben Naht (procedure.config) wie der reference-seed
@@ -132,6 +188,7 @@ export function buildGoldenMesh(): GoldenMeshFixture {
   return {
     demoCase,
     opened,
+    tasks: buildGoldenTasks(),
     vermerke: [
       vermerk("audit.golden-vermerk-1", "2026-06-01T09:00:00.000Z", {
         text: "Sachstand geprueft — die vorgelegten Unterlagen sind vollstaendig.",
@@ -189,6 +246,8 @@ export function buildGoldenMesh(): GoldenMeshFixture {
 export interface GoldenMeshSeedDeps {
   caseStore: CaseStore;
   wissenStore: WissenStore;
+  /** Optional: gesetzt seedet die Fixture auch die Aufgaben (Ziel/Schritte/Termin). */
+  taskStore?: TaskStore;
   log?: (
     level: "info" | "error",
     event: string,
@@ -228,6 +287,24 @@ export async function seedGoldenMesh(deps: GoldenMeshSeedDeps): Promise<void> {
     });
   } catch (error) {
     log("error", "dev.golden-mesh.vermerke.failed", { error: String(error) });
+  }
+  if (deps.taskStore) {
+    try {
+      const vorhandene = await deps.taskStore.listTasks({
+        tenantId: DEFAULT_TENANT_ID,
+        caseId: dossierDemo.caseId,
+      });
+      const schonDa = new Set(vorhandene.map((t) => t.taskId));
+      for (const t of fixture.tasks) {
+        if (!schonDa.has(t.taskId)) await deps.taskStore.insertTask(t);
+      }
+      log("info", "dev.golden-mesh.tasks.seeded", {
+        caseId: dossierDemo.caseId,
+        anzahl: fixture.tasks.length,
+      });
+    } catch (error) {
+      log("error", "dev.golden-mesh.tasks.failed", { error: String(error) });
+    }
   }
   try {
     const vorhandenesWissen = await deps.wissenStore.listEintraege({

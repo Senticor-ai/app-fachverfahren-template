@@ -56,7 +56,7 @@ export async function buildSeededMeshApp(
   const taskStore = new InMemoryTaskStore();
   const appStore = new InMemoryAppStore();
   if (opts.seed !== false) {
-    await seedGoldenMesh({ caseStore, wissenStore });
+    await seedGoldenMesh({ caseStore, wissenStore, taskStore });
   }
   const session = opts.session ?? meshCaseworkerSession();
   // Actor-bewusst: ein Request-Header `x-mesh-actor` überschreibt die Akteurs-Kennung (Rolle/Mandant bleiben).

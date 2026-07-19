@@ -48,7 +48,7 @@ function parseArgs(tokens: string[]): ParsedArgs {
 }
 
 interface Route {
-  method: "GET" | "POST";
+  method: "GET" | "POST" | "PATCH";
   url: string;
   body?: Record<string, unknown>;
   /** caseId, dessen aktuelle `version` vor dem Request geholt wird (Transition ohne --expected-version):
@@ -162,6 +162,51 @@ function routeFor(tokens: string[]): Route {
         `unbekanntes vermerk-Kommando: ${sub} (list|add|ki|review)`,
       );
     }
+    case "task": {
+      const sub = positionals[0] ?? "";
+      if (sub === "list") {
+        const id = p(1, "caseId");
+        return { method: "GET", url: `/api/cases/${enc(id)}/tasks` };
+      }
+      if (sub === "add") {
+        const id = p(1, "caseId");
+        return {
+          method: "POST",
+          url: `/api/cases/${enc(id)}/tasks`,
+          body: {
+            title: opt("title"),
+            ...(options["kind"] ? { taskKind: options["kind"] } : {}),
+            ...(options["parent"]
+              ? { parentTaskId: options["parent"] }
+              : {}),
+            ...(options["due"] ? { dueAt: options["due"] } : {}),
+          },
+        };
+      }
+      if (sub === "notiz") {
+        const id = p(1, "caseId");
+        return {
+          method: "POST",
+          url: `/api/cases/${enc(id)}/tasks`,
+          body: { title: opt("text"), taskKind: "notiz" },
+        };
+      }
+      const taskId = p(1, "taskId");
+      const url = `/api/tasks/${enc(taskId)}`;
+      if (sub === "done")
+        return { method: "PATCH", url, body: { dataPatch: { erledigt: true } } };
+      if (sub === "reopen")
+        return {
+          method: "PATCH",
+          url,
+          body: { dataPatch: { erledigt: false } },
+        };
+      if (sub === "state")
+        return { method: "PATCH", url, body: { state: opt("state") } };
+      throw new Error(
+        `unbekanntes task-Kommando: ${sub} (list|add|notiz|done|reopen|state)`,
+      );
+    }
     case "wissen": {
       const sub = positionals[0] ?? "";
       const proc = p(1, "procedureId");
@@ -198,7 +243,7 @@ function routeFor(tokens: string[]): Route {
     }
     default:
       throw new Error(
-        `unbekannte Gruppe: ${group} (procedures|cases|case|vermerk|wissen)`,
+        `unbekannte Gruppe: ${group} (procedures|cases|case|task|vermerk|wissen)`,
       );
   }
 }
@@ -351,6 +396,11 @@ const USAGE = `mesh — Agenten-CLI fuer das Fachverfahren-Mesh (Golden Fixture,
   case dump <caseId>                          Kompletter Entscheidungs-Kontext in EINEM JSON (Fall+Uebergaenge+Fortschritt+Blackboard+Aufgaben+Wissen)
   case transition <caseId> --action A [--detail D] [--expected-version N]
                                               Zustandsuebergang (Vier-Augen serverseitig; Version wird sonst selbst geholt)
+  task list <caseId>                          Aufgaben des Falls
+  task add <caseId> --title T [--kind K] [--parent P] [--due D]   Aufgabe anlegen
+  task notiz <caseId> --text T                Arbeits-Notiz (taskKind notiz, Autor server-seitig)
+  task done|reopen <taskId>                   Checklisten-Schritt ab-/aufhaken (data.erledigt)
+  task state <taskId> --state S               Aufgaben-Status setzen
   vermerk list <caseId>                       Blackboard lesen
   vermerk add <caseId> --text T [--kind K] [--sichtbarkeit public|private]
   vermerk ki <caseId> --task T                KI-Entwurf (offen, pruefpflichtig)

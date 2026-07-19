@@ -186,7 +186,8 @@ Vorlage muss sich **ohne finalen Build** selbst testen lassen. Beides speist EIN
 - **Golden Fixture** (`apps/fachverfahren/server/dev/golden-fixture.ts`): deterministische,
   verfahrens-NEUTRALE Mesh-Seed-Daten — self-contained (Demo-Fall aus derselben `procedure.config`-
   Naht wie der reference-seed, byte-identisch) + 2 Mensch-Vermerke + 1 KI-Entwurf (offen) +
-  1 Mensch-Wissen + 1 KI-Wissen (offen). `seedGoldenMesh({caseStore, wissenStore})` ist idempotent.
+  1 Ziel mit 2 Checklisten-Schritten (einer offen) + 1 Termin + 1 Mensch-Wissen + 1 KI-Wissen (offen).
+  `seedGoldenMesh({caseStore, wissenStore, taskStore?})` ist idempotent.
   Sie speist DREI Verbraucher: den Selbsttest, die Agenten-CLI und (im memory-Modus) den DEV-Server.
 - **Mesh-Harness** (`dev/mesh-harness.ts`): `buildSeededMeshApp()` bootet `appBff` IN-PROCESS gegen
   In-Memory-Stores + Golden Seed + feste Caseworker-Sitzung → `app.inject(...)` fährt die ECHTEN
@@ -195,7 +196,9 @@ Vorlage muss sich **ohne finalen Build** selbst testen lassen. Beides speist EIN
   ohne Server/Netz/Build — die Zusage „ohne finalen Build selbst testen".
 - **Agenten-CLI** (`dev/mesh-cli.ts`, Package-Script `mesh`): JSON-Ausgabe, Kommandos
   `procedures · cases · case create|show|export|tasks|actions|progress|transition|dump ·
-  vermerk list|add|ki|review · wissen list|export|add|ki|review`. `case dump <caseId>` liefert
+  task list|add|notiz|done|reopen|state · vermerk list|add|ki|review · wissen list|export|add|ki|review`.
+  `task done|reopen <taskId>` hakt einen Checklisten-Schritt ab (data.erledigt); `task notiz` legt eine
+  Arbeits-Notiz an (Autor server-seitig). `case dump <caseId>` liefert
   den KOMPLETTEN Entscheidungs-Kontext (Fall+Übergänge+Fortschritt+Blackboard+Aufgaben+Verfahrens-
   Wissen) in EINEM JSON — der konkrete „Mesh→Kontext"-Bundle für einen Agenten. `case transition` treibt
   die Fall-Zustandsmaschine (Vier-Augen serverseitig erzwungen → 403 bei Selbstfreigabe; die

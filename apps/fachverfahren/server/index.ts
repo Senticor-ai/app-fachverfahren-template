@@ -310,6 +310,7 @@ export async function startRuntime(
         await seedGoldenMesh({
           caseStore: bff.caseStore,
           wissenStore: bff.wissenStore,
+          taskStore: bff.taskStore,
           log,
         });
       }
