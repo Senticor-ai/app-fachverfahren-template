@@ -107,6 +107,7 @@ keine Existenz-Leaks). Store-Ausfall → 503 (`storeUnavailable`).
 | `POST /api/cases/:id/vermerke`       | `case.note.write`       | Menschlichen Aktenvermerk schreiben — unveränderlich im Fall-Audit (`case.note.added`, `quelle=mensch`).                                                                                                                                                         |
 | `POST /api/cases/:id/vermerke/ki`    | `case.note.write`       | KI-Aktenvermerk-ENTWURF via `AiAssistPort` (`quelle=ki`, `ki-vorschlag`, `reviewStatus=offen`; high-risk→422, kein Modell→503, NIE fingiert).                                                                                                                     |
 | `POST /api/cases/:id/vermerke/:vermerkId/review` | `case.note.write` | KI-Entwurf prüfen: `bestaetigt`/`verworfen` (append-only `case.note.reviewed`; einmalig→409, Mensch-Vermerk→422).                                                                                                                           |
+| `GET /api/cases/:id/vermerke/export` | `case.read`             | Kontext-Bundle der Akte für die agentische Weiterverarbeitung (nur public, Text injektions-neutralisiert) — die Brücke, die chos-code in Skills + Kontext übersetzt.                                                                                             |
 
 **Vier-Augen** bei `POST …/transitions`: trägt der Übergang `requiresFourEyes`,
 darf der Akteur des jüngsten Audit-Eintrags ihn nicht selbst auslösen (→ 403).
@@ -134,6 +135,35 @@ RBAC: eigene Permission `case.note.write` (getrennt von `case.decision.prepare` 
 vermerken ist nicht entscheiden). UI-Vorlage: `pages/vermerk-aktionen.tsx` (Liste
 + Schreib-/Prüf-Aktionen) unter `/amt/akte/:id`; im Verlauf sind offene
 KI-Entwürfe als Ton `warn` markiert (`case-akte-view.ts`).
+
+## Wiki-Mesh — die Akte als Blackboard, die Brücke zu KI-Agenten
+
+Der Aktenvermerk ist zugleich das **Fall-Wiki** und die KOORDINATIONS-Ebene des
+Agentic Composable Mesh: der geteilte Arbeitsraum, in dem Mensch UND Agent als
+gleichrangige Peers dokumentieren — für beide les- und nutzbar. Über die Grundform
+hinaus:
+
+- **Typisierte Zellen** (`kind`): notiz/hypothese/teilergebnis/frage/befund/
+  entscheidung/reflexion/**metadatum**/**evidenz** (+ verfahrens-Ebene `wissen`/
+  `faehigkeit`). Jede Zelle trägt eine Peer-Kennung `urheber` (`human:<rolle>`
+  ODER Modell/Agent), `sichtbarkeit` (public/private), `bezugVermerkId` (Threading)
+  und **`metadaten`** — der strukturierte, agenten-konsumierbare Teil (Norm,
+  Konfidenz, Tags, Nachweis-IDs). Ein KI-Eintrag trägt die AI-Provenienz
+  (Konfidenz/Quellen/Rationale) automatisch als Metadaten.
+- **Agentische Teilnahme**: `POST …/vermerke/ki` LIEST vor dem Vorschlag die
+  bisherigen public-Zellen (der Blackboard-Stand) als Kontext — der Agent trägt zur
+  laufenden Akte bei, statt kontextfrei zu raten.
+- **Prompt-Injektions-Guardrail** (`scanInjection`, `@senticor/public-sector-sdk`):
+  eine Zelle mit Injektions-Muster wird beim Agenten-Konsum NEUTRALISIERT (nicht
+  kaperbar) und für Prüfer als `verdacht` markiert.
+- **Kontext-Export** (die Brücke): `GET …/vermerke/export` liefert das
+  neutralisierte, strukturierte Bundle, das chos-code in Skills + Kontext übersetzt.
+
+**Zwei Ebenen (Zwei-Ebenen-Symmetrie):** neben dem Fall-Wiki gibt es das
+**Verfahrens-Wiki** — generelles Wissen + Fähigkeiten EINES Verfahrens, dieselbe
+Zellform, verfahrens-scoped im `WissenStore` (`app-store-postgres`, append-only,
+behörden-scoped). Routen `GET|POST /api/verfahren/:procedureId/:version/wissen`
+(+ `/ki`, `/export`); UI `pages/amt-verfahren-wiki.tsx`, erreichbar aus der Akte.
 
 ## Verfahren als DATEN — `ProcedureRegistry` / `transitionCase`
 
