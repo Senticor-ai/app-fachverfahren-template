@@ -54,6 +54,35 @@ export const WissenViewListDtoSchema = Type.Object(
 );
 export type WissenViewListDto = Static<typeof WissenViewListDtoSchema>;
 
+// ── Verfahrens-Wissens-EXPORT — die Brücke fürs verfahrens-weite Wiki (Symmetrie zum Fall-Export) ──────
+// Der stabile, agenten-konsumierbare Kontext-Bundle EINES Verfahrens: chos-code liest ihn und übersetzt das
+// generelle Wissen + die Fähigkeiten in Skills + Kontext. Der Text ist injektions-NEUTRALISIERT.
+export const WissenExportEintragSchema = Type.Object(
+  {
+    eintragId: Type.String({ minLength: 1 }),
+    kind: VermerkKindSchema,
+    quelle: VermerkQuelleSchema,
+    urheber: Type.String({ minLength: 1 }),
+    text: Type.String(),
+    metadaten: Type.Record(Type.String(), Type.Unknown()),
+    erstelltAm: Type.String({ minLength: 1 }),
+  },
+  { additionalProperties: false },
+);
+export type WissenExportEintragDto = Static<typeof WissenExportEintragSchema>;
+
+export const WissenVerfahrenExportDtoSchema = Type.Object(
+  {
+    procedureId: Type.String({ minLength: 1 }),
+    procedureVersion: Type.String({ minLength: 1 }),
+    eintraege: Type.Array(WissenExportEintragSchema),
+  },
+  { additionalProperties: false },
+);
+export type WissenVerfahrenExportDto = Static<
+  typeof WissenVerfahrenExportDtoSchema
+>;
+
 /** Route-Parameter: Verfahren + Version. */
 export const VerfahrenWissenParamsSchema = Type.Object(
   {

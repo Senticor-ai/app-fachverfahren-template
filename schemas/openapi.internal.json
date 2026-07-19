@@ -5208,6 +5208,171 @@
         "tags": ["verfahren-wissen"]
       }
     },
+    "/api/verfahren/{procedureId}/{version}/wissen/export": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "procedureId",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "eintraege": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "eintragId": { "minLength": 1, "type": "string" },
+                          "erstelltAm": { "minLength": 1, "type": "string" },
+                          "kind": {
+                            "anyOf": [
+                              { "enum": ["hypothese"], "type": "string" },
+                              { "enum": ["teilergebnis"], "type": "string" },
+                              { "enum": ["frage"], "type": "string" },
+                              { "enum": ["befund"], "type": "string" },
+                              { "enum": ["entscheidung"], "type": "string" },
+                              { "enum": ["reflexion"], "type": "string" },
+                              { "enum": ["metadatum"], "type": "string" },
+                              { "enum": ["evidenz"], "type": "string" },
+                              { "enum": ["wissen"], "type": "string" },
+                              { "enum": ["faehigkeit"], "type": "string" },
+                              { "enum": ["notiz"], "type": "string" }
+                            ]
+                          },
+                          "metadaten": {
+                            "additionalProperties": {},
+                            "type": "object"
+                          },
+                          "quelle": {
+                            "anyOf": [
+                              { "enum": ["mensch"], "type": "string" },
+                              { "enum": ["ki"], "type": "string" }
+                            ]
+                          },
+                          "text": { "type": "string" },
+                          "urheber": { "minLength": 1, "type": "string" }
+                        },
+                        "required": [
+                          "eintragId",
+                          "kind",
+                          "quelle",
+                          "urheber",
+                          "text",
+                          "metadaten",
+                          "erstelltAm"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "procedureId": { "minLength": 1, "type": "string" },
+                    "procedureVersion": { "minLength": 1, "type": "string" }
+                  },
+                  "required": ["procedureId", "procedureVersion", "eintraege"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Kontext-Bundle des Verfahrens-Wissens (neutralisiert) für die agentische Weiterverarbeitung",
+        "tags": ["verfahren-wissen"]
+      }
+    },
     "/api/verfahren/{procedureId}/{version}/wissen/ki": {
       "post": {
         "parameters": [

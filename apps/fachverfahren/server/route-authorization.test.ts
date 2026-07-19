@@ -276,6 +276,11 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           policy: "rbac:case.read",
         },
         {
+          method: "GET",
+          url: "/api/verfahren/:procedureId/:version/wissen/export",
+          policy: "rbac:case.read",
+        },
+        {
           method: "POST",
           url: "/api/verfahren/:procedureId/:version/wissen",
           policy: "rbac:case.note.write",

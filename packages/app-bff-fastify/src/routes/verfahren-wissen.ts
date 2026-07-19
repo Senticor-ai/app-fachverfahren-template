@@ -11,8 +11,10 @@ import {
   KiWissenRequestSchema,
   VerfahrenWissenParamsSchema,
   WissenEintragRequestSchema,
+  WissenVerfahrenExportDtoSchema,
   WissenViewDtoSchema,
   WissenViewListDtoSchema,
+  type WissenExportEintragDto,
   type WissenViewDto,
 } from "@senticor/app-bff-contracts";
 import type { VerfahrensWissenEintrag } from "@senticor/app-store-postgres";
@@ -52,6 +54,21 @@ function toWissenView(e: VerfahrensWissenEintrag): WissenViewDto {
     text: e.text,
     metadaten: e.metadaten,
     verdacht: scanInjection(e.text).suspicious,
+    erstelltAm: e.occurredAt,
+  };
+}
+
+/** Store-Eintrag → Export-Form (Text injektions-NEUTRALISIERT für die Agent-Weiterverarbeitung). */
+function toExportEintrag(e: VerfahrensWissenEintrag): WissenExportEintragDto {
+  return {
+    eintragId: e.eintragId,
+    kind: asKind(e.art),
+    quelle: e.urheber.startsWith("human:") ? "mensch" : "ki",
+    urheber: e.urheber,
+    text: scanInjection(e.text).suspicious
+      ? "[Inhalt ausgelassen: mögliche Prompt-Injektion]"
+      : e.text,
+    metadaten: e.metadaten,
     erstelltAm: e.occurredAt,
   };
 }
@@ -258,6 +275,40 @@ export function registerVerfahrenWissenRoutes(
         return storeUnavailable(request, reply);
       }
       return reply.send({ eintraege: eintraege.map(toWissenView) });
+    },
+  );
+
+  // ── Verfahrens-Wissens-EXPORT (Brücke für die agentische Weiterverarbeitung) ──────────────────
+  typed.get(
+    "/api/verfahren/:procedureId/:version/wissen/export",
+    {
+      config: readAuth.config,
+      preHandler: readAuth.preHandler,
+      schema: {
+        tags: ["verfahren-wissen"],
+        summary: "Kontext-Bundle des Verfahrens-Wissens (neutralisiert) für die agentische Weiterverarbeitung",
+        params: VerfahrenWissenParamsSchema,
+        response: { 200: WissenVerfahrenExportDtoSchema, ...errorResponses },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      let eintraege: VerfahrensWissenEintrag[];
+      try {
+        eintraege = await deps.wissenStore.listEintraege({
+          tenantId: session.tenantId,
+          authorityId: session.authorityId,
+          procedureId: request.params.procedureId,
+          procedureVersion: request.params.version,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      return reply.send({
+        procedureId: request.params.procedureId,
+        procedureVersion: request.params.version,
+        eintraege: eintraege.map(toExportEintrag),
+      });
     },
   );
 }
