@@ -245,11 +245,15 @@ export function registerVerfahrenWissenRoutes(
       } catch {
         return storeUnavailable(request, reply);
       }
-      const wiki = nurWissen(bisher).map((e) => ({
-        art: e.art,
-        urheber: e.urheber,
-        text: neutralisiereInjektion(e.text),
-      }));
+      // Fail-safe am LESE-Kontext: verworfenes KI-Wissen darf den nächsten KI-Vorschlag NICHT kontaminieren.
+      const wikiReviews = reviewMapOf(bisher);
+      const wiki = nurWissen(bisher)
+        .filter((e) => reviewStatusOf(e, wikiReviews) !== "verworfen")
+        .map((e) => ({
+          art: e.art,
+          urheber: e.urheber,
+          text: neutralisiereInjektion(e.text),
+        }));
 
       const result = await deps.aiAssist.suggest(
         {

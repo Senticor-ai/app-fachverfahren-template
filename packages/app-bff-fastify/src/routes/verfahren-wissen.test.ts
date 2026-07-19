@@ -188,6 +188,37 @@ describe("BFF Verfahrens-Wiki (/api/verfahren/:procedureId/:version/wissen)", ()
     await app.close();
   });
 
+  it("verworfenes KI-Wissen kontaminiert den nächsten KI-Vorschlag NICHT (Lese-Kontext fail-safe)", async () => {
+    const { app } = await buildBffApp({
+      session: caseworkerSession(),
+      wissenStore: new InMemoryWissenStore(),
+    });
+    // Der local-fake echot `input` → ein distinkter Marker landet im Text des KI-Eintrags A.
+    const a = (
+      await app.inject({
+        method: "POST",
+        url: `${BASE}/ki`,
+        payload: { task: "t1", input: { marker: "ZZZ-VERWORFEN-XYZ" } },
+      })
+    ).json();
+    expect(a.text).toContain("ZZZ-VERWORFEN-XYZ");
+    await app.inject({
+      method: "POST",
+      url: `${BASE}/${a.eintragId}/review`,
+      payload: { entscheidung: "verworfen" },
+    });
+    // Neuer KI-Eintrag B liest das Wiki als Kontext — A ist verworfen, darf also nicht auftauchen.
+    const b = (
+      await app.inject({
+        method: "POST",
+        url: `${BASE}/ki`,
+        payload: { task: "t2", input: {} },
+      })
+    ).json();
+    expect(b.text).not.toContain("ZZZ-VERWORFEN-XYZ");
+    await app.close();
+  });
+
   it("eine zweite Prüfung wird abgelehnt (409, append-only)", async () => {
     const { app } = await buildBffApp({
       session: caseworkerSession(),

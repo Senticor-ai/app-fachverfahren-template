@@ -327,10 +327,14 @@ export function registerVermerkRoutes(
       } catch {
         return storeUnavailable(request, reply);
       }
+      const bbReviews = reviewMapOf(bisher);
       const blackboard = bisher
         .filter((e) => e.eventType === NOTE_EVENT_TYPE)
-        .map((e) => toVermerkDto(e, appCase.caseId))
+        .map((e) => toVermerkDto(e, appCase.caseId, bbReviews.get(e.auditEventId)))
         .filter((v) => v.sichtbarkeit === "public")
+        // Fail-safe am LESE-Kontext (nicht nur am Export): ein vom Menschen VERWORFENER KI-Entwurf darf den
+        // nächsten KI-Vorschlag NICHT mehr kontaminieren — verworfenes Wissen ist aus dem Kontext raus.
+        .filter((v) => v.reviewStatus !== "verworfen")
         .map((v) => ({
           kind: v.kind,
           urheber: v.urheber,

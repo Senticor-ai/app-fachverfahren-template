@@ -178,6 +178,34 @@ describe("BFF Aktenvermerke (/api/cases/:id/vermerke)", () => {
     await fremd.close();
   });
 
+  it("verworfener KI-Vermerk kontaminiert den nächsten KI-Vorschlag NICHT (Blackboard-Lese-Kontext fail-safe)", async () => {
+    const { app, caseId } = await amtMitFall();
+    // Der local-fake echot `input` → ein distinkter Marker landet im Text von KI-Vermerk A.
+    const a = (
+      await app.inject({
+        method: "POST",
+        url: `/api/cases/${caseId}/vermerke/ki`,
+        payload: { task: "t1", input: { marker: "ZZZ-VERWORFEN-CASE" } },
+      })
+    ).json();
+    expect(a.text).toContain("ZZZ-VERWORFEN-CASE");
+    await app.inject({
+      method: "POST",
+      url: `/api/cases/${caseId}/vermerke/${a.vermerkId}/review`,
+      payload: { entscheidung: "verworfen" },
+    });
+    // Neuer KI-Vermerk B liest das public Blackboard — A ist verworfen, darf nicht im Kontext sein.
+    const b = (
+      await app.inject({
+        method: "POST",
+        url: `/api/cases/${caseId}/vermerke/ki`,
+        payload: { task: "t2", input: {} },
+      })
+    ).json();
+    expect(b.text).not.toContain("ZZZ-VERWORFEN-CASE");
+    await app.close();
+  });
+
   it("KI-Vermerk PRÜFEN: reviewStatus wandert offen → bestaetigt (append-only); zweiter Review → 409", async () => {
     const { app, caseId } = await amtMitFall();
     const vermerkId = (
