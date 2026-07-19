@@ -109,6 +109,7 @@ export type {
 export {
   createWissenStoreFromEnv,
   InMemoryWissenStore,
+  PostgresWissenStore,
   UnavailableWissenStore,
 } from "./wissen-store.js";
 export type {

@@ -9,6 +9,8 @@
 // Postgres-Adapter + die Migration sind der nächste Ausbauschritt (konsistent mit der übrigen Postgres-
 // Politik); der Standalone-/OSS-DEV-Pfad läuft auf InMemory. In PROD sitzt derselbe Store hinter der Naht.
 
+import { createPgClient, type PgClient } from "./client.js";
+
 /** Ein Wissens-Eintrag eines Verfahrens (dieselbe Zellform wie der Fall-Aktenvermerk, verfahrens-scoped). */
 export interface VerfahrensWissenEintrag {
   eintragId: string;
@@ -106,7 +108,133 @@ export function createWissenStoreFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): WissenStore {
   if (env["APP_STORE_MODE"] === "memory") return new InMemoryWissenStore();
-  return new UnavailableWissenStore(
-    "WissenStore: kein persistenter Adapter konfiguriert (nur APP_STORE_MODE=memory; Postgres-Adapter ist der nächste Ausbauschritt).",
-  );
+  const databaseUrl = env["APP_PG_URL"] ?? env["APP_PG_DIRECT_URL"];
+  return databaseUrl
+    ? new PostgresWissenStore(databaseUrl)
+    : new UnavailableWissenStore(
+        "APP_PG_URL or APP_PG_DIRECT_URL is required for verfahren-wissen data",
+      );
+}
+
+// ─── Postgres ────────────────────────────────────────────────────────────
+// Durable Adapter auf app_verfahren_wissen (Migration 20260719000000_verfahren_wissen). APPEND-ONLY: der Store
+// führt NUR INSERT + SELECT aus; die Tabelle erzwingt es zusätzlich per Trigger + REVOKE. Muster wie
+// PostgresAuditStore (append-only): withClient öffnet/schließt pro Query eine Verbindung.
+
+interface WissenRow extends Record<string, unknown> {
+  eintrag_id: string;
+  procedure_id: string;
+  procedure_version: string;
+  tenant_id: string;
+  authority_id: string;
+  jurisdiction_id: string;
+  actor_id: string;
+  art: string;
+  urheber: string;
+  text: string;
+  metadaten: Record<string, unknown>;
+  occurred_at: Date | string;
+}
+
+function eintragFromRow(row: WissenRow): VerfahrensWissenEintrag {
+  return {
+    eintragId: row.eintrag_id,
+    procedureId: row.procedure_id,
+    procedureVersion: row.procedure_version,
+    tenantId: row.tenant_id,
+    authorityId: row.authority_id,
+    jurisdictionId: row.jurisdiction_id,
+    actorId: row.actor_id,
+    art: row.art,
+    urheber: row.urheber,
+    text: row.text,
+    metadaten: row.metadaten ?? {},
+    occurredAt:
+      row.occurred_at instanceof Date
+        ? row.occurred_at.toISOString()
+        : row.occurred_at,
+  };
+}
+
+export class PostgresWissenStore implements WissenStore {
+  constructor(private readonly databaseUrl: string) {}
+
+  async appendEintrag(
+    eintrag: VerfahrensWissenEintrag,
+  ): Promise<VerfahrensWissenEintrag> {
+    return this.withClient(async (client) => {
+      const result = await client.query<WissenRow>(
+        `
+          INSERT INTO app_verfahren_wissen (
+            eintrag_id, procedure_id, procedure_version, tenant_id, authority_id,
+            jurisdiction_id, actor_id, art, urheber, text, metadaten, occurred_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12)
+          RETURNING *
+        `,
+        [
+          eintrag.eintragId,
+          eintrag.procedureId,
+          eintrag.procedureVersion,
+          eintrag.tenantId,
+          eintrag.authorityId,
+          eintrag.jurisdictionId,
+          eintrag.actorId,
+          eintrag.art,
+          eintrag.urheber,
+          eintrag.text,
+          JSON.stringify(eintrag.metadaten),
+          eintrag.occurredAt,
+        ],
+      );
+      const row = result.rows[0];
+      if (!row) {
+        throw new Error(
+          `verfahren-wissen "${eintrag.eintragId}" write returned no row`,
+        );
+      }
+      return eintragFromRow(row);
+    });
+  }
+
+  async listEintraege(query: WissenQuery): Promise<VerfahrensWissenEintrag[]> {
+    return this.withClient(async (client) => {
+      const result = await client.query<WissenRow>(
+        `
+          SELECT * FROM app_verfahren_wissen
+          WHERE tenant_id = $1 AND authority_id = $2
+            AND procedure_id = $3 AND procedure_version = $4
+          ORDER BY occurred_at ASC, eintrag_id ASC
+          LIMIT $5
+        `,
+        // LIMIT NULL = alle Zeilen (deckungsgleich mit InMemory: kein Default-Limit).
+        [
+          query.tenantId,
+          query.authorityId,
+          query.procedureId,
+          query.procedureVersion,
+          query.limit ?? null,
+        ],
+      );
+      return result.rows.map(eintragFromRow);
+    });
+  }
+
+  async ping(): Promise<void> {
+    await this.withClient(async (client) => {
+      await client.query("SELECT 1");
+    });
+  }
+
+  private async withClient<T>(
+    callback: (client: PgClient) => Promise<T>,
+  ): Promise<T> {
+    const client = await createPgClient(this.databaseUrl);
+    await client.connect();
+    try {
+      return await callback(client);
+    } finally {
+      await client.end();
+    }
+  }
 }
