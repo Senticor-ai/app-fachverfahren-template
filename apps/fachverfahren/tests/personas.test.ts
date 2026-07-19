@@ -230,3 +230,46 @@ describe("sichtbareBereiche", () => {
     ).toEqual([]);
   });
 });
+
+// P0-1 END-TO-END: ein VERFAHRENS-EIGENES Personen-Set (Beschaffung) fliesst durch die ganze Client-
+// Maschinerie — Beweis, dass das Template beliebige Fachverfahren (nicht nur Buerger<->Behoerde) traegt.
+describe("verfahrens-eigene Personas (P0-1: Beschaffung/HR)", () => {
+  const beschaffung: Pick<LeistungConfig, "personas"> = {
+    personas: [
+      { key: "requester", label: "Anfordernde Stelle", home: "/anforderung", routePrefix: "/anforderung" },
+      { key: "approver", label: "Freigabe", home: "/freigabe", routePrefix: "/freigabe" },
+      { key: "einkauf", label: "Einkauf", home: "/einkauf", routePrefix: "/einkauf" },
+      { key: "lieferant", label: "Lieferant", home: "/lieferant", routePrefix: "/lieferant" },
+    ],
+  };
+
+  it("disjunktes Set ERSETZT die Defaults (keine fremden Buerger/Behoerde-Personas)", () => {
+    const bereiche = personaBereiche(beschaffung).filter((b) => b.persona);
+    expect(bereiche.map((b) => b.persona)).toEqual([
+      "requester",
+      "approver",
+      "einkauf",
+      "lieferant",
+    ]);
+  });
+
+  it("allowedPersonas erlaubt die verfahrens-eigenen Personas (aus der Config abgeleitet)", () => {
+    const prin = {
+      ...basePrincipal,
+      personas: ["einkauf", "approver"] as SessionPrincipal["personas"],
+    };
+    expect(allowedPersonas(prin, { userPersonas: true }, beschaffung)).toEqual([
+      "approver",
+      "einkauf",
+    ]);
+  });
+
+  it("personaRoute nutzt routePrefix/home der eigenen Persona", () => {
+    expect(personaRoute("lieferant", beschaffung)).toBe("/lieferant");
+    expect(personaRoute("einkauf", beschaffung)).toBe("/einkauf");
+  });
+
+  it("personaHome fuehrt zur ersten zugewiesenen eigenen Persona", () => {
+    expect(personaHome(["einkauf"], [], beschaffung)).toBe("/einkauf");
+  });
+});

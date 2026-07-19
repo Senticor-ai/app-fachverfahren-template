@@ -117,6 +117,13 @@ export function mergePersonas(
   defaults: readonly PersonaDescriptor[] = DEFAULT_PERSONAS,
 ): readonly PersonaDescriptor[] {
   if (!config?.length) return defaults;
+  const defaultKeys = new Set(defaults.map((d) => d.key));
+  // KEIN Overlap mit den kanonischen Keys = ein VOLLSTAENDIG verfahrens-eigenes Personen-Set (z.B. Beschaffung:
+  // requester/approver/einkauf/lieferant). Dann ist die Config die GANZE Wahrheit — die generischen Defaults
+  // werden NICHT beigemischt (sonst zeigte ein Beschaffungs-Verfahren 3 fremde Bürger↔Behörde-Personas).
+  if (!config.some((p) => defaultKeys.has(p.key))) return config;
+  // Overlap = die 3 Defaults VERFEINERN (umbenennen): per-key fail-open mergen, un-genannte Defaults behalten,
+  // zusaetzlich genannte eigene anhaengen.
   const byKey = new Map(config.map((p) => [p.key, p]));
   const gemerged = defaults.map((d) => {
     const aus = byKey.get(d.key);
@@ -133,10 +140,8 @@ export function mergePersonas(
       ...(initials !== undefined ? { initials } : {}),
     };
   });
-  // VERFAHRENS-EIGENE Personas (Keys, die NICHT zu den kanonischen Defaults gehoeren) ANHAENGEN — so kann ein
-  // Fachverfahren beliebige Personas (Requester/Approver/Einkauf/Lieferant…) ergaenzen, nicht nur die 3
-  // umbenennen. Reihenfolge: erst die (ggf. umbenannten) Defaults, dann die eigenen (config-Reihenfolge).
-  const defaultKeys = new Set(defaults.map((d) => d.key));
+  // Zusaetzlich genannte VERFAHRENS-EIGENE Personas (Keys ausserhalb der Defaults) anhaengen — der gemischte
+  // Fall (Defaults verfeinern UND eigene ergaenzen). Reihenfolge: erst die Defaults, dann die eigenen.
   const eigene = config.filter((p) => !defaultKeys.has(p.key));
   return [...gemerged, ...eigene];
 }
