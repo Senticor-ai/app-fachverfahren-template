@@ -33,12 +33,14 @@ import {
   createCaseStoreFromEnv,
   createKanbanStoreFromEnv,
   createTaskStoreFromEnv,
+  createWissenStoreFromEnv,
   type AppStore,
   type AuditStore,
   type AuthStore,
   type CaseStore,
   type KanbanStore,
   type TaskStore,
+  type WissenStore,
 } from "@senticor/app-store-postgres";
 import {
   createInMemoryProcedureRegistry,
@@ -53,6 +55,7 @@ import { registerAuthPolicyGuard } from "./auth/authorization.js";
 import { registerAuthRoutes, type RegistrationMode } from "./auth/routes.js";
 import { createCookieSessionResolver } from "./auth/session-resolver.js";
 import { seedReferenceDemo } from "./dev/reference-seed.js";
+import { seedGoldenMesh } from "./dev/golden-fixture.js";
 import { registerBoardRoutes } from "./kanban/routes.js";
 import { antragProcedure, dossierProcedure } from "./procedure.config.js";
 import { registerUserRoutes } from "./users/routes.js";
@@ -104,6 +107,10 @@ interface BffWiring {
   appStore: AppStore;
   caseStore: CaseStore;
   taskStore: TaskStore;
+  /** Verfahrens-Wissens-Store (Verfahrens-Wiki), per Env gewählt — wie jeder andere Store. Ohne diesen
+   *  Durchstich fiele appBff auf einen plugin-internen, ephemeren In-Memory-Store zurück (folgte nie dem
+   *  APP_STORE_MODE und wäre nicht seedbar). */
+  wissenStore: WissenStore;
   procedureRegistry: ProcedureRegistry;
   sessionResolver: SessionResolver;
   auditSink: AuditSink;
@@ -152,6 +159,7 @@ export function buildPublicServer({
   appStore = createAppStoreFromEnv(),
   caseStore = createCaseStoreFromEnv(),
   taskStore = createTaskStoreFromEnv(),
+  wissenStore = createWissenStoreFromEnv(),
   // Verfahren-Registry: DEFAULT LEER (fail-closed — ohne Verfahren kein Fall). Der Consumer/Generator
   // (leistung.config → ProcedureVersion, ADR-0002) füllt sie; in PROD kann chos sie hinter der Naht liefern.
   procedureRegistry = createInMemoryProcedureRegistry([]),
@@ -172,6 +180,7 @@ export function buildPublicServer({
   appStore?: AppStore;
   caseStore?: CaseStore;
   taskStore?: TaskStore;
+  wissenStore?: WissenStore;
   procedureRegistry?: ProcedureRegistry;
   sessionResolver?: SessionResolver;
   auditSink?: AuditSink;
@@ -192,6 +201,7 @@ export function buildPublicServer({
           appStore,
           caseStore,
           taskStore,
+          wissenStore,
           procedureRegistry,
           // Default: der ECHTE Cookie/AuthStore-Flow (deny-by-default) — Tests
           // injizieren Stubs über den Parameter.
@@ -242,6 +252,7 @@ export async function startRuntime(
     appStore: createAppStoreFromEnv(env),
     caseStore: createCaseStoreFromEnv(env),
     taskStore: createTaskStoreFromEnv(env),
+    wissenStore: createWissenStoreFromEnv(env),
     // Der Runtime-Entrypoint registriert das Verfahren aus der procedure.config-Naht (der generische
     // buildPublicServer-Default bleibt fail-closed/leer — Unit-Tests injizieren ihre eigene Registry).
     // Eine generierende App überschreibt procedure.config.ts; in PROD kann chos die Naht liefern.
@@ -291,6 +302,14 @@ export async function startRuntime(
           taskStore: bff.taskStore,
           appStore: bff.appStore,
           env,
+          log,
+        });
+        // Die Golden Fixture ergänzt das Demo-Dossier um die MESH-Ebene (Blackboard-Vermerke inkl. offenem
+        // KI-Entwurf + Verfahrens-Wissen) — dieselbe Wahrheit, die Selbsttest und Agenten-CLI fahren. So zeigt
+        // die Live-DEV-App den vollen Mesh-Fluss (lesen · prüfen · exportieren) sofort. Idempotent, wirft nie.
+        await seedGoldenMesh({
+          caseStore: bff.caseStore,
+          wissenStore: bff.wissenStore,
           log,
         });
       }
