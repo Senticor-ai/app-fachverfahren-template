@@ -8,7 +8,9 @@
 // und Netzfehler bedeuten „API nicht erreichbar" (apiAvailable=false) — niemals ein Throw.
 import { apiPath } from "./board-client.js";
 
-export type SessionPersona = "buerger" | "sachbearbeitung" | "aufsicht";
+/** Arbeitsbereichs-/Persona-Schlüssel — OFFEN (`string`), synchron zur Kit-`Persona` (daten-getriebene
+ *  Personas; ein Fachverfahren kann beliebige definieren). NUR Erlebnis, keine Autorisierung. */
+export type SessionPersona = string;
 export type SessionWorkspaceRole = "admin" | "member" | "citizen";
 
 export interface SessionPrincipal {

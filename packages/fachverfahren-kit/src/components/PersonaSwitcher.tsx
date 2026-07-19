@@ -15,8 +15,13 @@ import {
 import * as React from "react";
 import { cn } from "../lib/utils.js";
 
-/** Die drei generischen Rollen jedes kommunalen Fachverfahrens (Antragsteller · Bearbeitung · Aufsicht). */
-export type Persona = "buerger" | "sachbearbeitung" | "aufsicht";
+/** Ein Arbeitsbereichs-/Persona-Schlüssel. OFFEN (`string`), damit ein Fachverfahren BELIEBIGE Personas
+ *  definieren kann (z.B. Beschaffung: `requester`/`approver`/`einkauf`/`lieferant`; HR: `antragsteller`/
+ *  `vorgesetzter`/`personalstelle`) — nicht nur Bürger↔Behörde. Die 3 kanonischen Defaults
+ *  (`buerger`/`sachbearbeitung`/`aufsicht`) bleiben als `DEFAULT_PERSONAS` erhalten; ein Konsument
+ *  überschreibt/ergänzt sie daten-getrieben über `config.personas`. Persona = NUR Navigation/Erlebnis,
+ *  KEINE Autorisierung (die trifft der Server über RBAC/Permissions). */
+export type Persona = string;
 
 /** Anzeige-Beschreibung eines Arbeitsbereichs (rein generisch — keine Leistungs-Inhalte).
  *
@@ -36,6 +41,12 @@ export interface PersonaDescriptor {
   /** Home-Route des Arbeitsbereichs (z.B. `/buerger`). Optional — die App entscheidet, ob/wie daraus Routing wird;
    *  fehlt sie, nutzt die App ihre eigene Routen-Konvention. */
   home?: string;
+  /** URL-Präfix, das URLs dieser Persona zuordnet (z.B. `/amt` → sachbearbeitung). Optional — für die daten-
+   *  getriebene URL→Persona-Ableitung (statt hart kodierter Pfad-Zuordnung). Fehlt es, dient `home` als Präfix. */
+  routePrefix?: string;
+  /** Optionale RBAC-Rollen, die diese Persona mitbringt (daten-getriebenes Persona→Rolle-Mapping). Standardmäßig
+   *  LEER: die Bürger↔Behörde-App leitet RBAC weiter aus der `UserRole` ab (kein Verhaltensbruch). */
+  rbacRoles?: readonly string[];
   /** Kurzbeschreibung für den Bereichs-Einstieg (Landing). Optional — sonst dient `sub` als Beschreibung. */
   beschreibung?: string;
   /** Optionales Icon. Wird vom Switcher aktuell nicht gerendert (Avatar = Initialen) und ist NICHT über eine
@@ -66,6 +77,8 @@ export const DEFAULT_PERSONAS: readonly PersonaDescriptor[] = [
     label: "Bürger:in",
     sub: "Antragstellung",
     initials: "BÜ",
+    home: "/buerger",
+    routePrefix: "/buerger",
     icon: User,
   },
   {
@@ -73,6 +86,8 @@ export const DEFAULT_PERSONAS: readonly PersonaDescriptor[] = [
     label: "Sachbearbeitung",
     sub: "Bearbeitung / Prüfung",
     initials: "SB",
+    home: "/amt",
+    routePrefix: "/amt",
     icon: ClipboardCheck,
   },
   {
@@ -80,6 +95,8 @@ export const DEFAULT_PERSONAS: readonly PersonaDescriptor[] = [
     label: "Aufsicht",
     sub: "Kennzahlen / Audit",
     initials: "AU",
+    home: "/aufsicht",
+    routePrefix: "/aufsicht",
     icon: LineChart,
   },
 ];
