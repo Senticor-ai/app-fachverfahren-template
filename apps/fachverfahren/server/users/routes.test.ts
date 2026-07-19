@@ -362,13 +362,27 @@ describe("user management routes — Arbeitsbereiche", () => {
     });
     expect(missing.statusCode).toBe(400);
 
+    // Personas sind OFFEN: ungueltig ist nur die FORM (kein Array / leere Strings), nicht der Wert.
     const invalid = await ctx.app.inject({
       method: "POST",
       url: "/api/v1/users",
       headers: { cookie: ctx.adminCookie },
-      payload: { ...memberBody, personas: ["hausmeister"] },
+      payload: { ...memberBody, personas: "sachbearbeitung" },
     });
     expect(invalid.statusCode).toBe(400);
+
+    // Eine VERFAHRENS-EIGENE Persona (z.B. `hausmeister`) ist jetzt GUELTIG (kein Enum-Filter mehr).
+    const eigene = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/users",
+      headers: { cookie: ctx.adminCookie },
+      payload: {
+        ...memberBody,
+        email: "eigene-persona@example.org",
+        personas: ["hausmeister"],
+      },
+    });
+    expect(eigene.statusCode).toBe(201);
 
     // Leeres Array ist GÜLTIG (Null-Arbeitsbereiche-Konto, z.B. Boards-only später).
     const empty = await ctx.app.inject({

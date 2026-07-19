@@ -11,7 +11,6 @@ import {
   effectivePersonas,
   isDuplicateUserError,
   StalePrincipalVersionError,
-  USER_PERSONAS,
 } from "@senticor/app-store-postgres";
 import { hashPassword } from "@senticor/provider-local-auth";
 import type { FastifyInstance } from "fastify";
@@ -43,13 +42,11 @@ interface UpdateUserRequestBody {
 /** Arbeitsbereichs-Liste validieren: Array, jedes Element im kanonischen Tripel.
  *  LEER ist gültig (Null-Arbeitsbereiche-Konto); Duplikate normalisiert der Store. */
 function isPersonaArray(value: unknown): value is UserPersona[] {
+  // Personas sind OFFEN (nicht-Autz): ein Array nicht-leerer Strings genuegt — kein Enum-Filter mehr, damit
+  // ein Fachverfahren eigene Personas (Beschaffung/HR) pflegen kann. Duplikate normalisiert der Store.
   return (
     Array.isArray(value) &&
-    value.every(
-      (entry) =>
-        typeof entry === "string" &&
-        (USER_PERSONAS as readonly string[]).includes(entry),
-    )
+    value.every((entry) => typeof entry === "string" && entry.length > 0)
   );
 }
 

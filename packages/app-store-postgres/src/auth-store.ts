@@ -8,9 +8,11 @@ export type UserStatus = "active" | "disabled";
  *  selbstregistrierte Bürger:innen (KEINE Workspace-Permissions). */
 export type UserRole = "admin" | "member" | "citizen";
 
-/** Personas = Arbeitsbereiche/Produkt-Erlebnis (Navigation), NIE Server-Autorisierung.
- *  Kanonische Reihenfolge = diese Konstante; alle Vergleiche laufen über normalizePersonas. */
-export type UserPersona = "buerger" | "sachbearbeitung" | "aufsicht";
+/** Personas = Arbeitsbereiche/Produkt-Erlebnis (Navigation), NIE Server-Autorisierung. OFFEN (`string`),
+ *  damit ein Fachverfahren BELIEBIGE Personas fuehren kann (Beschaffung/HR) — nicht nur die 3 kanonischen.
+ *  `USER_PERSONAS` bleibt die DEFAULT-Reihenfolge (Sortier-Referenz); es ist KEIN Validierungs-Enum mehr:
+ *  Personas sind opake Strings (keine Autz), der Server sortiert/dedupliziert sie nur. */
+export type UserPersona = string;
 export const USER_PERSONAS: readonly UserPersona[] = [
   "buerger",
   "sachbearbeitung",
@@ -51,7 +53,22 @@ export interface UserAccount {
 export function normalizePersonas(
   input: readonly UserPersona[],
 ): UserPersona[] {
-  return USER_PERSONAS.filter((persona) => input.includes(persona));
+  // Dedup unter Erhalt der Eingabe-Reihenfolge, DANN kanonisch sortiert: die Default-Personas zuerst
+  // (USER_PERSONAS-Index), verfahrens-eigene danach (stabil, Eingabe-Reihenfolge). Unbekannte werden NICHT
+  // mehr verworfen (Personas sind opak/nicht-Autz) — so ueberleben verfahrens-eigene Personas den Roundtrip.
+  const seen = new Set<string>();
+  const dedup: UserPersona[] = [];
+  for (const persona of input) {
+    if (!seen.has(persona)) {
+      seen.add(persona);
+      dedup.push(persona);
+    }
+  }
+  const rang = (p: UserPersona): number => {
+    const i = USER_PERSONAS.indexOf(p);
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  return dedup.sort((a, b) => rang(a) - rang(b));
 }
 
 /** DIE eine Ableitung der wirksamen Arbeitsbereiche aus beiden Quellen je Modus —
@@ -69,11 +86,11 @@ export function effectivePersonas(
     case "oidc_authoritative":
       return normalizePersonas(account.oidcPersonas);
     case "oidc_additive":
-      return USER_PERSONAS.filter(
-        (persona) =>
-          account.localPersonas.includes(persona) ||
-          account.oidcPersonas.includes(persona),
-      );
+      // Dupe-freie Union beider Quellen in kanonischer Reihenfolge (auch verfahrens-eigene Personas).
+      return normalizePersonas([
+        ...account.localPersonas,
+        ...account.oidcPersonas,
+      ]);
   }
 }
 

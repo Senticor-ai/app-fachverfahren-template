@@ -12,7 +12,6 @@
 // provider-Key ≙ genau ein konfigurierter Issuer) — NIE Re-Link über E-Mail.
 import {
   normalizePersonas,
-  USER_PERSONAS,
   type PersonaManagementMode,
   type UserPersona,
 } from "@senticor/app-store-postgres";
@@ -61,12 +60,10 @@ export function parseExternalPersonaClaim(
       `${PERSONA_CLAIM} must contain only strings`,
     );
   }
-  const known = raw.filter((entry): entry is UserPersona =>
-    (USER_PERSONAS as readonly string[]).includes(entry),
-  );
-  const ignored = [
-    ...new Set(raw.filter((entry) => !known.includes(entry as UserPersona))),
-  ];
+  // Personas sind OFFEN (nicht-Autz): ALLE String-Claims akzeptieren — kein Enum-Filter mehr, damit ein
+  // Fachverfahren eigene Persona-Claims (Beschaffung/HR) aus dem IdP uebernehmen kann. Nichts wird ignoriert.
+  const known: UserPersona[] = raw;
+  const ignored: string[] = [];
   return { kind: "present", personas: normalizePersonas(known), ignored };
 }
 
