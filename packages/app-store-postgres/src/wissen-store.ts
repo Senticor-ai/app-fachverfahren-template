@@ -5,9 +5,12 @@
 // Eintrag) und mandanten-/behörden-scoped — dieselbe Zellform wie der Fall-Aktenvermerk (Zwei-Ebenen-
 // Symmetrie), nur an der ProcedureVersion verankert.
 //
-// TRIAS wie CaseStore/TaskStore: InMemory (DEV/Tests) · Unavailable (fail-closed) · createXFromEnv. Der
-// Postgres-Adapter + die Migration sind der nächste Ausbauschritt (konsistent mit der übrigen Postgres-
-// Politik); der Standalone-/OSS-DEV-Pfad läuft auf InMemory. In PROD sitzt derselbe Store hinter der Naht.
+// AUSTAUSCHBARER PORT (dynamisch + modular): `WissenStore` ist die eine Schnittstelle, die BFF bekommt ihn
+// per Dependency-Injection (`BffDeps.wissenStore`). Implementierungen: InMemory (DEV/Tests) · Postgres
+// (OSS-Default durable, unten) · Unavailable (fail-closed). Die PROD-Ziel-Implementierung ist der chos GRAPH
+// STORE — er steckt hinter EXAKT dieser Schnittstelle (chos injiziert seinen Adapter über die DI-Naht,
+// `createWissenStoreFromEnv` bleibt der OSS-Selektor). Kein Lock-in auf Postgres: das Verfahrens-Wiki bleibt
+// gegen jede Wissens-Backing (relational, Graph, …) austauschbar, ohne dass eine Route/UI sich ändert.
 
 import { createPgClient, type PgClient } from "./client.js";
 
