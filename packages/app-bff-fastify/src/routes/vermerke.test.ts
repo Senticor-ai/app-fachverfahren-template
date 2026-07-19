@@ -280,6 +280,34 @@ describe("BFF Aktenvermerke (/api/cases/:id/vermerke)", () => {
     await app.close();
   });
 
+  it("Kontext-Export ist fail-safe: ein VERWORFENER KI-Entwurf propagiert NICHT (symmetrisch zum Wiki)", async () => {
+    const { app, caseId } = await amtMitFall();
+    const ki = (
+      await app.inject({
+        method: "POST",
+        url: `/api/cases/${caseId}/vermerke/ki`,
+        payload: { task: "zusammenfassung", input: {} },
+      })
+    ).json();
+    await app.inject({
+      method: "POST",
+      url: `/api/cases/${caseId}/vermerke/${ki.vermerkId}/review`,
+      payload: { entscheidung: "verworfen" },
+    });
+    const exp = (
+      await app.inject({
+        method: "GET",
+        url: `/api/cases/${caseId}/vermerke/export`,
+      })
+    ).json();
+    expect(
+      exp.eintraege.some(
+        (e: { eintragId: string }) => e.eintragId === ki.vermerkId,
+      ),
+    ).toBe(false);
+    await app.close();
+  });
+
   it("Review einer unbekannten vermerkId → 404", async () => {
     const { app, caseId } = await amtMitFall();
     const res = await app.inject({

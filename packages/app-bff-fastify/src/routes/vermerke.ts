@@ -493,6 +493,9 @@ export function registerVermerkRoutes(
         .filter((e) => e.eventType === NOTE_EVENT_TYPE)
         .map((e) => toVermerkDto(e, appCase.caseId, reviews.get(e.auditEventId)))
         .filter((v) => v.sichtbarkeit === "public")
+        // Fail-safe (symmetrisch zum Verfahrens-Wiki): ein vom Menschen VERWORFENER KI-Entwurf darf sich
+        // NICHT über die Brücke in Agent-Skills/Kontext fortpflanzen — verworfenes Wissen wird ausgeschlossen.
+        .filter((v) => v.reviewStatus !== "verworfen")
         .map(toWissenEintrag);
       return reply.send({
         caseId: appCase.caseId,
