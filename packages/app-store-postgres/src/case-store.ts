@@ -4,11 +4,14 @@
 // der Store persistiert Zeilen + erzwingt Optimistic-Locking; der reine `transitionCase`-Reducer (Zustands-Guards,
 // Vier-Augen) lebt in der BFF-Service-Schicht, die den Store aufruft.
 //
-// Drei Laufzeiten mit identischer Semantik (Konvention wie AppStore/KanbanStore): Postgres (PROD-STANDALONE),
-// In-Memory (Tests/DEV), Unavailable (fail-closed ohne DB). In der Zielarchitektur (ADR-0001) sitzt in PRODUKTION
-// chos hinter derselben Capability-Naht; diese Store-Impl ist der dokumentierte OSS-/Ohne-chos-Pfad. Mandanten-
-// scoped überall; `patchCaseState` schreibt Zustandswechsel + Audit ATOMAR in EINER Transaktion.
+// Laufzeiten mit identischer Semantik (Konvention wie AppStore/KanbanStore): Postgres (OSS-DEFAULT-STANDALONE),
+// In-Memory (Tests/DEV), Unavailable (fail-closed ohne DB) und — die Ziel-PROD-Backing „grundsätzlich chos für
+// alle Datenspeicherungen" — ChosCaseStore hinter derselben CaseStore-Naht (chos-case-store.ts, gewählt via
+// APP_STORE_MODE=chos). Mandanten-scoped überall; `patchCaseState` schreibt Zustandswechsel + Audit ATOMAR
+// (Postgres: eine Transaktion; chos: eine entity-lifecycle-Mutation).
 import { createPgClient, type PgClient } from "./client.js";
+import { ChosCaseStore } from "./chos-case-store.js";
+import { createChosClientFromEnv } from "./chos-client.js";
 
 /** Ein Fall/eine Akte — die Persistenzform der SDK-`Case` (kompatibel; der Store bleibt SDK-entkoppelt). */
 export interface AppCase {
@@ -294,7 +297,7 @@ export class PostgresCaseStore implements CaseStore {
  * `ownerActorId === null` ist NIE „meins": das entspricht `NULL = $1` in SQL, das ebenfalls nie wahr
  * ist. Diese Zeile IST die Postgres-Parität — sie darf nicht zu `?? ""`-Vergleichen o. Ä. aufweichen.
  */
-function imScope(c: AppCase, scope: CaseScope): boolean {
+export function imScope(c: AppCase, scope: CaseScope): boolean {
   return scope.scope === "authority"
     ? c.authorityId === scope.authorityId
     : c.ownerActorId !== null && c.ownerActorId === scope.actorId;
@@ -430,6 +433,16 @@ export function createCaseStoreFromEnv(
 ): CaseStore {
   // Ephemerer Preview-/Dev-Store (s. createAuthStoreFromEnv): APP_STORE_MODE=memory → prozess-lokaler In-Memory-Store.
   if (env["APP_STORE_MODE"] === "memory") return new InMemoryCaseStore();
+  // chos-Graph-Store (Ziel-PROD-Backing „grundsätzlich chos für alle Datenspeicherungen"): APP_STORE_MODE=chos
+  // + CHOS_API_URL. Fehlt die URL → fail-closed, kein stiller Fallback. Postgres bleibt der OSS-Default.
+  if (env["APP_STORE_MODE"] === "chos") {
+    const client = createChosClientFromEnv(env);
+    return client
+      ? new ChosCaseStore(client)
+      : new UnavailableCaseStore(
+          "CHOS_API_URL is required for APP_STORE_MODE=chos",
+        );
+  }
   const databaseUrl = env["APP_PG_URL"] ?? env["APP_PG_DIRECT_URL"];
   return databaseUrl
     ? new PostgresCaseStore(databaseUrl)

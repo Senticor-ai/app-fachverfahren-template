@@ -13,6 +13,8 @@
 // gegen jede Wissens-Backing (relational, Graph, …) austauschbar, ohne dass eine Route/UI sich ändert.
 
 import { createPgClient, type PgClient } from "./client.js";
+import { createChosClientFromEnv } from "./chos-client.js";
+import { ChosWissenStore } from "./chos-wissen-store.js";
 
 /** Ein Wissens-Eintrag eines Verfahrens (dieselbe Zellform wie der Fall-Aktenvermerk, verfahrens-scoped). */
 export interface VerfahrensWissenEintrag {
@@ -111,6 +113,16 @@ export function createWissenStoreFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): WissenStore {
   if (env["APP_STORE_MODE"] === "memory") return new InMemoryWissenStore();
+  // chos-Graph-Store — die von Anfang an benannte PROD-Ziel-Backing (s. Kopf): APP_STORE_MODE=chos + CHOS_API_URL.
+  // Fehlt die URL → fail-closed. Postgres bleibt der OSS-Default.
+  if (env["APP_STORE_MODE"] === "chos") {
+    const client = createChosClientFromEnv(env);
+    return client
+      ? new ChosWissenStore(client)
+      : new UnavailableWissenStore(
+          "CHOS_API_URL is required for APP_STORE_MODE=chos",
+        );
+  }
   const databaseUrl = env["APP_PG_URL"] ?? env["APP_PG_DIRECT_URL"];
   return databaseUrl
     ? new PostgresWissenStore(databaseUrl)

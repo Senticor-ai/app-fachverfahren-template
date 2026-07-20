@@ -8,6 +8,8 @@ import {
   InMemoryCaseStore,
   PostgresCaseStore,
 } from "./case-store.js";
+import { ChosCaseStore } from "./chos-case-store.js";
+import { InMemoryChosClient } from "./chos-client.js";
 
 // Parametrisierte Vertrags-Tests: identisch gegen den In-Memory-Store (immer) UND — wenn eine Datenbank
 // konfiguriert ist (APP_PG_DIRECT_URL/APP_PG_URL, Migrationen vorher ausgeführt) — gegen den Postgres-Store.
@@ -65,6 +67,13 @@ const impls: { name: string; make: () => CaseStore; enabled: boolean }[] = [
     name: "PostgresCaseStore",
     make: () => new PostgresCaseStore(pgUrl!),
     enabled: Boolean(pgUrl),
+  },
+  {
+    // Der chos-Graph-Adapter über einen Fake-Graph — läuft OHNE laufendes chos durch DENSELBEN Vertrag
+    // (Scope, Optimistic-Locking, atomarer Zustandswechsel+Audit, append-only-Ordnung, jsonb-Parität).
+    name: "ChosCaseStore(InMemoryChosClient)",
+    make: () => new ChosCaseStore(new InMemoryChosClient()),
+    enabled: true,
   },
 ];
 

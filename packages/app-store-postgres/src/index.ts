@@ -117,6 +117,21 @@ export type {
   WissenQuery,
   WissenStore,
 } from "./wissen-store.js";
+export {
+  ChosConflictError,
+  ChosEntityNotFoundError,
+  createChosClientFromEnv,
+  HttpChosClient,
+  InMemoryChosClient,
+} from "./chos-client.js";
+export type {
+  ChosClient,
+  ChosEntity,
+  ChosEvent,
+  HttpChosClientOptions,
+} from "./chos-client.js";
+export { ChosCaseStore } from "./chos-case-store.js";
+export { ChosWissenStore } from "./chos-wissen-store.js";
 export { nextPositionKey } from "./position.js";
 export {
   defaultMigrationOptionsFromEnv,

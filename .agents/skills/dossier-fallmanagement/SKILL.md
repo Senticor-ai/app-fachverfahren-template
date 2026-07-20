@@ -27,10 +27,14 @@ Datenmodell und die API-Fläche.
 
 ## Die Datenschicht — `CaseStore` + `TaskStore`
 
-Zwei server-autoritative Stores, jeder als **Trias** Postgres (PROD-Standalone) /
-InMemory (Tests/DEV) / Unavailable (fail-closed ohne DB), plus
-`createXFromEnv`-Fabrik. Beide sind Mandanten-scoped
-(`tenantId`/`authorityId`/`jurisdictionId`) und append-only im Audit.
+Zwei server-autoritative Stores, jeder als austauschbarer **Port** mit
+identischer Semantik: Postgres (**OSS-Default-Standalone**) / InMemory (Tests/DEV) /
+Unavailable (fail-closed ohne DB) — und für den `CaseStore`/`WissenStore` zusätzlich
+der **chos-Graph-Adapter** (Ziel-PROD-Backing „grundsätzlich chos für alle
+Datenspeicherungen", `packages/app-store-postgres/src/chos-case-store.ts` /
+`chos-wissen-store.ts`, gewählt via `APP_STORE_MODE=chos` + `CHOS_API_URL`). Alle
+hinter EXAKT derselben Schnittstelle — Route/UI ändern sich NICHT. Beide sind
+Mandanten-scoped (`tenantId`/`authorityId`/`jurisdictionId`) und append-only im Audit.
 
 ### `CaseStore` — die Akte (`packages/app-store-postgres/src/case-store.ts`)
 
@@ -48,8 +52,18 @@ Reducer (Guards, Vier-Augen) lebt in der BFF-Schicht.
 - `AppAuditEvent` (gegen `app_audit_events`) ist fachlich + append-only;
   `legalBasisId` und `purpose` sind **Pflicht** — eine Rechtsgrundlage wird NIE
   erfunden (sie kommt aus der `ProcedureVersion`).
-- `createCaseStoreFromEnv(env)`: `APP_PG_URL`/`APP_PG_DIRECT_URL` → Postgres,
-  sonst `UnavailableCaseStore` (fail-closed, kein stiller In-Memory-Fallback).
+- `createCaseStoreFromEnv(env)`: `APP_STORE_MODE=memory` → InMemory;
+  `APP_STORE_MODE=chos` (+ `CHOS_API_URL`) → `ChosCaseStore` (fail-closed ohne URL);
+  sonst `APP_PG_URL`/`APP_PG_DIRECT_URL` → Postgres (Default), sonst
+  `UnavailableCaseStore` (fail-closed, kein stiller In-Memory-Fallback).
+- **chos-Adapter** (`ChosCaseStore`, `packages/app-store-postgres/src/chos-case-store.ts`):
+  Fall-Dokumente als versionierte chos-Entities, Audit als append-only Ereignis-Stream
+  (Key = `caseId`); `patchCaseState` läuft ATOMAR als eine chos-`entity-lifecycle`-
+  Mutation (Zustand + Audit unteilbar). Er spricht NUR gegen die OSS-eigene Naht
+  `ChosClient` (`chos-client.ts`) — kein Hart-Bezug auf die privaten chos-Pakete;
+  der `InMemoryChosClient` macht den Adapter OHNE laufendes chos testbar (er durchläuft
+  denselben Store-Vertrag wie InMemory/Postgres). Der `HttpChosClient` ist die dünne
+  Draht-Kante (Endpunkt-Vertrag bei der Integration gegen ein laufendes chos zu fixieren).
 
 > Hinweis (ehrlich): `AppCase` trägt **keine** frei-formige `data`-Nutzlast und
 > **kein** `caseKind`. Die Akte hält nur ihre Stammfelder + `subjectIds`; alle
@@ -162,9 +176,12 @@ hinaus:
 **Zwei Ebenen (Zwei-Ebenen-Symmetrie):** neben dem Fall-Wiki gibt es das
 **Verfahrens-Wiki** — generelles Wissen + Fähigkeiten EINES Verfahrens, dieselbe
 Zellform, verfahrens-scoped im `WissenStore` (`app-store-postgres`, append-only,
-behörden-scoped). Routen `GET|POST /api/verfahren/:procedureId/:version/wissen`
-(+ `/ki`, `/export`, `/:eintragId/review`); UI `pages/amt-verfahren-wiki.tsx`,
-erreichbar aus der Akte.
+behörden-scoped). Der `WissenStore` ist derselbe austauschbare Port: InMemory /
+Postgres (Default) / **chos-Graph** (`ChosWissenStore`, `chos-wissen-store.ts` —
+die von Anfang an benannte PROD-Ziel-Backing, Wissens-Einträge als append-only
+chos-Ereignisse pro Verfahren, `APP_STORE_MODE=chos`). Routen
+`GET|POST /api/verfahren/:procedureId/:version/wissen` (+ `/ki`, `/export`,
+`/:eintragId/review`); UI `pages/amt-verfahren-wiki.tsx`, erreichbar aus der Akte.
 
 - **KI-Wissen ist prüfpflichtig** (dieselbe HITL-Naht wie im Fall, weil sein
   Blast-Radius ALLE künftigen Fälle des Verfahrens ist): ein KI-Eintrag startet

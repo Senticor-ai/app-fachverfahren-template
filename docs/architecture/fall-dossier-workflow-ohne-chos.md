@@ -33,6 +33,24 @@ Jeder Store folgt der etablierten Impl-Trias **Postgres / InMemory / Unavailable
 - **InMemory** — Tests/DEV, identische Semantik.
 - **Unavailable** — fail-closed ohne Datenbank (jede Operation wirft), damit kein stiller
   Datenverlust entsteht.
+- **chos-Graph** — die realisierte „hinter dem Port sitzt chos"-Backing (s. u.).
+
+### Der chos-Pfad (Ziel-PROD: „grundsätzlich chos für alle Datenspeicherungen")
+
+Das oben angekündigte „in Produktion sitzt chos hinter demselben Port" ist jetzt als konkreter
+Adapter da — Postgres bleibt der **OSS-Default**, chos ist per Umschalter wählbar:
+
+- `ChosCaseStore` (`src/chos-case-store.ts`) und `ChosWissenStore` (`src/chos-wissen-store.ts`)
+  implementieren dieselben `CaseStore`/`WissenStore`-Verträge. Fall-Dokumente liegen als
+  versionierte chos-**Entities**, das append-only Audit / Verfahrens-Wissen als chos-**Ereignis**-
+  Streams; `patchCaseState` ist EINE atomare chos-`entity-lifecycle`-Mutation (Zustand + Audit).
+- **Kein Hart-Bezug auf chos-IP:** die Adapter sprechen nur gegen die OSS-eigene Naht `ChosClient`
+  (`src/chos-client.ts`, chos-Vokabular: Entities + Lineage-Ereignisse). `InMemoryChosClient` macht
+  sie OHNE laufendes chos testbar (sie durchlaufen denselben Store-Vertrag wie InMemory/Postgres);
+  `HttpChosClient` ist die dünne Draht-Kante gegen die chos-HTTP-API (Endpunkt-Vertrag bei der
+  Integration gegen ein laufendes chos zu fixieren).
+- Umschalter: `APP_STORE_MODE=chos` + `CHOS_API_URL` (+ optional `CHOS_API_TOKEN`). Fehlt die URL →
+  fail-closed (`Unavailable*`), kein stiller Fallback. Route/UI/`leistung.config` ändern sich NICHT.
 
 Der BFF (`@senticor/app-bff-fastify`) exponiert die Naht über REST-Routen (`routes/cases.ts`,
 `routes/tasks.ts`): RBAC (`case.read` / `case.decision.prepare`), Kontext **nur** aus der
