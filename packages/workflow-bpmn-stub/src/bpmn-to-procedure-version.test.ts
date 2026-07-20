@@ -153,6 +153,50 @@ describe("bpmnToProcedureVersion", () => {
     ]);
   });
 
+  it("leitet N-AUGEN ab (Extension-Attribut requiredApprovals=3) — grafisch im BPMN konfigurierbar", () => {
+    const xml = `<bpmn:definitions xmlns:bpmn="x" xmlns:senticor="y">
+      <bpmn:process id="p">
+        <bpmn:userTask id="pruefung" name="Pruefung" />
+        <bpmn:userTask id="bewilligt" name="Bewilligt" />
+        <bpmn:sequenceFlow id="a" name="genehmigen" senticor:requiredApprovals="3"
+                           sourceRef="pruefung" targetRef="bewilligt" />
+      </bpmn:process>
+    </bpmn:definitions>`;
+
+    const { allowedTransitions } = bpmnToProcedureVersion(xml, {
+      procedureId: "procedure.example",
+      version: "1.0.0",
+      legalBasisIds: [],
+    });
+
+    expect(allowedTransitions).toEqual([
+      {
+        from: "Pruefung",
+        to: "Bewilligt",
+        action: "genehmigen",
+        requiredPermission: "case.decision.prepare",
+        requiredApprovals: 3,
+      },
+    ]);
+  });
+
+  it("ignoriert eine ungültige requiredApprovals-Angabe (< 2 / keine Zahl)", () => {
+    const xml = `<bpmn:definitions xmlns:bpmn="x" xmlns:senticor="y">
+      <bpmn:process id="p">
+        <bpmn:userTask id="a" name="A" />
+        <bpmn:userTask id="b" name="B" />
+        <bpmn:sequenceFlow id="f" name="weiter" senticor:requiredApprovals="eins"
+                           sourceRef="a" targetRef="b" />
+      </bpmn:process>
+    </bpmn:definitions>`;
+    const { allowedTransitions } = bpmnToProcedureVersion(xml, {
+      procedureId: "p",
+      version: "1",
+      legalBasisIds: [],
+    });
+    expect(allowedTransitions[0]).not.toHaveProperty("requiredApprovals");
+  });
+
   it("nutzt @id als Zustands-Label, wenn @name fehlt, und setzt den effectiveFrom-Sentinel", () => {
     const xml = `<process id="p">
       <task id="erfassen" />

@@ -198,6 +198,45 @@ describe("BFF POST /api/cases/:id/transitions", () => {
     await app.close();
   });
 
+  it("403 N-AUGEN: ein reiner requiredApprovals-Übergang (ohne requiresFourEyes) erzwingt die 2-Augen-Untergrenze", async () => {
+    // Beweist die engine-neutrale Verallgemeinerung: das Gate triggert über `requiredApprovalsOf(t) >= 2`, nicht
+    // nur über das boolesche `requiresFourEyes`. So bleibt ein aus dem BPMN abgeleiteter `senticor:requiredApprovals`
+    // -Übergang NICHT ungeschützt (kein Scheinschutz). Die volle N-Zählung (N>2) ist Folge-Ausbau.
+    const nAugen: ProcedureVersion = {
+      ...procedure,
+      allowedTransitions: [
+        procedure.allowedTransitions[0]!,
+        {
+          from: "aktiv",
+          to: "abgeschlossen",
+          action: "abschliessen",
+          requiredPermission: "case.decision.prepare",
+          requiredApprovals: 3,
+        },
+      ],
+    };
+    const { app } = await buildBffApp({
+      session: caseworkerSession(),
+      caseStore: new InMemoryCaseStore(),
+      procedureRegistry: createInMemoryProcedureRegistry([nAugen]),
+    });
+    const created = await createCase(app);
+    const aktiv = await app.inject({
+      method: "POST",
+      url: `/api/cases/${created.caseId}/transitions`,
+      payload: { action: "aktivieren", expectedVersion: created.version },
+    });
+    expect(aktiv.statusCode).toBe(200);
+    // Derselbe Akteur will den requiredApprovals-Übergang selbst auslösen → 403 (2-Augen-Separation).
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/cases/${created.caseId}/transitions`,
+      payload: { action: "abschliessen", expectedVersion: aktiv.json().version },
+    });
+    expect(res.statusCode).toBe(403);
+    await app.close();
+  });
+
   it("403 Vier-Augen bleibt bestehen, wenn ein FREMDES Ereignis dazwischenfunkt (Sperre gilt der Entscheidung, nicht der Reihenfolge)", async () => {
     // ANGRIFF, den diese Prüfung fährt: die Vorfassung verglich gegen das JÜNGSTE Audit-Ereignis
     // ohne Typ-Filter. Schreibt irgendein anderer Akteur nach dem Vorbereiter in den Fall-Strom,

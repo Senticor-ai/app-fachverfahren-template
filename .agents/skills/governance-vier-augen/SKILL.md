@@ -1,6 +1,6 @@
 ---
 name: governance-vier-augen
-description: Understand and use the server-enforced four-eyes / governance on the case-management path (ADR-0001) — a requiresFourEyes state transition (POST /api/cases/:id/transitions) may not be triggered by the same person who wrote the most recent append-only audit event, gated server-side against app_audit_events, with the legal basis taken from the procedure and never invented. Use it when asked how four-eyes / Vier-Augen / governance works now, how a case decision is approved by a second person, or how requiresFourEyes flows from BPMN into the server.
+description: Understand and use the server-enforced four-eyes / N-Augen governance on the case-management path (ADR-0001) — a transition requiring two or more eyes (requiresFourEyes, or the engine-neutral generalization requiredApprovals >= 2 via requiredApprovalsOf) at POST /api/cases/:id/transitions may not be triggered by the same person who wrote the most recent append-only audit event, gated server-side against app_audit_events, with the legal basis taken from the procedure and never invented. Use it when asked how four-eyes / Vier-Augen / N-Augen / requiredApprovals / governance works now, how a case decision is approved by a second person, or how requiresFourEyes / requiredApprovals flows from BPMN into the server.
 ---
 
 # Governance Vier-Augen (Fall-/Dossier-Pfad)
@@ -33,8 +33,10 @@ Genau EINE Stelle prüft die zwei Personen:
 1. Der passende Übergang wird aus dem Verfahren aufgelöst — `from` = AKTUELLER
    Zustand der Akte und `action` = `body.action`. Der Zielzustand wird NIE aus
    dem Body gelesen (`procedure.allowedTransitions.find(...)`); unbekannt ⇒ 400.
-2. Trägt der Übergang `requiresFourEyes`, lädt die Route
-   `caseStore.listAuditEvents({ tenantId, caseId })` (aufsteigend nach
+2. Verlangt der Übergang mindestens zwei Augen — geprüft über
+   `requiredApprovalsOf(transition) >= 2` (wahr für `requiresFourEyes: true`
+   ODER die Verallgemeinerung `requiredApprovals >= 2`, s. u. N-Augen) — lädt die
+   Route `caseStore.listAuditEvents({ tenantId, caseId })` (aufsteigend nach
    `occurred_at`), nimmt den JÜNGSTEN Eintrag und vergleicht dessen `actorId`
    mit `session.actorId`. Gleich ⇒ **403** („four-eyes: der auslösende Akteur
    muss ein anderer sein"). Der Akteur kommt AUSSCHLIESSLICH aus der Sitzung
@@ -66,6 +68,27 @@ NICHT. Das Flag ist reine Modell-Daten, die Erzwingung ist BFF-seitig.
   ein Extension-Attribut mit Local-Name `requiresFourEyes="true"` (Präfix egal,
   z. B. `senticor:requiresFourEyes`). Die Funktion ist rein/deterministisch und
   SETZT NUR das Flag — die Zwei-Personen-Erzwingung bleibt server-seitig (ADR-0002).
+
+## N-Augen: `requiredApprovals` (Verallgemeinerung, engine-neutral)
+
+- Typ: `CaseTransition.requiredApprovals?: number` — wie viele DISTINKTE
+  Freigebende der Übergang verlangt. `requiresFourEyes: true` ist genau der
+  Sonderfall `requiredApprovals: 2`; ohne beides = 1 (kein Freigabe-Zwang). Die
+  EINE Wahrheit dafür ist die reine SDK-Funktion `requiredApprovalsOf(transition)`
+  (`domain-kernel.ts`) — Route UND UI lesen sie hieraus, nie aus einem der beiden
+  Felder direkt. `approvalsSatisfied(distinctApprovers, transition)` ist das reine Gate.
+- Engine-NEUTRAL: die Zahl lebt auf der `ProcedureVersion`, nicht in einer
+  bestimmten Workflow-Engine. Der BPMN-Adapter leitet sie aus einem Flow-Extension-
+  Attribut Local-Name `requiredApprovals="N"` (N≥2, z. B. `senticor:requiredApprovals`)
+  ab — grafisch im BPMN konfigurierbar; ein späterer Camunda-/n8n-Adapter mappt
+  SEIN Modell ebenso auf dasselbe Feld. So bleibt die Governance-Spezifikation
+  über die Engine austauschbar.
+- ERZWUNGEN wird heute die **2-Augen-Untergrenze** für jeden Übergang mit
+  `requiredApprovalsOf >= 2` (auslösender ≠ letzter Bearbeiter). Die volle Zählung
+  N DISTINKTER Freigebender (N>2) ist bewusster Folge-Ausbau (Freigabe-Sammlung) —
+  bis dahin gilt: kein Scheinschutz (mind. 2 Augen), aber noch nicht die volle
+  konfigurierte Tiefe. Der Client-DTO (`GET /api/cases/:id`, `actions[].requiresFourEyes`)
+  spiegelt konsistent genau diese Untergrenze (`requiredApprovalsOf >= 2`).
 
 ## RBAC-Rechte
 
@@ -112,6 +135,10 @@ Route gatet über `bffRouteAuth({ kind: "rbac", permission })` VOR dem Handler
   dedizierte, an DIESE Entscheidung gebundene Vorbereiter-Rolle. Ein
   Entscheidungs-Entwurf mit `preparedBy`/`approvedBy`-Paarung existiert noch
   nicht.
+- **N-Augen (N>2) ist erst als Untergrenze erzwungen.** `requiredApprovals` ist
+  vollständig als engine-neutrale Spezifikation da (BPMN-ableitbar, im Modell, im
+  Client-DTO gespiegelt), aber die Route erzwingt bislang nur die 2-Augen-Separation.
+  Die volle Sammlung + Zählung N distinkter Freigebender fehlt noch (Folge-Ausbau).
 - **Keine eigene `case.decide`-Berechtigung.** Vorbereiten und Freigeben laufen
   beide unter `case.decision.prepare`; getrennt werden sie nur über die
   Akteur-Identität im Audit, nicht über verschiedene Rechte. Das per-Übergang

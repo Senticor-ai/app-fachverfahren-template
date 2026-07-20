@@ -33,6 +33,13 @@
 //   Die eigentliche Zwei-Akteure-Erzwingung passiert server-seitig (BFF/Governance) — hier wird NUR das Flag
 //   aus dem Modell abgeleitet.
 //
+// ── N-AUGEN-KONVENTION (Verallgemeinerung von Vier-Augen) ────────────────────────────────────────────────
+//   Ein Flow mit Extension-Attribut Local-Name `requiredApprovals="N"` (N≥2, Präfix egal, z. B.
+//   `senticor:requiredApprovals`) verlangt N DISTINKTE Freigebende → `CaseTransition.requiredApprovals`. Das
+//   ist die Verallgemeinerung von Vier-Augen (= requiredApprovals 2). ENGINE-NEUTRAL: ein anderer Workflow-
+//   Adapter (Camunda/n8n) mappt sein Modell ebenso auf dieses Feld — die Governance-Spezifikation ist damit
+//   austauschbar über die Engine, aber grafisch im BPMN konfigurierbar. Die Zahl-Erzwingung bleibt server-seitig.
+//
 // ── CLOSES-CASE-KONVENTION (dokumentiert, zwei gleichwertige Auslöser) ───────────────────────────────────
 //   (a) der ZIEL-Knoten des Übergangs ist ein `<endEvent>` (die BPMN-Semantik des Endereignisses IST
 //       „der Fall wird geschlossen"); ODER
@@ -92,6 +99,8 @@ interface SequenceFlow {
   name?: string;
   requiresFourEyesAttr: boolean;
   closesCaseAttr: boolean;
+  /** N-AUGEN: `senticor:requiredApprovals="3"` → 3 distinkte Freigebende (Verallgemeinerung von Vier-Augen). */
+  requiredApprovalsAttr?: number;
 }
 
 /** BPMN-Element-Tag (ohne Namespace-Präfix) → Rolle im abgeleiteten Zustandsmodell. */
@@ -262,11 +271,24 @@ export function bpmnToProcedureVersion(
     const closesCaseAttr = Object.entries(attrs).some(
       ([key, value]) => localName(key) === "closesCase" && value === "true",
     );
+    // N-AUGEN: `senticor:requiredApprovals="N"` (Präfix egal) → N distinkte Freigebende. Nur eine ganze Zahl ≥ 2.
+    const requiredApprovalsRaw = Object.entries(attrs).find(
+      ([key]) => localName(key) === "requiredApprovals",
+    )?.[1];
+    const parsedApprovals =
+      requiredApprovalsRaw !== undefined
+        ? Number.parseInt(requiredApprovalsRaw, 10)
+        : Number.NaN;
+    const requiredApprovalsAttr =
+      Number.isInteger(parsedApprovals) && parsedApprovals >= 2
+        ? parsedApprovals
+        : undefined;
     const flow: SequenceFlow = {
       sourceRef,
       targetRef,
       requiresFourEyesAttr,
       closesCaseAttr,
+      ...(requiredApprovalsAttr !== undefined ? { requiredApprovalsAttr } : {}),
       ...(name !== undefined ? { name } : {}),
     };
     const bucket = flowsBySource.get(sourceRef);
@@ -290,6 +312,11 @@ export function bpmnToProcedureVersion(
     const namedFlow = path.find((flow) => flow.name !== undefined);
     const action = namedFlow?.name ?? `${fromLabel}->${toLabel}`;
     const requiresFourEyes = path.some(isFourEyesFlow);
+    // N-AUGEN: die hoechste requiredApprovals-Angabe auf dem Pfad (0 = keine) — die Verallgemeinerung von Vier-Augen.
+    const requiredApprovals = Math.max(
+      0,
+      ...path.map((flow) => flow.requiredApprovalsAttr ?? 0),
+    );
     // Schließt dieser Übergang den Fall? ZWEI gleichwertige Auslöser (siehe Modul-Kommentar): das Ziel ist ein
     // endEvent ODER ein Flow auf dem Pfad trägt closesCase="true". Letzteres trägt den WIEDERAUFNEHMBAREN Fall:
     // ein reopenbarer Abschluss-Zustand hat ausgehende Flüsse und darf daher kein endEvent sein (ein
@@ -301,6 +328,12 @@ export function bpmnToProcedureVersion(
       // Zusammenlaufende Pfade mit gleicher Aktion: Vier-Augen ist die ODER-Verknüpfung.
       const merged: CaseTransition = { ...existing };
       if (requiresFourEyes) merged.requiresFourEyes = true;
+      if (requiredApprovals >= 2) {
+        merged.requiredApprovals = Math.max(
+          merged.requiredApprovals ?? 0,
+          requiredApprovals,
+        );
+      }
       if (closesCase) merged.closesCase = true;
       transitions.set(key, merged);
       return;
@@ -311,6 +344,7 @@ export function bpmnToProcedureVersion(
       action,
       requiredPermission: REQUIRED_PERMISSION,
       ...(requiresFourEyes ? { requiresFourEyes: true } : {}),
+      ...(requiredApprovals >= 2 ? { requiredApprovals } : {}),
       ...(closesCase ? { closesCase: true } : {}),
     });
   };

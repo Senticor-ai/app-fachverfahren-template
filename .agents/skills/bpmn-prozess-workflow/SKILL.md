@@ -109,9 +109,23 @@ Auslösern greift:
 Hier wird NUR das Flag aus dem Modell abgeleitet. Die eigentliche
 Zwei-Akteure-Erzwingung passiert **server-seitig**: `POST
 /api/cases/:id/transitions` (`app-bff-fastify/src/routes/cases.ts`) lehnt einen
-`requiresFourEyes`-Übergang mit `403` ab, wenn der Akteur des jüngsten
-Audit-Eintrags derselbe ist wie der aktuelle (Vorbereiter darf nicht selbst
-freigeben).
+Übergang, der mindestens zwei Augen verlangt, mit `403` ab, wenn der Akteur des
+jüngsten Audit-Eintrags derselbe ist wie der aktuelle (Vorbereiter darf nicht
+selbst freigeben).
+
+## N-Augen-Konvention: `requiredApprovals` (Verallgemeinerung)
+
+Ein Flow-Extension-Attribut mit Local-Name `requiredApprovals="N"` (N≥2, Präfix
+egal, z. B. `senticor:requiredApprovals="3"`) setzt
+`CaseTransition.requiredApprovals` = N — wie viele DISTINKTE Freigebende der
+Übergang verlangt. `requiresFourEyes` ist genau der Sonderfall
+`requiredApprovals: 2`. Die Zahl ist ENGINE-NEUTRAL (sie lebt auf der
+`ProcedureVersion`, nicht in der BPMN-Engine) — ein späterer Camunda-/n8n-Adapter
+mappt sein Modell ebenso auf dasselbe Feld; hier ist sie grafisch im BPMN
+konfigurierbar. Ungültige Angaben (keine Zahl, < 2) werden ignoriert. ERZWUNGEN
+ist server-seitig heute die 2-Augen-Untergrenze für jeden Übergang mit
+`requiredApprovals >= 2` (dieselbe `403`-Separation); die volle Zählung N>2 ist
+Folge-Ausbau. Details: [[governance-vier-augen]].
 
 ## closesCase-Konvention (Abschluss des Falls)
 

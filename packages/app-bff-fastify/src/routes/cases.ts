@@ -29,6 +29,7 @@ import {
 import {
   builtInPermissions,
   createFachlicheAuditEvent,
+  requiredApprovalsOf,
   transitionCase,
   type Case as DomainCase,
 } from "@senticor/public-sector-sdk";
@@ -333,7 +334,9 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
               action: transition.action,
               to: transition.to,
               requiredPermission: transition.requiredPermission,
-              requiresFourEyes: transition.requiresFourEyes ?? false,
+              // Konsistent zur Erzwingung (s. u.): true, sobald der Server die 2-Augen-Separation verlangt —
+              // auch für einen reinen `requiredApprovals >= 2`-Übergang ohne gesetztes `requiresFourEyes`.
+              requiresFourEyes: requiredApprovalsOf(transition) >= 2,
             }))
         : [];
       return reply.send({
@@ -518,7 +521,14 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
       // nur nicht auf, weil zufällig ausschliesslich BEARBEITUNGS-Ereignisse in diesen Strom laufen.
       // Die Sperre bezieht sich deshalb explizit auf die Ereignisse, die einen Bearbeitungsschritt am Fall
       // DARSTELLEN — neue Ereignistypen (Abruf, Zustellung, Vermerk) verschieben die Bezugsgröße nicht mehr.
-      if (transition.requiresFourEyes) {
+      //
+      // N-AUGEN (Untergrenze): der Trigger liest die effektive Freigabe-Zahl (`requiredApprovalsOf`), damit ein
+      // Übergang mit `requiredApprovals >= 2` (die Verallgemeinerung, engine-neutral aus dem BPMN abgeleitet)
+      // NICHT ungeschützt bleibt. Erzwungen wird hier die 2-Augen-SEPARATION (auslösender ≠ letzter Bearbeiter)
+      // — die Untergrenze jeder Freigabe. Die volle Zählung N DISTINKTER Freigebender (N>2) ist ein bewusster
+      // Folge-Ausbau (Freigabe-Sammlung); bis dahin gilt: kein Scheinschutz (mind. 2 Augen), aber auch noch
+      // nicht die volle konfigurierte Tiefe. `requiresFourEyes` bleibt exakt äquivalent (requiredApprovalsOf=2).
+      if (requiredApprovalsOf(transition) >= 2) {
         let events: AppAuditEvent[];
         try {
           events = await deps.caseStore.listAuditEvents({

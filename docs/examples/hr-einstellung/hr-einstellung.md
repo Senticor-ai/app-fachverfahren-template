@@ -29,5 +29,8 @@ bzw. als Aufgaben/Vermerke. Personas = nur Navigation; Autorisierung = Server/RB
 
 ## Grenzen — wie beim Beschaffungs-Blueprint
 
-N-Augen / mehrstufige Freigabeketten (P1-4) und Positions-/Wiederhol-Formularfelder (P1-6)
-sind Folge-Ausbau; heute trägt das Modell ein boolesches `requiresFourEyes`.
+N-Augen ist inzwischen als engine-neutrales `CaseTransition.requiredApprovals` (Zahl,
+grafisch im BPMN via `senticor:requiredApprovals` konfigurierbar) modelliert; server-seitig
+erzwungen ist heute die 2-Augen-Untergrenze, die volle Zählung N>2 distinkter Freigebender
+ist Folge-Ausbau. Positions-/Wiederhol-Formularfelder (P1-6) bleiben Folge-Ausbau. Die
+Budget-Freigabe hier nutzt weiter `requiresFourEyes` (≡ `requiredApprovals: 2`).

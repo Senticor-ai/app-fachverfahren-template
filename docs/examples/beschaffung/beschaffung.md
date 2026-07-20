@@ -60,8 +60,10 @@ Server bewahrt auf, stempelt Identität/Zeit und auditiert.
 
 ## Grenzen (ehrlich) — Folge-Ausbau
 
-- **N-Augen / mehrstufige Freigabeketten** (Wertgrenzen-gestaffelt, 3+ Freigeber): das
-  Modell trägt heute ein boolesches `requiresFourEyes` — gestaffelte Ketten sind
-  Folge-Arbeit (P1-4).
+- **N-Augen** (3+ Freigeber): modelliert als engine-neutrales
+  `CaseTransition.requiredApprovals` (Zahl, grafisch im BPMN via
+  `senticor:requiredApprovals` konfigurierbar; `requiresFourEyes` ≡ `requiredApprovals: 2`).
+  Server-seitig erzwungen ist heute die 2-Augen-Untergrenze; die volle Zählung N>2
+  distinkter Freigebender und **wertgrenzen-gestaffelte** Ketten (P1-4) sind Folge-Arbeit.
 - **Positions-Formularfelder**: `FeldTyp` hat (noch) keine Wiederhol-/Array-Felder für
   eine Positionstabelle im Antrag; Dossier-Verfahren nutzen `data`/Aufgaben (P1-6).

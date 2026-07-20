@@ -106,6 +106,12 @@ export interface CaseTransition {
   action: string;
   requiredPermission: string;
   requiresFourEyes?: boolean;
+  /** N-AUGEN (engine-NEUTRAL): wie viele DISTINKTE Freigebende dieser Übergang verlangt — die
+   *  Verallgemeinerung von `requiresFourEyes` (das ist genau `requiredApprovals: 2`). Default 1 (kein
+   *  Freigabe-Zwang). Die Zahl lebt auf der ProcedureVersion, NICHT in einer bestimmten Workflow-Engine: ein
+   *  Engine-Adapter (BPMN via `senticor:requiredApprovals` heute; Camunda/n8n später) mappt SEIN Modell hierauf.
+   *  So bleibt die Governance-Spezifikation austauschbar über die Engine — grafisch konfigurierbar im BPMN. */
+  requiredApprovals?: number;
   /** Schließt dieser Übergang den Fall? Dann wird `closedAt` gestempelt. Data-driven statt eines hart
    *  kodierten Zielzustand-Namens — jedes Verfahren benennt seinen Endzustand selbst (z. B. „abgeschlossen"). */
   closesCase?: boolean;
@@ -202,6 +208,27 @@ export interface LegalBasisReference {
   uri?: string;
   validFrom: string;
   validTo?: string;
+}
+
+/** Die effektive Zahl geforderter DISTINKTER Freigaben eines Übergangs. Backward-compat: `requiresFourEyes:true`
+ *  ≡ `requiredApprovals: 2`; ohne beides = 1 (keine Freigabe-Pflicht). Rein/deterministisch — die eine Wahrheit
+ *  für Vier-/N-Augen (Route-Enforcement UND UI lesen sie hieraus, nie aus einem der beiden Felder direkt). */
+export function requiredApprovalsOf(
+  transition: Pick<CaseTransition, "requiredApprovals" | "requiresFourEyes">,
+): number {
+  if (typeof transition.requiredApprovals === "number") {
+    return Math.max(1, Math.trunc(transition.requiredApprovals));
+  }
+  return transition.requiresFourEyes === true ? 2 : 1;
+}
+
+/** N-AUGEN-Prüfung (rein): ist die Freigabe erfüllt? `distinctApprovers` = Anzahl VERSCHIEDENER Freigebender,
+ *  die den Übergang mitgetragen haben (inkl. des auslösenden Akteurs). Erfüllt, wenn ≥ requiredApprovalsOf. */
+export function approvalsSatisfied(
+  distinctApprovers: number,
+  transition: Pick<CaseTransition, "requiredApprovals" | "requiresFourEyes">,
+): boolean {
+  return distinctApprovers >= requiredApprovalsOf(transition);
 }
 
 export function transitionCase(
