@@ -55,6 +55,9 @@ export interface PersonaDescriptor {
    *  ist die Zuständigkeit rein menschlich besetzt (kein Agent-Angebot). Der Mensch bleibt führend (HITL) — das AAL sagt,
    *  WIE VIEL der Agent vorbereiten darf, nie dass er allein entscheidet. */
   faehigkeiten?: KiFaehigkeiten;
+  /** WELLE 2: die ZUSICHERUNG dieser Zuständigkeit — Zertifizierungs-Status (§19) + CAL + Contract Envelope (§8), der
+   *  Laufzeit-Spiegel der CHOS-`governance.certification`. JSON-serialisierbar (Config-Naht); optional/feature-tolerant. */
+  certification?: KiZusicherung;
   /** Optionales Icon. Wird vom Switcher aktuell nicht gerendert (Avatar = Initialen) und ist NICHT über eine
    *  Config-Naht transportierbar — daher optional. */
   icon?: LucideIcon;
@@ -72,6 +75,20 @@ export interface KiFaehigkeiten {
   readonly ki: readonly string[];
   /** Das Autonomie-Level dieser Zuständigkeit. Fehlt es, bleibt die Autonomie unbestimmt (rein assistierend, HITL). */
   readonly aal?: AAL;
+}
+
+/** WELLE 2: die ZUSICHERUNG einer Zuständigkeit — Zertifizierungs-Status (§19: draft→incubated→candidate→certified→active) +
+ *  CAL-Level (0..4) + Contract Envelope (§8: Ergebnis/Daten/Governance/Nachweis). Laufzeit-Spiegel eines CHOS-
+ *  `governance.certification`-Eintrags. JSON-serialisierbar (Config-Naht). */
+export interface KiZusicherung {
+  readonly status?: string;
+  readonly cal?: number;
+  readonly envelope?: {
+    readonly outcome?: string;
+    readonly data?: string;
+    readonly governance?: string;
+    readonly evidence?: string;
+  };
 }
 
 /** Initialen aus einem Label ableiten (2 Zeichen) — damit ein Descriptor OHNE `initials` (z.B. aus einer generierten

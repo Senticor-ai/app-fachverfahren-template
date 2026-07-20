@@ -124,6 +124,11 @@ describe("toContractSnapshot — Business-Logik als ECHTE Zeilen, nicht '[functi
             ki: ["subsumtion", "bescheid-entwurf"],
             aal: "AAL-3",
           },
+          certification: {
+            status: "candidate",
+            cal: 3,
+            envelope: { outcome: "begründeter Bescheid" },
+          },
         },
         { key: "buerger", label: "Bürger:in" },
       ],
@@ -132,6 +137,11 @@ describe("toContractSnapshot — Business-Logik als ECHTE Zeilen, nicht '[functi
     expect(snap.personas?.[0]).toMatchObject({
       key: "sachbearbeitung",
       faehigkeiten: { ki: ["subsumtion", "bescheid-entwurf"], aal: "AAL-3" },
+      certification: {
+        status: "candidate",
+        cal: 3,
+        envelope: { outcome: "begründeter Bescheid" },
+      },
     });
     // Rein menschlich besetzte Zuständigkeit trägt kein KI-Angebot.
     expect(snap.personas?.[1]?.faehigkeiten).toBeUndefined();
