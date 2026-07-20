@@ -40,10 +40,11 @@ Jeder Store folgt der etablierten Impl-Trias **Postgres / InMemory / Unavailable
 Das oben angekündigte „in Produktion sitzt chos hinter demselben Port" ist jetzt als konkreter
 Adapter da — Postgres bleibt der **OSS-Default**, chos ist per Umschalter wählbar:
 
-- `ChosCaseStore` (`src/chos-case-store.ts`) und `ChosWissenStore` (`src/chos-wissen-store.ts`)
-  implementieren dieselben `CaseStore`/`WissenStore`-Verträge. Fall-Dokumente liegen als
-  versionierte chos-**Entities**, das append-only Audit / Verfahrens-Wissen als chos-**Ereignis**-
-  Streams; `patchCaseState` ist EINE atomare chos-`entity-lifecycle`-Mutation (Zustand + Audit).
+- `ChosCaseStore` (`src/chos-case-store.ts`), `ChosTaskStore` (`src/chos-task-store.ts`) und
+  `ChosWissenStore` (`src/chos-wissen-store.ts`) implementieren dieselben `CaseStore`/`TaskStore`/
+  `WissenStore`-Verträge. Fall- und Aufgaben-Dokumente liegen als versionierte chos-**Entities**,
+  das append-only Audit / Verfahrens-Wissen als chos-**Ereignis**-Streams; `patchCaseState` ist EINE
+  atomare chos-`entity-lifecycle`-Mutation (Zustand + Audit), `patchTask` ein CAS ohne Ereignis.
 - **Kein Hart-Bezug auf chos-IP:** die Adapter sprechen nur gegen die OSS-eigene Naht `ChosClient`
   (`src/chos-client.ts`, chos-Vokabular: Entities + Lineage-Ereignisse). `InMemoryChosClient` macht
   sie OHNE laufendes chos testbar (sie durchlaufen denselben Store-Vertrag wie InMemory/Postgres);

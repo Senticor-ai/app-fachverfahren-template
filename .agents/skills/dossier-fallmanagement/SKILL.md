@@ -29,12 +29,12 @@ Datenmodell und die API-Fläche.
 
 Zwei server-autoritative Stores, jeder als austauschbarer **Port** mit
 identischer Semantik: Postgres (**OSS-Default-Standalone**) / InMemory (Tests/DEV) /
-Unavailable (fail-closed ohne DB) — und für den `CaseStore`/`WissenStore` zusätzlich
-der **chos-Graph-Adapter** (Ziel-PROD-Backing „grundsätzlich chos für alle
+Unavailable (fail-closed ohne DB) — und für `CaseStore`/`TaskStore`/`WissenStore`
+zusätzlich der **chos-Graph-Adapter** (Ziel-PROD-Backing „grundsätzlich chos für alle
 Datenspeicherungen", `packages/app-store-postgres/src/chos-case-store.ts` /
-`chos-wissen-store.ts`, gewählt via `APP_STORE_MODE=chos` + `CHOS_API_URL`). Alle
-hinter EXAKT derselben Schnittstelle — Route/UI ändern sich NICHT. Beide sind
-Mandanten-scoped (`tenantId`/`authorityId`/`jurisdictionId`) und append-only im Audit.
+`chos-task-store.ts` / `chos-wissen-store.ts`, gewählt via `APP_STORE_MODE=chos` +
+`CHOS_API_URL`). Alle hinter EXAKT derselben Schnittstelle — Route/UI ändern sich NICHT.
+Beide sind Mandanten-scoped (`tenantId`/`authorityId`/`jurisdictionId`) und append-only im Audit.
 
 ### `CaseStore` — die Akte (`packages/app-store-postgres/src/case-store.ts`)
 

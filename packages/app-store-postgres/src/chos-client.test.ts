@@ -91,6 +91,37 @@ describe("InMemoryChosClient — Graph-Semantik (Fake für DEV/Tests)", () => {
     ).rejects.toBeInstanceOf(ChosEntityNotFoundError);
   });
 
+  it("mutateEntity: CAS OHNE Ereignis (reiner Patch — kein Lineage-Eintrag)", async () => {
+    const c = new InMemoryChosClient();
+    await c.putEntity({
+      collection: coll,
+      tenantId: t,
+      id: "x",
+      version: 1,
+      body: { a: 1 },
+    });
+    const updated = await c.mutateEntity({
+      collection: coll,
+      tenantId: t,
+      id: "x",
+      expectedVersion: 1,
+      nextBody: { a: 2 },
+    });
+    expect(updated.version).toBe(2);
+    expect(updated.body["a"]).toBe(2);
+    // Anders als mutateEntityWithEvent: KEIN Ereignis.
+    expect(await c.listEvents({ tenantId: t, stream: "x" })).toHaveLength(0);
+    await expect(
+      c.mutateEntity({
+        collection: coll,
+        tenantId: t,
+        id: "x",
+        expectedVersion: 1,
+        nextBody: {},
+      }),
+    ).rejects.toBeInstanceOf(ChosConflictError);
+  });
+
   it("listEvents ist chronologisch aufsteigend und stream-/mandanten-scoped", async () => {
     const c = new InMemoryChosClient();
     const ev = (stream: string, id: string, occurredAt: string) =>
@@ -214,6 +245,48 @@ describe("HttpChosClient — Draht-Abbildung + Fehler-Übersetzung (fail-safe)",
         },
       }),
     ).rejects.toBeInstanceOf(ChosEntityNotFoundError);
+  });
+
+  it("mutateEntity: PATCH-Methode; 409 → ChosConflictError", async () => {
+    let method = "";
+    const ok = new HttpChosClient({
+      baseUrl: "https://chos.example",
+      fetchImpl: fakeFetch((_url, init) => {
+        method = String(init.method);
+        return {
+          status: 200,
+          body: {
+            collection: coll,
+            tenantId: t,
+            id: "x",
+            version: 2,
+            body: {},
+          },
+        };
+      }),
+    });
+    await ok.mutateEntity({
+      collection: coll,
+      tenantId: t,
+      id: "x",
+      expectedVersion: 1,
+      nextBody: {},
+    });
+    expect(method).toBe("PATCH");
+
+    const conflict = new HttpChosClient({
+      baseUrl: "https://chos.example",
+      fetchImpl: fakeFetch(() => ({ status: 409 })),
+    });
+    await expect(
+      conflict.mutateEntity({
+        collection: coll,
+        tenantId: t,
+        id: "x",
+        expectedVersion: 1,
+        nextBody: {},
+      }),
+    ).rejects.toBeInstanceOf(ChosConflictError);
   });
 
   it("sonstiger Nicht-2xx wirft (kein stiller Teilzustand)", async () => {

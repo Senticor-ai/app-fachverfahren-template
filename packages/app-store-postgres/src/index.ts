@@ -132,6 +132,7 @@ export type {
 } from "./chos-client.js";
 export { ChosCaseStore } from "./chos-case-store.js";
 export { ChosWissenStore } from "./chos-wissen-store.js";
+export { ChosTaskStore } from "./chos-task-store.js";
 export { nextPositionKey } from "./position.js";
 export {
   defaultMigrationOptionsFromEnv,

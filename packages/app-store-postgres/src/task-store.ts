@@ -1,9 +1,12 @@
 // task-store — die Aufgaben/Ziele/Schritte/Termine EINER Akte (ADR-0001 / ADR-0003). Erweitert die SDK-`Task`-Form
 // um die Dossier-Träger `taskKind`/`parentTaskId`/`data` und persistiert gegen `app_tasks`. EINE polymorphe Tabelle
 // bildet die Ziele-mit-Schritten-Hierarchie ab; `aggregateChildFlag` liefert den Fortschritt compute-on-read (nie
-// persistiert). Drei Laufzeiten (Postgres/InMemory/Unavailable) mit identischer Semantik; Mandanten-scoped überall.
-// Template-Stub für den Standalone-/Ohne-chos-Pfad (in PROD sitzt chos hinter derselben Capability-Naht).
+// persistiert). Laufzeiten mit identischer Semantik: Postgres (OSS-Default) / InMemory / Unavailable + der
+// ChosTaskStore hinter derselben Naht (chos-task-store.ts, gewählt via APP_STORE_MODE=chos) — die Ziel-PROD-
+// Backing „grundsätzlich chos für alle Datenspeicherungen". Mandanten-scoped überall.
 import { createPgClient, type PgClient } from "./client.js";
+import { createChosClientFromEnv } from "./chos-client.js";
+import { ChosTaskStore } from "./chos-task-store.js";
 
 export type TaskState = "open" | "claimed" | "completed" | "cancelled";
 
@@ -99,7 +102,7 @@ export class TaskVersionConflictError extends Error {
   }
 }
 
-function applyTaskPatch(current: AppTask, patch: TaskPatch): AppTask {
+export function applyTaskPatch(current: AppTask, patch: TaskPatch): AppTask {
   return {
     ...current,
     ...(patch.title !== undefined ? { title: patch.title } : {}),
@@ -379,6 +382,15 @@ export function createTaskStoreFromEnv(
 ): TaskStore {
   // Ephemerer Preview-/Dev-Store (s. createAuthStoreFromEnv): APP_STORE_MODE=memory → prozess-lokaler In-Memory-Store.
   if (env["APP_STORE_MODE"] === "memory") return new InMemoryTaskStore();
+  // chos-Graph-Store: APP_STORE_MODE=chos + CHOS_API_URL (fail-closed ohne URL). Postgres bleibt der OSS-Default.
+  if (env["APP_STORE_MODE"] === "chos") {
+    const client = createChosClientFromEnv(env);
+    return client
+      ? new ChosTaskStore(client)
+      : new UnavailableTaskStore(
+          "CHOS_API_URL is required for APP_STORE_MODE=chos",
+        );
+  }
   const databaseUrl = env["APP_PG_URL"] ?? env["APP_PG_DIRECT_URL"];
   return databaseUrl
     ? new PostgresTaskStore(databaseUrl)

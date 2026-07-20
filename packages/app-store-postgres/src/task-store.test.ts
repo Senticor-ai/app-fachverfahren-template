@@ -13,6 +13,9 @@ import {
   TaskNotFoundError,
   TaskVersionConflictError,
 } from "./task-store.js";
+import { ChosCaseStore } from "./chos-case-store.js";
+import { ChosTaskStore } from "./chos-task-store.js";
+import { InMemoryChosClient } from "./chos-client.js";
 
 const uid = () => globalThis.crypto.randomUUID();
 
@@ -58,6 +61,8 @@ function macheTask(caseId: string, over: Partial<AppTask> = {}): AppTask {
 }
 
 const pgUrl = process.env["APP_PG_DIRECT_URL"] ?? process.env["APP_PG_URL"];
+// Ein geteilter Fake-Graph für die chos-Impl (beforeAll ruft makeTask/makeCase je einmal; Tests nutzen uids).
+const chosGraph = new InMemoryChosClient();
 const impls: {
   name: string;
   makeTask: () => TaskStore;
@@ -75,6 +80,14 @@ const impls: {
     makeTask: () => new PostgresTaskStore(pgUrl!),
     makeCase: () => new PostgresCaseStore(pgUrl!),
     enabled: Boolean(pgUrl),
+  },
+  {
+    // Ein chos-Graph trägt beide Collections (app_cases + app_tasks) — der Adapter läuft OHNE laufendes chos
+    // durch DENSELBEN Vertrag (Scope, Optimistic-Locking, data-Merge, aggregateChildFlag, Sortierung).
+    name: "Chos",
+    makeTask: () => new ChosTaskStore(chosGraph),
+    makeCase: () => new ChosCaseStore(chosGraph),
+    enabled: true,
   },
 ];
 
