@@ -32,6 +32,9 @@ export interface LeistungContractSnapshot {
   register: LeistungConfig["register"];
   detailSektionen: LeistungConfig["detailSektionen"];
   ki?: LeistungConfig["ki"];
+  /** WELLE 1c: die Zuständigkeiten (personas) mit ihren KI-Fähigkeiten je Zuständigkeit (faehigkeiten + AAL) — der
+   *  Laufzeit-Spiegel der CHOS-governance.faehigkeiten; das nicht-JSON-fähige `icon` ist abgestreift. */
+  personas?: LeistungConfig["personas"];
   /** ESCAPE-HATCH-Präsenz: nur gesetzt, wenn eine `berechne`-Funktion statt eines `tarif` genutzt wird. */
   berechne?: "[function]";
   /** ESCAPE-HATCH-Präsenz: nur gesetzt, wenn eine `nachweise`-Funktion statt der Codelisten-Ableitung genutzt wird. */
