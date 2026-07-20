@@ -38,18 +38,30 @@ Server-Sessions (httpOnly-Cookie, 12 h TTL), Admin-Bootstrap über
 `BOOTSTRAP_TOKEN` (HTTP) oder `AUTH_BOOTSTRAP_ADMIN_*` (Serverstart,
 idempotent).
 
-## OIDC-Konfigurationspfad (Folge-Iteration)
+## OIDC-Login (Keycloak, implementiert)
 
 Keycloak ist **nicht** verpflichtend; OIDC ist ein austauschbarer Provider.
-Der vorgesehene Vertrag existiert bereits: `ServerRuntimeConfig.identity`
-(`@senticor/public-sector-sdk`) mit `issuerUrl`, `clientId`,
-`sessionCookieName`, `tokenStorage: "server-session"`.
+Der Flow ist implementiert (Authorization Code + PKCE, Standard-OIDC via
+Discovery + JWKS): `apps/fachverfahren/server/auth/oidc.ts` (purer, testbarer
+Kern) + `auth/oidc-routes.ts` (Fastify-Verdrahtung). **OPT-IN** via Umgebung —
+ohne diese Variablen läuft die Vorlage mit lokalem Login weiter:
 
-Ein OIDC-Callback implementiert später: Token-Validierung (issuer/jwks) →
-`resolveActorForIdentity({ tenantId, provider: "oidc:<issuer>", subject })` →
-dieselbe Session-Ausstellung wie der lokale Login. Die Autorisierung bleibt
-unverändert — genau das sichern die Guard-Tests ab (ein via Mapping
-aufgelöster Principal passiert dieselben Permission-Guards).
+- `OIDC_ISSUER_URL` · `OIDC_CLIENT_ID` · `OIDC_REDIRECT_URI` (exakt wie bei
+  Keycloak registriert) · optional `OIDC_TENANT_ID`, `OIDC_POST_LOGIN_REDIRECT`.
+
+Routen: `GET /auth/oidc/login` (Redirect zum IdP; state/nonce/PKCE im httpOnly
+Flow-Cookie) → `GET /auth/oidc/callback` (Code→Token-Exchange, ID-Token-
+Validierung mit `jose`: Signatur/JWKS + issuer + audience + exp + **nonce**,
+`state`-Vergleich = CSRF) → `resolveActorForIdentity({ tenantId, provider:
+"oidc:<issuer>", subject })` → dieselbe Session-Ausstellung wie der lokale Login.
+Die Autorisierung bleibt unverändert (die Guard-Tests sichern das ab). KEINE
+Auto-Provisionierung: eine nicht verlinkte Identität ergibt 403.
+
+Beispielwerte (Keycloak): `issuerUrl = https://id.example.org/realms/verwaltung`,
+`clientId = fachverfahren`. Entra ID: `issuerUrl =
+https://login.microsoftonline.com/<tenant>/v2.0`. Identitäten werden pro
+Tenant über die Benutzerverwaltung bzw. Provisioning explizit verlinkt
+(`linkIdentity`).
 
 Beispielwerte (Keycloak): `issuerUrl = https://id.example.org/realms/verwaltung`,
 `clientId = fachverfahren`. Entra ID: `issuerUrl =

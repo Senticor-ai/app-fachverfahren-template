@@ -53,6 +53,10 @@ import { createAiAssistPortFromEnv } from "./platform/ai-assist.js";
 import { autoBootstrapAdminFromEnv } from "./auth/auto-bootstrap.js";
 import { registerAuthPolicyGuard } from "./auth/authorization.js";
 import { registerAuthRoutes, type RegistrationMode } from "./auth/routes.js";
+import {
+  oidcConfigFromEnv,
+  type OidcConfig,
+} from "./auth/oidc-routes.js";
 import { createCookieSessionResolver } from "./auth/session-resolver.js";
 import { seedReferenceDemo } from "./dev/reference-seed.js";
 import { seedGoldenMesh } from "./dev/golden-fixture.js";
@@ -124,6 +128,7 @@ function registerAppRoutes(
   policy: {
     bootstrapToken: string | undefined;
     registrationMode: RegistrationMode;
+    oidcConfig?: OidcConfig;
   },
   bff: BffWiring,
 ): void {
@@ -139,6 +144,7 @@ function registerAppRoutes(
     auditStore: stores.auditStore,
     bootstrapToken: policy.bootstrapToken,
     registrationMode: policy.registrationMode,
+    ...(policy.oidcConfig ? { oidcConfig: policy.oidcConfig } : {}),
   });
   registerBoardRoutes(app, stores);
   registerUserRoutes(app, stores);
@@ -170,6 +176,7 @@ export function buildPublicServer({
   registrationMode = parseRegistrationMode(
     process.env["AUTH_REGISTRATION_MODE"],
   ),
+  oidcConfig = oidcConfigFromEnv(),
 }: {
   config?: RuntimeConfig;
   state?: RuntimeState;
@@ -187,6 +194,7 @@ export function buildPublicServer({
   aiAssist?: AiAssistPort;
   bootstrapToken?: string | undefined;
   registrationMode?: RegistrationMode;
+  oidcConfig?: OidcConfig;
 } = {}): FastifyInstance {
   return buildRuntimePublicServer({
     config,
@@ -196,7 +204,11 @@ export function buildPublicServer({
       registerAppRoutes(
         app,
         { authStore, kanbanStore, auditStore },
-        { bootstrapToken, registrationMode },
+        {
+          bootstrapToken,
+          registrationMode,
+          ...(oidcConfig ? { oidcConfig } : {}),
+        },
         {
           appStore,
           caseStore,
@@ -244,9 +256,11 @@ export async function startRuntime(
   const kanbanStore = createKanbanStoreFromEnv(env);
   const auditStore = createAuditStoreFromEnv(env);
   const stores = { authStore, kanbanStore, auditStore };
+  const oidcConfig = oidcConfigFromEnv(env);
   const policy = {
     bootstrapToken: env["BOOTSTRAP_TOKEN"],
     registrationMode: parseRegistrationMode(env["AUTH_REGISTRATION_MODE"]),
+    ...(oidcConfig ? { oidcConfig } : {}),
   };
   const bff: BffWiring = {
     appStore: createAppStoreFromEnv(env),
