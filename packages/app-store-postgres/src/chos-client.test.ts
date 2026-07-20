@@ -122,6 +122,49 @@ describe("InMemoryChosClient — Graph-Semantik (Fake für DEV/Tests)", () => {
     ).rejects.toBeInstanceOf(ChosConflictError);
   });
 
+  it("transact: atomare Sammel-Upserts + -Löschungen (spannt Partitionen)", async () => {
+    const c = new InMemoryChosClient();
+    await c.putEntity({
+      collection: "a",
+      tenantId: "t1",
+      id: "x",
+      version: 1,
+      body: { v: 1 },
+    });
+    await c.transact({
+      puts: [
+        {
+          collection: "a",
+          tenantId: "t1",
+          id: "x",
+          version: 2,
+          body: { v: 2 },
+        },
+        {
+          collection: "b",
+          tenantId: "_auth",
+          id: "y",
+          version: 1,
+          body: { k: "v" },
+        },
+      ],
+    });
+    expect(
+      (await c.getEntity({ collection: "a", tenantId: "t1", id: "x" }))?.body[
+        "v"
+      ],
+    ).toBe(2);
+    expect(
+      await c.getEntity({ collection: "b", tenantId: "_auth", id: "y" }),
+    ).toBeDefined();
+    await c.transact({
+      deletes: [{ collection: "a", tenantId: "t1", id: "x" }],
+    });
+    expect(
+      await c.getEntity({ collection: "a", tenantId: "t1", id: "x" }),
+    ).toBeUndefined();
+  });
+
   it("listEvents ist chronologisch aufsteigend und stream-/mandanten-scoped", async () => {
     const c = new InMemoryChosClient();
     const ev = (stream: string, id: string, occurredAt: string) =>
@@ -287,6 +330,25 @@ describe("HttpChosClient — Draht-Abbildung + Fehler-Übersetzung (fail-safe)",
         nextBody: {},
       }),
     ).rejects.toBeInstanceOf(ChosConflictError);
+  });
+
+  it("transact: POST /v1/transact mit puts + deletes", async () => {
+    let captured: { url: string; body: unknown } | undefined;
+    const client = new HttpChosClient({
+      baseUrl: "https://chos.example",
+      fetchImpl: fakeFetch((url, init) => {
+        captured = { url, body: JSON.parse(String(init.body)) };
+        return { status: 200 };
+      }),
+    });
+    await client.transact({
+      puts: [
+        { collection: "a", tenantId: "t1", id: "x", version: 1, body: {} },
+      ],
+      deletes: [{ collection: "b", tenantId: "t1", id: "y" }],
+    });
+    expect(captured?.url).toBe("https://chos.example/v1/transact");
+    expect((captured?.body as { deletes: unknown[] }).deletes).toHaveLength(1);
   });
 
   it("sonstiger Nicht-2xx wirft (kein stiller Teilzustand)", async () => {

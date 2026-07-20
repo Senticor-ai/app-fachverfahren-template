@@ -40,11 +40,17 @@ Jeder Store folgt der etablierten Impl-Trias **Postgres / InMemory / Unavailable
 Das oben angekündigte „in Produktion sitzt chos hinter demselben Port" ist jetzt als konkreter
 Adapter da — Postgres bleibt der **OSS-Default**, chos ist per Umschalter wählbar:
 
-- `ChosCaseStore` (`src/chos-case-store.ts`), `ChosTaskStore` (`src/chos-task-store.ts`) und
-  `ChosWissenStore` (`src/chos-wissen-store.ts`) implementieren dieselben `CaseStore`/`TaskStore`/
-  `WissenStore`-Verträge. Fall- und Aufgaben-Dokumente liegen als versionierte chos-**Entities**,
-  das append-only Audit / Verfahrens-Wissen als chos-**Ereignis**-Streams; `patchCaseState` ist EINE
-  atomare chos-`entity-lifecycle`-Mutation (Zustand + Audit), `patchTask` ein CAS ohne Ereignis.
+- `ChosCaseStore` (`src/chos-case-store.ts`), `ChosTaskStore` (`src/chos-task-store.ts`),
+  `ChosWissenStore` (`src/chos-wissen-store.ts`) und `ChosAuthStore` (`src/chos-auth-store.ts`)
+  implementieren dieselben `CaseStore`/`TaskStore`/`WissenStore`/`AuthStore`-Verträge. Fall- und
+  Aufgaben-Dokumente liegen als versionierte chos-**Entities**, das append-only Audit / Verfahrens-
+  Wissen als chos-**Ereignis**-Streams; `patchCaseState` ist EINE atomare chos-`entity-lifecycle`-
+  Mutation (Zustand + Audit), `patchTask` ein CAS ohne Ereignis.
+- **Auth auch auf chos, aber sicherheitsbewusst:** `ChosAuthStore` legt Konten/Credentials/Sessions/
+  Identity-Links ab; atomare Mehr-Entity-Schritte (Konto-Anlage, -Löschung, Deaktivierung MIT
+  Session-Widerruf) laufen über das `transact`-Primitiv. Da Credentials/Sessions dann in chos liegen,
+  MUSS der Transport authentifiziert sein (`CHOS_API_TOKEN`). Ohne chos bleibt Auth adapter-basiert
+  auf Postgres/InMemory — genau wie alle anderen Stores.
 - **Kein Hart-Bezug auf chos-IP:** die Adapter sprechen nur gegen die OSS-eigene Naht `ChosClient`
   (`src/chos-client.ts`, chos-Vokabular: Entities + Lineage-Ereignisse). `InMemoryChosClient` macht
   sie OHNE laufendes chos testbar (sie durchlaufen denselben Store-Vertrag wie InMemory/Postgres);

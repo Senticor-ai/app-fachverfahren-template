@@ -1,4 +1,6 @@
 import { createPgClient, type PgClient } from "./client.js";
+import { createChosClientFromEnv } from "./chos-client.js";
+import { ChosAuthStore } from "./chos-auth-store.js";
 
 export type UserStatus = "active" | "disabled";
 
@@ -126,7 +128,7 @@ export interface UserAccessResult {
 /** Gemeinsame Patch-Auflösung beider Store-Implementierungen: normalisiert Personas,
  *  vergleicht als MENGE (Reihenfolge/Duplikate egal) und liefert nur real geänderte
  *  Felder — die Grundlage der No-op-Erkennung. */
-function resolveUserAccessPatch(
+export function resolveUserAccessPatch(
   current: UserAccount,
   patch: UserAccessPatch,
 ): { changed: boolean; fields: Partial<UserAccount> } {
@@ -668,6 +670,16 @@ export function createAuthStoreFromEnv(
   // apiAvailable=false → die Preview rendert „Server nicht erreichbar". Rückwärtskompatibel: der Default (ungesetzt) bleibt
   // Postgres-or-Unavailable; NUR der explizite memory-Modus (Preview/Smoke) schaltet den flüchtigen Store frei.
   if (env["APP_STORE_MODE"] === "memory") return new InMemoryAuthStore();
+  // chos-Graph-Store: APP_STORE_MODE=chos + CHOS_API_URL (fail-closed ohne URL). Postgres bleibt der OSS-Default.
+  // Auth-Daten (inkl. Credentials/Sessions) liegen dann in chos — der Transport MUSS authentifiziert sein (Token).
+  if (env["APP_STORE_MODE"] === "chos") {
+    const client = createChosClientFromEnv(env);
+    return client
+      ? new ChosAuthStore(client)
+      : new UnavailableAuthStore(
+          "CHOS_API_URL is required for APP_STORE_MODE=chos",
+        );
+  }
   const databaseUrl = env["APP_PG_URL"] ?? env["APP_PG_DIRECT_URL"];
   return databaseUrl
     ? new PostgresAuthStore(databaseUrl)

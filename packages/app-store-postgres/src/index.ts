@@ -133,6 +133,7 @@ export type {
 export { ChosCaseStore } from "./chos-case-store.js";
 export { ChosWissenStore } from "./chos-wissen-store.js";
 export { ChosTaskStore } from "./chos-task-store.js";
+export { ChosAuthStore } from "./chos-auth-store.js";
 export { nextPositionKey } from "./position.js";
 export {
   defaultMigrationOptionsFromEnv,
