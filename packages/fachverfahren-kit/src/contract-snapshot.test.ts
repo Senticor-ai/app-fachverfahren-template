@@ -113,6 +113,33 @@ describe("toContractSnapshot — Business-Logik als ECHTE Zeilen, nicht '[functi
     expect(snap.codelisten).toBeUndefined();
   });
 
+  it("WELLE 1c: personas mit KI-Fähigkeiten (faehigkeiten + AAL) fließen in den Contract, icon abgestreift", () => {
+    const config = {
+      ...basis,
+      personas: [
+        {
+          key: "sachbearbeitung",
+          label: "Sachbearbeitung",
+          faehigkeiten: {
+            ki: ["subsumtion", "bescheid-entwurf"],
+            aal: "AAL-3",
+          },
+        },
+        { key: "buerger", label: "Bürger:in" },
+      ],
+    } as unknown as LeistungConfig;
+    const snap = toContractSnapshot(config);
+    expect(snap.personas?.[0]).toMatchObject({
+      key: "sachbearbeitung",
+      faehigkeiten: { ki: ["subsumtion", "bescheid-entwurf"], aal: "AAL-3" },
+    });
+    // Rein menschlich besetzte Zuständigkeit trägt kein KI-Angebot.
+    expect(snap.personas?.[1]?.faehigkeiten).toBeUndefined();
+    // Das icon (LucideIcon) ist nicht JSON-serialisierbar → es darf NICHT im Snapshot landen.
+    expect(() => JSON.stringify(snap)).not.toThrow();
+    expect(snap.personas?.[0] && "icon" in snap.personas[0]).toBeFalsy();
+  });
+
   it("bleibt für bestehende Configs (nur berechne) unverändert kompatibel", () => {
     const snap = toContractSnapshot({
       ...basis,

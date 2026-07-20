@@ -75,6 +75,12 @@ export function toContractSnapshot<T = Record<string, unknown>>(
     register: config.register,
     detailSektionen: config.detailSektionen,
     ...(config.ki ? { ki: config.ki } : {}),
+    // WELLE 1c: die Zuständigkeiten (personas) mit ihren KI-Fähigkeiten je Zuständigkeit (faehigkeiten + AAL) fließen in den
+    // Contract — der Laufzeit-Spiegel der CHOS-governance.faehigkeiten. Das `icon` (LucideIcon) ist NICHT JSON-serialisierbar
+    // und wird abgestreift; nur wenn die Config personas deklariert (sonst leitet die App generische Defaults ab).
+    ...(config.personas
+      ? { personas: config.personas.map(({ icon: _icon, ...rest }) => rest) }
+      : {}),
     // Escape-Hatches nur als Präsenz-Marker (nicht JSON-serialisierbar) — und nur, wenn tatsächlich genutzt.
     ...(config.berechne ? { berechne: "[function]" as const } : {}),
     ...(config.nachweise ? { nachweise: "[function]" as const } : {}),

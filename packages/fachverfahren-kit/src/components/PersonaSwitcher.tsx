@@ -49,9 +49,29 @@ export interface PersonaDescriptor {
   rbacRoles?: readonly string[];
   /** Kurzbeschreibung für den Bereichs-Einstieg (Landing). Optional — sonst dient `sub` als Beschreibung. */
   beschreibung?: string;
+  /** WELLE 1c: die KI-Fähigkeiten dieser Zuständigkeit (Agent-Skills + Autonomie-Level) — der Laufzeit-Spiegel der
+   *  CHOS-`governance.faehigkeiten`. JSON-serialisierbar über die Config-Naht, damit die generierende Fabrik sie einspeist;
+   *  die App hat KEINE governance.yaml (die EINE Wahrheit ist die LeistungConfig). Optional/feature-tolerant: fehlt sie,
+   *  ist die Zuständigkeit rein menschlich besetzt (kein Agent-Angebot). Der Mensch bleibt führend (HITL) — das AAL sagt,
+   *  WIE VIEL der Agent vorbereiten darf, nie dass er allein entscheidet. */
+  faehigkeiten?: KiFaehigkeiten;
   /** Optionales Icon. Wird vom Switcher aktuell nicht gerendert (Avatar = Initialen) und ist NICHT über eine
    *  Config-Naht transportierbar — daher optional. */
   icon?: LucideIcon;
+}
+
+/** WELLE 1c: das Autonomie-Level (Agentic Autonomy Level, Blueprint §7) einer KI-Fähigkeit — ORDINAL, aufsteigend.
+ *  Governance-Konvention (Mensch bleibt führend), NICHT die EU-AI-Act-Risikoklasse (das ist `AiAssistClass`): AAL-1 Observe ·
+ *  AAL-2 Advise · AAL-3 Act-with-Approval. AAL-4/5 sind kein allgemeiner Produktivstandard. */
+export type AAL = "AAL-1" | "AAL-2" | "AAL-3" | "AAL-4" | "AAL-5";
+
+/** WELLE 1c: die KI-Fähigkeiten einer Zuständigkeit — die konkreten Agent-Skills (Domänensprache) + ihr Autonomie-Level.
+ *  Laufzeit-Spiegel eines CHOS-`governance.faehigkeiten`-Eintrags (dieselbe Form: Skills + eine Autonomie). JSON-serialisierbar. */
+export interface KiFaehigkeiten {
+  /** Die konkreten Agent-Skills der Zuständigkeit (z.B. „subsumtion", „bescheid-entwurf") — aus Fachkonzept/Governance. */
+  readonly ki: readonly string[];
+  /** Das Autonomie-Level dieser Zuständigkeit. Fehlt es, bleibt die Autonomie unbestimmt (rein assistierend, HITL). */
+  readonly aal?: AAL;
 }
 
 /** Initialen aus einem Label ableiten (2 Zeichen) — damit ein Descriptor OHNE `initials` (z.B. aus einer generierten
