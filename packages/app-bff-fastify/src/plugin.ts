@@ -51,7 +51,17 @@ export interface AppBffOptions {
   blobStorage?: BlobStoragePort;
   /** Verfahrens-Wiki-Store. OPTIONAL: fehlt er, nutzt der BFF den In-Memory-Store. */
   wissenStore?: WissenStore;
+  /** ZONEN-ROUTE-ENFORCEMENT (BSI-Netzsegmentierung, Angriffsflächen-Reduktion): die Flächen, die DIESE Instanz servieren
+   *  darf — aus dem Deploy-Env ZONE_SURFACES (aus derselben readZoneModel-Wahrheit wie die Netz-Segmentierung). Eine
+   *  Routen-Familie wird NUR registriert, wenn ihre Flächen diese Menge schneiden (Infra-Familien ohne Flächen-Tag immer).
+   *  UNDEFINED ⇒ keine Zonen-Trennung deklariert ⇒ ALLE Familien (heutiger Ein-App-Zustand, fail-open). RBAC bleibt die
+   *  PRIMÄRE Autorisierung INNERHALB der Zone — dies ist die zusätzliche, gröbere Grenze (Back-Office nie in der Bürger-Zone). */
+  allowedSurfaces?: readonly BffSurface[];
 }
+
+/** Die Flächen-Vokabular-Kontrakt mit dem Deploy-Env ZONE_SURFACES (= Engine SURFACE_KEYS). Bewusst lokal literal, damit
+ *  der BFF kein Domänen-/Persona-Paket importieren muss; die drei kanonischen Verfahrens-Flächen sind stabil. */
+export type BffSurface = "buerger" | "sachbearbeitung" | "aufsicht";
 
 export async function appBff(
   app: FastifyInstance,
@@ -87,15 +97,58 @@ export async function appBff(
       .code(500)
       .send({ error: "internal error", requestId: requestIdOf(request) });
   });
-  registerSessionRoute(app, deps);
-  registerCapabilitiesRoute(app, deps);
-  registerAiAssistRoutes(app, deps);
-  registerPreferencesRoutes(app, deps);
-  registerMailboxRoutes(app, deps);
-  registerCaseRoutes(app, deps);
-  registerTaskRoutes(app, deps);
-  registerVermerkRoutes(app, deps);
-  registerVerfahrenWissenRoutes(app, deps);
-  // Bürger-Sicht auf die EIGENEN Anträge (eigene Familie: der Scope ist durch die Route impliziert).
-  registerBuergerRoutes(app, deps);
+  // Die Routen-Familien mit ihrer FLÄCHEN-Zugehörigkeit als DATEN (die Selbstbeschreibung des BFF). `surfaces: null` =
+  // Infra (session/capabilities/preferences/ai-assist): quer, exponiert KEINE Fall-Daten → in JEDER Zone registriert.
+  // INVARIANTE (Angriffsflächen-Reduktion): KEINE Back-Office-Familie (cases/tasks/vermerke/verfahren-wissen) trägt
+  // "buerger" → die internet-exponierte Bürger-Zone (ZONE_SURFACES=buerger) bekommt NUR Infra + buerger + mailbox(own).
+  // Back-Office trägt sachbearbeitung+aufsicht großzügig (beide sind cluster-INTERN, nicht exponiert) — so bricht die
+  // Aufsichts-Zone (nur-lesend) nicht, wenn sie Fälle/Vermerke/Wissen liest. mailbox ist scope-split (own=Bürger,
+  // authority=Sachbearbeitung) → buerger+sachbearbeitung. RBAC bleibt die primäre Autorisierung innerhalb der Zone.
+  const familien: {
+    surfaces: readonly BffSurface[] | null;
+    register: () => void;
+  }[] = [
+    { surfaces: null, register: () => registerSessionRoute(app, deps) },
+    { surfaces: null, register: () => registerCapabilitiesRoute(app, deps) },
+    { surfaces: null, register: () => registerAiAssistRoutes(app, deps) },
+    { surfaces: null, register: () => registerPreferencesRoutes(app, deps) },
+    {
+      surfaces: ["buerger", "sachbearbeitung"],
+      register: () => registerMailboxRoutes(app, deps),
+    },
+    {
+      surfaces: ["sachbearbeitung", "aufsicht"],
+      register: () => registerCaseRoutes(app, deps),
+    },
+    {
+      surfaces: ["sachbearbeitung", "aufsicht"],
+      register: () => registerTaskRoutes(app, deps),
+    },
+    {
+      surfaces: ["sachbearbeitung", "aufsicht"],
+      register: () => registerVermerkRoutes(app, deps),
+    },
+    {
+      surfaces: ["sachbearbeitung", "aufsicht"],
+      register: () => registerVerfahrenWissenRoutes(app, deps),
+    },
+    // Bürger-Sicht auf die EIGENEN Anträge (eigene Familie: der Scope ist durch die Route impliziert).
+    { surfaces: ["buerger"], register: () => registerBuergerRoutes(app, deps) },
+  ];
+  // SENTINEL-DISZIPLIN (Wurzel eines Green-Wash-Befunds): UNDEFINED ⇒ NICHT zoniert ⇒ ALLE registrieren (fail-open,
+  // heutiger Ein-App-Zustand). Ein LEERES Array ist etwas ANDERES — eine zonierte STRUKTUR-Zone (z. B. datenhaltung), die
+  // KEINE Fläche servieren darf ⇒ nur Infra (surfaces:null), keine persona-/Back-Office-Familie. Nie `[]` wie `undefined`
+  // behandeln — sonst servierte genau die Daten-Zone alles (das Gegenteil ihrer Deklaration).
+  const allow =
+    opts.allowedSurfaces === undefined
+      ? null
+      : new Set<BffSurface>(opts.allowedSurfaces);
+  for (const f of familien) {
+    if (
+      allow === null ||
+      f.surfaces === null ||
+      f.surfaces.some((s) => allow.has(s))
+    )
+      f.register();
+  }
 }

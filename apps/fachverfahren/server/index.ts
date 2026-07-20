@@ -10,6 +10,7 @@ import {
   appBff,
   registerOpenApiCollector,
   registerOpenApiRoute,
+  type BffSurface,
 } from "@senticor/app-bff-fastify";
 import {
   buildInternalServer as buildRuntimeInternalServer,
@@ -53,10 +54,7 @@ import { createAiAssistPortFromEnv } from "./platform/ai-assist.js";
 import { autoBootstrapAdminFromEnv } from "./auth/auto-bootstrap.js";
 import { registerAuthPolicyGuard } from "./auth/authorization.js";
 import { registerAuthRoutes, type RegistrationMode } from "./auth/routes.js";
-import {
-  oidcConfigFromEnv,
-  type OidcConfig,
-} from "./auth/oidc-routes.js";
+import { oidcConfigFromEnv, type OidcConfig } from "./auth/oidc-routes.js";
 import { createCookieSessionResolver } from "./auth/session-resolver.js";
 import { seedReferenceDemo } from "./dev/reference-seed.js";
 import { seedGoldenMesh } from "./dev/golden-fixture.js";
@@ -79,6 +77,31 @@ const APP_IDENTITY = {
   applicationId: "fachverfahren",
   displayName: "Fachverfahren",
 };
+
+/** ZONEN-ROUTE-ENFORCEMENT: die erlaubten Flächen dieser Instanz aus dem Deploy-Env ZONE_SURFACES (csv, aus derselben
+ *  readZoneModel-Wahrheit wie die Netz-Segmentierung). Das SIGNAL ist die PRÄSENZ des Env-Schlüssels, NICHT sein Inhalt
+ *  (Wurzel eines Green-Wash-Befunds): der Deploy setzt ZONE_SURFACES auf JEDEM zonierten Pod (auch "" für eine reine
+ *  STRUKTUR-Zone). Also:
+ *    • Schlüssel FEHLT      ⇒ undefined ⇒ NICHT zoniert ⇒ fail-open (ALLE Familien = heutiger Ein-App-Zustand).
+ *    • Schlüssel GESETZT="" ⇒ [] ⇒ zonierte Struktur-Zone ⇒ KEINE Fläche (nur Infra) — NIE fail-open.
+ *    • Schlüssel="buerger,…"⇒ die kanonischen Flächen (unbekannte Tokens still verworfen ⇒ ggf. []). */
+const ZONE_SURFACE_KANON: readonly BffSurface[] = [
+  "buerger",
+  "sachbearbeitung",
+  "aufsicht",
+];
+function parseZoneSurfaces(
+  env: NodeJS.ProcessEnv,
+): readonly BffSurface[] | undefined {
+  const raw = env["ZONE_SURFACES"];
+  if (raw === undefined) return undefined; // Schlüssel nicht gesetzt ⇒ keine Zonen-Trennung (fail-open)
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s): s is BffSurface =>
+      (ZONE_SURFACE_KANON as readonly string[]).includes(s),
+    );
+}
 
 /** Self-Signup-Politik aus der Env: default AUS; `open_unverified` heißt ehrlich so,
  *  bis E-Mail-Verifikation existiert. Unbekannte Werte fallen GESCHLOSSEN zurück. */
@@ -120,6 +143,8 @@ interface BffWiring {
   auditSink: AuditSink;
   /** KI-Assistenz-Port, per Env gewählt (local-fake ODER echter Adapter). */
   aiAssist: AiAssistPort;
+  /** Erlaubte Flächen dieser Zone (aus ZONE_SURFACES) — undefined ⇒ keine Zonen-Trennung (fail-open). */
+  allowedSurfaces?: readonly BffSurface[];
 }
 
 function registerAppRoutes(
@@ -177,6 +202,7 @@ export function buildPublicServer({
     process.env["AUTH_REGISTRATION_MODE"],
   ),
   oidcConfig = oidcConfigFromEnv(),
+  allowedSurfaces = parseZoneSurfaces(process.env),
 }: {
   config?: RuntimeConfig;
   state?: RuntimeState;
@@ -195,6 +221,7 @@ export function buildPublicServer({
   bootstrapToken?: string | undefined;
   registrationMode?: RegistrationMode;
   oidcConfig?: OidcConfig;
+  allowedSurfaces?: readonly BffSurface[] | undefined;
 } = {}): FastifyInstance {
   return buildRuntimePublicServer({
     config,
@@ -221,6 +248,7 @@ export function buildPublicServer({
             sessionResolver ?? createCookieSessionResolver(authStore),
           auditSink,
           aiAssist,
+          ...(allowedSurfaces ? { allowedSurfaces } : {}),
         },
       ),
   });
@@ -262,6 +290,7 @@ export async function startRuntime(
     registrationMode: parseRegistrationMode(env["AUTH_REGISTRATION_MODE"]),
     ...(oidcConfig ? { oidcConfig } : {}),
   };
+  const allowedSurfaces = parseZoneSurfaces(env);
   const bff: BffWiring = {
     appStore: createAppStoreFromEnv(env),
     caseStore: createCaseStoreFromEnv(env),
@@ -280,6 +309,8 @@ export async function startRuntime(
     auditSink: createAuditSinkFromEnv(env),
     // Port-Registry: KI-Anbieter per Env (local-fake default; AI_ASSIST_PROVIDER=ollama für den echten Adapter).
     aiAssist: createAiAssistPortFromEnv(env),
+    // Zonen-Route-Enforcement: nur die Flächen dieser Zone (ZONE_SURFACES) — undefined ⇒ alle (fail-open).
+    ...(allowedSurfaces ? { allowedSurfaces } : {}),
   };
   return startRuntimeBase({
     env,
