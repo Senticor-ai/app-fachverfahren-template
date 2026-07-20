@@ -51,6 +51,11 @@ Adapter da — Postgres bleibt der **OSS-Default**, chos ist per Umschalter wäh
   Session-Widerruf) laufen über das `transact`-Primitiv. Da Credentials/Sessions dann in chos liegen,
   MUSS der Transport authentifiziert sein (`CHOS_API_TOKEN`). Ohne chos bleibt Auth adapter-basiert
   auf Postgres/InMemory — genau wie alle anderen Stores.
+- **VOLLSTÄNDIG „chos für alle Datenspeicherungen":** zusätzlich `ChosAuditStore` (Sicherheits-Audit,
+  append-only), `ChosAppStore` (Präferenzen + Postfach) und `ChosKanbanStore` (SB-Workspace-Boards mit
+  Spalten/Karten/Checklisten/Referenzen, versioniert). Damit haben ALLE sieben Stores von
+  `@senticor/app-store-postgres` (Case/Task/Wissen/Auth/Audit/App/Kanban) einen chos-Adapter hinter
+  ihrem Port — jeder mit dedizierten Fake-Graph-Tests (ohne laufendes chos).
 - **Kein Hart-Bezug auf chos-IP:** die Adapter sprechen nur gegen die OSS-eigene Naht `ChosClient`
   (`src/chos-client.ts`, chos-Vokabular: Entities + Lineage-Ereignisse). `InMemoryChosClient` macht
   sie OHNE laufendes chos testbar (sie durchlaufen denselben Store-Vertrag wie InMemory/Postgres);
