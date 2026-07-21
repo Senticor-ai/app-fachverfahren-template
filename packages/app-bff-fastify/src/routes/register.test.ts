@@ -22,23 +22,29 @@ const failingEvidence: EvidenceRetrievalPort = {
     semantics: defaultSemantics,
   },
   async requestEvidence() {
-    return capabilityFailure("register/rejected", "Register lehnte den Abruf ab", {
-      retryable: false,
-      classification: "restricted",
-    });
+    return capabilityFailure(
+      "register/rejected",
+      "Register lehnte den Abruf ab",
+      {
+        retryable: false,
+        classification: "restricted",
+      },
+    );
   },
 };
 
 const anfrage = {
   evidenceType: "meldebestaetigung",
   subjectId: "actor-citizen",
-  purpose: "Hundesteuer-Anmeldung — Wohnsitznachweis",
+  purpose: "Antrag — Wohnsitznachweis",
   acceptedSchemaVersions: ["xmeld.v1"],
 };
 
 describe("BFF /api/register/evidence", () => {
   it("200: Sachbearbeitung ruft einen Nachweis ab → EvidenceRecord + Audit (Zweck)", async () => {
-    const { app, auditSink } = await buildBffApp({ session: caseworkerSession() });
+    const { app, auditSink } = await buildBffApp({
+      session: caseworkerSession(),
+    });
     const res = await app.inject({
       method: "POST",
       url: "/api/register/evidence",

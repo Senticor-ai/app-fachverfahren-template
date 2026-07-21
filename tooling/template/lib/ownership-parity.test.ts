@@ -49,7 +49,11 @@ const updateUnmanagedPaths: string[] = [
   "vitest.browser.config.ts",
   "vitest.config.ts",
   "vitest.e2e.config.ts",
+  // Postgres-Integrationstest-Konfig (testcontainers) — wie vitest.e2e/browser Konsumenten-Hoheit.
+  "vitest.pg.config.ts",
   "vitest.shims.d.ts",
+  // MSW-Service-Worker (generiert, Test-Artefakt für vitest-browser) — Konsumenten-Hoheit.
+  "public/mockServiceWorker.js",
   ".storybook/**",
   // Konsumenten-CI und -Git-Hooks: laufen im Konsumenten-Repo, dessen Entwickler entscheiden.
   ".github/workflows/**",
@@ -81,9 +85,10 @@ const updateUnmanagedPaths: string[] = [
   "apps/*/tsconfig.json",
   "apps/*/tsconfig.server.json",
   "apps/*/vite.config.ts",
-  // Lokale Entwicklungsumgebung + E2E: Konsumenten-Hoheit.
+  // Lokale Entwicklungsumgebung + E2E + PG-Testcontainer-Setup: Konsumenten-Hoheit.
   "dev/**",
   "tests/e2e/**",
+  "tests/pg/**",
   // Doku außerhalb der verwalteten docs/agents|assets|reference|capabilities-Bäume.
   "docs/UX-UPGRADE-PLAN.md",
   "docs/adr/**",

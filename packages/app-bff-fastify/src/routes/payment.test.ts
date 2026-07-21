@@ -29,10 +29,14 @@ const failingPayment: PaymentPort = {
     );
   },
   async getPaymentStatus() {
-    return capabilityFailure("payment/unavailable", "Anbieter nicht erreichbar", {
-      retryable: true,
-      classification: "confidential",
-    });
+    return capabilityFailure(
+      "payment/unavailable",
+      "Anbieter nicht erreichbar",
+      {
+        retryable: true,
+        classification: "confidential",
+      },
+    );
   },
 };
 
@@ -44,7 +48,7 @@ describe("BFF /api/payment", () => {
       url: "/api/payment",
       payload: {
         amountMinor: 3000,
-        purpose: "Hundesteuer-Anmeldung — Verwaltungsgebühr",
+        purpose: "Antrag — Verwaltungsgebühr",
         reference: "KZ-2026-0001",
       },
     });
@@ -129,7 +133,11 @@ describe("BFF /api/payment", () => {
     expect(body.error).toContain("payment/provider-rejected");
     expect(body.error).not.toContain("Zahlungsanbieter lehnte ab");
     // Härtung 2 (Audit-Vollständigkeit): auch der ABGELEHNTE Versuch hinterlässt eine Spur (die Header versprechen es).
-    expect(auditSink.events.some((e) => e.kind === "app-data" && e.event.eventType === "payment.failed")).toBe(true);
+    expect(
+      auditSink.events.some(
+        (e) => e.kind === "app-data" && e.event.eventType === "payment.failed",
+      ),
+    ).toBe(true);
     await app.close();
   });
 });

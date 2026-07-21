@@ -9,7 +9,7 @@ export const PaymentCreateRequestSchema = Type.Object(
   {
     /** Betrag in kleinster Einheit (Cent), > 0. */
     amountMinor: Type.Integer({ minimum: 1 }),
-    /** Verwendungszweck (fachlich, z. B. "Hundesteuer-Anmeldung — Verwaltungsgebühr"). */
+    /** Verwendungszweck (fachlich, z. B. "Antragsgebühr — Verwaltungsgebühr"). */
     purpose: Type.String({ minLength: 1 }),
     /** Eindeutige fachliche Referenz (Vorgangs-/Kassenzeichen) — idempotenz-tauglich. */
     reference: Type.String({ minLength: 1 }),
