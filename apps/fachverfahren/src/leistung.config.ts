@@ -221,6 +221,20 @@ export const leistungConfig: LeistungConfig = {
         rollen: ["sachbearbeitung"],
         vierAugen: true,
         detailPflicht: true,
+        // Der Widerspruchsbescheid IST ein Verwaltungsakt → einfrieren; aber mit EIGENEM Regime: anzufechten
+        // mit der KLAGE (§ 74 VwGO), nicht erneut mit Widerspruch (ADR-0006 §3).
+        erlaesstBescheid: true,
+        verwaltungsakt: {
+          rechtsbehelf: {
+            art: "klage",
+            fristWert: 1,
+            fristEinheit: "monat",
+            stelle: "das zuständige Verwaltungsgericht",
+            norm: "§ 74 VwGO",
+          },
+          fiktionTage: 4,
+          fiktionNorm: "§ 41 Abs. 2 VwVfG",
+        },
       },
     ],
   },

@@ -88,6 +88,71 @@ describe("statusMachineToProcedureVersion", () => {
     ).toBe(false);
   });
 
+  it("setzt closesCase auch bei EXPLIZITEM Flag (wiederaufnehmbarer Abschluss, Ziel nicht terminal)", () => {
+    const src: StatusMachineSource = {
+      ...quelle,
+      states: [
+        { key: "eingegangen" },
+        { key: "festgesetzt" }, // NICHT terminal — wiederaufnehmbar
+        { key: "widerspruch" },
+      ],
+      transitions: [
+        {
+          from: "eingegangen",
+          to: "festgesetzt",
+          label: "Festsetzen",
+          closesCase: true,
+        },
+        {
+          from: "festgesetzt",
+          to: "widerspruch",
+          label: "Widerspruch bearbeiten",
+        },
+      ],
+    };
+    const pv = statusMachineToProcedureVersion(src);
+    // Schließt trotz nicht-terminalem Ziel (explizites Flag).
+    expect(
+      pv.allowedTransitions.find((t) => t.action === "festsetzen")?.closesCase,
+    ).toBe(true);
+    // Der Wiederaufnahme-Übergang schließt NICHT.
+    expect(
+      "closesCase" in
+        pv.allowedTransitions.find((t) => t.to === "widerspruch")!,
+    ).toBe(false);
+  });
+
+  it("reicht ein per-Übergang-VA-Regime durch (Widerspruchsbescheid = Klage, ADR-0006 §3)", () => {
+    const klage = {
+      rechtsbehelf: {
+        art: "klage" as const,
+        fristWert: 1,
+        fristEinheit: "monat" as const,
+        stelle: "das Verwaltungsgericht",
+        norm: "§ 74 VwGO",
+      },
+      fiktionTage: 4,
+      fiktionNorm: "§ 41 Abs. 2 VwVfG",
+    };
+    const src: StatusMachineSource = {
+      ...quelle,
+      states: [{ key: "a" }, { key: "b", terminal: true }],
+      transitions: [
+        {
+          from: "a",
+          to: "b",
+          label: "Zurückweisen",
+          erlaesstBescheid: true,
+          verwaltungsakt: klage,
+        },
+      ],
+    };
+    const pv = statusMachineToProcedureVersion(src);
+    const t = pv.allowedTransitions.find((x) => x.action === "zurueckweisen");
+    expect(t?.issuesVerwaltungsakt).toBe(true);
+    expect(t?.verwaltungsakt).toEqual(klage);
+  });
+
   it("WIRFT bei mehrdeutigen (from, action) — dieselbe Invariante wie check:procedure-contract", () => {
     // Zwei Übergänge desselben Ausgangszustands mit gleichem Label → gleiche action → mehrdeutig.
     const mehrdeutig: StatusMachineSource = {

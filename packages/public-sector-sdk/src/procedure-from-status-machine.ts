@@ -37,6 +37,8 @@ export interface StatusMachineTransitionSource {
   erlaesstBescheid?: boolean;
   /** Schließt den Fall bei NICHT-terminalem Ziel (wiederaufnehmbarer Abschluss) → closesCase. */
   closesCase?: boolean;
+  /** Eigenes VA-Regime NUR für diesen Übergang (überschreibt ProcedureVersion.verwaltungsakt) → CaseTransition.verwaltungsakt. */
+  verwaltungsakt?: VerwaltungsaktConfig;
   /** Data-driven Guard (Bedingung über case.data) → CaseTransition.guard. */
   guard?: Bedingung;
 }
@@ -102,6 +104,8 @@ export function statusMachineToProcedureVersion(
       ...(terminals.has(t.to) || t.closesCase ? { closesCase: true } : {}),
       // Erlässt dieser Übergang einen Verwaltungsakt? → der Server friert beim Übergang den Bescheid ein.
       ...(t.erlaesstBescheid ? { issuesVerwaltungsakt: true } : {}),
+      // Eigenes VA-Regime nur für diesen Übergang (z. B. Widerspruchsbescheid = Klage) — überschreibt das Procedure-Regime.
+      ...(t.verwaltungsakt ? { verwaltungsakt: t.verwaltungsakt } : {}),
       // Data-driven Guard (Bedingung über case.data) — der Server lässt den Übergang nur bei Erfüllung zu.
       ...(t.guard ? { guard: t.guard } : {}),
     };

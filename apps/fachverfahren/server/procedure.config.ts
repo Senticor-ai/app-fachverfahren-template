@@ -155,6 +155,19 @@ export const antragProcedure: ProcedureVersion =
         to: "widerspruch_zurueckgewiesen",
         label: "Widerspruch zurückweisen",
         vierAugen: true,
+        // Widerspruchsbescheid = Verwaltungsakt mit EIGENEM Klage-Regime (ADR-0006 §3), Spiegel von leistung.config.
+        erlaesstBescheid: true,
+        verwaltungsakt: {
+          rechtsbehelf: {
+            art: "klage",
+            fristWert: 1,
+            fristEinheit: "monat",
+            stelle: "das zuständige Verwaltungsgericht",
+            norm: "§ 74 VwGO",
+          },
+          fiktionTage: 4,
+          fiktionNorm: "§ 41 Abs. 2 VwVfG",
+        },
       },
     ],
   });

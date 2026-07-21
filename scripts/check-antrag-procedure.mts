@@ -74,6 +74,10 @@ const quelle: StatusMachineSource = {
     label: t.label,
     ...(t.vierAugen ? { vierAugen: true } : {}),
     ...(t.erlaesstBescheid ? { erlaesstBescheid: true } : {}),
+    // Wiederaufnehmbarer Abschluss (closesCase am nicht-terminalen Ziel) + per-Übergang-VA-Regime
+    // (Widerspruchsbescheid = Klage) MÜSSEN mitgemappt werden, sonst driftet die Ableitung stumm.
+    ...(t.closesCase ? { closesCase: true } : {}),
+    ...(t.verwaltungsakt ? { verwaltungsakt: t.verwaltungsakt } : {}),
     ...(t.guard ? { guard: t.guard } : {}),
   })),
 };

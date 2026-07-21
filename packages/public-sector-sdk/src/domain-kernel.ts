@@ -119,6 +119,11 @@ export interface CaseTransition {
    *  Bescheid (Tenor aus case.data + Rechtsbehelf-Snapshot + Hash) im append-only Audit ein — data-driven,
    *  symmetrisch zu `closesCase`/`requiresFourEyes`. */
   issuesVerwaltungsakt?: boolean;
+  /** Eigenes Rechtsbehelfs-/Bekanntgabe-Regime NUR für den von DIESEM Übergang erlassenen Verwaltungsakt —
+   *  überschreibt `ProcedureVersion.verwaltungsakt`. Nötig, wenn ein späterer Bescheid ein ANDERES Regime trägt
+   *  als der Ausgangsbescheid: der Widerspruchsbescheid ist mit der KLAGE (§ 74 VwGO) anzufechten, nicht erneut
+   *  mit Widerspruch (ADR-0006 §3). Fehlt es, gilt weiter `ProcedureVersion.verwaltungsakt` (rückwärtskompatibel). */
+  verwaltungsakt?: VerwaltungsaktConfig;
   /**
    * DATA-DRIVEN GUARD: dieser Übergang ist nur erlaubt, wenn die Bedingung über `case.data` erfüllt ist
    * (z. B. „Betrag > 1000" oder „Kategorie in [a,b]"). `transitionCase` wertet ihn server-autoritativ aus.

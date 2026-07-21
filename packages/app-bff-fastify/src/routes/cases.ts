@@ -784,15 +784,18 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
       // KANONISCHEN Bytes ist das portable Beweis-Token (der Bürger re-hasht die gelieferten Bytes).
       const now = new Date().toISOString();
       let verwaltungsaktPayload: Record<string, unknown> | undefined;
-      if (transition.issuesVerwaltungsakt && procedure.verwaltungsakt) {
+      // Per-Übergang-Regime (z. B. Widerspruchsbescheid = Klage, ADR-0006 §3) hat Vorrang vor dem
+      // Verfahrens-Regime; fehlt es, gilt weiter ProcedureVersion.verwaltungsakt (rückwärtskompatibel).
+      const vaConfig = transition.verwaltungsakt ?? procedure.verwaltungsakt;
+      if (transition.issuesVerwaltungsakt && vaConfig) {
         const content = {
           aktenzeichen: appCase.caseId,
           issuedAt: now,
           issuedBy: session.actorId,
           tenor: appCase.data["berechnung"] ?? null,
-          rechtsbehelf: procedure.verwaltungsakt.rechtsbehelf,
-          fiktionTage: procedure.verwaltungsakt.fiktionTage,
-          fiktionNorm: procedure.verwaltungsakt.fiktionNorm,
+          rechtsbehelf: vaConfig.rechtsbehelf,
+          fiktionTage: vaConfig.fiktionTage,
+          fiktionNorm: vaConfig.fiktionNorm,
           // HERKUNFT DES TENORS — ehrlich statt falscher Sicherheit: der Betrag wurde CLIENT-seitig
           // gerechnet (der `berechne`-Escape-Hatch ist Client-TS, server-seitig nicht ausführbar) und vom
           // Server NICHT nachgerechnet. Er wird gefroren + gehasht (unveränderlich + beweisbar-unverändert),

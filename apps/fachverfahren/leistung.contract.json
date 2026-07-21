@@ -204,7 +204,19 @@
           "sachbearbeitung"
         ],
         "vierAugen": true,
-        "detailPflicht": true
+        "detailPflicht": true,
+        "erlaesstBescheid": true,
+        "verwaltungsakt": {
+          "rechtsbehelf": {
+            "art": "klage",
+            "fristWert": 1,
+            "fristEinheit": "monat",
+            "stelle": "das zuständige Verwaltungsgericht",
+            "norm": "§ 74 VwGO"
+          },
+          "fiktionTage": 4,
+          "fiktionNorm": "§ 41 Abs. 2 VwVfG"
+        }
       }
     ]
   },

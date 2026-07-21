@@ -155,6 +155,10 @@ export interface Transition {
    *  wieder-öffenbar (hat ausgehende Übergänge) — ein terminaler Zustand dürfte das nicht. Symmetrisch zum
    *  BPMN-Muster (senticor:closesCase). Die Ableitung mappt `terminal(to) ODER closesCase` → CaseTransition.closesCase. */
   closesCase?: boolean;
+  /** Eigenes VA-Regime NUR für den von DIESEM Übergang erlassenen Bescheid (überschreibt das Verfahrens-Regime
+   *  config.zustellung). Z. B. der Widerspruchsbescheid ist mit KLAGE (§ 74 VwGO) anzufechten, nicht erneut mit
+   *  Widerspruch (ADR-0006 §3). Die Ableitung reicht es an CaseTransition.verwaltungsakt durch. */
+  verwaltungsakt?: VerwaltungsaktConfig;
   /** DATA-DRIVEN GUARD: der Übergang ist nur erlaubt, wenn die Bedingung über die Falldaten (case.data)
    *  erfüllt ist. Der Server (transitionCase) wertet ihn autoritativ aus (→ CaseTransition.guard). Erzwingt
    *  WORKFLOW-KONSISTENZ über die deklarierte Datenlage, KEINE Autorisierung (case.data ist client-geliefert). */
@@ -348,6 +352,14 @@ export interface ZustellungConfig {
    *  VwVfG-Widerspruch-Belehrung. Wird beim Erlass in den Bescheid eingefroren. Fehlt sie, fällt
    *  BescheidView auf die generische Widerspruchs-Belehrung zurück (Abwärtskompatibilität). */
   rechtsbehelf?: RechtsbehelfConfig | undefined;
+}
+
+/** VA-Regime als DATEN (kit-Spiegel des SDK-`VerwaltungsaktConfig`): Rechtsbehelf + Bekanntgabefiktion eines
+ *  förmlichen Bescheids. Für ein pro-Übergang abweichendes Regime (z. B. Widerspruchsbescheid = Klage). */
+export interface VerwaltungsaktConfig {
+  rechtsbehelf: RechtsbehelfConfig;
+  fiktionTage: number;
+  fiktionNorm: string;
 }
 
 /** Eine zu überwachende Frist (spiegelt TerminFristPanel `FristItem` — `status` exakt-optional, ohne `| undefined`). */
