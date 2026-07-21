@@ -31,7 +31,13 @@ const extern: Datenanbindung = {
 describe("datenanbindungen — effektive Liste (defensiv)", () => {
   it("fehlt → leer (kein Falsch-Block über bestehende Configs)", () => {
     expect(datenanbindungen({})).toEqual([]);
-    expect(datenanbindungen({ datenanbindung: undefined })).toEqual([]);
+    // Defensiv gegen explizites `undefined` (fremd-/partiell-erzeugte Config): der Typ verbietet es
+    // (exactOptionalPropertyTypes), zur Laufzeit muss der Guard es wie „fehlt" behandeln → Cast.
+    expect(
+      datenanbindungen({
+        datenanbindung: undefined,
+      } as unknown as Parameters<typeof datenanbindungen>[0]),
+    ).toEqual([]);
   });
   it("verwirft Einträge ohne quelle, behält gültige", () => {
     const list = datenanbindungen({
@@ -73,11 +79,14 @@ describe("verifyDatenanbindung — DSGVO-Zweckbindung + BSI-Verbindungsklasse", 
     expect(v.mangel[0]).toMatchObject({ quelle: "E-Akte", feld: "zweck" });
   });
   it("register/extern ohne verbindungsklasse → Mangel (BSI TR-03190)", () => {
+    // Das reale Szenario ist eine Anbindung, der das Feld FEHLT (nicht explizit undefined) → weglassen.
+    const { verbindungsklasse: _rk, ...registerOhneKlasse } = register;
+    const { verbindungsklasse: _ek, ...externOhneKlasse } = extern;
     const vReg = verifyDatenanbindung({
-      datenanbindung: [{ ...register, verbindungsklasse: undefined }],
+      datenanbindung: [registerOhneKlasse],
     });
     const vExt = verifyDatenanbindung({
-      datenanbindung: [{ ...extern, verbindungsklasse: undefined }],
+      datenanbindung: [externOhneKlasse],
     });
     expect(vReg.mangel.some((m) => m.feld === "verbindungsklasse")).toBe(true);
     expect(vExt.mangel.some((m) => m.feld === "verbindungsklasse")).toBe(true);
