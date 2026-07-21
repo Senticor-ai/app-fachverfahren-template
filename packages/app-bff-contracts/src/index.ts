@@ -115,6 +115,14 @@ export {
   type PaymentStatusDto,
 } from "./payment.js";
 export {
+  IdentityProfileDtoSchema,
+  AssuranceRequestSchema,
+  AssuranceResultDtoSchema,
+  type IdentityProfileDto,
+  type AssuranceRequestDto,
+  type AssuranceResultDto,
+} from "./identity.js";
+export {
   KiVermerkRequestSchema,
   VermerkDtoSchema,
   VermerkIdParamsSchema,

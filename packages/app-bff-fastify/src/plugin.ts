@@ -20,15 +20,18 @@ import type {
 import {
   createLocalAiAssistPort,
   createLocalBlobStoragePort,
+  createLocalIdentityAndTrustPort,
   createLocalPaymentPort,
   type AiAssistPort,
   type BlobStoragePort,
+  type IdentityAndTrustPort,
   type PaymentPort,
 } from "@senticor/platform-contracts";
 import type { BffDeps } from "./deps.js";
 import { requestIdOf } from "./route-auth.js";
 import { registerAiAssistRoutes } from "./routes/ai-assist.js";
 import { registerPaymentRoutes } from "./routes/payment.js";
+import { registerIdentityRoutes } from "./routes/identity.js";
 import { registerCapabilitiesRoute } from "./routes/capabilities.js";
 import { registerBuergerRoutes } from "./routes/buerger.js";
 import { registerCaseRoutes } from "./routes/cases.js";
@@ -53,6 +56,9 @@ export interface AppBffOptions {
   /** Zahlungs-Port (ePayBL). OPTIONAL: fehlt er, nutzt der BFF den local-fake (deterministischer Roundtrip,
    *  ohne Netz) — eine App wählt in der Komposition per Env den echten Adapter. */
   payment?: PaymentPort;
+  /** Identitäts-/Vertrauens-Port (BundID/eID). OPTIONAL: fehlt er, nutzt der BFF den local-fake (liest das
+   *  Subjekt aus der Sitzung) — eine App wählt in der Komposition per Env den echten Adapter. */
+  identityAndTrust?: IdentityAndTrustPort;
   /** Byte-Storage-Port. OPTIONAL: fehlt er, nutzt der BFF den In-Memory-Fake. */
   blobStorage?: BlobStoragePort;
   /** Verfahrens-Wiki-Store. OPTIONAL: fehlt er, nutzt der BFF den In-Memory-Store. */
@@ -83,6 +89,7 @@ export async function appBff(
     rbacRegistry: opts.rbacRegistry ?? builtInRbacRegistry,
     aiAssist: opts.aiAssist ?? createLocalAiAssistPort(),
     payment: opts.payment ?? createLocalPaymentPort(),
+    identityAndTrust: opts.identityAndTrust ?? createLocalIdentityAndTrustPort(),
     blobStorage: opts.blobStorage ?? createLocalBlobStoragePort(),
     wissenStore: opts.wissenStore ?? new InMemoryWissenStore(),
   };
@@ -118,6 +125,8 @@ export async function appBff(
     { surfaces: null, register: () => registerSessionRoute(app, deps) },
     { surfaces: null, register: () => registerCapabilitiesRoute(app, deps) },
     { surfaces: null, register: () => registerAiAssistRoutes(app, deps) },
+    // Identität/Vertrauen (BundID/eID): das SITZUNGS-eigene Subjekt — Infra (quer, keine Fall-Daten), RBAC session.read.
+    { surfaces: null, register: () => registerIdentityRoutes(app, deps) },
     { surfaces: null, register: () => registerPreferencesRoutes(app, deps) },
     {
       surfaces: ["buerger", "sachbearbeitung"],

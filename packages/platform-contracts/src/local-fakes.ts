@@ -165,12 +165,13 @@ export function createLocalPaymentPort(): PaymentPort {
   };
 }
 
-export function createLocalPlatformPorts(
-  options: { aiAssistModel?: string } = {},
-): PlatformPorts {
-  const deliveries = new Map<string, "queued" | "delivered" | "failed">();
-
-  const identityAndTrust: IdentityAndTrustPort = {
+/**
+ * Der lokale IdentityAndTrustPort als EIGENSTÄNDIGE Fabrik (wie createLocalAiAssistPort). Zustandslos: liest die
+ * Identität aus dem Aufruf-Kontext (der Aufrufer/BFF setzt actor aus der Sitzung); die Assurance wird lokal
+ * akzeptiert. Deterministisch, ohne BundID/eID-Server. Für den Durchstich (später echter DeutschlandID-Adapter).
+ */
+export function createLocalIdentityAndTrustPort(): IdentityAndTrustPort {
+  return {
     descriptor: descriptor(
       "identity-and-trust",
       "Local Identity and Trust",
@@ -189,6 +190,16 @@ export function createLocalPlatformPorts(
       return capabilityOk({ accepted: true });
     },
   };
+}
+
+export function createLocalPlatformPorts(
+  options: { aiAssistModel?: string } = {},
+): PlatformPorts {
+  const deliveries = new Map<string, "queued" | "delivered" | "failed">();
+
+  // EINE Wahrheit: dieselbe Identitäts-Impl wie die eigenständige Fabrik.
+  const identityAndTrust: IdentityAndTrustPort =
+    createLocalIdentityAndTrustPort();
 
   const dataExchange: DataExchangePort = {
     descriptor: descriptor(

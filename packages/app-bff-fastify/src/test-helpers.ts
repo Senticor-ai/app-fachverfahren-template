@@ -24,8 +24,10 @@ import {
 } from "@senticor/public-sector-sdk";
 import {
   createLocalAiAssistPort,
+  createLocalIdentityAndTrustPort,
   createLocalPaymentPort,
   type AiAssistPort,
+  type IdentityAndTrustPort,
   type PaymentPort,
 } from "@senticor/platform-contracts";
 import { appBff } from "./plugin.js";
@@ -65,6 +67,7 @@ export async function buildBffApp({
   procedureRegistry = createInMemoryProcedureRegistry([]),
   aiAssist = createLocalAiAssistPort(),
   payment = createLocalPaymentPort(),
+  identityAndTrust = createLocalIdentityAndTrustPort(),
   wissenStore = new InMemoryWissenStore(),
 }: {
   session?: ResolvedSession;
@@ -74,6 +77,7 @@ export async function buildBffApp({
   procedureRegistry?: ProcedureRegistry;
   aiAssist?: AiAssistPort;
   payment?: PaymentPort;
+  identityAndTrust?: IdentityAndTrustPort;
   wissenStore?: WissenStore;
 } = {}): Promise<{
   app: FastifyInstance;
@@ -93,6 +97,7 @@ export async function buildBffApp({
     auditSink,
     aiAssist,
     payment,
+    identityAndTrust,
     wissenStore,
   });
   return { app, auditSink, appStore, caseStore, taskStore };
