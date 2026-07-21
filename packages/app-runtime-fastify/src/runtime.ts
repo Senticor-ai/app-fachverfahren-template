@@ -11,6 +11,7 @@ import {
 import { assertStaticDir } from "./health.js";
 import { logError, logInfo } from "./logging.js";
 import { RuntimeMetrics } from "./metrics.js";
+import { startTelemetry } from "./telemetry.js";
 import {
   buildInternalServer,
   buildPublicServer,
@@ -55,6 +56,13 @@ export async function startRuntime(
   const config =
     options.config ?? readRuntimeConfig(env, options.configOverrides ?? {});
   await assertStaticDir(config);
+  // OpenTelemetry-Traces (Issue #54): startet NUR bei gesetztem OTEL_EXPORTER_OTLP_ENDPOINT — sonst undefined
+  // (No-op-Tracer, kein Export). Vor dem Serverbau, damit die Request-Spans (hooks.ts) exportiert werden.
+  const telemetry = startTelemetry({
+    serviceName: env["APP_APPLICATION_ID"] ?? "app-runtime-fastify",
+    buildInfo: config.buildInfo,
+    env,
+  });
   const state = createRuntimeState();
   const metrics = new RuntimeMetrics();
   const registerInternalRoutes = options.registerInternalRoutes;
@@ -108,6 +116,10 @@ export async function startRuntime(
         return "error";
       });
     const result = await Promise.race([closed, timeout]);
+    // OTel-Exporter sauber flushen/schließen (best-effort — blockiert den Shutdown nicht).
+    await telemetry?.shutdown().catch((error: unknown) => {
+      logError("runtime.telemetry.shutdown.error", { error: String(error) });
+    });
     logInfo("runtime.shutdown.finished", { result });
     process.exit(result === "closed" ? 0 : 1);
   };

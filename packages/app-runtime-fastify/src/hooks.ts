@@ -3,6 +3,7 @@
 // Request-Log auf onResponse.
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { RuntimeConfig } from "./config.js";
 import { NO_STORE } from "./constants.js";
@@ -10,9 +11,14 @@ import { logAudit, logInfo } from "./logging.js";
 import type { RuntimeMetrics } from "./metrics.js";
 import { applySecurityHeaders } from "./security-headers.js";
 
+// OpenTelemetry-Tracer (Issue #54). Ohne gestartete NodeSDK (telemetry.ts) ist dies ein NO-OP-Tracer:
+// startSpan liefert einen nicht-aufzeichnenden Span, alle Aufrufe sind nahe-null teuer → Standalone unberührt.
+const tracer = trace.getTracer("app-runtime-fastify");
+
 interface RequestContext {
   startedAt: bigint;
   requestId: string;
+  span: Span;
 }
 
 const requestContexts = new WeakMap<FastifyRequest, RequestContext>();
@@ -24,9 +30,11 @@ export function registerPublicHooks(
 ) {
   app.addHook("onRequest", async (request, reply) => {
     const requestId = readHeader(request, "x-request-id") ?? randomUUID();
+    const span = tracer.startSpan(`${request.method} ${request.url}`);
     requestContexts.set(request, {
       startedAt: process.hrtime.bigint(),
       requestId,
+      span,
     });
     reply.header("X-Request-ID", requestId);
     applySecurityHeaders(reply, config);
@@ -65,6 +73,17 @@ export function registerPublicHooks(
       requestId: context?.requestId ?? request.id,
       traceparent: readHeader(request, "traceparent") ?? "",
     });
+    // OTel-Span abschließen (Issue #54): Attribute nach Semantic Conventions, ERROR ab 5xx. Route (nicht die
+    // rohe URL) als http.route → niedrige Kardinalität; KEINE PII in Attributen (nur pseudonyme Kennungen).
+    if (context) {
+      context.span.setAttribute("http.request.method", request.method);
+      context.span.setAttribute("http.route", route);
+      context.span.setAttribute("http.response.status_code", reply.statusCode);
+      if (reply.statusCode >= 500) {
+        context.span.setStatus({ code: SpanStatusCode.ERROR });
+      }
+      context.span.end();
+    }
   });
 }
 

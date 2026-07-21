@@ -13,6 +13,9 @@ verifyDepsBeforeRun: false
 allowBuilds:
   esbuild: false
   msw: true
+  # protobufjs (transitiv über die OTel-SDK): kein Build-Script nötig — der OTLP-Exporter läuft über HTTP+JSON,
+  # nicht protobuf. Bewusst false (kein postinstall-codegen).
+  protobufjs: false
 
 catalog:
   "@types/node": ^24.13.3

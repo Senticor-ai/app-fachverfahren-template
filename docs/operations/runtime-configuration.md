@@ -30,5 +30,20 @@ Operative Endpunkte:
 `/internal/build-info` laufen auf `INTERNAL_PORT` und dürfen nicht öffentlich
 geroutet werden.
 
+## Observability (Issue #54)
+
+Zwei komplementäre, leichtgewichtige Ebenen:
+
+- **Metriken** — `GET /internal/metrics` (Prometheus-Textformat): `http_requests_total`
+  (Counter), `http_request_duration_seconds` als **Histogramm** (`_bucket`/`_sum`/`_count`
+  → p95/p99 via `histogram_quantile`) und `app_build_info`. Immer an, prozess-lokal.
+- **Traces (OpenTelemetry)** — **opt-in**: gesetzt `OTEL_EXPORTER_OTLP_ENDPOINT`, startet die
+  Runtime die OTel-NodeSDK und exportiert je Request einen Span (OTLP/HTTP) mit
+  `http.request.method`/`http.route`/`http.response.status_code` (ERROR ab 5xx). Optional
+  `OTEL_SERVICE_NAME` (Default: `APP_APPLICATION_ID`); Endpoint/Header über die Standard-
+  `OTEL_EXPORTER_OTLP_*`-Variablen. OHNE die ENV bleibt `@opentelemetry/api` ein No-op-Tracer
+  (nahe-null Overhead) — der Standalone-/OSS-Pfad läuft unverändert. Attribute enthalten
+  **keine PII** (nur pseudonyme Kennungen); `http.route` statt roher URL hält die Kardinalität niedrig.
+
 Der Service Worker bleibt per `APP_ENABLE_SERVICE_WORKER=false` deaktiviert,
 bis die App den Update-Flow bewusst freischaltet.
