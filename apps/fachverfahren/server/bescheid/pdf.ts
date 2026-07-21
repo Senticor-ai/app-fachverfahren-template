@@ -1,0 +1,267 @@
+// bescheid/pdf — rendert den EINGEFRORENEN Verwaltungsakt (Issue #60) als PDF-Langzeitdokument, TEMPLATE-
+// GETRIEBEN: die Struktur des Bescheids ist DATEN (`BescheidTemplate` = geordnete Sektionen), nicht Layout-
+// Code — konsistent zur „Verfahren = DATEN"-Philosophie. Ein Verfahren kann ein eigenes Template mitgeben;
+// ohne Template greift `defaultBescheidTemplate`. Reine, server-autoritative Funktion.
+//
+// KI-AGENTEN (Issue #59/#60): Freitext-Sektionen (z. B. eine Begründung) tragen bereits MENSCHLICH GEPRÜFTE
+// Absätze. Der KI-Entwurf läuft davor über den AiAssistPort (chos-Agent, AAL-2 „Advise", limited-risk,
+// reviewRequired) — siehe `bescheid/ki-entwurf.ts`. Der Renderer selbst ruft NIE die KI (Determinismus +
+// keine Seiteneffekte beim Rendern): KI entwirft → Mensch gibt frei → Text wird Template-Daten → gerendert.
+//
+// PDF/A-STAND (ehrlich): wohlgeformtes PDF 1.7 + vollständige Metadaten + aus `issuedAt` abgeleitete
+// (deterministische) Zeitstempel. Die formale PDF/A-1b-ZERTIFIZIERUNG verlangt zusätzlich eingebettete
+// Schriften (statt Standard-14), einen sRGB-ICC-OutputIntent und ein XMP-Paket (`pdfaid:part/conformance`)
+// + veraPDF-Gate — dokumentierte Folgearbeit auf #60. Der Generator ist bewusst asset-frei.
+import type { VerwaltungsaktDto } from "@senticor/app-bff-contracts";
+import {
+  PDFDocument,
+  StandardFonts,
+  rgb,
+  type PDFFont,
+  type PDFPage,
+} from "pdf-lib";
+
+/** Eine Bescheid-Sektion als DATEN. Bekannte Kinds ziehen ihren Inhalt aus dem VA; `freitext` trägt (ggf.
+ *  KI-entworfene, menschlich geprüfte) Absätze. So ist die Bescheid-Struktur pro Verfahren überschreibbar. */
+export type BescheidSektion =
+  | { kind: "kopf" }
+  | { kind: "tenor"; ueberschrift?: string }
+  | { kind: "bekanntgabe"; ueberschrift?: string }
+  | { kind: "rechtsbehelf"; ueberschrift?: string }
+  | { kind: "freitext"; ueberschrift?: string; absaetze: readonly string[] }
+  | { kind: "integritaet"; ueberschrift?: string };
+
+/** Das Bescheid-Template = geordnete Sektionen. Verfahrens-neutral; ein Verfahren kann es ersetzen. */
+export interface BescheidTemplate {
+  titel: string;
+  sektionen: readonly BescheidSektion[];
+}
+
+/** Das neutrale Standard-Template: Kopf → Tenor → (optional Begründung) → Bekanntgabe → Rechtsbehelf → Integrität. */
+export const defaultBescheidTemplate: BescheidTemplate = {
+  titel: "Bescheid (Verwaltungsakt)",
+  sektionen: [
+    { kind: "kopf" },
+    { kind: "tenor", ueberschrift: "Verfügungssatz (Tenor)" },
+    { kind: "bekanntgabe", ueberschrift: "Bekanntgabe" },
+    { kind: "rechtsbehelf", ueberschrift: "Rechtsbehelfsbelehrung" },
+    {
+      kind: "integritaet",
+      ueberschrift: "Integritätsnachweis (fälschungssicher)",
+    },
+  ],
+};
+
+export interface BescheidPdfInput {
+  /** Der eingefrorene Verwaltungsakt (selbsttragende Bytes + checksumSha256), wie im Bürger-Abruf. */
+  va: VerwaltungsaktDto;
+  /** Anzeigename der erlassenden Behörde (aus dem Fall-/Session-Kontext, nicht aus dem Client-Body). */
+  behoerde: string;
+  /** Optionales Verfahrens-Template; ohne Angabe `defaultBescheidTemplate`. */
+  template?: BescheidTemplate;
+}
+
+const A4: readonly [number, number] = [595.28, 841.89];
+const MARGIN = 56; // ~2 cm
+const PRODUCER = "Fachverfahren-Template Bescheid-Renderer";
+
+const FRIST_EINHEIT: Record<string, string> = {
+  monat: "Monat(en)",
+  woche: "Woche(n)",
+  tag: "Tag(en)",
+};
+
+/** ISO → deutsches Datum (TT.MM.JJJJ); ungültiger Wert → Rohwert. */
+function formatDatum(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  const tag = String(date.getUTCDate()).padStart(2, "0");
+  const monat = String(date.getUTCMonth() + 1).padStart(2, "0");
+  return `${tag}.${monat}.${date.getUTCFullYear()}`;
+}
+
+/** Ein Tenor-Eintrag als lesbare Zeile — opake Werte kompakt als JSON. */
+function tenorZeilen(tenor: VerwaltungsaktDto["tenor"]): string[] {
+  if (!tenor) return ["(kein Tenor eingefroren)"];
+  const entries = Object.entries(tenor);
+  if (entries.length === 0) return ["(kein Tenor eingefroren)"];
+  return entries.map(([key, value]) => {
+    const dargestellt =
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+        ? String(value)
+        : JSON.stringify(value);
+    return `${key}: ${dargestellt}`;
+  });
+}
+
+/** Zerlegt einen Absatz an Wortgrenzen in Zeilen, die in `maxWidth` (Punkt) passen. */
+function wrap(
+  text: string,
+  font: PDFFont,
+  size: number,
+  maxWidth: number,
+): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (font.widthOfTextAtSize(candidate, size) > maxWidth && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length > 0 ? lines : [""];
+}
+
+/**
+ * Rendert den Bescheid template-getrieben und liefert die PDF-Bytes. Deterministisch bezüglich Inhalt:
+ * gleiche VA-Bytes + gleiches Template → gleiche sichtbare Seiten + gleicher eingebetteter Hash
+ * (Zeitstempel aus `issuedAt`, nicht aus der Uhr).
+ */
+export async function renderBescheidPdf(
+  input: BescheidPdfInput,
+): Promise<Uint8Array> {
+  const { va, behoerde } = input;
+  const template = input.template ?? defaultBescheidTemplate;
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+
+  // Selbstbeschreibende Metadaten: der Hash liegt in den Keywords → das Dokument trägt sein Beweis-Token.
+  const erlassDatum = new Date(va.issuedAt);
+  const issued = Number.isNaN(erlassDatum.getTime()) ? undefined : erlassDatum;
+  doc.setTitle(`Bescheid ${va.aktenzeichen}`);
+  doc.setAuthor(behoerde);
+  doc.setSubject(`Verwaltungsakt ${va.aktenzeichen} — Bekanntgabe`);
+  doc.setKeywords([
+    `aktenzeichen:${va.aktenzeichen}`,
+    `sha256:${va.checksumSha256}`,
+    `tenorHerkunft:${va.tenorHerkunft}`,
+  ]);
+  doc.setProducer(PRODUCER);
+  doc.setCreator(behoerde);
+  if (issued) {
+    doc.setCreationDate(issued);
+    doc.setModificationDate(issued);
+  }
+
+  const contentWidth = A4[0] - 2 * MARGIN;
+  let currentPage: PDFPage = doc.addPage([A4[0], A4[1]]);
+  let y = A4[1] - MARGIN;
+
+  const write = (
+    text: string,
+    opts: {
+      size?: number;
+      font?: PDFFont;
+      gap?: number;
+      color?: ReturnType<typeof rgb>;
+    } = {},
+  ): void => {
+    const size = opts.size ?? 11;
+    const useFont = opts.font ?? font;
+    for (const line of wrap(text, useFont, size, contentWidth)) {
+      if (y < MARGIN + 24) {
+        currentPage = doc.addPage([A4[0], A4[1]]);
+        y = A4[1] - MARGIN;
+      }
+      currentPage.drawText(line, {
+        x: MARGIN,
+        y,
+        size,
+        font: useFont,
+        color: opts.color ?? rgb(0.1, 0.1, 0.1),
+      });
+      y -= size + 4;
+    }
+    y -= opts.gap ?? 0;
+  };
+
+  const grau = rgb(0.4, 0.4, 0.4);
+
+  for (const sektion of template.sektionen) {
+    switch (sektion.kind) {
+      case "kopf":
+        write(behoerde, { size: 13, font: bold, gap: 2 });
+        write(template.titel, { size: 18, font: bold, gap: 6 });
+        write(`Aktenzeichen: ${va.aktenzeichen}`);
+        write(`Erlassen am: ${formatDatum(va.issuedAt)}`);
+        write(`Festgesetzt durch: ${va.issuedBy}`, { gap: 10 });
+        break;
+      case "tenor": {
+        write(sektion.ueberschrift ?? "Verfügungssatz (Tenor)", {
+          size: 13,
+          font: bold,
+          gap: 2,
+        });
+        for (const zeile of tenorZeilen(va.tenor)) write(zeile);
+        write(`Herkunft des Tenor: ${va.tenorHerkunft}`, {
+          size: 9,
+          color: grau,
+          gap: 12,
+        });
+        break;
+      }
+      case "freitext":
+        if (sektion.ueberschrift)
+          write(sektion.ueberschrift, { size: 13, font: bold, gap: 2 });
+        for (const absatz of sektion.absaetze) write(absatz, { gap: 4 });
+        y -= 8;
+        break;
+      case "bekanntgabe":
+        write(sektion.ueberschrift ?? "Bekanntgabe", {
+          size: 13,
+          font: bold,
+          gap: 2,
+        });
+        write(
+          `Die Bekanntgabe gilt am ${va.fiktionTage}. Tag nach der Aufgabe zur Post als bewirkt (${va.fiktionNorm}).`,
+          { gap: 12 },
+        );
+        break;
+      case "rechtsbehelf": {
+        write(sektion.ueberschrift ?? "Rechtsbehelfsbelehrung", {
+          size: 13,
+          font: bold,
+          gap: 2,
+        });
+        const rb = va.rechtsbehelf;
+        const einheit = FRIST_EINHEIT[rb.fristEinheit] ?? rb.fristEinheit;
+        write(
+          `Gegen diesen Bescheid kann innerhalb von ${rb.fristWert} ${einheit} nach Bekanntgabe ${rb.art} ` +
+            `bei ${rb.stelle} erhoben werden (${rb.norm}).`,
+          { gap: 16 },
+        );
+        break;
+      }
+      case "integritaet":
+        write(
+          sektion.ueberschrift ?? "Integritätsnachweis (fälschungssicher)",
+          {
+            size: 10,
+            font: bold,
+            gap: 2,
+          },
+        );
+        write(
+          "Dieser Bescheid ist über die kanonischen Bytes des eingefrorenen Verwaltungsakts durch einen " +
+            "SHA-256-Hash gesichert. Jede nachträgliche Änderung verändert den Hash.",
+          { size: 8, color: grau },
+        );
+        write(`SHA-256: ${va.checksumSha256}`, {
+          size: 8,
+          font: bold,
+          color: rgb(0.2, 0.2, 0.2),
+        });
+        break;
+    }
+  }
+
+  return doc.save();
+}
