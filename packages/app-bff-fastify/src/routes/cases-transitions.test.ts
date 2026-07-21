@@ -231,7 +231,10 @@ describe("BFF POST /api/cases/:id/transitions", () => {
     const res = await app.inject({
       method: "POST",
       url: `/api/cases/${created.caseId}/transitions`,
-      payload: { action: "abschliessen", expectedVersion: aktiv.json().version },
+      payload: {
+        action: "abschliessen",
+        expectedVersion: aktiv.json().version,
+      },
     });
     expect(res.statusCode).toBe(403);
     await app.close();
@@ -353,6 +356,140 @@ describe("BFF POST /api/cases/:id/transitions", () => {
     });
     expect(erlaubt.statusCode).toBe(200);
     expect(erlaubt.json().state).toBe("eskaliert");
+    await app.close();
+  });
+});
+
+describe("N-Augen N>2 — Freigabe-Sammlung (Issue #56)", () => {
+  // Verfahren mit einem 3-Augen-Abschluss: aufgenommen → aktiv (ohne Freigabe) → abgeschlossen (requiredApprovals 3).
+  const nAugen3: ProcedureVersion = {
+    procedureId: "n-augen-3",
+    version: "1",
+    effectiveFrom: "2026-01-01T00:00:00.000Z",
+    legalBasisIds: ["VwV-IGM-2023"],
+    allowedStates: ["aufgenommen", "aktiv", "abgeschlossen"],
+    allowedTransitions: [
+      {
+        from: "aufgenommen",
+        to: "aktiv",
+        action: "aktivieren",
+        requiredPermission: "case.decision.prepare",
+      },
+      {
+        from: "aktiv",
+        to: "abgeschlossen",
+        action: "abschliessen",
+        requiredPermission: "case.decision.prepare",
+        requiredApprovals: 3,
+      },
+    ],
+  };
+
+  it("erst 3 DISTINKTE Freigebende (letzter Bearbeiter + Freigabe + Auslöser) lassen den Übergang zu", async () => {
+    // Ein gemeinsamer Store + Registry, drei Instanzen mit VERSCHIEDENEN Akteuren (A/B/C).
+    const caseStore = new InMemoryCaseStore();
+    const procedureRegistry = createInMemoryProcedureRegistry([nAugen3]);
+    const mk = async (actorId: string) =>
+      (
+        await buildBffApp({
+          session: caseworkerSession({ actorId }),
+          caseStore,
+          procedureRegistry,
+        })
+      ).app;
+    const a = await mk("actor.A");
+    const b = await mk("actor.B");
+    const c = await mk("actor.C");
+
+    // A eröffnet + aktiviert (A ist damit der letzte Bearbeiter, der in den Zustand „aktiv" geführt hat).
+    const created = (
+      await a.inject({
+        method: "POST",
+        url: "/api/cases",
+        payload: {
+          procedureId: "n-augen-3",
+          procedureVersion: "1",
+          state: "aufgenommen",
+          subjectIds: ["s"],
+        },
+      })
+    ).json() as { caseId: string; version: number };
+    const aktiv = await a.inject({
+      method: "POST",
+      url: `/api/cases/${created.caseId}/transitions`,
+      payload: { action: "aktivieren", expectedVersion: created.version },
+    });
+    const v = aktiv.json().version as number;
+
+    // B löst den 3-Augen-Abschluss aus — nur {A (letzter), B (Auslöser)} = 2 < 3 → 403.
+    const zuFrueh = await b.inject({
+      method: "POST",
+      url: `/api/cases/${created.caseId}/transitions`,
+      payload: { action: "abschliessen", expectedVersion: v },
+    });
+    expect(zuFrueh.statusCode).toBe(403);
+    expect(zuFrueh.json().error).toContain("n-augen");
+
+    // C erfasst seine Freigabe → jetzt {A, C} gesammelt (Auslöser zählt erst beim Übergang).
+    const freigabe = await c.inject({
+      method: "POST",
+      url: `/api/cases/${created.caseId}/approvals`,
+      payload: { action: "abschliessen", expectedVersion: v },
+    });
+    expect(freigabe.statusCode).toBe(200);
+    expect(freigabe.json()).toMatchObject({
+      recorded: true,
+      requiredApprovals: 3,
+      distinctApprovers: 2,
+      satisfied: false,
+    });
+
+    // B löst erneut aus — jetzt {A (letzter), C (Freigabe), B (Auslöser)} = 3 → 200.
+    const abschluss = await b.inject({
+      method: "POST",
+      url: `/api/cases/${created.caseId}/transitions`,
+      payload: { action: "abschliessen", expectedVersion: v },
+    });
+    expect(abschluss.statusCode).toBe(200);
+    expect(abschluss.json().state).toBe("abgeschlossen");
+
+    await Promise.all([a.close(), b.close(), c.close()]);
+  });
+
+  it("Freigabe für einen Übergang OHNE Freigabe-Pflicht → 400; Version-Drift → 409", async () => {
+    const caseStore = new InMemoryCaseStore();
+    const procedureRegistry = createInMemoryProcedureRegistry([nAugen3]);
+    const { app } = await buildBffApp({
+      session: caseworkerSession({ actorId: "actor.A" }),
+      caseStore,
+      procedureRegistry,
+    });
+    const created = (
+      await app.inject({
+        method: "POST",
+        url: "/api/cases",
+        payload: {
+          procedureId: "n-augen-3",
+          procedureVersion: "1",
+          state: "aufgenommen",
+          subjectIds: ["s"],
+        },
+      })
+    ).json() as { caseId: string; version: number };
+    // „aktivieren" braucht keine Freigabe → 400.
+    const ohne = await app.inject({
+      method: "POST",
+      url: `/api/cases/${created.caseId}/approvals`,
+      payload: { action: "aktivieren", expectedVersion: created.version },
+    });
+    expect(ohne.statusCode).toBe(400);
+    // Falsche expectedVersion → 409.
+    const drift = await app.inject({
+      method: "POST",
+      url: `/api/cases/${created.caseId}/approvals`,
+      payload: { action: "abschliessen", expectedVersion: 99 },
+    });
+    expect(drift.statusCode).toBe(409);
     await app.close();
   });
 });

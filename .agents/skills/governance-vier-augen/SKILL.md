@@ -135,10 +135,14 @@ Route gatet über `bffRouteAuth({ kind: "rbac", permission })` VOR dem Handler
   dedizierte, an DIESE Entscheidung gebundene Vorbereiter-Rolle. Ein
   Entscheidungs-Entwurf mit `preparedBy`/`approvedBy`-Paarung existiert noch
   nicht.
-- **N-Augen (N>2) ist erst als Untergrenze erzwungen.** `requiredApprovals` ist
-  vollständig als engine-neutrale Spezifikation da (BPMN-ableitbar, im Modell, im
-  Client-DTO gespiegelt), aber die Route erzwingt bislang nur die 2-Augen-Separation.
-  Die volle Sammlung + Zählung N distinkter Freigebender fehlt noch (Folge-Ausbau).
+- **N-Augen (N>2) ist voll erzwungen (Issue #56).** Über die 2-Augen-Separation hinaus
+  sammelt der Server explizite Freigaben: `POST /api/cases/:id/approvals`
+  (`{ action, expectedVersion }`) schreibt ein append-only `case.approval.recorded`
+  (Akteur aus der Sitzung). Beim Übergang zählt die Route die DISTINKTEN Träger der
+  Entscheidung im aktuellen Zustands-Dwell — letzter Bearbeiter + Freigebende (für genau
+  diese Action) + auslösender Akteur — und verlangt `>= requiredApprovalsOf(t)`; sonst 403
+  („n-augen: benötigt N …"). `case.approval.recorded` ist bewusst KEIN Vier-Augen-relevanter
+  Bearbeitungsschritt (verschiebt die „letzter Bearbeiter"-Bezugsgröße nicht).
 - **Keine eigene `case.decide`-Berechtigung.** Vorbereiten und Freigeben laufen
   beide unter `case.decision.prepare`; getrennt werden sie nur über die
   Akteur-Identität im Audit, nicht über verschiedene Rechte. Das per-Übergang

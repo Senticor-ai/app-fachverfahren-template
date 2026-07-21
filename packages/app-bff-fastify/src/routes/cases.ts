@@ -7,6 +7,8 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 import {
   CaseAllowedActionsDtoSchema,
+  CaseApprovalRequestSchema,
+  CaseApprovalResultDtoSchema,
   CaseAuditListDtoSchema,
   CaseAuditQuerySchema,
   CaseCreateRequestSchema,
@@ -56,6 +58,11 @@ const FOUR_EYES_RELEVANT_EVENT_TYPES: ReadonlySet<string> = new Set([
   "case.opened",
   "case.transitioned",
 ]);
+
+// N-AUGEN (Issue #56): eine explizite Freigabe eines Akteurs für EINEN bestimmten Übergang. BEWUSST KEIN
+// FOUR_EYES_RELEVANT-Typ — eine Freigabe ist kein Bearbeitungsschritt und darf die „letzter Bearbeiter"-
+// Bezugsgröße der 2-Augen-Separation NICHT verschieben.
+const CASE_APPROVAL_EVENT_TYPE = "case.approval.recorded";
 
 /** AppCase → CaseDto (Server-Topologie tenant/authority/jurisdiction bleibt verborgen). */
 function toCaseDto(c: AppCase): CaseDto {
@@ -464,6 +471,144 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
     },
   );
 
+  // N-AUGEN Freigabe-Sammlung (Issue #56): ein Akteur erfasst seine Freigabe für EINEN Übergang. Erst wenn
+  // genug DISTINKTE Freigebende gesammelt sind, lässt POST /transitions den `requiredApprovals`-Übergang zu.
+  typed.post(
+    "/api/cases/:id/approvals",
+    {
+      config: writeAuth.config,
+      preHandler: writeAuth.preHandler,
+      schema: {
+        tags: ["cases"],
+        summary:
+          "N-Augen: eine Freigabe für einen Übergang erfassen (Freigabe-Sammlung)",
+        params: CaseIdParamsSchema,
+        body: CaseApprovalRequestSchema,
+        response: { 200: CaseApprovalResultDtoSchema, ...errorResponses },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      const body = request.body;
+      let appCase: AppCase | undefined;
+      try {
+        appCase = await deps.caseStore.getCase({
+          tenantId: session.tenantId,
+          caseId: request.params.id,
+          scope: "authority",
+          authorityId: session.authorityId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      if (!appCase)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+      // Die Freigabe bindet an den aktuellen Zustand (Optimistic-Locking) — sonst freigäbe man „ins Leere",
+      // nachdem der Fall schon weitergezogen ist.
+      if (appCase.version !== body.expectedVersion)
+        return reply.code(409).send({
+          error: "case version conflict",
+          requestId: requestIdOf(request),
+        });
+      const procedure = deps.procedureRegistry.get(
+        appCase.procedureId,
+        appCase.procedureVersion,
+      );
+      if (!procedure) return badRequest(reply, request, "unknown procedure");
+      const transition = procedure.allowedTransitions.find(
+        (candidate) =>
+          candidate.from === appCase!.state && candidate.action === body.action,
+      );
+      if (!transition)
+        return badRequest(
+          reply,
+          request,
+          `invalid case transition: ${appCase.state}/${body.action}`,
+        );
+      // Ein Übergang OHNE Freigabe-Pflicht braucht keine Freigabe-Sammlung (fail-closed gegen sinnlose Zellen).
+      if (requiredApprovalsOf(transition) < 2)
+        return badRequest(reply, request, "action requires no approval");
+      const legalBasisId = procedure.legalBasisIds[0];
+      if (legalBasisId === undefined)
+        return badRequest(reply, request, "procedure has no legal basis");
+
+      let events: AppAuditEvent[];
+      try {
+        events = await deps.caseStore.listAuditEvents({
+          tenantId: session.tenantId,
+          caseId: appCase.caseId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      const relevant = events.filter((e) =>
+        FOUR_EYES_RELEVANT_EVENT_TYPES.has(e.eventType),
+      );
+      const letzterSchritt = relevant[relevant.length - 1];
+      const dwellStartIdx = letzterSchritt
+        ? events.indexOf(letzterSchritt)
+        : -1;
+      const approvalsInDwell = events
+        .slice(dwellStartIdx + 1)
+        .filter(
+          (e) =>
+            e.eventType === CASE_APPROVAL_EVENT_TYPE &&
+            e.payload["action"] === body.action,
+        );
+      const alreadyApproved = approvalsInDwell.some(
+        (a) => a.actorId === session.actorId,
+      );
+
+      if (!alreadyApproved) {
+        const audit = createFachlicheAuditEvent({
+          eventType: CASE_APPROVAL_EVENT_TYPE,
+          actorId: session.actorId,
+          actingAuthorityId: session.authorityId,
+          purpose: "case-management",
+          legalBasisId,
+          caseId: appCase.caseId,
+          requestId: requestIdOf(request),
+          summary: `Freigabe für '${body.action}'`,
+        });
+        try {
+          await deps.caseStore.appendAuditEvent({
+            auditEventId: audit.auditEventId,
+            caseId: appCase.caseId,
+            tenantId: session.tenantId,
+            authorityId: session.authorityId,
+            jurisdictionId: session.jurisdictionId,
+            actorId: session.actorId,
+            eventType: CASE_APPROVAL_EVENT_TYPE,
+            purpose: audit.purpose,
+            legalBasisId: audit.legalBasisId,
+            requestId: audit.requestId,
+            payload: { action: body.action, summary: audit.summary },
+            occurredAt: audit.occurredAt,
+          });
+        } catch {
+          return storeUnavailable(request, reply);
+        }
+      }
+
+      // Fortschritt: distinkte Träger dieser Entscheidung im aktuellen Dwell = letzter Bearbeiter + Freigebende
+      // (inkl. der gerade erfassten). Der AUSLÖSER zählt zusätzlich erst beim tatsächlichen Übergang.
+      const distinct = new Set<string>();
+      if (letzterSchritt) distinct.add(letzterSchritt.actorId);
+      for (const a of approvalsInDwell) distinct.add(a.actorId);
+      if (!alreadyApproved) distinct.add(session.actorId);
+      const needed = requiredApprovalsOf(transition);
+      return reply.send({
+        action: body.action,
+        recorded: !alreadyApproved,
+        distinctApprovers: distinct.size,
+        requiredApprovals: needed,
+        satisfied: distinct.size >= needed,
+      });
+    },
+  );
+
   typed.post(
     "/api/cases/:id/transitions",
     {
@@ -574,6 +719,33 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
             error: "four-eyes: der auslösende Akteur muss ein anderer sein",
             requestId: requestIdOf(request),
           });
+
+        // N-AUGEN (Issue #56): über die 2-Augen-Separation hinaus zählt der Server bei `requiredApprovals > 2`
+        // die DISTINKTEN Akteure, die DIESE Entscheidung getragen haben: der letzte Bearbeiter (der in den
+        // aktuellen Zustand geführt hat) + alle expliziten Freigaben IM AKTUELLEN Zustands-Dwell für genau
+        // diese Action + der auslösende Akteur. Freigaben werden über POST /api/cases/:id/approvals gesammelt.
+        const needed = requiredApprovalsOf(transition);
+        if (needed > 2) {
+          const dwellStartIdx = letzterSchritt
+            ? events.indexOf(letzterSchritt)
+            : -1;
+          const distinct = new Set<string>();
+          if (letzterSchritt) distinct.add(letzterSchritt.actorId);
+          for (const e of events.slice(dwellStartIdx + 1)) {
+            if (
+              e.eventType === CASE_APPROVAL_EVENT_TYPE &&
+              e.payload["action"] === body.action
+            ) {
+              distinct.add(e.actorId);
+            }
+          }
+          distinct.add(session.actorId);
+          if (distinct.size < needed)
+            return reply.code(403).send({
+              error: `n-augen: benötigt ${needed} distinkte Freigebende, ${distinct.size} vorhanden`,
+              requestId: requestIdOf(request),
+            });
+        }
       }
 
       // Zielzustand über den reinen SDK-Reducer rechnen (Zustands-/Data-Guard + Optimistic-Locking). Der

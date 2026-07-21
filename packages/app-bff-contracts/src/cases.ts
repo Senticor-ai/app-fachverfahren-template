@@ -81,6 +81,34 @@ export type CaseTransitionRequestDto = Static<
   typeof CaseTransitionRequestSchema
 >;
 
+// N-AUGEN (Issue #56): eine explizite Freigabe eines Akteurs für EINEN Übergang. Server-autoritativ: der
+// Akteur kommt aus der Sitzung; `expectedVersion` bindet die Freigabe an den aktuellen Zustand (409 bei Drift).
+export const CaseApprovalRequestSchema = Type.Object(
+  {
+    action: Type.String({ minLength: 1 }),
+    expectedVersion: Type.Integer({ minimum: 1 }),
+  },
+  { additionalProperties: false },
+);
+
+export type CaseApprovalRequestDto = Static<typeof CaseApprovalRequestSchema>;
+
+export const CaseApprovalResultDtoSchema = Type.Object(
+  {
+    action: Type.String({ minLength: 1 }),
+    /** Wurde eine NEUE Freigabe geschrieben (false = derselbe Akteur hatte bereits freigegeben). */
+    recorded: Type.Boolean(),
+    /** Distinkte Freigebende dieser Entscheidung im aktuellen Zustand (inkl. letztem Bearbeiter). */
+    distinctApprovers: Type.Integer({ minimum: 0 }),
+    requiredApprovals: Type.Integer({ minimum: 1 }),
+    /** Reicht die aktuelle Zahl bereits für den Übergang? */
+    satisfied: Type.Boolean(),
+  },
+  { additionalProperties: false },
+);
+
+export type CaseApprovalResultDto = Static<typeof CaseApprovalResultDtoSchema>;
+
 // Verlauf/Audit einer Akte (append-only, chronologisch). Die Server-Topologie (tenant/authority/jurisdiction)
 // wird — wie bei der Fall-DTO — bewusst NICHT exponiert. `payload` ist frei-formig (z. B. previousState/newState/
 // summary/detail) → nur dort ist additionalProperties erlaubt. `actorId` ist die (pseudonyme) Akteurs-Kennung,
