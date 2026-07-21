@@ -14,6 +14,7 @@ import type {
 import type {
   AiAssistPort,
   BlobStoragePort,
+  PaymentPort,
 } from "@senticor/platform-contracts";
 
 export interface BffDeps {
@@ -30,6 +31,9 @@ export interface BffDeps {
   /** KI-Assistenz als PORT (austauschbar: local-fake ODER echter Adapter, z.B. Ollama). Die App-Komposition
    *  wählt die Impl per Env; der BFF konsumiert nur den Vertrag — nie einen konkreten Anbieter. */
   aiAssist: AiAssistPort;
+  /** Zahlung/Gebühr als PORT (austauschbar: local-fake ODER echter Adapter, z.B. ePayBL/XBezahldienste). Die
+   *  App-Komposition wählt die Impl per Env; der BFF konsumiert nur den Vertrag — nie einen konkreten Anbieter. */
+  payment: PaymentPort;
   /** Byte-Storage für Nachweise/Dokumente (austauschbar: In-Memory-Fake / Dateisystem / Objekt-Store). */
   blobStorage: BlobStoragePort;
   /** Verfahrens-weites Wiki (generelles Wissen + Fähigkeiten je Verfahren) — die durable Wiki-Ebene. */

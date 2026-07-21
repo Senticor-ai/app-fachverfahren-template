@@ -96,6 +96,8 @@ describe("GET /api/capabilities", () => {
       "case.own.submit",
       "mailbox.own.read",
       "mailbox.own.write",
+      // Die eigene Gebühr veranlassen/prüfen (ePayBL-Naht) — getrennt vom Einreichen.
+      "payment.initiate",
       "preferences.read",
       "preferences.write",
       "session.read",

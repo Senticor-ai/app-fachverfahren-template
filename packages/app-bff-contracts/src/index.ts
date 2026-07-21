@@ -109,6 +109,12 @@ export {
   type AiSuggestionDto,
 } from "./ai-assist.js";
 export {
+  PaymentCreateRequestSchema,
+  PaymentStatusDtoSchema,
+  type PaymentCreateRequestDto,
+  type PaymentStatusDto,
+} from "./payment.js";
+export {
   KiVermerkRequestSchema,
   VermerkDtoSchema,
   VermerkIdParamsSchema,

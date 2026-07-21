@@ -83,6 +83,14 @@ export const builtInPermissions = {
     permission: "case.note.write",
     description: "Aktenvermerk an einen Fall schreiben",
   },
+  // ── Zahlung/Gebühr (ePayBL-Naht) ──────────────────────────────────────────────────────────────
+  // Eine Gebühr/Zahlung für den EIGENEN Vorgang veranlassen und ihren Status prüfen. EIGENE Permission
+  // (nicht `case.own.submit`): Zahlen ist getrennt vom Einreichen — ein Zahlungsrecht reitet nie auf dem
+  // Einreichen mit. Bürger:innen zahlen ihre Gebühr; die Behörde sieht den Zahlstatus über die Fall-Sicht.
+  paymentInitiate: {
+    permission: "payment.initiate",
+    description: "Zahlung/Gebühr für einen eigenen Vorgang veranlassen und prüfen",
+  },
 } as const satisfies Record<string, RbacPermission>;
 
 export const builtInRbacRegistry = {
@@ -101,6 +109,8 @@ export const builtInRbacRegistry = {
         // NUR die eigenen Vorgänge — NIE `case.read` (das ist die Behörden-Sicht über ALLE Fälle).
         builtInPermissions.caseOwnRead,
         builtInPermissions.caseOwnSubmit,
+        // Die eigene Gebühr veranlassen/prüfen (ePayBL-Naht) — getrennt vom Einreichen.
+        builtInPermissions.paymentInitiate,
       ],
       builtIn: true,
     },

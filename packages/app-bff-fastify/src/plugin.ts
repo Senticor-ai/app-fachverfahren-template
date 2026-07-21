@@ -20,12 +20,15 @@ import type {
 import {
   createLocalAiAssistPort,
   createLocalBlobStoragePort,
+  createLocalPaymentPort,
   type AiAssistPort,
   type BlobStoragePort,
+  type PaymentPort,
 } from "@senticor/platform-contracts";
 import type { BffDeps } from "./deps.js";
 import { requestIdOf } from "./route-auth.js";
 import { registerAiAssistRoutes } from "./routes/ai-assist.js";
+import { registerPaymentRoutes } from "./routes/payment.js";
 import { registerCapabilitiesRoute } from "./routes/capabilities.js";
 import { registerBuergerRoutes } from "./routes/buerger.js";
 import { registerCaseRoutes } from "./routes/cases.js";
@@ -47,6 +50,9 @@ export interface AppBffOptions {
   /** KI-Assistenz-Port. OPTIONAL: fehlt er, nutzt der BFF den local-fake (deterministisch, ohne Netz) —
    *  eine App wählt in der Komposition per Env den echten Adapter. */
   aiAssist?: AiAssistPort;
+  /** Zahlungs-Port (ePayBL). OPTIONAL: fehlt er, nutzt der BFF den local-fake (deterministischer Roundtrip,
+   *  ohne Netz) — eine App wählt in der Komposition per Env den echten Adapter. */
+  payment?: PaymentPort;
   /** Byte-Storage-Port. OPTIONAL: fehlt er, nutzt der BFF den In-Memory-Fake. */
   blobStorage?: BlobStoragePort;
   /** Verfahrens-Wiki-Store. OPTIONAL: fehlt er, nutzt der BFF den In-Memory-Store. */
@@ -76,6 +82,7 @@ export async function appBff(
     auditSink: opts.auditSink,
     rbacRegistry: opts.rbacRegistry ?? builtInRbacRegistry,
     aiAssist: opts.aiAssist ?? createLocalAiAssistPort(),
+    payment: opts.payment ?? createLocalPaymentPort(),
     blobStorage: opts.blobStorage ?? createLocalBlobStoragePort(),
     wissenStore: opts.wissenStore ?? new InMemoryWissenStore(),
   };
@@ -134,6 +141,8 @@ export async function appBff(
     },
     // Bürger-Sicht auf die EIGENEN Anträge (eigene Familie: der Scope ist durch die Route impliziert).
     { surfaces: ["buerger"], register: () => registerBuergerRoutes(app, deps) },
+    // Zahlung/Gebühr für den EIGENEN Vorgang (ePayBL-Naht) — Bürger-Fläche, RBAC payment.initiate.
+    { surfaces: ["buerger"], register: () => registerPaymentRoutes(app, deps) },
   ];
   // SENTINEL-DISZIPLIN (Wurzel eines Green-Wash-Befunds): UNDEFINED ⇒ NICHT zoniert ⇒ ALLE registrieren (fail-open,
   // heutiger Ein-App-Zustand). Ein LEERES Array ist etwas ANDERES — eine zonierte STRUKTUR-Zone (z. B. datenhaltung), die

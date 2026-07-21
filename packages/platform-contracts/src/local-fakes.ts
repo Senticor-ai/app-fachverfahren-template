@@ -129,13 +129,45 @@ export function createLocalAiAssistPort(
   };
 }
 
+/**
+ * Der lokale PaymentPort als EIGENSTÄNDIGE Fabrik (wie createLocalAiAssistPort), damit die Port-Registry
+ * ihn im „local"-Modus direkt nutzen kann. Hält die Zahlungen in einer eigenen Map; jede createPayment
+ * fingiert einen sofort abgeschlossenen Roundtrip (deterministisch, ohne Netz/ePayBL). Für den Durchstich.
+ */
+export function createLocalPaymentPort(): PaymentPort {
+  const payments = new Map<string, { amountMinor: number; reference: string }>();
+  return {
+    descriptor: descriptor("payment", "Local Payment", "confidential"),
+    async createPayment(_context, request) {
+      const paymentId = id("payment");
+      payments.set(paymentId, {
+        amountMinor: request.amountMinor,
+        reference: request.reference,
+      });
+      return capabilityOk({
+        paymentId,
+        status: "completed",
+        amountMinor: request.amountMinor,
+        currency: request.currency,
+        providerReference: request.reference,
+      });
+    },
+    async getPaymentStatus(_context, paymentId) {
+      const stored = payments.get(paymentId);
+      return capabilityOk({
+        paymentId,
+        status: stored ? "completed" : "failed",
+        amountMinor: stored?.amountMinor ?? 0,
+        currency: "EUR",
+        ...(stored ? { providerReference: stored.reference } : {}),
+      });
+    },
+  };
+}
+
 export function createLocalPlatformPorts(
   options: { aiAssistModel?: string } = {},
 ): PlatformPorts {
-  const payments = new Map<
-    string,
-    { amountMinor: number; reference: string }
-  >();
   const deliveries = new Map<string, "queued" | "delivered" | "failed">();
 
   const identityAndTrust: IdentityAndTrustPort = {
@@ -190,33 +222,8 @@ export function createLocalPlatformPorts(
     },
   };
 
-  const payment: PaymentPort = {
-    descriptor: descriptor("payment", "Local Payment", "confidential"),
-    async createPayment(_context, request) {
-      const paymentId = id("payment");
-      payments.set(paymentId, {
-        amountMinor: request.amountMinor,
-        reference: request.reference,
-      });
-      return capabilityOk({
-        paymentId,
-        status: "completed",
-        amountMinor: request.amountMinor,
-        currency: request.currency,
-        providerReference: request.reference,
-      });
-    },
-    async getPaymentStatus(_context, paymentId) {
-      const stored = payments.get(paymentId);
-      return capabilityOk({
-        paymentId,
-        status: stored ? "completed" : "failed",
-        amountMinor: stored?.amountMinor ?? 0,
-        currency: "EUR",
-        ...(stored ? { providerReference: stored.reference } : {}),
-      });
-    },
-  };
+  // EINE Wahrheit: dieselbe Zahlungs-Impl wie die eigenständige Fabrik (kein zweiter Roundtrip-Klon).
+  const payment: PaymentPort = createLocalPaymentPort();
 
   const mailbox: MailboxPort = {
     descriptor: descriptor("mailbox", "Local Mailbox", "confidential"),
