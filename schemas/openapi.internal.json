@@ -745,6 +745,138 @@
         "tags": ["buerger"]
       }
     },
+    "/api/buerger/antraege/{id}/bescheid.pdf": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": { "application/json": { "schema": {} } },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Den eigenen (eingefrorenen) Bescheid als PDF herunterladen",
+        "tags": ["buerger"]
+      }
+    },
     "/api/buerger/antraege/{id}/nachweise": {
       "get": {
         "parameters": [
@@ -4016,6 +4148,226 @@
         "tags": ["vermerke"]
       }
     },
+    "/api/identity": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "assuranceLevel": { "type": "string" },
+                    "displayName": { "type": "string" },
+                    "identifiers": {
+                      "additionalProperties": { "type": "string" },
+                      "type": "object"
+                    },
+                    "identityProvider": { "type": "string" },
+                    "representedOrganizationId": { "type": "string" },
+                    "subjectId": { "minLength": 1, "type": "string" }
+                  },
+                  "required": [
+                    "subjectId",
+                    "displayName",
+                    "assuranceLevel",
+                    "identityProvider",
+                    "identifiers"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Die eigene (angemeldete) Identität lesen (BundID/eID-Naht)",
+        "tags": ["identity"]
+      }
+    },
+    "/api/identity/assurance": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "minimumAssuranceLevel": { "minLength": 1, "type": "string" }
+                },
+                "required": ["minimumAssuranceLevel"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "accepted": { "type": "boolean" },
+                    "stepUpUrl": { "type": "string" }
+                  },
+                  "required": ["accepted"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Ein Mindest-Vertrauensniveau (eIDAS) verlangen (Step-up)",
+        "tags": ["identity"]
+      }
+    },
     "/api/mailbox": {
       "get": {
         "parameters": [
@@ -4344,6 +4696,272 @@
         },
         "summary": "Nachricht verfassen (scope: own oder authority)",
         "tags": ["mailbox"]
+      }
+    },
+    "/api/payment": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "amountMinor": { "minimum": 1, "type": "integer" },
+                  "purpose": { "minLength": 1, "type": "string" },
+                  "reference": { "minLength": 1, "type": "string" },
+                  "returnUrl": { "minLength": 1, "type": "string" }
+                },
+                "required": ["amountMinor", "purpose", "reference"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "amountMinor": { "minimum": 0, "type": "integer" },
+                    "currency": { "enum": ["EUR"], "type": "string" },
+                    "paymentId": { "minLength": 1, "type": "string" },
+                    "providerReference": { "type": "string" },
+                    "status": {
+                      "anyOf": [
+                        { "enum": ["created"], "type": "string" },
+                        { "enum": ["pending"], "type": "string" },
+                        { "enum": ["completed"], "type": "string" },
+                        { "enum": ["failed"], "type": "string" },
+                        { "enum": ["refunded"], "type": "string" }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "paymentId",
+                    "status",
+                    "amountMinor",
+                    "currency"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Zahlung/Gebühr für einen eigenen Vorgang veranlassen (ePayBL-Naht)",
+        "tags": ["payment"]
+      }
+    },
+    "/api/payment/{paymentId}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "paymentId",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "amountMinor": { "minimum": 0, "type": "integer" },
+                    "currency": { "enum": ["EUR"], "type": "string" },
+                    "paymentId": { "minLength": 1, "type": "string" },
+                    "providerReference": { "type": "string" },
+                    "status": {
+                      "anyOf": [
+                        { "enum": ["created"], "type": "string" },
+                        { "enum": ["pending"], "type": "string" },
+                        { "enum": ["completed"], "type": "string" },
+                        { "enum": ["failed"], "type": "string" },
+                        { "enum": ["refunded"], "type": "string" }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "paymentId",
+                    "status",
+                    "amountMinor",
+                    "currency"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Status einer eigenen Zahlung/Gebühr abfragen",
+        "tags": ["payment"]
       }
     },
     "/api/preferences": {
@@ -4735,6 +5353,169 @@
         },
         "summary": "Registrierte Verfahren in Kurzform (für die Wahl beim Anlegen einer Akte)",
         "tags": ["cases"]
+      }
+    },
+    "/api/register/evidence": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "acceptedSchemaVersions": {
+                    "items": { "minLength": 1, "type": "string" },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "consentRef": { "type": "string" },
+                  "evidenceType": { "minLength": 1, "type": "string" },
+                  "purpose": { "minLength": 1, "type": "string" },
+                  "subjectId": { "minLength": 1, "type": "string" }
+                },
+                "required": [
+                  "evidenceType",
+                  "subjectId",
+                  "purpose",
+                  "acceptedSchemaVersions"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "attributes": {
+                      "additionalProperties": {},
+                      "type": "object"
+                    },
+                    "documentRef": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "attachmentId": { "minLength": 1, "type": "string" },
+                        "checksumSha256": { "type": "string" },
+                        "fileName": { "type": "string" },
+                        "mimeType": { "type": "string" },
+                        "sizeBytes": { "minimum": 0, "type": "integer" }
+                      },
+                      "required": [
+                        "attachmentId",
+                        "fileName",
+                        "mimeType",
+                        "sizeBytes",
+                        "checksumSha256"
+                      ],
+                      "type": "object"
+                    },
+                    "evidenceId": { "minLength": 1, "type": "string" },
+                    "evidenceType": { "type": "string" },
+                    "issuedAt": { "type": "string" },
+                    "issuerAuthorityId": { "type": "string" },
+                    "schemaVersion": { "type": "string" }
+                  },
+                  "required": [
+                    "evidenceId",
+                    "evidenceType",
+                    "schemaVersion",
+                    "issuedAt",
+                    "issuerAuthorityId"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Einen Nachweis aus einem Register abrufen (Once-Only, zweckgebunden)",
+        "tags": ["register"]
       }
     },
     "/api/session": {
@@ -6000,6 +6781,249 @@
         },
         "summary": "Einen KI-Wissens-Entwurf prüfen (bestätigen/verwerfen)",
         "tags": ["verfahren-wissen"]
+      }
+    },
+    "/api/zustellung": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "attachments": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "attachmentId": { "minLength": 1, "type": "string" },
+                        "checksumSha256": { "type": "string" },
+                        "fileName": { "type": "string" },
+                        "mimeType": { "type": "string" },
+                        "sizeBytes": { "minimum": 0, "type": "integer" }
+                      },
+                      "required": [
+                        "attachmentId",
+                        "fileName",
+                        "mimeType",
+                        "sizeBytes",
+                        "checksumSha256"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "bodyText": { "minLength": 1, "type": "string" },
+                  "messageId": { "minLength": 1, "type": "string" },
+                  "recipientId": { "minLength": 1, "type": "string" },
+                  "subject": { "minLength": 1, "type": "string" }
+                },
+                "required": ["messageId", "recipientId", "subject", "bodyText"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "deliveryId": { "minLength": 1, "type": "string" }
+                  },
+                  "required": ["deliveryId"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Einen Bescheid rechtssicher zustellen (De-Mail/eBO-Naht)",
+        "tags": ["zustellung"]
+      }
+    },
+    "/api/zustellung/{deliveryId}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deliveryId",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "status": {
+                      "anyOf": [
+                        { "enum": ["queued"], "type": "string" },
+                        { "enum": ["delivered"], "type": "string" },
+                        { "enum": ["failed"], "type": "string" }
+                      ]
+                    }
+                  },
+                  "required": ["status"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Den Zustellstatus (Zustellnachweis) eines Bescheids abfragen",
+        "tags": ["zustellung"]
       }
     }
   },

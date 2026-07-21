@@ -225,6 +225,11 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           url: "/api/buerger/antraege/:id/bescheid",
           policy: "rbac:case.own.read",
         },
+        {
+          method: "GET",
+          url: "/api/buerger/antraege/:id/bescheid.pdf",
+          policy: "rbac:case.own.read",
+        },
         // Nachweis-Upload (Byte-Transfer): Lesen/Download = case.own.read, Hochladen = case.own.submit.
         {
           method: "GET",

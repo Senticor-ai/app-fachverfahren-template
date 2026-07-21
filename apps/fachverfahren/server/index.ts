@@ -10,8 +10,10 @@ import {
   appBff,
   registerOpenApiCollector,
   registerOpenApiRoute,
+  type BescheidPdfRenderer,
   type BffSurface,
 } from "@senticor/app-bff-fastify";
+import { renderBescheidPdf } from "./bescheid/pdf.js";
 import {
   buildInternalServer as buildRuntimeInternalServer,
   buildPublicServer as buildRuntimePublicServer,
@@ -143,6 +145,8 @@ interface BffWiring {
   auditSink: AuditSink;
   /** KI-Assistenz-Port, per Env gewählt (local-fake ODER echter Adapter). */
   aiAssist: AiAssistPort;
+  /** Bescheid-PDF-Renderer (pdf-lib, template-getrieben) — App-seitige Impl hinter dem BFF-Port (#60). */
+  bescheidPdf?: BescheidPdfRenderer;
   /** Erlaubte Flächen dieser Zone (aus ZONE_SURFACES) — undefined ⇒ keine Zonen-Trennung (fail-open). */
   allowedSurfaces?: readonly BffSurface[];
 }
@@ -309,6 +313,8 @@ export async function startRuntime(
     auditSink: createAuditSinkFromEnv(env),
     // Port-Registry: KI-Anbieter per Env (local-fake default; AI_ASSIST_PROVIDER=ollama für den echten Adapter).
     aiAssist: createAiAssistPortFromEnv(env),
+    // Bescheid-PDF-Renderer (pdf-lib, template-getrieben) — App-seitige Impl hinter dem BFF-Port (#60).
+    bescheidPdf: renderBescheidPdf,
     // Zonen-Route-Enforcement: nur die Flächen dieser Zone (ZONE_SURFACES) — undefined ⇒ alle (fail-open).
     ...(allowedSurfaces ? { allowedSurfaces } : {}),
   };

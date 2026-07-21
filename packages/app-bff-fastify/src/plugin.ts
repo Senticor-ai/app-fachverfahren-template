@@ -31,7 +31,7 @@ import {
   type MailboxPort,
   type PaymentPort,
 } from "@senticor/platform-contracts";
-import type { BffDeps } from "./deps.js";
+import type { BescheidPdfRenderer, BffDeps } from "./deps.js";
 import { requestIdOf } from "./route-auth.js";
 import { registerAiAssistRoutes } from "./routes/ai-assist.js";
 import { registerPaymentRoutes } from "./routes/payment.js";
@@ -75,6 +75,9 @@ export interface AppBffOptions {
   blobStorage?: BlobStoragePort;
   /** Verfahrens-Wiki-Store. OPTIONAL: fehlt er, nutzt der BFF den In-Memory-Store. */
   wissenStore?: WissenStore;
+  /** Bescheid-PDF-Renderer (pdf-lib). OPTIONAL: fehlt er, liefert die `.pdf`-Route 501 — der JSON-/BescheidView-
+   *  Pfad bleibt unberührt. KEIN local-fake, weil das PDF-Rendering App-seitig (asset-nah) verortet ist. */
+  bescheidPdf?: BescheidPdfRenderer;
   /** ZONEN-ROUTE-ENFORCEMENT (BSI-Netzsegmentierung, Angriffsflächen-Reduktion): die Flächen, die DIESE Instanz servieren
    *  darf — aus dem Deploy-Env ZONE_SURFACES (aus derselben readZoneModel-Wahrheit wie die Netz-Segmentierung). Eine
    *  Routen-Familie wird NUR registriert, wenn ihre Flächen diese Menge schneiden (Infra-Familien ohne Flächen-Tag immer).
@@ -101,12 +104,15 @@ export async function appBff(
     rbacRegistry: opts.rbacRegistry ?? builtInRbacRegistry,
     aiAssist: opts.aiAssist ?? createLocalAiAssistPort(),
     payment: opts.payment ?? createLocalPaymentPort(),
-    identityAndTrust: opts.identityAndTrust ?? createLocalIdentityAndTrustPort(),
+    identityAndTrust:
+      opts.identityAndTrust ?? createLocalIdentityAndTrustPort(),
     mailbox: opts.mailbox ?? createLocalMailboxPort(),
     evidenceRetrieval:
       opts.evidenceRetrieval ?? createLocalEvidenceRetrievalPort(),
     blobStorage: opts.blobStorage ?? createLocalBlobStoragePort(),
     wissenStore: opts.wissenStore ?? new InMemoryWissenStore(),
+    // exactOptionalPropertyTypes: nur setzen, wenn geliefert (kein `bescheidPdf: undefined`).
+    ...(opts.bescheidPdf ? { bescheidPdf: opts.bescheidPdf } : {}),
   };
   app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error.validation) {

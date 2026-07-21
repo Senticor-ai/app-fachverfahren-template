@@ -19,6 +19,15 @@ import type {
   MailboxPort,
   PaymentPort,
 } from "@senticor/platform-contracts";
+import type { VerwaltungsaktDto } from "@senticor/app-bff-contracts";
+
+/** Rendert den eingefrorenen Verwaltungsakt als PDF-Langzeitdokument (Issue #60). PORT: die App-Komposition
+ *  liefert die konkrete (pdf-lib-)Impl — das BFF-Paket bleibt frei von PDF-/Font-Abhängigkeiten und konsumiert
+ *  nur den Vertrag. Optional: ohne Renderer antwortet die `.pdf`-Route mit 501 (kein stiller JSON-Fallback). */
+export type BescheidPdfRenderer = (input: {
+  va: VerwaltungsaktDto;
+  behoerde: string;
+}) => Promise<Uint8Array>;
 
 export interface BffDeps {
   appStore: AppStore;
@@ -50,4 +59,7 @@ export interface BffDeps {
   blobStorage: BlobStoragePort;
   /** Verfahrens-weites Wiki (generelles Wissen + Fähigkeiten je Verfahren) — die durable Wiki-Ebene. */
   wissenStore: WissenStore;
+  /** Bescheid-PDF-Renderer als PORT (optional; die App-Komposition liefert die pdf-lib-Impl). Ohne ihn liefert
+   *  die `.pdf`-Download-Route 501 — der JSON-/BescheidView-Pfad bleibt unberührt. */
+  bescheidPdf?: BescheidPdfRenderer;
 }

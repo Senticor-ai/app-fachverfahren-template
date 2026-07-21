@@ -15,7 +15,7 @@
 // Config liegt ausserhalb seines rootDir). Er stempelt Kennung/Version/Zeit/Eigentümer und auditiert.
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import type { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
+import { Type, type TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 import {
   AntragDtoSchema,
   AntragEinreichenRequestSchema,
@@ -305,6 +305,95 @@ export function registerBuergerRoutes(
     },
   );
 
+  // Denselben eingefrorenen Verwaltungsakt als PDF-Langzeitdokument HERUNTERLADEN (Issue #60). Reine ALTERNATIVE
+  // REPRÄSENTATION der bereits über die BescheidView bekanntgegebenen VA — bewusst OHNE eigenes `case.disclosed`,
+  // damit der Fristanker (Bekanntgabe) nicht doppelt gesetzt wird; die Bekanntgabe liegt beim JSON-/View-Abruf.
+  typed.get(
+    "/api/buerger/antraege/:id/bescheid.pdf",
+    {
+      config: readAuth.config,
+      preHandler: readAuth.preHandler,
+      schema: {
+        tags: ["buerger"],
+        summary: "Den eigenen (eingefrorenen) Bescheid als PDF herunterladen",
+        params: AntragIdParamsSchema,
+        // 200 = Binär (PDF-Bytes) → Unknown, damit Fastify die Bytes roh sendet (Buffer umgeht die Serialisierung).
+        // 500 = Integritäts-/Render-Fehler, 501 = kein Renderer verdrahtet.
+        response: {
+          200: Type.Unknown(),
+          500: ErrorEnvelopeSchema,
+          501: ErrorEnvelopeSchema,
+          ...errorResponses,
+        },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      let found: AppCase | undefined;
+      try {
+        found = await deps.caseStore.getCase({
+          tenantId: session.tenantId,
+          caseId: request.params.id,
+          scope: "owner",
+          actorId: session.actorId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      if (!found)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+
+      let events: AppAuditEvent[];
+      try {
+        events = await deps.caseStore.listAuditEvents({
+          tenantId: session.tenantId,
+          caseId: found.caseId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      const va = findVerwaltungsakt(events);
+      if (!va)
+        return reply
+          .code(404)
+          .send({ error: "kein Bescheid", requestId: requestIdOf(request) });
+
+      // DEFENSE-IN-DEPTH: den Hash über die gelieferten Bytes NACHRECHNEN — weicht er ab, NICHT ausliefern.
+      if (canonicalSha256(va.content) !== va.checksumSha256)
+        return reply.code(500).send({
+          error: "bescheid integrity check failed",
+          requestId: requestIdOf(request),
+        });
+
+      // Ohne verdrahteten Renderer kein stiller JSON-Fallback: 501 (die App-Komposition liefert die pdf-lib-Impl).
+      if (!deps.bescheidPdf)
+        return reply.code(501).send({
+          error: "pdf renderer not configured",
+          requestId: requestIdOf(request),
+        });
+
+      const dto = toVerwaltungsaktDto(va);
+      let pdf: Uint8Array;
+      try {
+        pdf = await deps.bescheidPdf({ va: dto, behoerde: found.authorityId });
+      } catch {
+        return reply.code(500).send({
+          error: "bescheid pdf render failed",
+          requestId: requestIdOf(request),
+        });
+      }
+      const safeName = dto.aktenzeichen.replace(/[^A-Za-z0-9._-]+/g, "_");
+      void reply.header("content-type", "application/pdf");
+      void reply.header(
+        "content-disposition",
+        `attachment; filename="Bescheid-${safeName}.pdf"`,
+      );
+      return reply.send(Buffer.from(pdf));
+    },
+  );
+
   typed.post(
     "/api/buerger/antraege",
     {
@@ -408,7 +497,8 @@ export function registerBuergerRoutes(
       preHandler: submitAuth.preHandler,
       schema: {
         tags: ["buerger"],
-        summary: "Rechtsbehelf (Widerspruch/Einspruch/Klage) gegen den eigenen Bescheid einlegen",
+        summary:
+          "Rechtsbehelf (Widerspruch/Einspruch/Klage) gegen den eigenen Bescheid einlegen",
         params: AntragIdParamsSchema,
         body: WiderspruchRequestSchema,
         response: {
@@ -462,8 +552,7 @@ export function registerBuergerRoutes(
 
       // Art + Norm aus dem EINGEFRORENEN Regime (regime-neutral) — nicht aus dem Body, nicht erfunden.
       const rechtsbehelf = va.content["rechtsbehelf"] as
-        | { art?: unknown; norm?: unknown }
-        | undefined;
+        { art?: unknown; norm?: unknown } | undefined;
       const art: "widerspruch" | "einspruch" | "klage" =
         rechtsbehelf?.art === "einspruch" || rechtsbehelf?.art === "klage"
           ? rechtsbehelf.art
