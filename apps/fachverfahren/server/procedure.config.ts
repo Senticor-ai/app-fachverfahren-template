@@ -117,6 +117,9 @@ export const antragProcedure: ProcedureVersion =
       { key: "widerspruch_in_pruefung" },
       { key: "abgeholfen", terminal: true },
       { key: "widerspruch_zurueckgewiesen", terminal: true },
+      { key: "rueckforderung_festgesetzt" },
+      { key: "erstattet", terminal: true },
+      { key: "niedergeschlagen", terminal: true },
     ],
     transitions: [
       { from: "eingegangen", to: "in_pruefung", label: "In Prüfung nehmen" },
@@ -168,6 +171,42 @@ export const antragProcedure: ProcedureVersion =
           fiktionTage: 4,
           fiktionNorm: "§ 41 Abs. 2 VwVfG",
         },
+      },
+      // Rückforderungs-Verfahren (ADR-0007) — Spiegel von leistung.config; stelltForderung MUSS deckungsgleich sein.
+      {
+        from: "festgesetzt",
+        to: "rueckforderung_festgesetzt",
+        label: "Rückforderung festsetzen",
+        vierAugen: true,
+        erlaesstBescheid: true,
+        stelltForderung: {
+          tarif: {
+            positionen: [
+              { kategorie: "standard", betragCent: 5000, label: "Standard" },
+              { kategorie: "express", betragCent: 9000, label: "Express" },
+              {
+                kategorie: "gebuehrenfrei",
+                betragCent: 0,
+                label: "Gebührenfrei",
+              },
+            ],
+            defaultCent: 0,
+          },
+          diskriminator: "anliegen.kategorie",
+          zahlungsfristTage: 30,
+        },
+      },
+      {
+        from: "rueckforderung_festgesetzt",
+        to: "erstattet",
+        label: "Erstattung bestätigen",
+        vierAugen: true,
+      },
+      {
+        from: "rueckforderung_festgesetzt",
+        to: "niedergeschlagen",
+        label: "Forderung niederschlagen",
+        vierAugen: true,
       },
     ],
   });

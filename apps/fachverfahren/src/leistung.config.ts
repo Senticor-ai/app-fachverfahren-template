@@ -158,6 +158,19 @@ export const leistungConfig: LeistungConfig = {
         tone: "block",
         terminal: true,
       },
+      // Rückforderungs-Verfahren (ADR-0007): Rückforderungsbescheid + Sollstellung → Erstattung/Niederschlagung.
+      {
+        key: "rueckforderung_festgesetzt",
+        label: "Rückforderung festgesetzt",
+        tone: "warn",
+      },
+      { key: "erstattet", label: "Erstattet", tone: "ok", terminal: true },
+      {
+        key: "niedergeschlagen",
+        label: "Niedergeschlagen",
+        tone: "block",
+        terminal: true,
+      },
     ],
     transitions: [
       {
@@ -235,6 +248,49 @@ export const leistungConfig: LeistungConfig = {
           fiktionTage: 4,
           fiktionNorm: "§ 41 Abs. 2 VwVfG",
         },
+      },
+      // ── Rückforderungs-Verfahren (ADR-0007) — Sollstellung server-autoritativ über den Tarif ─────────
+      {
+        from: "festgesetzt",
+        to: "rueckforderung_festgesetzt",
+        label: "Rückforderung festsetzen",
+        rollen: ["sachbearbeitung"],
+        vierAugen: true,
+        detailPflicht: true,
+        // Der Rückforderungsbescheid IST ein Verwaltungsakt (Standard-Widerspruch-Regime aus config.zustellung).
+        erlaesstBescheid: true,
+        // SOLLSTELLUNG: die Höhe kommt SERVER-AUTORITATIV aus dem Tarif + der gewählten Kategorie — nie vom Client.
+        stelltForderung: {
+          tarif: {
+            positionen: [
+              { kategorie: "standard", betragCent: 5000, label: "Standard" },
+              { kategorie: "express", betragCent: 9000, label: "Express" },
+              {
+                kategorie: "gebuehrenfrei",
+                betragCent: 0,
+                label: "Gebührenfrei",
+              },
+            ],
+            defaultCent: 0,
+          },
+          diskriminator: "anliegen.kategorie",
+          zahlungsfristTage: 30,
+        },
+      },
+      {
+        from: "rueckforderung_festgesetzt",
+        to: "erstattet",
+        label: "Erstattung bestätigen",
+        rollen: ["sachbearbeitung"],
+        vierAugen: true,
+      },
+      {
+        from: "rueckforderung_festgesetzt",
+        to: "niedergeschlagen",
+        label: "Forderung niederschlagen",
+        rollen: ["sachbearbeitung"],
+        vierAugen: true,
+        detailPflicht: true,
       },
     ],
   },

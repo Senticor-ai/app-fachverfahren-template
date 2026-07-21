@@ -14,6 +14,7 @@
 import type {
   CaseTransition,
   ProcedureVersion,
+  StelltForderungConfig,
   VerwaltungsaktConfig,
 } from "./domain-kernel.js";
 import type { Bedingung } from "./rules.js";
@@ -39,6 +40,8 @@ export interface StatusMachineTransitionSource {
   closesCase?: boolean;
   /** Eigenes VA-Regime NUR für diesen Übergang (überschreibt ProcedureVersion.verwaltungsakt) → CaseTransition.verwaltungsakt. */
   verwaltungsakt?: VerwaltungsaktConfig;
+  /** Stellt eine Forderung/Sollstellung (Rückforderung) → CaseTransition.stelltForderung. */
+  stelltForderung?: StelltForderungConfig;
   /** Data-driven Guard (Bedingung über case.data) → CaseTransition.guard. */
   guard?: Bedingung;
 }
@@ -106,6 +109,8 @@ export function statusMachineToProcedureVersion(
       ...(t.erlaesstBescheid ? { issuesVerwaltungsakt: true } : {}),
       // Eigenes VA-Regime nur für diesen Übergang (z. B. Widerspruchsbescheid = Klage) — überschreibt das Procedure-Regime.
       ...(t.verwaltungsakt ? { verwaltungsakt: t.verwaltungsakt } : {}),
+      // Sollstellung/Rückforderung: server schreibt beim Übergang forderung.gestellt (server-autoritative Höhe).
+      ...(t.stelltForderung ? { stelltForderung: t.stelltForderung } : {}),
       // Data-driven Guard (Bedingung über case.data) — der Server lässt den Übergang nur bei Erfüllung zu.
       ...(t.guard ? { guard: t.guard } : {}),
     };

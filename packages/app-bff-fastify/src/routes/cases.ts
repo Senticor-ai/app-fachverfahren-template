@@ -30,6 +30,7 @@ import {
   type AppCase,
 } from "@senticor/app-store-postgres";
 import {
+  berechneTarif,
   builtInPermissions,
   createFachlicheAuditEvent,
   requiredApprovalsOf,
@@ -93,6 +94,20 @@ function toAuditDto(e: AppAuditEvent): CaseAuditEventDto {
     prevHash: e.prevHash ?? null,
     ...(e.entryHash !== undefined ? { entryHash: e.entryHash } : {}),
   };
+}
+
+/** Liest einen Punkt-Pfad (z. B. "anliegen.kategorie") aus den (opaken) Falldaten. Defensiv: fehlt ein Glied,
+ *  → undefined. NUR für den DEKLARIERTEN Sollstellungs-Diskriminator (eine Kategorie-WAHL, kein Betrag). */
+function leseDatenPfad(data: Record<string, unknown>, pfad: string): unknown {
+  return pfad
+    .split(".")
+    .reduce<unknown>(
+      (acc, key) =>
+        acc && typeof acc === "object"
+          ? (acc as Record<string, unknown>)[key]
+          : undefined,
+      data,
+    );
 }
 
 /** AppCase → SDK-`Case` für den reinen `transitionCase`-Reducer (Guards/Vier-Augen leben im SDK, nicht im Store).
@@ -809,6 +824,29 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
         };
       }
 
+      // SOLLSTELLUNG (Rückforderung, ADR-0007): die Höhe ist SERVER-AUTORITATIV — sie kommt aus dem
+      // hinterlegten Tarif + der client-GEWÄHLTEN Kategorie (Diskriminator), NIE als client-gelieferter
+      // Betrag. Sie reitet ATOMAR in der Übergangs-payload (dasselbe Muster wie der eingefrorene VA); die
+      // Read-Brücke (forderungsstandAusAudit) liest sie als forderung.gestellt.
+      let forderungPayload: Record<string, unknown> | undefined;
+      if (transition.stelltForderung) {
+        const cfg = transition.stelltForderung;
+        const kategorie = String(
+          leseDatenPfad(appCase.data, cfg.diskriminator) ?? "",
+        );
+        const tarif = berechneTarif(cfg.tarif, kategorie);
+        const faelligIso = new Date(
+          Date.parse(now) + (cfg.zahlungsfristTage ?? 30) * 86_400_000,
+        ).toISOString();
+        forderungPayload = {
+          art: "forderung.gestellt",
+          betragCent: tarif.betragCent,
+          faelligIso,
+          kategorie,
+          tarifBekannt: tarif.bekannt,
+        };
+      }
+
       const auditEvent: AppAuditEvent = {
         auditEventId: `audit.${randomUUID()}`,
         caseId: appCase.caseId,
@@ -827,6 +865,7 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
           ...(verwaltungsaktPayload
             ? { verwaltungsakt: verwaltungsaktPayload }
             : {}),
+          ...(forderungPayload ? { forderung: forderungPayload } : {}),
         },
         occurredAt: now,
       };

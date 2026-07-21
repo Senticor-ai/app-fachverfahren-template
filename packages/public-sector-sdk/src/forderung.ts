@@ -127,25 +127,44 @@ export interface ForderungAuditQuelle {
   occurredAt: string;
 }
 
+/** Ein Forderungs-Ereignis aus einer payload (art + betragCent/faelligIso) rekonstruieren — defensiv. */
+function ausPayload(
+  art: string,
+  payload: Record<string, unknown> | undefined,
+  occurredAt: string,
+): ForderungEreignis {
+  const betrag = payload?.["betragCent"];
+  const faellig = payload?.["faelligIso"];
+  return {
+    art,
+    ...(typeof betrag === "number" ? { betragCent: betrag } : {}),
+    ...(typeof faellig === "string" ? { faelligIso: faellig } : {}),
+    occurredAt,
+  };
+}
+
 /**
- * Die READ-Brücke: extrahiert die `forderung.*`-Ereignisse aus dem append-only Fall-Audit und berechnet den
- * Forderungsstand. Betrag/Fälligkeit kommen aus der (server-geschriebenen) payload — der offene Restbetrag
+ * Die READ-Brücke: extrahiert die Forderungs-Ereignisse aus dem append-only Fall-Audit und berechnet den
+ * Forderungsstand. Zwei Formen (beide server-geschrieben): (a) EIGENSTÄNDIGE `forderung.*`-Ereignisse
+ * (Zahlung/Mahnung, standalone) und (b) eine in eine andere Event-payload EINGEBETTETE Sollstellung
+ * (`payload.forderung`, die ATOMAR mit dem Übergang schreibt — wie der eingefrorene VA). Der offene Restbetrag
  * bleibt eine reine Ableitung, nie eine gespeicherte Zweitwahrheit. So liest jede BFF-/UI-Fläche denselben Stand.
  */
 export function forderungsstandAusAudit(
   events: readonly ForderungAuditQuelle[],
 ): ForderungStand {
-  const ereignisse: ForderungEreignis[] = events
-    .filter((e) => e.eventType.startsWith("forderung."))
-    .map((e) => {
-      const betrag = e.payload?.["betragCent"];
-      const faellig = e.payload?.["faelligIso"];
-      return {
-        art: e.eventType,
-        ...(typeof betrag === "number" ? { betragCent: betrag } : {}),
-        ...(typeof faellig === "string" ? { faelligIso: faellig } : {}),
-        occurredAt: e.occurredAt,
-      };
-    });
+  const ereignisse: ForderungEreignis[] = [];
+  for (const e of events) {
+    if (e.eventType.startsWith("forderung.")) {
+      ereignisse.push(ausPayload(e.eventType, e.payload, e.occurredAt));
+    }
+    const eingebettet = e.payload?.["forderung"];
+    if (eingebettet && typeof eingebettet === "object") {
+      const f = eingebettet as Record<string, unknown>;
+      if (typeof f["art"] === "string") {
+        ereignisse.push(ausPayload(f["art"], f, e.occurredAt));
+      }
+    }
+  }
   return berechneForderungsstand(ereignisse);
 }

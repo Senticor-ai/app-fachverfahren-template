@@ -159,6 +159,11 @@ export interface Transition {
    *  config.zustellung). Z. B. der Widerspruchsbescheid ist mit KLAGE (§ 74 VwGO) anzufechten, nicht erneut mit
    *  Widerspruch (ADR-0006 §3). Die Ableitung reicht es an CaseTransition.verwaltungsakt durch. */
   verwaltungsakt?: VerwaltungsaktConfig;
+  /** STELLT eine Forderung/Sollstellung (Rückforderung, ADR-0007): der Server schreibt beim Übergang ein
+   *  append-only `forderung.gestellt`-Ereignis mit SERVER-AUTORITATIVER Höhe (aus `tarif` + der client-
+   *  gewählten Kategorie unter `diskriminator`) + Fälligkeit (now + `zahlungsfristTage`). Der Server übernimmt
+   *  NIE einen client-gelieferten Betrag. Data-driven, symmetrisch zu `erlaesstBescheid`. */
+  stelltForderung?: StelltForderungConfig;
   /** DATA-DRIVEN GUARD: der Übergang ist nur erlaubt, wenn die Bedingung über die Falldaten (case.data)
    *  erfüllt ist. Der Server (transitionCase) wertet ihn autoritativ aus (→ CaseTransition.guard). Erzwingt
    *  WORKFLOW-KONSISTENZ über die deklarierte Datenlage, KEINE Autorisierung (case.data ist client-geliefert). */
@@ -360,6 +365,25 @@ export interface VerwaltungsaktConfig {
   rechtsbehelf: RechtsbehelfConfig;
   fiktionTage: number;
   fiktionNorm: string;
+}
+
+/** Eine Tarif-Position: Kategorie → fester Betrag (Cent). kit-Spiegel des SDK-`TarifPosition`. */
+export interface TarifPosition {
+  kategorie: string;
+  betragCent: number;
+  label?: string;
+}
+/** Server-hinterlegter Tarif (Gebührensatzung als DATEN). kit-Spiegel des SDK-`TarifTabelle`. */
+export interface TarifTabelle {
+  positionen: TarifPosition[];
+  defaultCent?: number;
+}
+/** Konfiguration einer Sollstellung an einem Übergang (Rückforderung): server-autoritative Höhe aus `tarif`
+ *  + der client-gewählten Kategorie unter dem Datenpfad `diskriminator`; Zahlungsfrist in Tagen (Default 30). */
+export interface StelltForderungConfig {
+  tarif: TarifTabelle;
+  diskriminator: string;
+  zahlungsfristTage?: number;
 }
 
 /** Eine zu überwachende Frist (spiegelt TerminFristPanel `FristItem` — `status` exakt-optional, ohne `| undefined`). */

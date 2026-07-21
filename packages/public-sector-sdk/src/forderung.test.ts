@@ -144,6 +144,26 @@ describe("forderungsstandAusAudit (READ-Brücke aus dem Fall-Audit)", () => {
       ]).status,
     ).toBe("keine");
   });
+
+  it("liest eine EINGEBETTETE Sollstellung aus payload.forderung (atomar mit dem Übergang)", () => {
+    const stand = forderungsstandAusAudit([
+      {
+        eventType: "case.transitioned",
+        payload: {
+          newState: "rueckforderung_festgesetzt",
+          forderung: {
+            art: FORDERUNG_GESTELLT,
+            betragCent: 9000,
+            faelligIso: "2026-03-01",
+          },
+        },
+        occurredAt: "2026-02-01",
+      },
+    ]);
+    expect(stand.status).toBe("offen");
+    expect(stand.offenCent).toBe(9000);
+    expect(stand.faelligIso).toBe("2026-03-01");
+  });
 });
 
 describe("istForderungMahnbar", () => {

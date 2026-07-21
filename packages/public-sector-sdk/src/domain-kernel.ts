@@ -1,4 +1,13 @@
 import { evalBedingung, type Bedingung } from "./rules.js";
+import type { TarifTabelle } from "./tarif.js";
+
+/** Konfiguration einer Sollstellung an einem Übergang (Rückforderung, ADR-0007): server-autoritative Höhe aus
+ *  `tarif` + der client-gewählten Kategorie unter dem Datenpfad `diskriminator`; Zahlungsfrist in Tagen. */
+export interface StelltForderungConfig {
+  tarif: TarifTabelle;
+  diskriminator: string;
+  zahlungsfristTage?: number;
+}
 
 export interface Actor {
   actorId: string;
@@ -124,6 +133,9 @@ export interface CaseTransition {
    *  als der Ausgangsbescheid: der Widerspruchsbescheid ist mit der KLAGE (§ 74 VwGO) anzufechten, nicht erneut
    *  mit Widerspruch (ADR-0006 §3). Fehlt es, gilt weiter `ProcedureVersion.verwaltungsakt` (rückwärtskompatibel). */
   verwaltungsakt?: VerwaltungsaktConfig;
+  /** Stellt dieser Übergang eine Forderung/Sollstellung (Rückforderung, ADR-0007)? Dann schreibt der Server ein
+   *  append-only `forderung.gestellt`-Ereignis mit server-autoritativer Höhe (tarif + Kategorie) + Fälligkeit. */
+  stelltForderung?: StelltForderungConfig;
   /**
    * DATA-DRIVEN GUARD: dieser Übergang ist nur erlaubt, wenn die Bedingung über `case.data` erfüllt ist
    * (z. B. „Betrag > 1000" oder „Kategorie in [a,b]"). `transitionCase` wertet ihn server-autoritativ aus.

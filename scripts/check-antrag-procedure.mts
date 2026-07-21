@@ -78,6 +78,7 @@ const quelle: StatusMachineSource = {
     // (Widerspruchsbescheid = Klage) MÜSSEN mitgemappt werden, sonst driftet die Ableitung stumm.
     ...(t.closesCase ? { closesCase: true } : {}),
     ...(t.verwaltungsakt ? { verwaltungsakt: t.verwaltungsakt } : {}),
+    ...(t.stelltForderung ? { stelltForderung: t.stelltForderung } : {}),
     ...(t.guard ? { guard: t.guard } : {}),
   })),
 };
