@@ -207,6 +207,7 @@ describe("BFF-Verdrahtung im App-Server", () => {
         "/api/buerger/antraege/{id}/bescheid.pdf",
         "/api/buerger/antraege/{id}/nachweise",
         "/api/buerger/antraege/{id}/nachweise/{attachmentId}",
+        "/api/buerger/antraege/{id}/rueckforderung/zahlung",
         "/api/buerger/antraege/{id}/widerspruch",
         "/api/capabilities",
         "/api/cases",

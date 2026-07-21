@@ -252,6 +252,11 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           policy: "rbac:case.own.submit",
         },
         {
+          method: "POST",
+          url: "/api/buerger/antraege/:id/rueckforderung/zahlung",
+          policy: "rbac:case.own.submit",
+        },
+        {
           method: "GET",
           url: "/api/mailbox",
           policy:

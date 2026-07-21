@@ -38,7 +38,10 @@ import type { AppAuditEvent, AppCase } from "@senticor/app-store-postgres";
 import {
   builtInPermissions,
   createFachlicheAuditEvent,
+  forderungsstandAusAudit,
+  FORDERUNG_ZAHLUNG_EINGEGANGEN,
 } from "@senticor/public-sector-sdk";
+import type { PortCallContext } from "@senticor/platform-contracts";
 import type { BffDeps } from "../deps.js";
 import { canonicalSha256 } from "../canonical-hash.js";
 import { bffRouteAuth, requestIdOf, sessionOf } from "../route-auth.js";
@@ -602,6 +605,145 @@ export function registerBuergerRoutes(
         art,
         eingelegtAm: objection.occurredAt,
       });
+    },
+  );
+
+  // ── RÜCKFORDERUNG: ZAHLUNGSEINGANG VERBUCHEN (Issue #62, ADR-0007) ───────────────────────────────
+  // Die Bürger:in bestätigt eine abgeschlossene Zahlung auf die EIGENE Rückforderung. Der Server VERIFIZIERT
+  // die Zahlung über den PaymentPort (Status/Betrag serverseitig, NIE aus dem Body) und verbucht sie append-only
+  // als `forderung.zahlung.eingegangen`. IDEMPOTENT über die `paymentId` (kein Doppel-Buchen bei erneutem
+  // Bestätigen). Der offene Restbetrag bleibt eine reine Ableitung (forderungsstandAusAudit).
+  const ZahlungRequestSchema = Type.Object(
+    { paymentId: Type.String({ minLength: 1 }) },
+    { additionalProperties: false },
+  );
+  const ForderungsstandDtoSchema = Type.Object(
+    {
+      status: Type.String(),
+      sollCent: Type.Integer(),
+      gezahltCent: Type.Integer(),
+      offenCent: Type.Integer(),
+      faelligIso: Type.Optional(Type.String()),
+      mahnstufe: Type.Integer(),
+    },
+    { additionalProperties: false },
+  );
+  typed.post(
+    "/api/buerger/antraege/:id/rueckforderung/zahlung",
+    {
+      config: submitAuth.config,
+      preHandler: submitAuth.preHandler,
+      schema: {
+        tags: ["buerger"],
+        summary:
+          "Eine abgeschlossene Zahlung auf die eigene Rückforderung verbuchen",
+        params: AntragIdParamsSchema,
+        body: ZahlungRequestSchema,
+        response: {
+          200: ForderungsstandDtoSchema,
+          409: ErrorEnvelopeSchema,
+          502: ErrorEnvelopeSchema,
+          ...errorResponses,
+        },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      let found: AppCase | undefined;
+      try {
+        found = await deps.caseStore.getCase({
+          tenantId: session.tenantId,
+          caseId: request.params.id,
+          scope: "owner",
+          actorId: session.actorId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      if (!found)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+
+      // Zahlung SERVER-VERIFIZIEREN: Status + Betrag kommen aus dem PaymentPort, nie aus dem Body.
+      const context: PortCallContext = {
+        requestId: requestIdOf(request),
+        tenantId: session.tenantId,
+        authorityId: session.authorityId,
+        jurisdictionId: session.jurisdictionId,
+        actor: { actorId: session.actorId, actorType: "citizen" },
+        purpose: "payment",
+      };
+      const status = await deps.payment.getPaymentStatus(
+        context,
+        request.body.paymentId,
+      );
+      if (!status.ok)
+        return reply.code(502).send({
+          error: "payment status unavailable",
+          requestId: requestIdOf(request),
+        });
+      if (status.value.status !== "completed")
+        return reply.code(409).send({
+          error: `payment not completed (${status.value.status})`,
+          requestId: requestIdOf(request),
+        });
+
+      let events: AppAuditEvent[];
+      try {
+        events = await deps.caseStore.listAuditEvents({
+          tenantId: session.tenantId,
+          caseId: found.caseId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+
+      // IDEMPOTENZ: diese paymentId schon verbucht? → aktuellen Stand zurückgeben, nicht doppelt buchen.
+      const schonVerbucht = events.some(
+        (e) =>
+          e.eventType === FORDERUNG_ZAHLUNG_EINGEGANGEN &&
+          e.payload["paymentId"] === request.body.paymentId,
+      );
+      if (!schonVerbucht) {
+        const zahlung = createFachlicheAuditEvent({
+          eventType: FORDERUNG_ZAHLUNG_EINGEGANGEN,
+          actorId: session.actorId,
+          actingAuthorityId: found.authorityId,
+          purpose: "zahlung",
+          legalBasisId: "§ 49a VwVfG",
+          caseId: found.caseId,
+          requestId: requestIdOf(request),
+          summary: `Zahlungseingang auf die Rückforderung ${found.caseId} verbucht`,
+        });
+        try {
+          await deps.caseStore.appendAuditEvent({
+            auditEventId: zahlung.auditEventId,
+            caseId: found.caseId,
+            tenantId: session.tenantId,
+            authorityId: found.authorityId,
+            jurisdictionId: found.jurisdictionId,
+            actorId: session.actorId,
+            eventType: FORDERUNG_ZAHLUNG_EINGEGANGEN,
+            purpose: zahlung.purpose,
+            legalBasisId: zahlung.legalBasisId,
+            requestId: zahlung.requestId,
+            // Betrag SERVER-VERIFIZIERT (aus dem PaymentPort), paymentId für die Idempotenz.
+            payload: {
+              betragCent: status.value.amountMinor,
+              paymentId: request.body.paymentId,
+            },
+            occurredAt: zahlung.occurredAt,
+          });
+        } catch {
+          return storeUnavailable(request, reply);
+        }
+        events = await deps.caseStore.listAuditEvents({
+          tenantId: session.tenantId,
+          caseId: found.caseId,
+        });
+      }
+      return reply.send(forderungsstandAusAudit(events));
     },
   );
 
