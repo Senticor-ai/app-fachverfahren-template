@@ -150,6 +150,11 @@ export interface Transition {
    *  `vierAugen`. Die server-seitige Ableitung (statusMachineToProcedureVersion) mappt es auf
    *  CaseTransition.issuesVerwaltungsakt; das Drift-Gate check:antrag-procedure sichert die Deckung. */
   erlaesstBescheid?: boolean;
+  /** SCHLIESST dieser Übergang den Fall, OHNE dass sein Zielzustand terminal ist? Für einen WIEDERAUFNEHMBAREN
+   *  Abschluss (resumable-closed): z. B. `festgesetzt` schließt den Antrag, bleibt aber über einen Widerspruch
+   *  wieder-öffenbar (hat ausgehende Übergänge) — ein terminaler Zustand dürfte das nicht. Symmetrisch zum
+   *  BPMN-Muster (senticor:closesCase). Die Ableitung mappt `terminal(to) ODER closesCase` → CaseTransition.closesCase. */
+  closesCase?: boolean;
   /** DATA-DRIVEN GUARD: der Übergang ist nur erlaubt, wenn die Bedingung über die Falldaten (case.data)
    *  erfüllt ist. Der Server (transitionCase) wertet ihn autoritativ aus (→ CaseTransition.guard). Erzwingt
    *  WORKFLOW-KONSISTENZ über die deklarierte Datenlage, KEINE Autorisierung (case.data ist client-geliefert). */

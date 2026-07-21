@@ -35,6 +35,8 @@ export interface StatusMachineTransitionSource {
   vierAugen?: boolean;
   /** Erlässt dieser Übergang einen förmlichen Verwaltungsakt? → issuesVerwaltungsakt. */
   erlaesstBescheid?: boolean;
+  /** Schließt den Fall bei NICHT-terminalem Ziel (wiederaufnehmbarer Abschluss) → closesCase. */
+  closesCase?: boolean;
   /** Data-driven Guard (Bedingung über case.data) → CaseTransition.guard. */
   guard?: Bedingung;
 }
@@ -95,8 +97,9 @@ export function statusMachineToProcedureVersion(
       // Optionale Flags NUR setzen, wenn zutreffend (exactOptionalPropertyTypes; und damit fehlend==false
       // nicht zu einem Vertrags-Diff wird — konsistent zu toProcedureContractSnapshot).
       ...(t.vierAugen ? { requiresFourEyes: true } : {}),
-      // Ein Übergang IN einen Endzustand schließt den Fall — data-driven, kein hart kodierter Zustandsname.
-      ...(terminals.has(t.to) ? { closesCase: true } : {}),
+      // Ein Übergang IN einen Endzustand schließt den Fall — ODER ein explizit als schließend markierter
+      // Übergang (wiederaufnehmbarer Abschluss, Ziel nicht terminal). Data-driven, kein hart kodierter Name.
+      ...(terminals.has(t.to) || t.closesCase ? { closesCase: true } : {}),
       // Erlässt dieser Übergang einen Verwaltungsakt? → der Server friert beim Übergang den Bescheid ein.
       ...(t.erlaesstBescheid ? { issuesVerwaltungsakt: true } : {}),
       // Data-driven Guard (Bedingung über case.data) — der Server lässt den Übergang nur bei Erfüllung zu.

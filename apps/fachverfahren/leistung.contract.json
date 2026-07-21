@@ -104,12 +104,28 @@
       {
         "key": "festgesetzt",
         "label": "Festgesetzt",
-        "tone": "ok",
-        "terminal": true
+        "tone": "ok"
       },
       {
         "key": "abgelehnt",
         "label": "Abgelehnt",
+        "tone": "block",
+        "terminal": true
+      },
+      {
+        "key": "widerspruch_in_pruefung",
+        "label": "Widerspruch in Prüfung",
+        "tone": "warn"
+      },
+      {
+        "key": "abgeholfen",
+        "label": "Abgeholfen",
+        "tone": "ok",
+        "terminal": true
+      },
+      {
+        "key": "widerspruch_zurueckgewiesen",
+        "label": "Widerspruch zurückgewiesen",
         "tone": "block",
         "terminal": true
       }
@@ -139,7 +155,8 @@
           "sachbearbeitung"
         ],
         "vierAugen": true,
-        "erlaesstBescheid": true
+        "erlaesstBescheid": true,
+        "closesCase": true
       },
       {
         "from": "review_noetig",
@@ -149,7 +166,8 @@
           "sachbearbeitung"
         ],
         "vierAugen": true,
-        "erlaesstBescheid": true
+        "erlaesstBescheid": true,
+        "closesCase": true
       },
       {
         "from": "in_pruefung",
@@ -158,6 +176,34 @@
         "rollen": [
           "sachbearbeitung"
         ],
+        "detailPflicht": true
+      },
+      {
+        "from": "festgesetzt",
+        "to": "widerspruch_in_pruefung",
+        "label": "Widerspruch bearbeiten",
+        "rollen": [
+          "sachbearbeitung"
+        ]
+      },
+      {
+        "from": "widerspruch_in_pruefung",
+        "to": "abgeholfen",
+        "label": "Abhilfe",
+        "rollen": [
+          "sachbearbeitung"
+        ],
+        "vierAugen": true,
+        "detailPflicht": true
+      },
+      {
+        "from": "widerspruch_in_pruefung",
+        "to": "widerspruch_zurueckgewiesen",
+        "label": "Widerspruch zurückweisen",
+        "rollen": [
+          "sachbearbeitung"
+        ],
+        "vierAugen": true,
         "detailPflicht": true
       }
     ]

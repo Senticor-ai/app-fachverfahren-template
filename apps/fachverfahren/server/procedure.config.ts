@@ -111,8 +111,12 @@ export const antragProcedure: ProcedureVersion =
       { key: "eingegangen" },
       { key: "in_pruefung" },
       { key: "review_noetig" },
-      { key: "festgesetzt", terminal: true },
+      // Wiederaufnehmbar-geschlossen (nicht terminal) — der Widerspruch öffnet den Fall wieder (ADR-0006).
+      { key: "festgesetzt" },
       { key: "abgelehnt", terminal: true },
+      { key: "widerspruch_in_pruefung" },
+      { key: "abgeholfen", terminal: true },
+      { key: "widerspruch_zurueckgewiesen", terminal: true },
     ],
     transitions: [
       { from: "eingegangen", to: "in_pruefung", label: "In Prüfung nehmen" },
@@ -123,6 +127,7 @@ export const antragProcedure: ProcedureVersion =
         label: "Festsetzen",
         vierAugen: true,
         erlaesstBescheid: true,
+        closesCase: true,
       },
       {
         from: "review_noetig",
@@ -130,8 +135,27 @@ export const antragProcedure: ProcedureVersion =
         label: "Festsetzen (Zweitfreigabe)",
         vierAugen: true,
         erlaesstBescheid: true,
+        closesCase: true,
       },
       { from: "in_pruefung", to: "abgelehnt", label: "Ablehnen" },
+      // Widerspruchs-Verfahren (ADR-0006) — Spiegel von leistung.config, Drift-Gate check:antrag-procedure.
+      {
+        from: "festgesetzt",
+        to: "widerspruch_in_pruefung",
+        label: "Widerspruch bearbeiten",
+      },
+      {
+        from: "widerspruch_in_pruefung",
+        to: "abgeholfen",
+        label: "Abhilfe",
+        vierAugen: true,
+      },
+      {
+        from: "widerspruch_in_pruefung",
+        to: "widerspruch_zurueckgewiesen",
+        label: "Widerspruch zurückweisen",
+        vierAugen: true,
+      },
     ],
   });
 

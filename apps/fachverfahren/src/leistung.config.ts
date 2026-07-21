@@ -141,8 +141,23 @@ export const leistungConfig: LeistungConfig = {
       { key: "eingegangen", label: "Eingegangen", tone: "neu" },
       { key: "in_pruefung", label: "In Prüfung", tone: "info" },
       { key: "review_noetig", label: "Review nötig", tone: "warn" },
-      { key: "festgesetzt", label: "Festgesetzt", tone: "ok", terminal: true },
+      // WIEDERAUFNEHMBARER Abschluss: festgesetzt schließt den Antrag (closesCase am Festsetzen-Übergang),
+      // ist aber NICHT terminal — ein Widerspruch (§ 68 ff. VwGO) öffnet den Fall in den Widerspruchs-Zweig.
+      { key: "festgesetzt", label: "Festgesetzt", tone: "ok" },
       { key: "abgelehnt", label: "Abgelehnt", tone: "block", terminal: true },
+      // Widerspruchs-Verfahren (ADR-0006): Bearbeitung → Abhilfe (§ 72 VwGO) oder Zurückweisung (§ 73 VwGO).
+      {
+        key: "widerspruch_in_pruefung",
+        label: "Widerspruch in Prüfung",
+        tone: "warn",
+      },
+      { key: "abgeholfen", label: "Abgeholfen", tone: "ok", terminal: true },
+      {
+        key: "widerspruch_zurueckgewiesen",
+        label: "Widerspruch zurückgewiesen",
+        tone: "block",
+        terminal: true,
+      },
     ],
     transitions: [
       {
@@ -165,6 +180,8 @@ export const leistungConfig: LeistungConfig = {
         vierAugen: true,
         // Die Festsetzung ERLÄSST den Verwaltungsakt → der Server friert beim Übergang den Bescheid ein.
         erlaesstBescheid: true,
+        // Schließt den Fall (festgesetzt ist wiederaufnehmbar-geschlossen, nicht terminal).
+        closesCase: true,
       },
       {
         from: "review_noetig",
@@ -173,12 +190,36 @@ export const leistungConfig: LeistungConfig = {
         rollen: ["sachbearbeitung"],
         vierAugen: true,
         erlaesstBescheid: true,
+        closesCase: true,
       },
       {
         from: "in_pruefung",
         to: "abgelehnt",
         label: "Ablehnen",
         rollen: ["sachbearbeitung"],
+        detailPflicht: true,
+      },
+      // ── Widerspruchs-Verfahren (ADR-0006) — auf der GENERISCHEN Übergangs-Maschinerie ────────────────
+      {
+        from: "festgesetzt",
+        to: "widerspruch_in_pruefung",
+        label: "Widerspruch bearbeiten",
+        rollen: ["sachbearbeitung"],
+      },
+      {
+        from: "widerspruch_in_pruefung",
+        to: "abgeholfen",
+        label: "Abhilfe",
+        rollen: ["sachbearbeitung"],
+        vierAugen: true,
+        detailPflicht: true,
+      },
+      {
+        from: "widerspruch_in_pruefung",
+        to: "widerspruch_zurueckgewiesen",
+        label: "Widerspruch zurückweisen",
+        rollen: ["sachbearbeitung"],
+        vierAugen: true,
         detailPflicht: true,
       },
     ],
