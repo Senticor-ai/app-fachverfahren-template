@@ -63,11 +63,11 @@ Projekte `unit` + `template-tooling`. Die schwereren Ebenen sind eigene Kommando
   (self-test der DEV-Seed-Daten; die Seed selbst läuft nur unter
   `APP_STORE_MODE=memory`, ist verfahrens-neutral + synthetisch).
 
-**Ehrlich (kein Mock-Setup vorhanden):** `msw` (Mock Service Worker) ist NICHT
-verdrahtet (keine Dependency, keine Handler) — die Browser-Tests speisen sich aus
-Props/Fixtures, nicht aus MSW; `testcontainers` wird NICHT genutzt (PG kommt aus
-docker-compose bzw. der CI-Umgebung). Wer echte HTTP-Mocks/auto-Container braucht,
-muss sie erst einführen — nicht so tun, als liefen sie schon.
+- **HTTP-Mocks (MSW)** — `*.browser.test.tsx` können echte HTTP-Aufrufe gegen
+  MSW-MOCKDATEN fahren: `setupWorker` (aus `msw/browser`) fängt die relativen
+  `/api/*`-fetches im echten Browser ab (Worker: `public/mockServiceWorker.js`).
+  Beispiel: `apps/fachverfahren/src/antrag-client.browser.test.tsx` testet den
+  realen HTTP-Client (fetch + DTO→Vorgang-Mapping) ohne laufenden Server.
 
 ## Evidence
 
