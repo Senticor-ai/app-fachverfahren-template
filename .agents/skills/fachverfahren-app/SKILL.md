@@ -103,8 +103,11 @@ Verwaltungsakt** — der Bürger kann ihn selbst herunterladen, und er ist
 bestandskraft-fest (er darf NICHT aus der lebenden Config neu gerendert werden;
 sonst änderte eine Tarif-/Regime-Umstellung rückwirkend einen VA von 2024). Der
 gesamte Mechanismus (Einfrieren am Übergang, Bekanntgabe als `case.disclosed`,
-Bürger-Download `GET /api/buerger/antraege/:id/bescheid` mit Hash-Beweis) ist im
-Template GEBAUT — als Agent deklarierst du nur DATEN in `leistung.config.ts`:
+Bürger-Download `GET /api/buerger/antraege/:id/bescheid` als JSON mit Hash-Beweis
+UND `GET /api/buerger/antraege/:id/bescheid.pdf` als echtes, selbsttragendes
+PDF-Langzeitdokument — eingebettete Schrift, Hash sichtbar + in den Metadaten;
+`BescheidView` zeigt beides über den `pdfDownloadUrl`-Prop) ist im Template
+GEBAUT — als Agent deklarierst du nur DATEN in `leistung.config.ts`:
 
 1. Der bescheid-erlassende Übergang der `statusMachine` trägt
    `erlaesstBescheid: true` (neben `vierAugen: true` — eine Festsetzung ist
@@ -120,6 +123,14 @@ Template GEBAUT — als Agent deklarierst du nur DATEN in `leistung.config.ts`:
    `erlaesstBescheid` in `apps/fachverfahren/server/procedure.config.ts`; das
    Gate `pnpm run check:antrag-procedure` erzwingt die Deckung (schlägt bei
    Drift an).
+
+Der PDF-Renderer (`apps/fachverfahren/server/bescheid/pdf.ts`) ist **template-
+getrieben** (`BescheidTemplate` = geordnete Sektionen als DATEN) und **KI-
+assistierbar**: `bescheid/ki-entwurf.ts` lässt den chos-Agenten (AiAssistPort,
+AAL-2 „Advise") eine Begründung ENTWERFEN — limited-risk, `reviewRequired:true`
+(HITL); erst nach menschlicher Freigabe wird der Text eine Freitext-Sektion. Der
+Renderer selbst ruft NIE die KI (Determinismus). Du musst hier nichts tun — das
+greift automatisch, sobald das Verfahren einen Bescheid erlässt.
 
 Der Bürger-Antrag ist server-persistent (überlebt Reload): `/buerger/antraege`
 (Meine Anträge), `/buerger/antrag/:id` (Status) und `/buerger/bescheid/:id`
@@ -145,6 +156,35 @@ Eigentümerschaft AUSSCHLIESSLICH aus der Session; DTOs in
 - **Postfach**: `GET /api/mailbox?box=inbox&scope=own` → die generische
   `Postfach`-Kit-Komponente unter `/buerger/postfach` (Bescheide/Nachrichten der
   Behörde inkl. Zustellnachweis/Bekanntgabe).
+
+## Rechtsbehelfs- & Rückforderungs-Verfahren (GEBAUT, data-driven)
+
+Über den Erst-Bescheid hinaus trägt die `statusMachine` zwei WEITERE Fall-Zweige,
+die auf DERSELBEN generischen Übergangs-Maschinerie (`POST /api/cases/:id/
+transitions`, RBAC + Vier-Augen + append-only Audit) laufen — du deklarierst nur
+Zustände/Übergänge als DATEN (ADR-0006 / ADR-0007):
+
+- **Wiederaufnehmbarer Abschluss** (`Transition.closesCase: true`): ein Übergang
+  darf den Fall SCHLIESSEN, ohne dass sein Zielzustand `terminal` ist — nötig für
+  ein `festgesetzt`, das ein Widerspruch wieder öffnet (symmetrisch zum BPMN-
+  `senticor:closesCase`). Ein terminaler Zustand dürfte keine ausgehenden Übergänge haben.
+- **Widerspruchs-Verfahren**: `festgesetzt → widerspruch_in_pruefung →
+  abgeholfen | widerspruch_zurueckgewiesen` (Vier-Augen). Der Widerspruchsbescheid
+  ist ein VA mit EIGENEM Rechtsbehelfsregime (KLAGE, nicht erneut Widerspruch) —
+  dafür trägt der Übergang ein per-Übergang-Override `Transition.verwaltungsakt`
+  (überschreibt `zustellung.rechtsbehelf`); ohne Override gilt das Verfahrens-Regime.
+- **Rückforderungs-Verfahren**: `festgesetzt → rueckforderung_festgesetzt →
+  erstattet | niedergeschlagen`. Der stellende Übergang trägt
+  `Transition.stelltForderung: { tarif, diskriminator, zahlungsfristTage }` — der
+  Server schreibt eine **Sollstellung** (`forderung.gestellt`) mit SERVER-
+  AUTORITATIVER Höhe (`berechneTarif(tarif, case.data[diskriminator])`, nie ein
+  client-gelieferter Betrag). Der offene Restbetrag ist eine reine Ableitung
+  (`forderungsstandAusAudit`, SDK). Zahlungseingang verbuchen:
+  `POST /api/buerger/antraege/:id/rueckforderung/zahlung` (owner-scoped, Betrag
+  server-verifiziert via PaymentPort, idempotent je `paymentId`). Mahnwesen: der
+  zeitgetriebene Worker `apps/fachverfahren/server/forderung-mahnung.ts`
+  (`worker:mahnung`, CronJob-Muster wie der Fristen-Scanner) mahnt überfällige
+  offene Forderungen (idempotent — die Mahnung verlängert die Frist).
 
 ## Bürger-Sprache: Leichte Sprache und Fachbegriffe
 
