@@ -74,6 +74,28 @@ runtime:
 secretRefs: []
 extraEnv: []
 
+# Fristen-Scan-CronJob (Issue #58): zeitgetriebener Tick über den reinen Motor.
+# tenantIds = kommagetrennte Mandanten (APP_TENANT_IDS); leer → No-op-Lauf (kein Fehler).
+# Store-Konfig (APP_STORE_MODE/DATABASE_URL) kommt wie beim Web-Pod aus configmap + secretRefs.
+deadlineWorker:
+  enabled: true
+  schedule: "*/15 * * * *"
+  tenantIds: ""
+  restartPolicy: OnFailure
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 120
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  resources:
+    requests:
+      cpu: 50m
+      memory: 96Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
 resources:
   requests:
     cpu: 100m
