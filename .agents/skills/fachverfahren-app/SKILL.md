@@ -49,7 +49,7 @@ oder erfundene Variante (`dog-tax` o. Ä.); ein abweichender Slug driftet den Bu
    ```
 
 3. `apps/fachverfahren/src/leistung.config.ts` mit den Werten des
-   freigegebenen Fachkonzepts füllen: `id/label/kommune`,
+   freigegebenen Fachkonzepts füllen: `id/label/kommune` (Trägerin = Kommune/Behörde/interne Stelle),
    `rechtsgrundlagen` (nur belegt), `antrag.steps` (Pflichtfelder mit
    Validierung; Bürger-Felder zusätzlich mit `leichteSprache`/`hintEinfach`
    im selben Schritt — siehe „Bürger-Sprache" unten), `statusMachine`
