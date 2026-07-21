@@ -21,10 +21,12 @@ import {
   createLocalAiAssistPort,
   createLocalBlobStoragePort,
   createLocalIdentityAndTrustPort,
+  createLocalMailboxPort,
   createLocalPaymentPort,
   type AiAssistPort,
   type BlobStoragePort,
   type IdentityAndTrustPort,
+  type MailboxPort,
   type PaymentPort,
 } from "@senticor/platform-contracts";
 import type { BffDeps } from "./deps.js";
@@ -32,6 +34,7 @@ import { requestIdOf } from "./route-auth.js";
 import { registerAiAssistRoutes } from "./routes/ai-assist.js";
 import { registerPaymentRoutes } from "./routes/payment.js";
 import { registerIdentityRoutes } from "./routes/identity.js";
+import { registerZustellungRoutes } from "./routes/zustellung.js";
 import { registerCapabilitiesRoute } from "./routes/capabilities.js";
 import { registerBuergerRoutes } from "./routes/buerger.js";
 import { registerCaseRoutes } from "./routes/cases.js";
@@ -59,6 +62,9 @@ export interface AppBffOptions {
   /** Identitäts-/Vertrauens-Port (BundID/eID). OPTIONAL: fehlt er, nutzt der BFF den local-fake (liest das
    *  Subjekt aus der Sitzung) — eine App wählt in der Komposition per Env den echten Adapter. */
   identityAndTrust?: IdentityAndTrustPort;
+  /** Bescheid-Zustellungs-Port (De-Mail/eBO). OPTIONAL: fehlt er, nutzt der BFF den local-fake (sofort
+   *  "delivered") — eine App wählt in der Komposition per Env den echten Adapter. */
+  mailbox?: MailboxPort;
   /** Byte-Storage-Port. OPTIONAL: fehlt er, nutzt der BFF den In-Memory-Fake. */
   blobStorage?: BlobStoragePort;
   /** Verfahrens-Wiki-Store. OPTIONAL: fehlt er, nutzt der BFF den In-Memory-Store. */
@@ -90,6 +96,7 @@ export async function appBff(
     aiAssist: opts.aiAssist ?? createLocalAiAssistPort(),
     payment: opts.payment ?? createLocalPaymentPort(),
     identityAndTrust: opts.identityAndTrust ?? createLocalIdentityAndTrustPort(),
+    mailbox: opts.mailbox ?? createLocalMailboxPort(),
     blobStorage: opts.blobStorage ?? createLocalBlobStoragePort(),
     wissenStore: opts.wissenStore ?? new InMemoryWissenStore(),
   };
@@ -152,6 +159,11 @@ export async function appBff(
     { surfaces: ["buerger"], register: () => registerBuergerRoutes(app, deps) },
     // Zahlung/Gebühr für den EIGENEN Vorgang (ePayBL-Naht) — Bürger-Fläche, RBAC payment.initiate.
     { surfaces: ["buerger"], register: () => registerPaymentRoutes(app, deps) },
+    // Bescheid-Zustellung (De-Mail/eBO) — behördliche Außenwirkung, Back-Office-Fläche, RBAC bescheid.versand.
+    {
+      surfaces: ["sachbearbeitung"],
+      register: () => registerZustellungRoutes(app, deps),
+    },
   ];
   // SENTINEL-DISZIPLIN (Wurzel eines Green-Wash-Befunds): UNDEFINED ⇒ NICHT zoniert ⇒ ALLE registrieren (fail-open,
   // heutiger Ein-App-Zustand). Ein LEERES Array ist etwas ANDERES — eine zonierte STRUKTUR-Zone (z. B. datenhaltung), die

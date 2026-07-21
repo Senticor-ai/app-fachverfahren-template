@@ -15,6 +15,7 @@ import type {
   AiAssistPort,
   BlobStoragePort,
   IdentityAndTrustPort,
+  MailboxPort,
   PaymentPort,
 } from "@senticor/platform-contracts";
 
@@ -38,6 +39,9 @@ export interface BffDeps {
   /** Identität/Vertrauen als PORT (austauschbar: local-fake ODER echter Adapter, z.B. BundID/DeutschlandID/eIDAS).
    *  Liest das angemeldete Subjekt + prüft Vertrauensniveaus (Step-up); der BFF konsumiert nur den Vertrag. */
   identityAndTrust: IdentityAndTrustPort;
+  /** Bescheid-Zustellung als PORT (austauschbar: local-fake ODER echter Adapter, z.B. De-Mail/eBO/ZaPuK).
+   *  Hoheitliche Außenwirkung (VwZG); der BFF konsumiert nur den Vertrag — nie einen konkreten Anbieter. */
+  mailbox: MailboxPort;
   /** Byte-Storage für Nachweise/Dokumente (austauschbar: In-Memory-Fake / Dateisystem / Objekt-Store). */
   blobStorage: BlobStoragePort;
   /** Verfahrens-weites Wiki (generelles Wissen + Fähigkeiten je Verfahren) — die durable Wiki-Ebene. */

@@ -123,6 +123,15 @@ export {
   type AssuranceResultDto,
 } from "./identity.js";
 export {
+  AttachmentRefSchema,
+  BescheidVersandRequestSchema,
+  ZustellQuittungDtoSchema,
+  ZustellStatusDtoSchema,
+  type BescheidVersandRequestDto,
+  type ZustellQuittungDto,
+  type ZustellStatusDto,
+} from "./zustellung.js";
+export {
   KiVermerkRequestSchema,
   VermerkDtoSchema,
   VermerkIdParamsSchema,

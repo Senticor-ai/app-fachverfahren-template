@@ -91,6 +91,14 @@ export const builtInPermissions = {
     permission: "payment.initiate",
     description: "Zahlung/Gebühr für einen eigenen Vorgang veranlassen und prüfen",
   },
+  // ── Bescheid-Zustellung (De-Mail/eBO-Naht) ──────────────────────────────────────────────────────
+  // Einen Bescheid rechtssicher ZUSTELLEN + den Zustellstatus prüfen (VwZG · De-Mail/eBO). EIGENE
+  // Permission, getrennt vom behördlichen Postfach (mailbox.authority.*): Zustellen ist eine hoheitliche
+  // Außenwirkung (Zustellfiktion), nicht das interne Nachrichtenfach. Nur die Sachbearbeitung stellt zu.
+  bescheidVersand: {
+    permission: "bescheid.versand",
+    description: "Einen Bescheid rechtssicher zustellen und den Zustellstatus prüfen",
+  },
 } as const satisfies Record<string, RbacPermission>;
 
 export const builtInRbacRegistry = {
@@ -131,6 +139,8 @@ export const builtInRbacRegistry = {
         builtInPermissions.aiAssist,
         // Aktenvermerke schreiben (Mensch-Vermerk + KI-Vermerk-Entwurf am Fall).
         builtInPermissions.caseNoteWrite,
+        // Bescheide rechtssicher zustellen (De-Mail/eBO) — hoheitliche Außenwirkung.
+        builtInPermissions.bescheidVersand,
       ],
       builtIn: true,
     },

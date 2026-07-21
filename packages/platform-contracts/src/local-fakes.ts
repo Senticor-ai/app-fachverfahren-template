@@ -192,11 +192,29 @@ export function createLocalIdentityAndTrustPort(): IdentityAndTrustPort {
   };
 }
 
+/**
+ * Der lokale MailboxPort (Bescheid-Zustellung, De-Mail/eBO) als EIGENSTÄNDIGE Fabrik (wie createLocalAiAssistPort).
+ * Hält die Zustellungen in einer eigenen Map; sendMessage stellt sofort "delivered" zu (deterministisch, ohne
+ * De-Mail-Gateway). Für den Durchstich (später echter De-Mail/eBO-Adapter).
+ */
+export function createLocalMailboxPort(): MailboxPort {
+  const deliveries = new Map<string, "queued" | "delivered" | "failed">();
+  return {
+    descriptor: descriptor("mailbox", "Local Mailbox", "confidential"),
+    async sendMessage(_context, _message) {
+      const deliveryId = id("delivery");
+      deliveries.set(deliveryId, "delivered");
+      return capabilityOk({ deliveryId });
+    },
+    async getDeliveryStatus(_context, deliveryId) {
+      return capabilityOk({ status: deliveries.get(deliveryId) ?? "failed" });
+    },
+  };
+}
+
 export function createLocalPlatformPorts(
   options: { aiAssistModel?: string } = {},
 ): PlatformPorts {
-  const deliveries = new Map<string, "queued" | "delivered" | "failed">();
-
   // EINE Wahrheit: dieselbe Identitäts-Impl wie die eigenständige Fabrik.
   const identityAndTrust: IdentityAndTrustPort =
     createLocalIdentityAndTrustPort();
@@ -236,17 +254,8 @@ export function createLocalPlatformPorts(
   // EINE Wahrheit: dieselbe Zahlungs-Impl wie die eigenständige Fabrik (kein zweiter Roundtrip-Klon).
   const payment: PaymentPort = createLocalPaymentPort();
 
-  const mailbox: MailboxPort = {
-    descriptor: descriptor("mailbox", "Local Mailbox", "confidential"),
-    async sendMessage(_context, _message) {
-      const deliveryId = id("delivery");
-      deliveries.set(deliveryId, "delivered");
-      return capabilityOk({ deliveryId });
-    },
-    async getDeliveryStatus(_context, deliveryId) {
-      return capabilityOk({ status: deliveries.get(deliveryId) ?? "failed" });
-    },
-  };
+  // EINE Wahrheit: dieselbe Zustellungs-Impl wie die eigenständige Fabrik.
+  const mailbox: MailboxPort = createLocalMailboxPort();
 
   const signatureSeal: SignatureSealPort = {
     descriptor: descriptor("signature-seal", "Local Signature and Seal"),

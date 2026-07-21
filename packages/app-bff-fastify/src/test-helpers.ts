@@ -25,9 +25,11 @@ import {
 import {
   createLocalAiAssistPort,
   createLocalIdentityAndTrustPort,
+  createLocalMailboxPort,
   createLocalPaymentPort,
   type AiAssistPort,
   type IdentityAndTrustPort,
+  type MailboxPort,
   type PaymentPort,
 } from "@senticor/platform-contracts";
 import { appBff } from "./plugin.js";
@@ -68,6 +70,7 @@ export async function buildBffApp({
   aiAssist = createLocalAiAssistPort(),
   payment = createLocalPaymentPort(),
   identityAndTrust = createLocalIdentityAndTrustPort(),
+  mailbox = createLocalMailboxPort(),
   wissenStore = new InMemoryWissenStore(),
 }: {
   session?: ResolvedSession;
@@ -78,6 +81,7 @@ export async function buildBffApp({
   aiAssist?: AiAssistPort;
   payment?: PaymentPort;
   identityAndTrust?: IdentityAndTrustPort;
+  mailbox?: MailboxPort;
   wissenStore?: WissenStore;
 } = {}): Promise<{
   app: FastifyInstance;
@@ -98,6 +102,7 @@ export async function buildBffApp({
     aiAssist,
     payment,
     identityAndTrust,
+    mailbox,
     wissenStore,
   });
   return { app, auditSink, appStore, caseStore, taskStore };
