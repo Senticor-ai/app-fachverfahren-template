@@ -71,14 +71,19 @@ export function berechneForderungsstand(
     (e) => e.art === FORDERUNG_GEMAHNT,
   ).length;
 
-  // Maßgebliche Fälligkeit: jüngste Stundung, sonst jüngste Sollstellung (chronologisch über occurredAt).
-  const juengste = (art: string): string | undefined =>
-    ereignisse
-      .filter((e) => e.art === art && typeof e.faelligIso === "string")
-      .sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))
-      .at(-1)?.faelligIso;
-  const faelligIso =
-    juengste(FORDERUNG_GESTUNDET) ?? juengste(FORDERUNG_GESTELLT);
+  // Maßgebliche Fälligkeit: das CHRONOLOGISCH JÜNGSTE fristsetzende Ereignis (Sollstellung, Stundung ODER
+  // Mahnung) gewinnt. Kritisch fürs Mahnwesen: eine Mahnung setzt eine NEUE Frist → die Forderung ist erst
+  // nach deren Ablauf wieder mahnbar (kein Dauer-Mahnen bei jedem Scan-Tick).
+  const faelligIso = ereignisse
+    .filter(
+      (e) =>
+        typeof e.faelligIso === "string" &&
+        (e.art === FORDERUNG_GESTELLT ||
+          e.art === FORDERUNG_GESTUNDET ||
+          e.art === FORDERUNG_GEMAHNT),
+    )
+    .sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))
+    .at(-1)?.faelligIso;
 
   const hatNiedergeschlagen = ereignisse.some(
     (e) => e.art === FORDERUNG_NIEDERGESCHLAGEN,
@@ -118,6 +123,19 @@ export function istForderungMahnbar(
   if (stand.offenCent <= 0) return false;
   if (stand.faelligIso === undefined) return false;
   return stand.faelligIso <= nowIso;
+}
+
+/** Die Standard-Obergrenze der Mahnstufe: danach folgt Vollstreckung/Niederschlagung, kein Weiter-Mahnen. */
+export const DEFAULT_MAX_MAHNSTUFE = 3;
+
+/** Soll für diese Forderung eine (weitere) Mahnung ausgelöst werden? Mahnbar (überfällig + offen) UND die
+ *  Mahnstufe hat die Obergrenze noch nicht erreicht. Rein/deterministisch (injizierte Zeit). */
+export function planeMahnung(
+  stand: ForderungStand,
+  nowIso: string,
+  maxMahnstufe: number = DEFAULT_MAX_MAHNSTUFE,
+): boolean {
+  return istForderungMahnbar(stand, nowIso) && stand.mahnstufe < maxMahnstufe;
 }
 
 /** Minimale Fall-Audit-Ereignis-Form für die Ableitung — store-unabhängig (Parität zu StatusMachineSource). */

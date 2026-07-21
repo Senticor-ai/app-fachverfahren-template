@@ -5,6 +5,7 @@ import {
   berechneForderungsstand,
   forderungsstandAusAudit,
   istForderungMahnbar,
+  planeMahnung,
   FORDERUNG_GESTELLT,
   FORDERUNG_ZAHLUNG_EINGEGANGEN,
   FORDERUNG_GEMAHNT,
@@ -186,5 +187,53 @@ describe("istForderungMahnbar", () => {
     ]);
     expect(istForderungMahnbar(erledigt, "2027-01-01")).toBe(false);
     expect(istForderungMahnbar(gestundet, "2027-01-01")).toBe(false);
+  });
+
+  it("eine Mahnung VERLÄNGERT die Frist → nicht sofort erneut mahnbar (kein Dauer-Mahnen)", () => {
+    const stand = berechneForderungsstand([
+      gestellt(12000, "2026-02-01", "2026-01-01"),
+      {
+        art: FORDERUNG_GEMAHNT,
+        faelligIso: "2026-03-15",
+        occurredAt: "2026-02-05",
+      },
+    ]);
+    // Maßgeblich ist jetzt die Mahn-Frist (jüngstes fristsetzendes Ereignis).
+    expect(stand.faelligIso).toBe("2026-03-15");
+    expect(stand.mahnstufe).toBe(1);
+    expect(istForderungMahnbar(stand, "2026-02-10")).toBe(false); // vor der neuen Frist
+    expect(istForderungMahnbar(stand, "2026-03-20")).toBe(true); // nach der neuen Frist
+  });
+});
+
+describe("planeMahnung (überfällig + Stufe unter Obergrenze)", () => {
+  const offenFaellig = berechneForderungsstand([gestellt(12000, "2026-02-01")]);
+  it("mahnbar + Stufe 0 → Mahnung", () => {
+    expect(planeMahnung(offenFaellig, "2026-02-02")).toBe(true);
+  });
+  it("Obergrenze erreicht → keine weitere Mahnung (dann Vollstreckung/Niederschlagung)", () => {
+    const dreiMalGemahnt = berechneForderungsstand([
+      gestellt(12000, "2026-02-01", "2026-01-01"),
+      {
+        art: FORDERUNG_GEMAHNT,
+        faelligIso: "2026-02-01",
+        occurredAt: "2026-02-02",
+      },
+      {
+        art: FORDERUNG_GEMAHNT,
+        faelligIso: "2026-02-01",
+        occurredAt: "2026-02-03",
+      },
+      {
+        art: FORDERUNG_GEMAHNT,
+        faelligIso: "2026-02-01",
+        occurredAt: "2026-02-04",
+      },
+    ]);
+    expect(dreiMalGemahnt.mahnstufe).toBe(3);
+    expect(planeMahnung(dreiMalGemahnt, "2026-06-01")).toBe(false);
+  });
+  it("nicht mahnbar → keine Mahnung", () => {
+    expect(planeMahnung(offenFaellig, "2026-01-01")).toBe(false);
   });
 });
