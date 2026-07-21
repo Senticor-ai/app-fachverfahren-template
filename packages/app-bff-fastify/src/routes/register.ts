@@ -16,6 +16,7 @@ import {
 } from "@senticor/public-sector-sdk";
 import type { BffDeps } from "../deps.js";
 import { bffRouteAuth, requestIdOf, sessionOf } from "../route-auth.js";
+import { sendPortFailure } from "../port-route-safety.js";
 
 /** Retryable-Fehler → 503, sonst 502 (das Register lehnte ab). Literal für die getypte reply.code(). */
 const failStatus = (retryable: boolean): 502 | 503 => (retryable ? 503 : 502);
@@ -73,9 +74,7 @@ export function registerRegisterRoutes(
           : {}),
       });
       if (!result.ok) {
-        return reply
-          .code(failStatus(result.error.retryable))
-          .send({ error: result.error.message, requestId: requestIdOf(request) });
+        return sendPortFailure(reply, deps, request, result.error, failStatus(result.error.retryable), "register.evidence.failed");
       }
       // Datensparsam auditiert: Nachweis-TYP + Zweck + Aussteller — NICHT die abgerufenen Personendaten.
       await deps.auditSink.emit({

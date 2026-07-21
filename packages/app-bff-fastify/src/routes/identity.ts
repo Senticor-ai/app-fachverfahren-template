@@ -15,6 +15,7 @@ import type { PortCallContext } from "@senticor/platform-contracts";
 import { builtInPermissions } from "@senticor/public-sector-sdk";
 import type { BffDeps } from "../deps.js";
 import { bffRouteAuth, requestIdOf, sessionOf } from "../route-auth.js";
+import { sendPortFailure } from "../port-route-safety.js";
 
 /** Retryable-Fehler → 503, sonst 502 (der Identitäts-Anbieter lehnte ab). Literal für die getypte reply.code(). */
 const failStatus = (retryable: boolean): 502 | 503 => (retryable ? 503 : 502);
@@ -69,9 +70,7 @@ export function registerIdentityRoutes(
         contextOf(request),
       );
       if (!result.ok) {
-        return reply
-          .code(failStatus(result.error.retryable))
-          .send({ error: result.error.message, requestId: requestIdOf(request) });
+        return sendPortFailure(reply, deps, request, result.error, failStatus(result.error.retryable), "identity.failed");
       }
       return reply.code(200).send(result.value);
     },
@@ -102,9 +101,7 @@ export function registerIdentityRoutes(
         request.body.minimumAssuranceLevel,
       );
       if (!result.ok) {
-        return reply
-          .code(failStatus(result.error.retryable))
-          .send({ error: result.error.message, requestId: requestIdOf(request) });
+        return sendPortFailure(reply, deps, request, result.error, failStatus(result.error.retryable), "identity.failed");
       }
       return reply.code(200).send(result.value);
     },

@@ -113,8 +113,8 @@ describe("BFF /api/payment", () => {
     await app.close();
   });
 
-  it("502: Anbieter lehnt ab → ehrliches Scheitern, kein fingierter Status", async () => {
-    const { app } = await buildBffApp({
+  it("502: Anbieter lehnt ab → ehrlich + KLASSIFIKATIONS-SICHER (Code statt PII-Message) + Fehlversuch auditiert", async () => {
+    const { app, auditSink } = await buildBffApp({
       session: citizenSession(),
       payment: failingPayment,
     });
@@ -124,6 +124,12 @@ describe("BFF /api/payment", () => {
       payload: { amountMinor: 100, purpose: "x", reference: "r" },
     });
     expect(res.statusCode).toBe(502);
+    const body = res.json();
+    // Härtung 1 (PII-Leak-Sperre): confidential-Failure → der stabile CODE, NICHT die (evtl. PII-tragende) Anbieter-Message.
+    expect(body.error).toContain("payment/provider-rejected");
+    expect(body.error).not.toContain("Zahlungsanbieter lehnte ab");
+    // Härtung 2 (Audit-Vollständigkeit): auch der ABGELEHNTE Versuch hinterlässt eine Spur (die Header versprechen es).
+    expect(auditSink.events.some((e) => e.kind === "app-data" && e.event.eventType === "payment.failed")).toBe(true);
     await app.close();
   });
 });

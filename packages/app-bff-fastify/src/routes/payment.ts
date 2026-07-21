@@ -18,6 +18,7 @@ import {
 } from "@senticor/public-sector-sdk";
 import type { BffDeps } from "../deps.js";
 import { bffRouteAuth, requestIdOf, sessionOf } from "../route-auth.js";
+import { sendPortFailure } from "../port-route-safety.js";
 
 const PaymentIdParamsSchema = Type.Object(
   { paymentId: Type.String({ minLength: 1 }) },
@@ -79,9 +80,7 @@ export function registerPaymentRoutes(
           : {}),
       });
       if (!result.ok) {
-        return reply
-          .code(failStatus(result.error.retryable))
-          .send({ error: result.error.message, requestId: requestIdOf(request) });
+        return sendPortFailure(reply, deps, request, result.error, failStatus(result.error.retryable), "payment.failed");
       }
       // Zahlungs-Veranlassung ist auditpflichtig (Kassen-Nachvollzug): Referenz + Status, kein PII.
       await deps.auditSink.emit({
@@ -133,9 +132,7 @@ export function registerPaymentRoutes(
         request.params.paymentId,
       );
       if (!result.ok) {
-        return reply
-          .code(failStatus(result.error.retryable))
-          .send({ error: result.error.message, requestId: requestIdOf(request) });
+        return sendPortFailure(reply, deps, request, result.error, failStatus(result.error.retryable), "payment.failed");
       }
       return reply.code(200).send(result.value);
     },

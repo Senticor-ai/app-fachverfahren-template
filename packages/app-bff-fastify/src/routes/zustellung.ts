@@ -19,6 +19,7 @@ import {
 } from "@senticor/public-sector-sdk";
 import type { BffDeps } from "../deps.js";
 import { bffRouteAuth, requestIdOf, sessionOf } from "../route-auth.js";
+import { sendPortFailure } from "../port-route-safety.js";
 
 const DeliveryIdParamsSchema = Type.Object(
   { deliveryId: Type.String({ minLength: 1 }) },
@@ -80,9 +81,7 @@ export function registerZustellungRoutes(
         attachments: request.body.attachments ?? [],
       });
       if (!result.ok) {
-        return reply
-          .code(failStatus(result.error.retryable))
-          .send({ error: result.error.message, requestId: requestIdOf(request) });
+        return sendPortFailure(reply, deps, request, result.error, failStatus(result.error.retryable), "zustellung.failed");
       }
       // Zustellung ist auditpflichtig (Zustellnachweis): Referenz + Zustell-Id, kein Bescheid-Inhalt.
       await deps.auditSink.emit({
@@ -124,9 +123,7 @@ export function registerZustellungRoutes(
         request.params.deliveryId,
       );
       if (!result.ok) {
-        return reply
-          .code(failStatus(result.error.retryable))
-          .send({ error: result.error.message, requestId: requestIdOf(request) });
+        return sendPortFailure(reply, deps, request, result.error, failStatus(result.error.retryable), "zustellung.failed");
       }
       return reply.code(200).send(result.value);
     },
