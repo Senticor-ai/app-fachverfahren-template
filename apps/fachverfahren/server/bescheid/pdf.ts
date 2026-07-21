@@ -8,18 +8,40 @@
 // reviewRequired) — siehe `bescheid/ki-entwurf.ts`. Der Renderer selbst ruft NIE die KI (Determinismus +
 // keine Seiteneffekte beim Rendern): KI entwirft → Mensch gibt frei → Text wird Template-Daten → gerendert.
 //
-// PDF/A-STAND (ehrlich): wohlgeformtes PDF 1.7 + vollständige Metadaten + aus `issuedAt` abgeleitete
-// (deterministische) Zeitstempel. Die formale PDF/A-1b-ZERTIFIZIERUNG verlangt zusätzlich eingebettete
-// Schriften (statt Standard-14), einen sRGB-ICC-OutputIntent und ein XMP-Paket (`pdfaid:part/conformance`)
-// + veraPDF-Gate — dokumentierte Folgearbeit auf #60. Der Generator ist bewusst asset-frei.
+// PDF/A-STAND (ehrlich): wohlgeformtes PDF mit EINGEBETTETER Schrift (DejaVu, permissive Lizenz) → ein
+// SELBSTTRAGENDES Dokument, das ohne systemseitige Schriften identisch rendert (Kern eines Langzeit-/
+// Archivdokuments) + vollständige Metadaten + aus `issuedAt` abgeleitete (deterministische) Zeitstempel.
+// Die formale PDF/A-1b-ZERTIFIZIERUNG verlangt DARÜBER HINAUS einen sRGB-ICC-OutputIntent und ein XMP-Paket
+// (`pdfaid:part/conformance`) + veraPDF-Validierung als Gate — beides braucht Assets/Tooling, die im Repo/
+// Umfeld nicht vorliegen (kein sRGB-ICC via npm, kein veraPDF); ehrlich als Folgearbeit auf #60 offen.
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import type { VerwaltungsaktDto } from "@senticor/app-bff-contracts";
-import {
-  PDFDocument,
-  StandardFonts,
-  rgb,
-  type PDFFont,
-  type PDFPage,
-} from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
+import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+
+const nodeRequire = createRequire(import.meta.url);
+let dejaVuCache: { regular: Uint8Array; bold: Uint8Array } | undefined;
+
+/** Lädt die DejaVu-TTFs (permissive Lizenz) EINMALIG aus dem Paket `dejavu-fonts-ttf`. Eingebettet macht
+ *  das Dokument selbsttragend (rendert ohne systemseitige Schriften) — Grundvoraussetzung für PDF/A. */
+function ladeDejaVu(): { regular: Uint8Array; bold: Uint8Array } {
+  if (!dejaVuCache) {
+    dejaVuCache = {
+      regular: new Uint8Array(
+        readFileSync(
+          nodeRequire.resolve("dejavu-fonts-ttf/ttf/DejaVuSans.ttf"),
+        ),
+      ),
+      bold: new Uint8Array(
+        readFileSync(
+          nodeRequire.resolve("dejavu-fonts-ttf/ttf/DejaVuSans-Bold.ttf"),
+        ),
+      ),
+    };
+  }
+  return dejaVuCache;
+}
 
 /** Eine Bescheid-Sektion als DATEN. Bekannte Kinds ziehen ihren Inhalt aus dem VA; `freitext` trägt (ggf.
  *  KI-entworfene, menschlich geprüfte) Absätze. So ist die Bescheid-Struktur pro Verfahren überschreibbar. */
@@ -130,8 +152,11 @@ export async function renderBescheidPdf(
   const { va, behoerde } = input;
   const template = input.template ?? defaultBescheidTemplate;
   const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  // Eingebettete DejaVu-Schrift (subset) → selbsttragendes, langzeit-stabiles Dokument (kein Standard-14).
+  doc.registerFontkit(fontkit);
+  const dejaVu = ladeDejaVu();
+  const font = await doc.embedFont(dejaVu.regular, { subset: true });
+  const bold = await doc.embedFont(dejaVu.bold, { subset: true });
 
   // Selbstbeschreibende Metadaten: der Hash liegt in den Keywords → das Dokument trägt sein Beweis-Token.
   const erlassDatum = new Date(va.issuedAt);
