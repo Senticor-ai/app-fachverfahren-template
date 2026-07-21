@@ -130,6 +130,14 @@ export type {
   ChosEvent,
   HttpChosClientOptions,
 } from "./chos-client.js";
+export {
+  DEADLINE_OVERDUE,
+  DEADLINE_SINCE_KEY,
+  DEADLINE_STATUS_KEY,
+  findDueDeadlines,
+  runDeadlineScan,
+  runDeadlineScanForTenants,
+} from "./deadline-scan.js";
 export { ChosCaseStore } from "./chos-case-store.js";
 export { ChosWissenStore } from "./chos-wissen-store.js";
 export { ChosTaskStore } from "./chos-task-store.js";
