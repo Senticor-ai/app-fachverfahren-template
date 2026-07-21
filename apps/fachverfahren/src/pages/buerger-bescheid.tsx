@@ -5,11 +5,16 @@
 // Umstellung den bereits erlassenen Bescheid NICHT.
 import { useEffect, useId, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { BescheidView, Button, type Vorgang } from "@senticor/fachverfahren-kit";
+import {
+  BescheidView,
+  Button,
+  type Vorgang,
+} from "@senticor/fachverfahren-kit";
 import { Shell } from "../app/shell.js";
 import { store } from "../store.js";
 import { CaseRequestError } from "../case-client.js";
 import {
+  bescheidPdfUrl,
   ladeBescheid,
   legeWiderspruchEin,
   type VerwaltungsaktDto,
@@ -69,9 +74,7 @@ function WiderspruchAktion({
         className="mt-6 rounded-md border border-border bg-muted/40 p-4 text-sm"
         role="status"
       >
-        <p className="font-medium text-foreground">
-          {label.name} eingelegt.
-        </p>
+        <p className="font-medium text-foreground">{label.name} eingelegt.</p>
         <p className="mt-1 text-muted-foreground">
           {status === "bereits"
             ? `Für diesen Bescheid wurde bereits ein ${label.name} eingelegt.`
@@ -86,7 +89,10 @@ function WiderspruchAktion({
       <h2 className="text-sm font-semibold text-foreground">
         Mit dem Bescheid nicht einverstanden?
       </h2>
-      <label htmlFor={feldId} className="mt-2 block text-sm text-muted-foreground">
+      <label
+        htmlFor={feldId}
+        className="mt-2 block text-sm text-muted-foreground"
+      >
         Begründung (optional)
       </label>
       <textarea
@@ -180,6 +186,8 @@ export function BuergerBescheidPage(): React.JSX.Element {
                 fiktionTage: va.fiktionTage,
                 fiktionNorm: va.fiktionNorm,
               }}
+              // Echter, server-generierter Bescheid als Datei-Download (owner-scoped, hash-beweisbar).
+              pdfDownloadUrl={bescheidPdfUrl(id)}
             />
             {/* Die HANDLUNG zur Belehrung: den Rechtsbehelf tatsächlich einlegen (Art aus dem Regime). */}
             <WiderspruchAktion antragId={id} art={va.rechtsbehelf.art} />

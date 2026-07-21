@@ -42,6 +42,12 @@ export interface BescheidViewProps<T = Record<string, unknown>> {
    * fällt die Belehrung auf den generischen, config-getriebenen Widerspruchs-Text zurück.
    */
   belehrung?: BescheidBelehrung;
+  /**
+   * Optionale URL zum AMTLICHEN, server-generierten Bescheid-PDF (owner-scoped Download, hash-beweisbar).
+   * Ist sie gesetzt, bietet die Ansicht einen echten Datei-Download an (statt nur `window.print()`); der
+   * Server bleibt die Wahrheit über die Bytes. Fehlt sie, bleibt allein die Druck-Aktion (SB-Vorschau/DEV).
+   */
+  pdfDownloadUrl?: string;
 }
 
 /** Name des Rechtsbehelfs für den Belehrungstext. */
@@ -114,6 +120,7 @@ export function BescheidView<T = Record<string, unknown>>({
   vorgang,
   config,
   belehrung,
+  pdfDownloadUrl,
 }: BescheidViewProps<T>): ReactElement {
   const berechnung: Berechnung | undefined = vorgang.berechnung;
   const datum = useMemo(
@@ -130,15 +137,38 @@ export function BescheidView<T = Record<string, unknown>>({
   return (
     <section className="mx-auto w-full max-w-3xl px-6 py-8 print:max-w-none print:px-0 print:py-0">
       {/* Aktions-Leiste — NUR am Bildschirm, im Druck ausgeblendet (print:hidden) */}
-      <div className="mb-6 flex items-center justify-end print:hidden">
-        <Button
-          type="button"
-          onClick={() => window.print()}
-          aria-label="Bescheid als PDF herunterladen"
-        >
-          <Download className="h-4 w-4" aria-hidden="true" />
-          Als PDF herunterladen
-        </Button>
+      <div className="mb-6 flex items-center justify-end gap-2 print:hidden">
+        {pdfDownloadUrl ? (
+          <>
+            {/* Echter, server-generierter Bescheid als Datei-Download (owner-scoped, hash-beweisbar). */}
+            <Button asChild>
+              <a
+                href={pdfDownloadUrl}
+                download
+                aria-label="Amtlichen Bescheid als PDF herunterladen"
+              >
+                <Download className="h-4 w-4" aria-hidden="true" />
+                Amtliches PDF herunterladen
+              </a>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => window.print()}
+            >
+              Drucken
+            </Button>
+          </>
+        ) : (
+          <Button
+            type="button"
+            onClick={() => window.print()}
+            aria-label="Bescheid als PDF herunterladen"
+          >
+            <Download className="h-4 w-4" aria-hidden="true" />
+            Als PDF herunterladen
+          </Button>
+        )}
       </div>
 
       {/* Das Dokument — am Bildschirm als Karte, im Druck randlos/ohne Schatten (print:*) */}

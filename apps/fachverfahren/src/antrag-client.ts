@@ -27,7 +27,12 @@ import type {
 import type { Vorgang, VorgangPersistence } from "@senticor/fachverfahren-kit";
 import { apiPath, CaseRequestError } from "./case-client.js";
 
-export type { NachweisDownloadDto, NachweisRefDto, VerwaltungsaktDto, WiderspruchDto };
+export type {
+  NachweisDownloadDto,
+  NachweisRefDto,
+  VerwaltungsaktDto,
+  WiderspruchDto,
+};
 
 /** Die eigenen Nachweise eines Antrags auflisten (nur Metadaten). */
 export async function ladeNachweise(
@@ -106,6 +111,14 @@ export async function ladeBescheid(
   }
 }
 
+/** Die owner-scoped Download-URL des AMTLICHEN Bescheid-PDF (server-generiert, hash-beweisbar). Nutzt dasselbe
+ *  BASE_URL-Präfix wie alle API-Aufrufe; als `href` eines Download-Links verwendbar (Session-Cookie trägt die Auth). */
+export function bescheidPdfUrl(antragId: string): string {
+  return apiPath(
+    `/api/buerger/antraege/${encodeURIComponent(antragId)}/bescheid.pdf`,
+  );
+}
+
 /**
  * Legt einen Rechtsbehelf (Widerspruch/Einspruch/Klage) gegen den eigenen Bescheid ein — die
  * Rechtsbehelfs-HANDLUNG zur Belehrung. Der Server setzt einen erlassenen Bescheid voraus (404) und lässt
@@ -120,9 +133,7 @@ export async function legeWiderspruchEin(
     `/api/buerger/antraege/${encodeURIComponent(antragId)}/widerspruch`,
     {
       method: "POST",
-      body: JSON.stringify(
-        begruendung !== undefined ? { begruendung } : {},
-      ),
+      body: JSON.stringify(begruendung !== undefined ? { begruendung } : {}),
     },
   );
 }
