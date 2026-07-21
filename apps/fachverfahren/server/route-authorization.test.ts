@@ -269,6 +269,49 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           policy: "rbac:preferences.write",
         },
         { method: "GET", url: "/api/session", policy: "rbac:session.read" },
+        // N-Augen-Freigabe-Sammlung (Issue #56): Vorbereiten/Freigeben = case.decision.prepare.
+        {
+          method: "POST",
+          url: "/api/cases/:id/approvals",
+          policy: "rbac:case.decision.prepare",
+        },
+        // Fachdienst-Durchstiche (Port-Seams): Identität (BundID/eID), Zahlung (ePayBL), Register-Abruf
+        // (NOOTS/Once-Only), Bescheid-Zustellung (De-Mail/eBO) — je eigene, deny-by-default RBAC-Permission.
+        {
+          method: "GET",
+          url: "/api/identity",
+          policy: "rbac:session.read",
+        },
+        {
+          method: "POST",
+          url: "/api/identity/assurance",
+          policy: "rbac:session.read",
+        },
+        {
+          method: "POST",
+          url: "/api/payment",
+          policy: "rbac:payment.initiate",
+        },
+        {
+          method: "GET",
+          url: "/api/payment/:paymentId",
+          policy: "rbac:payment.initiate",
+        },
+        {
+          method: "POST",
+          url: "/api/register/evidence",
+          policy: "rbac:register.abruf",
+        },
+        {
+          method: "POST",
+          url: "/api/zustellung",
+          policy: "rbac:bescheid.versand",
+        },
+        {
+          method: "GET",
+          url: "/api/zustellung/:deliveryId",
+          policy: "rbac:bescheid.versand",
+        },
         // Verfahrens-Wiki: Lesen = case.read; Schreiben (Mensch + KI) = case.note.write.
         {
           method: "GET",
