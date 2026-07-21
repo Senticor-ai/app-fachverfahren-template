@@ -53,8 +53,12 @@ Projekte `unit` + `template-tooling`. Die schwereren Ebenen sind eigene Kommando
   InMemory + Chos-Fake IMMER, und über **echtes Postgres NUR wenn**
   `APP_PG_DIRECT_URL`/`APP_PG_URL` gesetzt ist (`describe.skipIf`). Lokal liefert
   `docker-compose.yml` (postgres:16) die DB; Migrationen via `pnpm run db:migrate`
-  (Direct-URL). **In CI läuft KEIN Postgres-Service → der PG-Pfad wird
-  ÜBERSPRUNGEN** (nur InMemory/Fake). Den echten PG-Lauf also lokal/gezielt fahren.
+  (Direct-URL). **Automatisiert:** `pnpm run test:pg` fährt über **testcontainers**
+  (`tests/pg/global-setup.ts`) selbst einen echten Postgres hoch, migriert und
+  lässt die Store-Tests gegen die echte DB laufen — GRACEFUL-SKIP ohne Docker
+  (dann InMemory/Fake). Bei Rancher/colima `DOCKER_HOST` +
+  `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE` auf den Socket setzen. Der schnelle
+  `test`-Lauf enthält den PG-Pfad bewusst NICHT (kein Docker-Zwang).
 - **Golden-Fixture/Referenz-Seed** — `apps/fachverfahren/server/dev/*.test.ts`
   (self-test der DEV-Seed-Daten; die Seed selbst läuft nur unter
   `APP_STORE_MODE=memory`, ist verfahrens-neutral + synthetisch).
