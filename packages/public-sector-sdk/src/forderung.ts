@@ -119,3 +119,33 @@ export function istForderungMahnbar(
   if (stand.faelligIso === undefined) return false;
   return stand.faelligIso <= nowIso;
 }
+
+/** Minimale Fall-Audit-Ereignis-Form für die Ableitung — store-unabhängig (Parität zu StatusMachineSource). */
+export interface ForderungAuditQuelle {
+  eventType: string;
+  payload?: Record<string, unknown>;
+  occurredAt: string;
+}
+
+/**
+ * Die READ-Brücke: extrahiert die `forderung.*`-Ereignisse aus dem append-only Fall-Audit und berechnet den
+ * Forderungsstand. Betrag/Fälligkeit kommen aus der (server-geschriebenen) payload — der offene Restbetrag
+ * bleibt eine reine Ableitung, nie eine gespeicherte Zweitwahrheit. So liest jede BFF-/UI-Fläche denselben Stand.
+ */
+export function forderungsstandAusAudit(
+  events: readonly ForderungAuditQuelle[],
+): ForderungStand {
+  const ereignisse: ForderungEreignis[] = events
+    .filter((e) => e.eventType.startsWith("forderung."))
+    .map((e) => {
+      const betrag = e.payload?.["betragCent"];
+      const faellig = e.payload?.["faelligIso"];
+      return {
+        art: e.eventType,
+        ...(typeof betrag === "number" ? { betragCent: betrag } : {}),
+        ...(typeof faellig === "string" ? { faelligIso: faellig } : {}),
+        occurredAt: e.occurredAt,
+      };
+    });
+  return berechneForderungsstand(ereignisse);
+}

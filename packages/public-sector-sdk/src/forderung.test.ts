@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 import {
   berechneForderungsstand,
+  forderungsstandAusAudit,
   istForderungMahnbar,
   FORDERUNG_GESTELLT,
   FORDERUNG_ZAHLUNG_EINGEGANGEN,
@@ -113,6 +114,35 @@ describe("berechneForderungsstand", () => {
     ]);
     expect(s.gezahltCent).toBe(0);
     expect(s.offenCent).toBe(12000);
+  });
+});
+
+describe("forderungsstandAusAudit (READ-Brücke aus dem Fall-Audit)", () => {
+  it("liest nur forderung.*-Ereignisse + rechnet den Stand (Betrag/Fälligkeit aus payload)", () => {
+    const stand = forderungsstandAusAudit([
+      { eventType: "case.transitioned", occurredAt: "2026-01-01" },
+      {
+        eventType: FORDERUNG_GESTELLT,
+        payload: { betragCent: 12000, faelligIso: "2026-02-01" },
+        occurredAt: "2026-01-02",
+      },
+      {
+        eventType: FORDERUNG_ZAHLUNG_EINGEGANGEN,
+        payload: { betragCent: 5000 },
+        occurredAt: "2026-01-10",
+      },
+    ]);
+    expect(stand.status).toBe("teilweise-bezahlt");
+    expect(stand.offenCent).toBe(7000);
+    expect(stand.faelligIso).toBe("2026-02-01");
+  });
+
+  it("kein forderung.*-Ereignis → status 'keine'", () => {
+    expect(
+      forderungsstandAusAudit([
+        { eventType: "case.disclosed", occurredAt: "2026-01-01" },
+      ]).status,
+    ).toBe("keine");
   });
 });
 
