@@ -24,6 +24,7 @@ import {
   ChosEntityNotFoundError,
   type ChosClient,
 } from "./chos-client.js";
+import { auditStreamOrder, chainAuditEvent } from "./audit-chain.js";
 
 const CASE_COLLECTION = "app_cases";
 /** Stream-Sentinel für ein Audit-Ereignis OHNE caseId (mandantenweit) — via listAuditEvents(caseId) nie
@@ -90,6 +91,14 @@ function bodyToAudit(
         ? (body["payload"] as Record<string, unknown>)
         : {},
     occurredAt: String(body["occurredAt"]),
+    // Hash-Kette (Issue #53) — im chos-Ereignis-Body mitgeführt.
+    prevHash:
+      body["prevHash"] === null || body["prevHash"] === undefined
+        ? null
+        : String(body["prevHash"]),
+    ...(body["entryHash"] !== undefined
+      ? { entryHash: String(body["entryHash"]) }
+      : {}),
   };
 }
 
@@ -159,6 +168,7 @@ export class ChosCaseStore implements CaseStore {
       closedAt:
         input.closedAt !== undefined ? input.closedAt : currentCase.closedAt,
     };
+    const chained = await this.chainAudit(input.auditEvent);
     try {
       const updated = await this.client.mutateEntityWithEvent({
         collection: CASE_COLLECTION,
@@ -167,10 +177,10 @@ export class ChosCaseStore implements CaseStore {
         expectedVersion: input.expectedVersion,
         nextBody: caseToBody(next),
         event: {
-          stream: input.auditEvent.caseId ?? NO_CASE_STREAM,
-          id: input.auditEvent.auditEventId,
-          occurredAt: input.auditEvent.occurredAt,
-          body: auditToBody(input.auditEvent),
+          stream: chained.caseId ?? NO_CASE_STREAM,
+          id: chained.auditEventId,
+          occurredAt: chained.occurredAt,
+          body: auditToBody(chained),
         },
       });
       return bodyToCase(updated.body);
@@ -190,14 +200,25 @@ export class ChosCaseStore implements CaseStore {
   }
 
   async appendAuditEvent(event: AppAuditEvent): Promise<AppAuditEvent> {
+    const chained = await this.chainAudit(event);
     await this.client.appendEvent({
-      tenantId: event.tenantId,
-      stream: event.caseId ?? NO_CASE_STREAM,
-      id: event.auditEventId,
-      occurredAt: event.occurredAt,
-      body: auditToBody(event),
+      tenantId: chained.tenantId,
+      stream: chained.caseId ?? NO_CASE_STREAM,
+      id: chained.auditEventId,
+      occurredAt: chained.occurredAt,
+      body: auditToBody(chained),
     });
-    return { ...event, payload: { ...event.payload } };
+    return { ...chained, payload: { ...chained.payload } };
+  }
+
+  /** Stempelt die Hash-Kette (prevHash/entryHash) — prevHash = Vorgänger im chos-Ereignis-Stream (Issue #53).
+   *  Liest den Stream, kettet an dessen letztes Ereignis. Race-Fenster wie InMemory (Single-Thread-Parität). */
+  private async chainAudit(event: AppAuditEvent): Promise<AppAuditEvent> {
+    const stream = event.caseId ?? NO_CASE_STREAM;
+    const existing = (
+      await this.client.listEvents({ tenantId: event.tenantId, stream })
+    ).map((e) => bodyToAudit(e.body, event.caseId ?? ""));
+    return chainAuditEvent(event, existing);
   }
 
   async listAuditEvents(query: {
@@ -210,7 +231,9 @@ export class ChosCaseStore implements CaseStore {
       stream: query.caseId,
       ...(query.limit !== undefined ? { limit: query.limit } : { limit: 500 }),
     });
-    return events.map((e) => bodyToAudit(e.body, query.caseId));
+    return events
+      .map((e) => bodyToAudit(e.body, query.caseId))
+      .sort(auditStreamOrder);
   }
 
   async ping(): Promise<void> {

@@ -23,6 +23,7 @@ import {
 import {
   CaseNotFoundError,
   CaseVersionConflictError,
+  verifyAuditChain,
   type AppAuditEvent,
   type AppCase,
 } from "@senticor/app-store-postgres";
@@ -82,6 +83,8 @@ function toAuditDto(e: AppAuditEvent): CaseAuditEventDto {
     legalBasisId: e.legalBasisId,
     payload: e.payload,
     occurredAt: e.occurredAt,
+    prevHash: e.prevHash ?? null,
+    ...(e.entryHash !== undefined ? { entryHash: e.entryHash } : {}),
   };
 }
 
@@ -282,7 +285,29 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
       } catch {
         return storeUnavailable(request, reply);
       }
-      return reply.send({ events: events.map(toAuditDto) });
+      // HASH-KETTE (Issue #53): der Server verifiziert die Verkettung des GESAMTEN Streams und liefert den
+      // Report mit. Bewusst über den ungekürzten Stream (nicht die evtl. limitierte Sicht), damit ein
+      // gekürztes `limit` nicht fälschlich als Bruch erscheint.
+      let full: AppAuditEvent[] = events;
+      if (request.query.limit !== undefined) {
+        try {
+          full = await deps.caseStore.listAuditEvents({
+            tenantId: session.tenantId,
+            caseId: found.caseId,
+          });
+        } catch {
+          return storeUnavailable(request, reply);
+        }
+      }
+      const chain = verifyAuditChain(full);
+      return reply.send({
+        events: events.map(toAuditDto),
+        chain: {
+          ok: chain.ok,
+          ...(chain.brokenAt !== undefined ? { brokenAt: chain.brokenAt } : {}),
+          ...(chain.reason !== undefined ? { reason: chain.reason } : {}),
+        },
+      });
     },
   );
 

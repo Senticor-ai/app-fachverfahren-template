@@ -12,6 +12,11 @@
 import { createPgClient, type PgClient } from "./client.js";
 import { ChosCaseStore } from "./chos-case-store.js";
 import { createChosClientFromEnv } from "./chos-client.js";
+import {
+  auditEntryHash,
+  auditStreamOrder,
+  chainAuditEvent,
+} from "./audit-chain.js";
 
 /** Ein Fall/eine Akte — die Persistenzform der SDK-`Case` (kompatibel; der Store bleibt SDK-entkoppelt). */
 export interface AppCase {
@@ -65,6 +70,12 @@ export interface AppAuditEvent {
   requestId: string;
   payload: Record<string, unknown>;
   occurredAt: string;
+  /** HASH-KETTE (tamper-evidentes Audit, Issue #53) — vom STORE beim Append gestempelt, nicht vom Aufrufer.
+   *  `prevHash` = `entryHash` des Vorgängers im Stream (tenantId, caseId) bzw. `null` (Genesis); `entryHash` =
+   *  Hash über die kanonischen Bytes dieses Ereignisses inkl. `prevHash` (s. audit-chain.ts). Auf gelesenen
+   *  Ereignissen immer gesetzt; beim Schreiben ignoriert der Store eingehende Werte und rechnet selbst. */
+  prevHash?: string | null;
+  entryHash?: string;
 }
 
 /**
@@ -238,10 +249,7 @@ export class PostgresCaseStore implements CaseStore {
             Number(existing.rows[0]!.version),
           );
         }
-        await client.query(
-          AUDIT_INSERT_SQL,
-          auditInsertParams(input.auditEvent),
-        );
+        await insertChainedAuditEvent(client, input.auditEvent);
         await client.query("COMMIT");
         return caseFromRow(upd.rows[0]!);
       } catch (error) {
@@ -252,10 +260,7 @@ export class PostgresCaseStore implements CaseStore {
   }
 
   async appendAuditEvent(event: AppAuditEvent): Promise<AppAuditEvent> {
-    return this.withClient(async (client) => {
-      await client.query(AUDIT_INSERT_SQL, auditInsertParams(event));
-      return event;
-    });
+    return this.withClient((client) => insertChainedAuditEvent(client, event));
   }
 
   async listAuditEvents(query: {
@@ -267,7 +272,7 @@ export class PostgresCaseStore implements CaseStore {
       const result = await client.query<AuditRow>(
         `SELECT ${AUDIT_COLS} FROM app_audit_events
          WHERE tenant_id = $1 AND case_id = $2
-         ORDER BY occurred_at ASC
+         ORDER BY occurred_at ASC, audit_event_id ASC
          LIMIT $3`,
         [query.tenantId, query.caseId, query.limit ?? 500],
       );
@@ -372,10 +377,8 @@ export class InMemoryCaseStore implements CaseStore {
       closedAt: input.closedAt !== undefined ? input.closedAt : found.closedAt,
     };
     this.cases.set(this.key(input.tenantId, input.caseId), next);
-    this.audit.push({
-      ...input.auditEvent,
-      payload: { ...input.auditEvent.payload },
-    });
+    const chained = this.chainAudit(input.auditEvent);
+    this.audit.push({ ...chained, payload: { ...chained.payload } });
     return {
       ...next,
       subjectIds: [...next.subjectIds],
@@ -384,8 +387,18 @@ export class InMemoryCaseStore implements CaseStore {
   }
 
   async appendAuditEvent(event: AppAuditEvent): Promise<AppAuditEvent> {
-    this.audit.push({ ...event, payload: { ...event.payload } });
-    return { ...event, payload: { ...event.payload } };
+    const chained = this.chainAudit(event);
+    this.audit.push({ ...chained, payload: { ...chained.payload } });
+    return { ...chained, payload: { ...chained.payload } };
+  }
+
+  /** Stempelt die Hash-Kette (prevHash/entryHash) auf ein neues Ereignis — prevHash = Vorgänger im Stream
+   *  (tenantId, caseId). Der Store rechnet selbst; eingehende Ketten-Felder werden verworfen (Issue #53). */
+  private chainAudit(event: AppAuditEvent): AppAuditEvent {
+    const stream = this.audit.filter(
+      (e) => e.tenantId === event.tenantId && e.caseId === event.caseId,
+    );
+    return chainAuditEvent(event, stream);
   }
 
   async listAuditEvents(query: {
@@ -395,7 +408,7 @@ export class InMemoryCaseStore implements CaseStore {
   }): Promise<AppAuditEvent[]> {
     return this.audit
       .filter((e) => e.tenantId === query.tenantId && e.caseId === query.caseId)
-      .sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))
+      .sort(auditStreamOrder)
       .slice(0, query.limit ?? 500)
       .map((e) => ({ ...e, payload: { ...e.payload } }));
   }
@@ -472,9 +485,9 @@ function cloneData(data: Record<string, unknown>): Record<string, unknown> {
 const CASE_COLS = `case_id, tenant_id, authority_id, jurisdiction_id, procedure_id,
   procedure_version, state, version, subject_ids, opened_at, closed_at, data, owner_actor_id`;
 const AUDIT_COLS = `audit_event_id, case_id, tenant_id, authority_id, jurisdiction_id,
-  actor_id, event_type, purpose, legal_basis_id, request_id, payload, occurred_at`;
+  actor_id, event_type, purpose, legal_basis_id, request_id, payload, occurred_at, prev_hash, entry_hash`;
 const AUDIT_INSERT_SQL = `INSERT INTO app_audit_events (${AUDIT_COLS})
-  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12)`;
+  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13,$14)`;
 
 function caseInsertParams(c: AppCase): unknown[] {
   return [
@@ -508,7 +521,42 @@ function auditInsertParams(e: AppAuditEvent): unknown[] {
     e.requestId,
     JSON.stringify(e.payload),
     e.occurredAt,
+    e.prevHash ?? null,
+    e.entryHash ?? null,
   ];
+}
+
+/** Fügt ein Audit-Ereignis MIT Hash-Kette ein (Issue #53): liest den letzten `entry_hash` des Streams
+ *  (tenantId, caseId) IM SELBEN Client/TX, rechnet `entryHash` und schreibt. `IS NOT DISTINCT FROM` behandelt
+ *  ein NULL-`case_id` korrekt. In `patchCaseState` serialisiert der Fall-Versions-CAS konkurrierende Appends
+ *  desselben Falls; für Standalone-Appends bleibt ein enges Race-Fenster (dokumentiert, wie InMemory/chos). */
+async function insertChainedAuditEvent(
+  client: PgClient,
+  event: AppAuditEvent,
+): Promise<AppAuditEvent> {
+  // Die KETTEN-SPITZE: das Ereignis, dessen entry_hash von KEINEM anderen als prev_hash referenziert wird
+  // (Ende der verketteten Liste) — reihenfolge-unabhängig wie im reinen chainAuditEvent, damit ein nicht-
+  // monotoner occurred_at keinen Fork erzeugt. Leerer Stream → keine Zeile → Genesis (prevHash null).
+  const prev = await client.query<{ entry_hash: string | null }>(
+    `SELECT a.entry_hash FROM app_audit_events a
+       WHERE a.tenant_id = $1 AND a.case_id IS NOT DISTINCT FROM $2
+         AND a.entry_hash IS NOT NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM app_audit_events b
+            WHERE b.tenant_id = $1 AND b.case_id IS NOT DISTINCT FROM $2
+              AND b.prev_hash = a.entry_hash
+         )
+       LIMIT 1`,
+    [event.tenantId, event.caseId],
+  );
+  const prevHash = prev.rows[0]?.entry_hash ?? null;
+  const chained: AppAuditEvent = {
+    ...event,
+    prevHash,
+    entryHash: auditEntryHash(event, prevHash),
+  };
+  await client.query(AUDIT_INSERT_SQL, auditInsertParams(chained));
+  return chained;
 }
 
 interface CaseRow extends Record<string, unknown> {
@@ -540,6 +588,8 @@ interface AuditRow extends Record<string, unknown> {
   request_id: string;
   payload: Record<string, unknown>;
   occurred_at: Date | string;
+  prev_hash: string | null;
+  entry_hash: string | null;
 }
 
 function caseFromRow(row: CaseRow): AppCase {
@@ -580,6 +630,8 @@ function auditFromRow(row: AuditRow): AppAuditEvent {
     requestId: row.request_id,
     payload: row.payload && typeof row.payload === "object" ? row.payload : {},
     occurredAt: toIsoString(row.occurred_at),
+    prevHash: row.prev_hash ?? null,
+    ...(row.entry_hash !== null ? { entryHash: row.entry_hash } : {}),
   };
 }
 

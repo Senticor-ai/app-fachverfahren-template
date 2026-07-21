@@ -1986,6 +1986,16 @@
                 "schema": {
                   "additionalProperties": false,
                   "properties": {
+                    "chain": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "brokenAt": { "minLength": 1, "type": "string" },
+                        "ok": { "type": "boolean" },
+                        "reason": { "minLength": 1, "type": "string" }
+                      },
+                      "required": ["ok"],
+                      "type": "object"
+                    },
                     "events": {
                       "items": {
                         "additionalProperties": false,
@@ -1998,12 +2008,19 @@
                               { "type": "null" }
                             ]
                           },
+                          "entryHash": { "minLength": 1, "type": "string" },
                           "eventType": { "minLength": 1, "type": "string" },
                           "legalBasisId": { "minLength": 1, "type": "string" },
                           "occurredAt": { "minLength": 1, "type": "string" },
                           "payload": {
                             "additionalProperties": {},
                             "type": "object"
+                          },
+                          "prevHash": {
+                            "anyOf": [
+                              { "minLength": 1, "type": "string" },
+                              { "type": "null" }
+                            ]
                           },
                           "purpose": { "minLength": 1, "type": "string" }
                         },
@@ -2015,14 +2032,15 @@
                           "purpose",
                           "legalBasisId",
                           "payload",
-                          "occurredAt"
+                          "occurredAt",
+                          "prevHash"
                         ],
                         "type": "object"
                       },
                       "type": "array"
                     }
                   },
-                  "required": ["events"],
+                  "required": ["events", "chain"],
                   "type": "object"
                 }
               }

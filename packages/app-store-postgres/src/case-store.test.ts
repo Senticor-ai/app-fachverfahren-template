@@ -10,6 +10,7 @@ import {
 } from "./case-store.js";
 import { ChosCaseStore } from "./chos-case-store.js";
 import { InMemoryChosClient } from "./chos-client.js";
+import { verifyAuditChain } from "./audit-chain.js";
 
 // Parametrisierte Vertrags-Tests: identisch gegen den In-Memory-Store (immer) UND — wenn eine Datenbank
 // konfiguriert ist (APP_PG_DIRECT_URL/APP_PG_URL, Migrationen vorher ausgeführt) — gegen den Postgres-Store.
@@ -342,6 +343,50 @@ for (const impl of impls) {
       expect(
         (await store.listAuditEvents({ tenantId: "fremd", caseId })).length,
       ).toBe(0);
+    });
+
+    it("Audit-Hash-Kette (Issue #53): jedes Ereignis ist verkettet + tamper-evident verifizierbar", async () => {
+      const tenantId = `t-chain-${uid()}`;
+      const c = macheCase({ tenantId, caseId: `case-${uid()}` });
+      await store.insertCase(c);
+      const scope = { tenantId, caseId: c.caseId };
+      // Mehrere Ereignisse über beide Append-Pfade (patchCaseState + appendAuditEvent).
+      await store.patchCaseState({
+        ...scope,
+        expectedVersion: 1,
+        newState: "aktiv",
+        auditEvent: macheAudit(c.caseId, {
+          tenantId,
+          eventType: "case.transitioned",
+        }),
+      });
+      await store.appendAuditEvent(
+        macheAudit(c.caseId, { tenantId, eventType: "bescheid.abgerufen" }),
+      );
+      await store.patchCaseState({
+        ...scope,
+        expectedVersion: 2,
+        newState: "abgeschlossen",
+        auditEvent: macheAudit(c.caseId, {
+          tenantId,
+          eventType: "case.transitioned",
+        }),
+      });
+      const liste = await store.listAuditEvents(scope);
+      expect(liste).toHaveLength(3);
+      // Jedes Ereignis trägt die Kette; GENAU EINES ist Genesis (prevHash null). Die Listen-Reihenfolge ist
+      // occurredAt-basiert und muss NICHT die Ketten-Reihenfolge sein — verify folgt den Links.
+      expect(liste.every((e) => typeof e.entryHash === "string")).toBe(true);
+      expect(liste.filter((e) => (e.prevHash ?? null) === null)).toHaveLength(
+        1,
+      );
+      // Die Kette verifiziert lückenlos.
+      expect(verifyAuditChain(liste).ok).toBe(true);
+      // MANIPULATION eines gelieferten Ereignisses wird erkannt (tamper-evident).
+      const tampered = liste.map((e, i) =>
+        i === 1 ? { ...e, payload: { ...e.payload, hacked: true } } : e,
+      );
+      expect(verifyAuditChain(tampered).ok).toBe(false);
     });
   });
 }

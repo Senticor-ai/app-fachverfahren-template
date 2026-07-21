@@ -95,6 +95,10 @@ export const CaseAuditEventDtoSchema = Type.Object(
     legalBasisId: Type.String({ minLength: 1 }),
     payload: Type.Record(Type.String(), Type.Unknown()),
     occurredAt: Type.String({ minLength: 1 }),
+    // Hash-Kette (Issue #53): der Client kann die Verkettung anzeigen; die server-seitige Verifikation liegt
+    // im `chain`-Feld der Liste. `prevHash` null = Genesis; `entryHash` fehlt nur bei Alt-Ereignissen.
+    prevHash: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+    entryHash: Type.Optional(Type.String({ minLength: 1 })),
   },
   { additionalProperties: false },
 );
@@ -108,8 +112,24 @@ export const CaseAuditQuerySchema = Type.Object(
 
 export type CaseAuditQueryDto = Static<typeof CaseAuditQuerySchema>;
 
+/** Server-seitiger Verifikations-Report der Audit-Hash-Kette (Issue #53) — `ok:false` heißt: das Protokoll
+ *  wurde nachträglich manipuliert/gekürzt (tamper-evident). `brokenAt` = auditEventId der Bruchstelle. */
+export const CaseAuditChainReportSchema = Type.Object(
+  {
+    ok: Type.Boolean(),
+    brokenAt: Type.Optional(Type.String({ minLength: 1 })),
+    reason: Type.Optional(Type.String({ minLength: 1 })),
+  },
+  { additionalProperties: false },
+);
+
+export type CaseAuditChainReport = Static<typeof CaseAuditChainReportSchema>;
+
 export const CaseAuditListDtoSchema = Type.Object(
-  { events: Type.Array(CaseAuditEventDtoSchema) },
+  {
+    events: Type.Array(CaseAuditEventDtoSchema),
+    chain: CaseAuditChainReportSchema,
+  },
   { additionalProperties: false },
 );
 

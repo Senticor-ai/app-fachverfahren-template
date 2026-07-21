@@ -137,6 +137,13 @@ export { ChosAuthStore } from "./chos-auth-store.js";
 export { ChosAuditStore } from "./chos-audit-store.js";
 export { ChosAppStore } from "./chos-app-store.js";
 export { ChosKanbanStore } from "./chos-kanban-store.js";
+export {
+  auditEntryHash,
+  auditStreamOrder,
+  chainAuditEvent,
+  verifyAuditChain,
+} from "./audit-chain.js";
+export type { AuditChainResult } from "./audit-chain.js";
 export { nextPositionKey } from "./position.js";
 export {
   defaultMigrationOptionsFromEnv,
