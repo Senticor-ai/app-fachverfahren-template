@@ -11,3 +11,4 @@ export * from "./authorization.js";
 export * from "./audit.js";
 export * from "./rbac.js";
 export * from "./forderung.js";
+export * from "./tarif.js";
