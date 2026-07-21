@@ -212,6 +212,30 @@ export function createLocalMailboxPort(): MailboxPort {
   };
 }
 
+/**
+ * Der lokale EvidenceRetrievalPort (Register-/Nachweis-Abruf, Once-Only/NOOTS) als EIGENSTÄNDIGE Fabrik. Zustandslos:
+ * quittiert jeden Abruf mit einem synthetischen Nachweis. Deterministisch bis auf issuedAt. Für den Durchstich.
+ */
+export function createLocalEvidenceRetrievalPort(): EvidenceRetrievalPort {
+  return {
+    descriptor: descriptor(
+      "evidence-retrieval",
+      "Local Evidence Retrieval",
+      "restricted",
+    ),
+    async requestEvidence(_context, request) {
+      return capabilityOk({
+        evidenceId: id("evidence"),
+        evidenceType: request.evidenceType,
+        schemaVersion: request.acceptedSchemaVersions[0] ?? "local.v1",
+        issuedAt: new Date().toISOString(),
+        issuerAuthorityId: "authority.local",
+        attributes: { localFake: true },
+      });
+    },
+  };
+}
+
 export function createLocalPlatformPorts(
   options: { aiAssistModel?: string } = {},
 ): PlatformPorts {
@@ -233,23 +257,9 @@ export function createLocalPlatformPorts(
     },
   };
 
-  const evidenceRetrieval: EvidenceRetrievalPort = {
-    descriptor: descriptor(
-      "evidence-retrieval",
-      "Local Evidence Retrieval",
-      "restricted",
-    ),
-    async requestEvidence(_context, request) {
-      return capabilityOk({
-        evidenceId: id("evidence"),
-        evidenceType: request.evidenceType,
-        schemaVersion: request.acceptedSchemaVersions[0] ?? "local.v1",
-        issuedAt: new Date().toISOString(),
-        issuerAuthorityId: "authority.local",
-        attributes: { localFake: true },
-      });
-    },
-  };
+  // EINE Wahrheit: derselbe Nachweis-Abruf wie die eigenständige Fabrik.
+  const evidenceRetrieval: EvidenceRetrievalPort =
+    createLocalEvidenceRetrievalPort();
 
   // EINE Wahrheit: dieselbe Zahlungs-Impl wie die eigenständige Fabrik (kein zweiter Roundtrip-Klon).
   const payment: PaymentPort = createLocalPaymentPort();

@@ -24,10 +24,12 @@ import {
 } from "@senticor/public-sector-sdk";
 import {
   createLocalAiAssistPort,
+  createLocalEvidenceRetrievalPort,
   createLocalIdentityAndTrustPort,
   createLocalMailboxPort,
   createLocalPaymentPort,
   type AiAssistPort,
+  type EvidenceRetrievalPort,
   type IdentityAndTrustPort,
   type MailboxPort,
   type PaymentPort,
@@ -71,6 +73,7 @@ export async function buildBffApp({
   payment = createLocalPaymentPort(),
   identityAndTrust = createLocalIdentityAndTrustPort(),
   mailbox = createLocalMailboxPort(),
+  evidenceRetrieval = createLocalEvidenceRetrievalPort(),
   wissenStore = new InMemoryWissenStore(),
 }: {
   session?: ResolvedSession;
@@ -82,6 +85,7 @@ export async function buildBffApp({
   payment?: PaymentPort;
   identityAndTrust?: IdentityAndTrustPort;
   mailbox?: MailboxPort;
+  evidenceRetrieval?: EvidenceRetrievalPort;
   wissenStore?: WissenStore;
 } = {}): Promise<{
   app: FastifyInstance;
@@ -103,6 +107,7 @@ export async function buildBffApp({
     payment,
     identityAndTrust,
     mailbox,
+    evidenceRetrieval,
     wissenStore,
   });
   return { app, auditSink, appStore, caseStore, taskStore };

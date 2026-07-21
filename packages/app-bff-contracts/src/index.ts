@@ -132,6 +132,12 @@ export {
   type ZustellStatusDto,
 } from "./zustellung.js";
 export {
+  EvidenceRequestDtoSchema,
+  EvidenceRecordDtoSchema,
+  type EvidenceRequestDto,
+  type EvidenceRecordDto,
+} from "./register.js";
+export {
   KiVermerkRequestSchema,
   VermerkDtoSchema,
   VermerkIdParamsSchema,

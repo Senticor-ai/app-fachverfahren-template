@@ -99,6 +99,14 @@ export const builtInPermissions = {
     permission: "bescheid.versand",
     description: "Einen Bescheid rechtssicher zustellen und den Zustellstatus prüfen",
   },
+  // ── Register-/Nachweis-Abruf (Once-Only · NOOTS/EvidenceRetrieval) ───────────────────────────────
+  // Einen Nachweis aus einem Register abrufen, damit die Bürger:in ihn NICHT erneut einreichen muss
+  // (Once-Only-Prinzip). Zweckgebunden. EIGENE Permission: der Register-Abruf ist eine eigene
+  // datenschutzrelevante Handlung, getrennt vom Lesen des Vorgangs (case.read).
+  registerAbruf: {
+    permission: "register.abruf",
+    description: "Nachweis aus einem Register abrufen (Once-Only, zweckgebunden)",
+  },
 } as const satisfies Record<string, RbacPermission>;
 
 export const builtInRbacRegistry = {
@@ -141,6 +149,8 @@ export const builtInRbacRegistry = {
         builtInPermissions.caseNoteWrite,
         // Bescheide rechtssicher zustellen (De-Mail/eBO) — hoheitliche Außenwirkung.
         builtInPermissions.bescheidVersand,
+        // Nachweise aus Registern abrufen (Once-Only) — die Bürger:in reicht nicht doppelt ein.
+        builtInPermissions.registerAbruf,
       ],
       builtIn: true,
     },

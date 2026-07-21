@@ -14,6 +14,7 @@ import type {
 import type {
   AiAssistPort,
   BlobStoragePort,
+  EvidenceRetrievalPort,
   IdentityAndTrustPort,
   MailboxPort,
   PaymentPort,
@@ -42,6 +43,9 @@ export interface BffDeps {
   /** Bescheid-Zustellung als PORT (austauschbar: local-fake ODER echter Adapter, z.B. De-Mail/eBO/ZaPuK).
    *  Hoheitliche Außenwirkung (VwZG); der BFF konsumiert nur den Vertrag — nie einen konkreten Anbieter. */
   mailbox: MailboxPort;
+  /** Register-/Nachweis-Abruf als PORT (austauschbar: local-fake ODER echter Adapter, z.B. NOOTS/Once-Only).
+   *  Zweckgebundener Nachweis-Abruf; der BFF konsumiert nur den Vertrag — nie einen konkreten Anbieter. */
+  evidenceRetrieval: EvidenceRetrievalPort;
   /** Byte-Storage für Nachweise/Dokumente (austauschbar: In-Memory-Fake / Dateisystem / Objekt-Store). */
   blobStorage: BlobStoragePort;
   /** Verfahrens-weites Wiki (generelles Wissen + Fähigkeiten je Verfahren) — die durable Wiki-Ebene. */

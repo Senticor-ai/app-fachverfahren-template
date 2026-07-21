@@ -20,11 +20,13 @@ import type {
 import {
   createLocalAiAssistPort,
   createLocalBlobStoragePort,
+  createLocalEvidenceRetrievalPort,
   createLocalIdentityAndTrustPort,
   createLocalMailboxPort,
   createLocalPaymentPort,
   type AiAssistPort,
   type BlobStoragePort,
+  type EvidenceRetrievalPort,
   type IdentityAndTrustPort,
   type MailboxPort,
   type PaymentPort,
@@ -35,6 +37,7 @@ import { registerAiAssistRoutes } from "./routes/ai-assist.js";
 import { registerPaymentRoutes } from "./routes/payment.js";
 import { registerIdentityRoutes } from "./routes/identity.js";
 import { registerZustellungRoutes } from "./routes/zustellung.js";
+import { registerRegisterRoutes } from "./routes/register.js";
 import { registerCapabilitiesRoute } from "./routes/capabilities.js";
 import { registerBuergerRoutes } from "./routes/buerger.js";
 import { registerCaseRoutes } from "./routes/cases.js";
@@ -65,6 +68,9 @@ export interface AppBffOptions {
   /** Bescheid-Zustellungs-Port (De-Mail/eBO). OPTIONAL: fehlt er, nutzt der BFF den local-fake (sofort
    *  "delivered") — eine App wählt in der Komposition per Env den echten Adapter. */
   mailbox?: MailboxPort;
+  /** Register-/Nachweis-Abruf-Port (NOOTS/Once-Only). OPTIONAL: fehlt er, nutzt der BFF den local-fake
+   *  (synthetischer Nachweis) — eine App wählt in der Komposition per Env den echten Adapter. */
+  evidenceRetrieval?: EvidenceRetrievalPort;
   /** Byte-Storage-Port. OPTIONAL: fehlt er, nutzt der BFF den In-Memory-Fake. */
   blobStorage?: BlobStoragePort;
   /** Verfahrens-Wiki-Store. OPTIONAL: fehlt er, nutzt der BFF den In-Memory-Store. */
@@ -97,6 +103,8 @@ export async function appBff(
     payment: opts.payment ?? createLocalPaymentPort(),
     identityAndTrust: opts.identityAndTrust ?? createLocalIdentityAndTrustPort(),
     mailbox: opts.mailbox ?? createLocalMailboxPort(),
+    evidenceRetrieval:
+      opts.evidenceRetrieval ?? createLocalEvidenceRetrievalPort(),
     blobStorage: opts.blobStorage ?? createLocalBlobStoragePort(),
     wissenStore: opts.wissenStore ?? new InMemoryWissenStore(),
   };
@@ -163,6 +171,11 @@ export async function appBff(
     {
       surfaces: ["sachbearbeitung"],
       register: () => registerZustellungRoutes(app, deps),
+    },
+    // Register-/Nachweis-Abruf (Once-Only/NOOTS) — Back-Office-Fläche, RBAC register.abruf.
+    {
+      surfaces: ["sachbearbeitung"],
+      register: () => registerRegisterRoutes(app, deps),
     },
   ];
   // SENTINEL-DISZIPLIN (Wurzel eines Green-Wash-Befunds): UNDEFINED ⇒ NICHT zoniert ⇒ ALLE registrieren (fail-open,
