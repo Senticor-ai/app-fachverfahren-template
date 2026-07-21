@@ -22,6 +22,22 @@ describe("createAiAssistPortFromEnv — Port-Registry (Modul-Auswahl per Env)", 
     expect(port.descriptor.provider).toBe("ollama");
   });
 
+  it("AI_ASSIST_PROVIDER=chos → chos-Agentic-Adapter (mit CHOS_AGENT_URL)", () => {
+    const port = createAiAssistPortFromEnv({
+      AI_ASSIST_PROVIDER: "chos",
+      CHOS_AGENT_URL: "https://chos.example",
+    } as NodeJS.ProcessEnv);
+    expect(port.descriptor.provider).toBe("chos");
+  });
+
+  it("AI_ASSIST_PROVIDER=chos OHNE CHOS_AGENT_URL → wirft (fail-closed)", () => {
+    expect(() =>
+      createAiAssistPortFromEnv({
+        AI_ASSIST_PROVIDER: "chos",
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/CHOS_AGENT_URL/);
+  });
+
   it("unbekannter Anbieter → wirft (fail-closed, kein stiller Fallback)", () => {
     expect(() =>
       createAiAssistPortFromEnv({

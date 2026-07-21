@@ -6,6 +6,8 @@
 // Fail-closed nach dem Muster von createAuditSinkFromEnv: ein unbekannter Anbieter WIRFT (kein stiller
 // Fallback auf einen ungewollten Anbieter).
 import {
+  createChosAgentClientFromEnv,
+  createChosAiAssistPort,
   createLocalAiAssistPort,
   type AiAssistPort,
 } from "@senticor/platform-contracts";
@@ -15,6 +17,8 @@ import { createOllamaAiAssistPortFromEnv } from "@senticor/provider-ai-ollama";
  * Wählt die AiAssistPort-Impl aus der Umgebung:
  *  - `AI_ASSIST_PROVIDER=local` (Default): deterministischer local-fake, kein Netz.
  *  - `AI_ASSIST_PROVIDER=ollama`: echter Ollama-Adapter (OLLAMA_BASE_URL/OLLAMA_MODEL).
+ *  - `AI_ASSIST_PROVIDER=chos`: chos-code als Kernel für agentische KI (Cognitive Hive OS, AAL-2 Advise über
+ *    Handoff Envelope) — braucht `CHOS_AGENT_URL` (bzw. `CHOS_API_URL`), sonst Fehler (fail-closed).
  * Unbekannter Wert → Fehler (fail-closed).
  */
 export function createAiAssistPortFromEnv(
@@ -23,7 +27,15 @@ export function createAiAssistPortFromEnv(
   const provider = env["AI_ASSIST_PROVIDER"] ?? "local";
   if (provider === "local") return createLocalAiAssistPort();
   if (provider === "ollama") return createOllamaAiAssistPortFromEnv(env);
+  if (provider === "chos") {
+    const client = createChosAgentClientFromEnv(env);
+    if (!client)
+      throw new Error(
+        "AI_ASSIST_PROVIDER=chos requires CHOS_AGENT_URL (or CHOS_API_URL)",
+      );
+    return createChosAiAssistPort(client);
+  }
   throw new Error(
-    `AI_ASSIST_PROVIDER must be local or ollama, got: ${provider}`,
+    `AI_ASSIST_PROVIDER must be local, ollama or chos, got: ${provider}`,
   );
 }
