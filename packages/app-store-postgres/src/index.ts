@@ -176,3 +176,9 @@ export {
   type KeyManagement,
   type SealedPayload,
 } from "./crypto-shred.js";
+
+export {
+  redactData,
+  isTombstone,
+  type RedactionTombstone,
+} from "./redaction.js";
