@@ -5064,6 +5064,188 @@
         "tags": ["composables"]
       }
     },
+    "/api/composables/{id}/spine/{aufgabe}": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          },
+          {
+            "in": "path",
+            "name": "aufgabe",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "caseId": { "minLength": 1, "type": "string" },
+                  "input": { "additionalProperties": {}, "type": "object" }
+                },
+                "required": ["input"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "aufgabe": { "minLength": 1, "type": "string" },
+                    "autonomy": { "minLength": 1, "type": "string" },
+                    "composableId": { "minLength": 1, "type": "string" },
+                    "rechtsnah": { "type": "boolean" },
+                    "suggestion": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "confidence": {
+                          "maximum": 1,
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "euAiActClass": {
+                          "anyOf": [
+                            { "enum": ["minimal"], "type": "string" },
+                            { "enum": ["limited-risk"], "type": "string" },
+                            { "enum": ["high-risk"], "type": "string" }
+                          ]
+                        },
+                        "marking": {
+                          "enum": ["ki-vorschlag"],
+                          "type": "string"
+                        },
+                        "modelId": { "minLength": 1, "type": "string" },
+                        "rationale": { "minLength": 1, "type": "string" },
+                        "reviewRequired": { "enum": [true], "type": "boolean" },
+                        "sources": {
+                          "items": { "type": "string" },
+                          "type": "array"
+                        },
+                        "value": {}
+                      },
+                      "required": [
+                        "value",
+                        "confidence",
+                        "modelId",
+                        "rationale",
+                        "sources",
+                        "marking",
+                        "euAiActClass",
+                        "reviewRequired"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "composableId",
+                    "aufgabe",
+                    "rechtsnah",
+                    "autonomy",
+                    "suggestion"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Den Spine-Agent eine Aufgabe ausführen lassen (assistiv, HCAI — reviewRequired, nie eine Entscheidung)",
+        "tags": ["composables"]
+      }
+    },
     "/api/identity": {
       "get": {
         "responses": {

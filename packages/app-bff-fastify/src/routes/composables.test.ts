@@ -129,3 +129,75 @@ describe("BFF /api/composables (Discovery)", () => {
     await app.close();
   });
 });
+
+describe("BFF Spine-Run POST /api/composables/:id/spine/:aufgabe", () => {
+  it("führt eine rechtsnahe Aufgabe (pruefung) aus → Vorschlag mit reviewRequired=true, rechtsnah=true", async () => {
+    const { app } = await appWith([composable()]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/composables/musterverfahren/spine/pruefung",
+      payload: { input: { sachverhalt: "synthetisch" } },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.composableId).toBe("musterverfahren");
+    expect(body.aufgabe).toBe("pruefung");
+    expect(body.rechtsnah).toBe(true);
+    expect(body.autonomy).toBe("AAL-2");
+    // Der Kern der HCAI-Doktrin: die KI liefert einen Vorschlag, die Entscheidung bleibt menschlich.
+    expect(body.suggestion.reviewRequired).toBe(true);
+    expect(body.suggestion.marking).toBe("ki-vorschlag");
+    await app.close();
+  });
+
+  it("eine reine Assistenz-Aufgabe ist nicht rechtsnah (rechtsnah=false)", async () => {
+    const { app } = await appWith([composable()]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/composables/musterverfahren/spine/assistenz",
+      payload: { input: {} },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().rechtsnah).toBe(false);
+    // Auch hier: reviewRequired bleibt true (der Port erzwingt es).
+    expect(res.json().suggestion.reviewRequired).toBe(true);
+    await app.close();
+  });
+
+  it("422, wenn die Aufgabe am Spine NICHT deklariert ist (kein Erfinden von Fähigkeiten)", async () => {
+    // composable() deklariert nur assistenz+pruefung → subsumtion ist nicht dabei.
+    const { app } = await appWith([composable()]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/composables/musterverfahren/spine/subsumtion",
+      payload: { input: {} },
+    });
+    expect(res.statusCode).toBe(422);
+    expect(res.json().error).toContain("nicht deklariert");
+    await app.close();
+  });
+
+  it("404, wenn das Composable keinen Spine-Agent hat", async () => {
+    const { spine: _weg, ...ohneSpine } = composable();
+    void _weg;
+    const { app } = await appWith([ohneSpine]);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/composables/musterverfahren/spine/assistenz",
+      payload: { input: {} },
+    });
+    expect(res.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it("403 ohne ai.assist (Bürger-Rolle darf den Spine nicht ausführen)", async () => {
+    const { app } = await appWith([composable()], citizenSession());
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/composables/musterverfahren/spine/assistenz",
+      payload: { input: {} },
+    });
+    expect(res.statusCode).toBe(403);
+    await app.close();
+  });
+});

@@ -219,6 +219,12 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           url: "/api/composables/:id",
           policy: "rbac:session.read",
         },
+        // Spine-Run: agentische (KI-)Handlung → ai.assist (nur Sachbearbeitung).
+        {
+          method: "POST",
+          url: "/api/composables/:id/spine/:aufgabe",
+          policy: "rbac:ai.assist",
+        },
         {
           method: "PATCH",
           url: "/api/tasks/:id",

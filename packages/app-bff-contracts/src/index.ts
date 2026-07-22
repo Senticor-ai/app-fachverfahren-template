@@ -211,9 +211,15 @@ export {
   ComposableListDtoSchema,
   ComposableDetailDtoSchema,
   SpineAgentDtoSchema,
+  ComposableSpineParamsSchema,
+  SpineRunRequestSchema,
+  SpineRunResultDtoSchema,
   type ComposableSummaryDto,
   type ComposableListDto,
   type ComposableDetailDto,
   type SpineAgentDto,
+  type ComposableSpineParamsDto,
+  type SpineRunRequestDto,
+  type SpineRunResultDto,
 } from "./composables.js";
 export { openApiInfo, openApiTags } from "./openapi.js";

@@ -87,14 +87,33 @@ function routeFor(tokens: string[]): Route {
     case "cases":
       return { method: "GET", url: "/api/cases" };
     case "composable": {
-      // Discovery der Agentic Composables (Blueprint §33: alles per CLI). `list` | `show <id>`.
+      // Agentic Composables (Blueprint §33: alles per CLI). `list` | `show <id>` | `spine <id> <aufgabe>`.
       const sub = positionals[0] ?? "list";
       if (sub === "list") return { method: "GET", url: "/api/composables" };
       if (sub === "show") {
         const id = p(1, "composableId");
         return { method: "GET", url: `/api/composables/${enc(id)}` };
       }
-      throw new Error(`unbekanntes composable-Kommando: ${sub} (list|show)`);
+      if (sub === "spine") {
+        // Den Spine-Agent eine Aufgabe ausführen lassen (assistiv, reviewRequired). `--input <json>` optional.
+        const id = p(1, "composableId");
+        const aufgabe = p(2, "aufgabe");
+        let input: Record<string, unknown> = {};
+        if (options["input"]) {
+          const parsed: unknown = JSON.parse(options["input"]);
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
+            input = parsed as Record<string, unknown>;
+          else throw new Error("--input muss ein JSON-Objekt sein");
+        }
+        return {
+          method: "POST",
+          url: `/api/composables/${enc(id)}/spine/${enc(aufgabe)}`,
+          body: { input },
+        };
+      }
+      throw new Error(
+        `unbekanntes composable-Kommando: ${sub} (list|show|spine)`,
+      );
     }
     case "case": {
       const sub = positionals[0] ?? "";

@@ -274,4 +274,35 @@ describe("Agenten-CLI (mesh-cli)", () => {
     expect(res?.ok).toBe(false);
     expect(res?.status).toBe(404);
   });
+
+  it("composable spine: fuehrt eine rechtsnahe Pruefung aus -> Vorschlag mit reviewRequired (nie Entscheidung)", async () => {
+    const [res] = await executeMeshCommands([
+      [
+        "composable",
+        "spine",
+        "musterverfahren",
+        "pruefung",
+        "--input",
+        '{"sachverhalt":"synthetisch"}',
+      ],
+    ]);
+    expect(res?.ok).toBe(true);
+    const d = res?.data as {
+      rechtsnah: boolean;
+      autonomy: string;
+      suggestion: { reviewRequired: boolean };
+    };
+    expect(d.rechtsnah).toBe(true);
+    expect(d.autonomy).toBe("AAL-2");
+    expect(d.suggestion.reviewRequired).toBe(true);
+  });
+
+  it("composable spine: eine nicht deklarierte Aufgabe -> ok:false, 422", async () => {
+    // musterantrag deklariert nur assistenz+strukturierung → subsumtion ist nicht dabei.
+    const [res] = await executeMeshCommands([
+      ["composable", "spine", "musterantrag", "subsumtion", "--input", "{}"],
+    ]);
+    expect(res?.ok).toBe(false);
+    expect(res?.status).toBe(422);
+  });
 });
