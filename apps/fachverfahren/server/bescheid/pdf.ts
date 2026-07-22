@@ -44,10 +44,18 @@ function ladeDejaVu(): { regular: Uint8Array; bold: Uint8Array } {
 }
 
 /** Eine Bescheid-Sektion als DATEN. Bekannte Kinds ziehen ihren Inhalt aus dem VA; `freitext` trägt (ggf.
- *  KI-entworfene, menschlich geprüfte) Absätze. So ist die Bescheid-Struktur pro Verfahren überschreibbar. */
+ *  KI-entworfene, menschlich geprüfte) Absätze. So ist die Bescheid-Struktur pro Verfahren überschreibbar.
+ *
+ *  `begruendung` ist die GENERISCHE SUBSUMTIONS-NAHT: sie rendert die (rechtliche) Begründung + die
+ *  §-belegten Rechenpositionen, die das `berechne`/Tarif-Ergebnis (der Kit-`Berechnung`-Typ) im
+ *  eingefrorenen Tenor mitführt — der DETERMINISTISCHE Gegenpol zum `freitext` (KI-Entwurf, menschlich
+ *  geprüft). So füllt die Generierung (CHOS) nur `berechne` → `Berechnung{begruendungRecht, positionen[].norm}`,
+ *  und die Herleitung erscheint OHNE Renderer-Änderung im rechtsgültigen Bescheid. Trägt der Tenor keine
+ *  solche Herleitung (nicht Berechnungs-förmig / keine Begründung), wird die Sektion sauber ausgelassen. */
 export type BescheidSektion =
   | { kind: "kopf" }
   | { kind: "tenor"; ueberschrift?: string }
+  | { kind: "begruendung"; ueberschrift?: string }
   | { kind: "bekanntgabe"; ueberschrift?: string }
   | { kind: "rechtsbehelf"; ueberschrift?: string }
   | { kind: "freitext"; ueberschrift?: string; absaetze: readonly string[] }
@@ -59,12 +67,15 @@ export interface BescheidTemplate {
   sektionen: readonly BescheidSektion[];
 }
 
-/** Das neutrale Standard-Template: Kopf → Tenor → (optional Begründung) → Bekanntgabe → Rechtsbehelf → Integrität. */
+/** Das neutrale Standard-Template: Kopf → Tenor → Begründung (Subsumtion, falls im Tenor mitgeführt) →
+ *  Bekanntgabe → Rechtsbehelf → Integrität. Die `begruendung`-Sektion degradiert sauber (rendert nichts),
+ *  wenn der Tenor keine Berechnungs-Herleitung trägt — so bleibt das Default-Template für JEDES Verfahren gültig. */
 export const defaultBescheidTemplate: BescheidTemplate = {
   titel: "Bescheid (Verwaltungsakt)",
   sektionen: [
     { kind: "kopf" },
     { kind: "tenor", ueberschrift: "Verfügungssatz (Tenor)" },
+    { kind: "begruendung", ueberschrift: "Begründung" },
     { kind: "bekanntgabe", ueberschrift: "Bekanntgabe" },
     { kind: "rechtsbehelf", ueberschrift: "Rechtsbehelfsbelehrung" },
     {
@@ -102,9 +113,82 @@ function formatDatum(iso: string): string {
   return `${tag}.${monat}.${date.getUTCFullYear()}`;
 }
 
-/** Ein Tenor-Eintrag als lesbare Zeile — opake Werte kompakt als JSON. */
+/** Eine (frozen) Rechenposition, wie der Kit-`Berechnung`-Typ sie im Tenor mitführt — defensiv getippt
+ *  (der Tenor ist server-opak, deshalb alles `unknown`). */
+interface TenorPosition {
+  label?: unknown;
+  betrag?: unknown;
+  norm?: unknown;
+}
+
+/** Die well-known Felder des Kit-`Berechnung`-Ergebnisses, wie sie im eingefrorenen Tenor liegen. Die GENERISCHE
+ *  Naht zwischen Subsumtion (CHOS füllt `berechne`) und Bescheid: der Renderer liest NUR diese Vertrags-Schlüssel
+ *  aus dem opaken Tenor — kein Domänen-Literal. */
+interface TenorBerechnung {
+  betrag: number;
+  einheit: string;
+  label?: string;
+  begruendung?: string;
+  begruendungRecht?: string;
+  positionen: TenorPosition[];
+}
+
+/** Liest — rein defensiv — die `Berechnung`-Vertragsfelder aus dem opaken, eingefrorenen Tenor. Gibt `undefined`
+ *  zurück, wenn der Tenor NICHT Berechnungs-förmig ist (numerischer `betrag` + `einheit`-String) — dann greift die
+ *  generische key:value-Darstellung (Rückwärtskompatibilität für frei-formige Tenöre). */
+function berechnungAusTenor(
+  tenor: VerwaltungsaktDto["tenor"],
+): TenorBerechnung | undefined {
+  if (!tenor || typeof tenor !== "object") return undefined;
+  const t = tenor as Record<string, unknown>;
+  if (typeof t["betrag"] !== "number" || typeof t["einheit"] !== "string")
+    return undefined;
+  const positionen = Array.isArray(t["positionen"])
+    ? (t["positionen"] as TenorPosition[])
+    : [];
+  return {
+    betrag: t["betrag"],
+    einheit: t["einheit"],
+    ...(typeof t["label"] === "string" ? { label: t["label"] } : {}),
+    ...(typeof t["begruendung"] === "string"
+      ? { begruendung: t["begruendung"] }
+      : {}),
+    ...(typeof t["begruendungRecht"] === "string"
+      ? { begruendungRecht: t["begruendungRecht"] }
+      : {}),
+    positionen,
+  };
+}
+
+/** Eine Rechenposition als lesbare Zeile: „Label: Betrag (Norm)" — die Norm nur, wenn belegt. */
+function positionZeile(p: TenorPosition): string | undefined {
+  const label = typeof p.label === "string" ? p.label : undefined;
+  const betrag =
+    typeof p.betrag === "number" || typeof p.betrag === "string"
+      ? String(p.betrag)
+      : undefined;
+  if (!label && betrag === undefined) return undefined;
+  const norm = typeof p.norm === "string" && p.norm ? ` (${p.norm})` : "";
+  return `${label ?? "Position"}: ${betrag ?? "—"}${norm}`;
+}
+
+/** Ein Tenor-Eintrag als lesbare Zeile. Ist der Tenor Berechnungs-förmig, wird der FESTGESETZTE Betrag sauber als
+ *  „Label: Betrag Einheit" gezeigt (statt jedes interne Berechnungs-Feld zu dumpen); sonst opake key:value-Zeilen
+ *  (frei-formiger Tenor, kompakt als JSON für Nicht-Skalare). */
 function tenorZeilen(tenor: VerwaltungsaktDto["tenor"]): string[] {
   if (!tenor) return ["(kein Tenor eingefroren)"];
+  const berechnung = berechnungAusTenor(tenor);
+  if (berechnung) {
+    const kopf = `${berechnung.label ?? "Festgesetzter Betrag"}: ${berechnung.betrag} ${berechnung.einheit}`;
+    // Mehrposten-Aufschlüsselung nur zeigen, wenn sie über den Gesamtbetrag hinausgeht (≥ 2 Positionen).
+    const posten =
+      berechnung.positionen.length >= 2
+        ? berechnung.positionen
+            .map(positionZeile)
+            .filter((z): z is string => z !== undefined)
+        : [];
+    return [kopf, ...posten];
+  }
   const entries = Object.entries(tenor);
   if (entries.length === 0) return ["(kein Tenor eingefroren)"];
   return entries.map(([key, value]) => {
@@ -231,6 +315,33 @@ export async function renderBescheidPdf(
           color: grau,
           gap: 12,
         });
+        break;
+      }
+      case "begruendung": {
+        // DETERMINISTISCHE Subsumtions-Herleitung aus dem eingefrorenen Berechnungs-Tenor (CHOS füllt `berechne`).
+        const berechnung = berechnungAusTenor(va.tenor);
+        if (!berechnung) break; // kein Berechnungs-förmiger Tenor → keine Herleitung (sauberer Degrade)
+        const text = berechnung.begruendungRecht ?? berechnung.begruendung;
+        const postenZeilen =
+          berechnung.positionen.length >= 2
+            ? berechnung.positionen
+                .map(positionZeile)
+                .filter((z): z is string => z !== undefined)
+            : [];
+        // Wenn WEDER eine Begründung NOCH mehr als eine §-belegte Position vorliegt, ist nichts herzuleiten.
+        const belegtePosten = berechnung.positionen.some(
+          (p) => typeof p.norm === "string" && p.norm,
+        );
+        if (!text && !belegtePosten) break;
+        write(sektion.ueberschrift ?? "Begründung", {
+          size: 13,
+          font: bold,
+          gap: 2,
+        });
+        if (text) write(text, { gap: 4 });
+        for (const zeile of postenZeilen)
+          write(zeile, { size: 9, color: grau });
+        y -= 8;
         break;
       }
       case "freitext":

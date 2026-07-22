@@ -160,14 +160,11 @@ export class CaseRequestError extends Error {
   }
 }
 
-// Die App wird ggf. unter einem Präfix ausgeliefert (APP_PREVIEW_BASE → Vite-Base, siehe
-// main.tsx). Root-absolute Pfade würden hinter einem einbettenden Proxy am Präfix vorbeigehen —
-// deshalb werden ALLE API-Aufrufe mit der aufgelösten Base präfixiert (Standalone: BASE_URL = "/").
-const API_BASE = import.meta.env.BASE_URL.replace(/\/+$/, "");
-
-export function apiPath(path: string): string {
-  return `${API_BASE}${path}`;
-}
+// Die API-Basis-Auflösung (Auslieferungs-Präfix vs. VITE_API_BASE für getrennte Deploys) liegt in der EINEN
+// Wahrheit `api-base.ts`; hier importiert (interne Nutzung) UND re-exportiert, damit bestehende Importe
+// (`from "./case-client.js"`) gültig bleiben.
+import { apiPath } from "./api-base.js";
+export { apiPath };
 
 /** Definierte Query-Parameter serialisieren (undefined wird weggelassen). */
 function queryString(

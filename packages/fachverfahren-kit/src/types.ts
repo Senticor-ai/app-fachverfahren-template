@@ -695,6 +695,21 @@ export interface Datenanbindung {
   datenformat?: string;
   /** Norm-/Rechtsgrundlage der Anbindung. */
   normRef?: NormRef;
+  /** MESH-NAHT: das DATENPRODUKT (Composable des geteilten Backends), das diese Anbindung LIEFERT. Verknüpft die
+   *  Datenanbindung mit dem Agentic-Composable-Mesh (composables.config): das Bürger-Frontend deklariert den
+   *  Abruf/die Meldung, das geteilte, wachsende Backend stellt sie als wiederverwendbares Datenprodukt bereit
+   *  (publish/consume). OPTIONAL/additiv — ohne die Referenz ist die Anbindung eine reine Punkt-zu-Punkt-Deklaration. */
+  datenprodukt?: {
+    /** Id des bereitstellenden Composables/Datenprodukts (AgenticComposable.id im geteilten Backend). */
+    composableId: string;
+    /** Der gelieferte Outcome/das Ergebnis (Anzeige/Katalog) — z. B. „verifizierte Meldeadresse". */
+    ergebnis?: string;
+  };
+  /** DURCHSTICH-SCHALTER (mock ↔ real): `mock` = eine Proxy-/Mock-Zelle im geteilten Backend liefert den
+   *  Interop-Durchstich VOR der echten Integration (Register/Zahlung/Zustellung); `real` = die produktive
+   *  Anbindung. Als DATEN geflippt (kein Code-Sonderweg). Fehlt der Wert ⇒ `mock` (sicherer Default: ein
+   *  generiertes Verfahren läuft E2E, bevor eine echte Fremdanbindung steht). */
+  provider?: "mock" | "real";
 }
 
 export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {

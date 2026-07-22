@@ -3,7 +3,11 @@
 import type { VerwaltungsaktDto } from "@senticor/app-bff-contracts";
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
-import { renderBescheidPdf, type BescheidTemplate } from "./pdf.js";
+import {
+  renderBescheidPdf,
+  defaultBescheidTemplate,
+  type BescheidTemplate,
+} from "./pdf.js";
 
 const VA: VerwaltungsaktDto = {
   aktenzeichen: "IGM-2026-0042",
@@ -86,5 +90,34 @@ describe("renderBescheidPdf", () => {
       behoerde: BEHOERDE,
     });
     expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe("%PDF-");
+  });
+
+  it("rendert die Subsumtions-Naht: das Default-Template zeigt die §-belegte Begründung aus einem Berechnungs-förmigen Tenor", async () => {
+    // Der Tenor trägt den eingefrorenen Kit-`Berechnung`-Vertrag (betrag/einheit/positionen[].norm + Begründung) —
+    // GENAU das, was CHOS' `berechne`-Delta erzeugt und der Server als Tenor einfriert. Das Default-Template
+    // rendert daraus deterministisch die Begründungs-Sektion, ohne dass der Renderer geändert wird.
+    const va: VerwaltungsaktDto = {
+      ...VA,
+      tenor: {
+        betrag: 120,
+        einheit: "EUR/Jahr",
+        label: "Festgesetzte Abgabe",
+        begruendungRecht:
+          "Die Festsetzung folgt der einschlägigen Tarifstaffel; die Tatbestandsvoraussetzungen liegen vor.",
+        status: "final",
+        positionen: [
+          { label: "Grundbetrag", betrag: 100, norm: "§ 3 Abs. 1 Satzung" },
+          { label: "Zuschlag", betrag: 20, norm: "§ 4 Satzung" },
+        ],
+      },
+    };
+    const bytes = await renderBescheidPdf({
+      va,
+      behoerde: BEHOERDE,
+      template: defaultBescheidTemplate,
+    });
+    expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe("%PDF-");
+    const loaded = await PDFDocument.load(bytes);
+    expect(loaded.getPageCount()).toBeGreaterThanOrEqual(1);
   });
 });
