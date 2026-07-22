@@ -133,6 +133,9 @@ const updateUnmanagedPaths: string[] = [
   "scripts/dev-api.test.mjs",
   "scripts/evidence-build.mjs",
   "scripts/motion-baseline.json",
+  // PDF/A-Konvertierung des Bescheids (open source, Python/pikepdf, kein Java) — polyglottes Tool
+  // + Doku; Toolchain-Bereitstellung (venv/ICC) ist Umgebungsentscheidung des Konsumenten.
+  "scripts/pdfa/**",
   "scripts/smoke-generated-app.sh",
   "scripts/test-generated-app-ci.guard.test.ts",
   "scripts/test-generated-app-ci.sh",
