@@ -88,6 +88,7 @@ export type {
   AppCase,
   CaseStore,
   ListCasesQuery,
+  PatchCaseDataInput,
   PatchCaseStateInput,
 } from "./case-store.js";
 export {

@@ -17,6 +17,7 @@ import {
   type CaseStore,
   type GetCaseInput,
   type ListCasesQuery,
+  type PatchCaseDataInput,
   type PatchCaseStateInput,
 } from "./case-store.js";
 import {
@@ -191,6 +192,55 @@ export class ChosCaseStore implements CaseStore {
           input.expectedVersion,
           // Der frühe Check oben deckt den Normalfall mit echter Ist-Version ab; hier zählt nur der seltene
           // NEBENLÄUFIGE Wechsel zwischen Lesen und Mutieren — ein Patch hebt die Version um genau 1.
+          error.actualVersion ?? input.expectedVersion + 1,
+        );
+      if (error instanceof ChosEntityNotFoundError)
+        throw new CaseNotFoundError(input.caseId);
+      throw error;
+    }
+  }
+
+  async patchCaseData(input: PatchCaseDataInput): Promise<AppCase> {
+    const current = await this.client.getEntity({
+      collection: CASE_COLLECTION,
+      tenantId: input.tenantId,
+      id: input.caseId,
+    });
+    if (!current) throw new CaseNotFoundError(input.caseId);
+    const currentCase = bodyToCase(current.body);
+    if (currentCase.version !== input.expectedVersion)
+      throw new CaseVersionConflictError(
+        input.caseId,
+        input.expectedVersion,
+        currentCase.version,
+      );
+    const next: AppCase = {
+      ...currentCase,
+      // `state` bleibt unangetastet — eine DSGVO-Löschung ist kein Zustandswechsel.
+      data: input.newData,
+      version: currentCase.version + 1,
+    };
+    const chained = await this.chainAudit(input.auditEvent);
+    try {
+      const updated = await this.client.mutateEntityWithEvent({
+        collection: CASE_COLLECTION,
+        tenantId: input.tenantId,
+        id: input.caseId,
+        expectedVersion: input.expectedVersion,
+        nextBody: caseToBody(next),
+        event: {
+          stream: chained.caseId ?? NO_CASE_STREAM,
+          id: chained.auditEventId,
+          occurredAt: chained.occurredAt,
+          body: auditToBody(chained),
+        },
+      });
+      return bodyToCase(updated.body);
+    } catch (error) {
+      if (error instanceof ChosConflictError)
+        throw new CaseVersionConflictError(
+          input.caseId,
+          input.expectedVersion,
           error.actualVersion ?? input.expectedVersion + 1,
         );
       if (error instanceof ChosEntityNotFoundError)

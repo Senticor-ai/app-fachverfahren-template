@@ -122,6 +122,20 @@ export interface PatchCaseStateInput {
   auditEvent: AppAuditEvent;
 }
 
+/** Optimistisch gesperrte Änderung der fachlichen NUTZLAST (`data`) — schreibt neue `data`/`version`+1 UND das
+ *  Audit-Ereignis ATOMAR in DERSELBEN Transaktion. Anwendungsfall: DSGVO-LÖSCHUNG (Issue #55) — der Aufrufer
+ *  (BFF) hat die redigierten/krypto-geshredderten Daten bereits über die reinen Funktionen (`redactData`,
+ *  `sealForSubject`) ermittelt; der Store persistiert sie + protokolliert die Löschung append-only, OHNE die
+ *  gelöschten Werte zu wiederholen. Der `state` bleibt unangetastet — eine Löschung ist KEIN Zustandswechsel.
+ *  Der eingefrorene Bescheid-VA im Audit-Payload bleibt unberührt (Bestandskraft, Art. 17 Abs. 3). */
+export interface PatchCaseDataInput {
+  tenantId: string;
+  caseId: string;
+  expectedVersion: number;
+  newData: Record<string, unknown>;
+  auditEvent: AppAuditEvent;
+}
+
 export interface CaseStore {
   insertCase(input: AppCase): Promise<AppCase>;
   getCase(input: GetCaseInput): Promise<AppCase | undefined>;
@@ -129,6 +143,10 @@ export interface CaseStore {
   /** ATOMAR: Zustandswechsel (Optimistic-Locking) + append-only Audit in EINER Transaktion. Wirft
    *  `CaseNotFoundError` / `CaseVersionConflictError`. */
   patchCaseState(input: PatchCaseStateInput): Promise<AppCase>;
+  /** ATOMAR: fachliche Nutzlast (`data`) ersetzen (Optimistic-Locking) + append-only Audit in EINER
+   *  Transaktion. Für DSGVO-Löschung (Redaction/Krypto-Shredding, Issue #55). Wirft
+   *  `CaseNotFoundError` / `CaseVersionConflictError`. */
+  patchCaseData(input: PatchCaseDataInput): Promise<AppCase>;
   appendAuditEvent(event: AppAuditEvent): Promise<AppAuditEvent>;
   listAuditEvents(query: {
     tenantId: string;
@@ -231,6 +249,45 @@ export class PostgresCaseStore implements CaseStore {
           [
             input.newState,
             input.closedAt ?? null,
+            input.tenantId,
+            input.caseId,
+            input.expectedVersion,
+          ],
+        );
+        if (upd.rows.length === 0) {
+          const existing = await client.query<{ version: number }>(
+            `SELECT version FROM app_cases WHERE tenant_id = $1 AND case_id = $2`,
+            [input.tenantId, input.caseId],
+          );
+          if (existing.rows.length === 0)
+            throw new CaseNotFoundError(input.caseId);
+          throw new CaseVersionConflictError(
+            input.caseId,
+            input.expectedVersion,
+            Number(existing.rows[0]!.version),
+          );
+        }
+        await insertChainedAuditEvent(client, input.auditEvent);
+        await client.query("COMMIT");
+        return caseFromRow(upd.rows[0]!);
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      }
+    });
+  }
+
+  async patchCaseData(input: PatchCaseDataInput): Promise<AppCase> {
+    return this.withClient(async (client) => {
+      await client.query("BEGIN");
+      try {
+        const upd = await client.query<CaseRow>(
+          `UPDATE app_cases
+             SET data = $1::jsonb, version = version + 1, updated_at = now()
+           WHERE tenant_id = $2 AND case_id = $3 AND version = $4
+           RETURNING ${CASE_COLS}`,
+          [
+            JSON.stringify(input.newData),
             input.tenantId,
             input.caseId,
             input.expectedVersion,
@@ -386,6 +443,31 @@ export class InMemoryCaseStore implements CaseStore {
     };
   }
 
+  async patchCaseData(input: PatchCaseDataInput): Promise<AppCase> {
+    const found = this.cases.get(this.key(input.tenantId, input.caseId));
+    if (!found) throw new CaseNotFoundError(input.caseId);
+    if (found.version !== input.expectedVersion)
+      throw new CaseVersionConflictError(
+        input.caseId,
+        input.expectedVersion,
+        found.version,
+      );
+    const next: AppCase = {
+      ...found,
+      // `state` bleibt unangetastet — eine Löschung ist kein Zustandswechsel.
+      data: cloneData(input.newData),
+      version: found.version + 1,
+    };
+    this.cases.set(this.key(input.tenantId, input.caseId), next);
+    const chained = this.chainAudit(input.auditEvent);
+    this.audit.push({ ...chained, payload: { ...chained.payload } });
+    return {
+      ...next,
+      subjectIds: [...next.subjectIds],
+      data: cloneData(next.data),
+    };
+  }
+
   async appendAuditEvent(event: AppAuditEvent): Promise<AppAuditEvent> {
     const chained = this.chainAudit(event);
     this.audit.push({ ...chained, payload: { ...chained.payload } });
@@ -428,6 +510,9 @@ export class UnavailableCaseStore implements CaseStore {
     throw new Error(this.reason);
   }
   async patchCaseState(): Promise<AppCase> {
+    throw new Error(this.reason);
+  }
+  async patchCaseData(): Promise<AppCase> {
     throw new Error(this.reason);
   }
   async appendAuditEvent(): Promise<AppAuditEvent> {

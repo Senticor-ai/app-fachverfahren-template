@@ -11,6 +11,7 @@ import {
 import { ChosCaseStore } from "./chos-case-store.js";
 import { InMemoryChosClient } from "./chos-client.js";
 import { verifyAuditChain } from "./audit-chain.js";
+import { isTombstone, redactData } from "./redaction.js";
 
 // Parametrisierte Vertrags-Tests: identisch gegen den In-Memory-Store (immer) UND — wenn eine Datenbank
 // konfiguriert ist (APP_PG_DIRECT_URL/APP_PG_URL, Migrationen vorher ausgeführt) — gegen den Postgres-Store.
@@ -315,6 +316,93 @@ for (const impl of impls) {
           caseId: "gibt-es-nicht",
           expectedVersion: 1,
           newState: "aktiv",
+          auditEvent: macheAudit("gibt-es-nicht", { tenantId: c.tenantId }),
+        }),
+      ).rejects.toBeInstanceOf(CaseNotFoundError);
+    });
+
+    it("patchCaseData: DSGVO-Löschung ersetzt `data` (Redaction) + Lösch-Audit ATOMAR; State unberührt; Locking/Not-Found werfen", async () => {
+      const c = macheCase({
+        tenantId: `t-del-${uid()}`,
+        state: "abgeschlossen",
+        data: {
+          antragsteller: { vorname: "Alex", nachname: "Muster", plz: "12345" },
+          anliegen: { kategorie: "standard" },
+        },
+      });
+      await store.insertCase(c);
+      const scope = { tenantId: c.tenantId, caseId: c.caseId };
+
+      // Reine Lösch-Ableitung (redaction.ts) → nur die redigierte `data` fliesst in den Store.
+      const { data: redigiert, redacted } = redactData(
+        c.data,
+        ["antragsteller.vorname", "antragsteller.nachname"],
+        "2026-07-22T00:00:00.000Z",
+      );
+      const nach = await store.patchCaseData({
+        ...scope,
+        expectedVersion: 1,
+        newData: redigiert,
+        auditEvent: macheAudit(c.caseId, {
+          tenantId: c.tenantId,
+          eventType: "data.redacted",
+          legalBasisId: "DSGVO-Art17",
+          // Die Löschung protokolliert NUR die Pfade, NIE die gelöschten Werte.
+          payload: { redactedPaths: redacted, summary: "PII gelöscht" },
+        }),
+      });
+      expect(nach.version).toBe(2);
+      // State ist unangetastet — Löschung ist kein Zustandswechsel.
+      expect(nach.state).toBe("abgeschlossen");
+      const ast = nach.data["antragsteller"] as Record<string, unknown>;
+      expect(isTombstone(ast["vorname"])).toBe(true);
+      expect(isTombstone(ast["nachname"])).toBe(true);
+      // Nicht-PII bleibt erhalten.
+      expect(ast["plz"]).toBe("12345");
+      expect(
+        (nach.data["anliegen"] as Record<string, unknown>)["kategorie"],
+      ).toBe("standard");
+      // Persistenz: erneutes Lesen zeigt die Tombstones (jsonb-Roundtrip-Parität).
+      const gelesen = await store.getCase({
+        ...scope,
+        scope: "authority",
+        authorityId: "b1",
+      });
+      expect(
+        isTombstone(
+          (gelesen?.data["antragsteller"] as Record<string, unknown>)[
+            "vorname"
+          ],
+        ),
+      ).toBe(true);
+      // Lösch-Audit landete append-only, ohne die gelöschten Werte zu wiederholen.
+      const audit = await store.listAuditEvents(scope);
+      expect(audit).toHaveLength(1);
+      expect(audit[0]?.eventType).toBe("data.redacted");
+      expect(audit[0]?.payload["redactedPaths"]).toEqual([
+        "antragsteller.vorname",
+        "antragsteller.nachname",
+      ]);
+      expect(JSON.stringify(audit[0]?.payload)).not.toContain("Alex");
+
+      // Veraltete expectedVersion → Konflikt, kein zweites Audit.
+      await expect(
+        store.patchCaseData({
+          ...scope,
+          expectedVersion: 1,
+          newData: {},
+          auditEvent: macheAudit(c.caseId, { tenantId: c.tenantId }),
+        }),
+      ).rejects.toBeInstanceOf(CaseVersionConflictError);
+      expect((await store.listAuditEvents(scope)).length).toBe(1);
+
+      // Unbekannter Fall → NotFound.
+      await expect(
+        store.patchCaseData({
+          tenantId: c.tenantId,
+          caseId: "gibt-es-nicht",
+          expectedVersion: 1,
+          newData: {},
           auditEvent: macheAudit("gibt-es-nicht", { tenantId: c.tenantId }),
         }),
       ).rejects.toBeInstanceOf(CaseNotFoundError);
