@@ -40,6 +40,9 @@ import {
   createFachlicheAuditEvent,
   forderungsstandAusAudit,
   FORDERUNG_ZAHLUNG_EINGEGANGEN,
+  istRechtsbehelfVerfristet,
+  rechtsbehelfVerfristetAb,
+  type RechtsbehelfFristRegime,
 } from "@senticor/public-sector-sdk";
 import type { PortCallContext } from "@senticor/platform-contracts";
 import type { BffDeps } from "../deps.js";
@@ -553,9 +556,15 @@ export function registerBuergerRoutes(
           requestId: requestIdOf(request),
         });
 
-      // Art + Norm aus dem EINGEFRORENEN Regime (regime-neutral) — nicht aus dem Body, nicht erfunden.
+      // Art + Norm + Frist aus dem EINGEFRORENEN Regime (regime-neutral) — nicht aus dem Body, nicht erfunden.
       const rechtsbehelf = va.content["rechtsbehelf"] as
-        { art?: unknown; norm?: unknown } | undefined;
+        | {
+            art?: unknown;
+            norm?: unknown;
+            fristWert?: unknown;
+            fristEinheit?: unknown;
+          }
+        | undefined;
       const art: "widerspruch" | "einspruch" | "klage" =
         rechtsbehelf?.art === "einspruch" || rechtsbehelf?.art === "klage"
           ? rechtsbehelf.art
@@ -575,6 +584,39 @@ export function registerBuergerRoutes(
         requestId: requestIdOf(request),
         summary: `Rechtsbehelf (${art}) gegen Bescheid ${found.caseId} durch die/den Eigentümer:in eingelegt`,
       });
+
+      // FRISTPRÜFUNG (Issue #61, „verspäteter Rechtsbehelf erkannt"): Anker = die Bekanntgabe (erstes
+      // `case.disclosed` — der Abruf des eigenen Bescheids), Frist = das EINGEFRORENE Regime des VA. Rein
+      // server-autoritativ berechnet (Standardfall §§ 187/188 BGB). Wir FLAGGEN nur — kein Zurückweisen:
+      // die Zulässigkeit (inkl. § 58 Abs. 2 VwGO / Wiedereinsetzung) entscheidet die Behörde. `null`, wenn
+      // keine Bekanntgabe verankert ist (Frist nicht angelaufen) oder das Regime keine Frist trägt.
+      const bekanntgabeAnker = events.find(
+        (e) => e.eventType === "case.disclosed",
+      )?.occurredAt;
+      const fristRegime: RechtsbehelfFristRegime | undefined =
+        typeof rechtsbehelf?.fristWert === "number" &&
+        (rechtsbehelf.fristEinheit === "monat" ||
+          rechtsbehelf.fristEinheit === "woche" ||
+          rechtsbehelf.fristEinheit === "tag")
+          ? {
+              fristWert: rechtsbehelf.fristWert,
+              fristEinheit: rechtsbehelf.fristEinheit,
+            }
+          : undefined;
+      const verfristet: boolean | null =
+        bekanntgabeAnker && fristRegime
+          ? istRechtsbehelfVerfristet(
+              bekanntgabeAnker,
+              fristRegime,
+              objection.occurredAt,
+            )
+          : null;
+      const fristAblaufIso =
+        bekanntgabeAnker && fristRegime
+          ? (rechtsbehelfVerfristetAb(bekanntgabeAnker, fristRegime) ??
+            undefined)
+          : undefined;
+
       try {
         await deps.caseStore.appendAuditEvent({
           auditEventId: objection.auditEventId,
@@ -591,6 +633,9 @@ export function registerBuergerRoutes(
           payload: {
             art,
             summary: objection.summary,
+            // Der Fristablauf wird MITAUDITIERT (die Behörde sieht ihn im Verlauf), aber nur als Flag.
+            ...(verfristet !== null ? { verfristet } : {}),
+            ...(fristAblaufIso !== undefined ? { fristAblaufIso } : {}),
             ...(request.body.begruendung !== undefined
               ? { begruendung: request.body.begruendung }
               : {}),
@@ -604,6 +649,8 @@ export function registerBuergerRoutes(
         aktenzeichen: found.caseId,
         art,
         eingelegtAm: objection.occurredAt,
+        verfristet,
+        ...(fristAblaufIso !== undefined ? { fristAblaufIso } : {}),
       });
     },
   );

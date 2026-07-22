@@ -1507,9 +1507,18 @@
                         { "enum": ["klage"], "type": "string" }
                       ]
                     },
-                    "eingelegtAm": { "minLength": 1, "type": "string" }
+                    "eingelegtAm": { "minLength": 1, "type": "string" },
+                    "fristAblaufIso": { "minLength": 1, "type": "string" },
+                    "verfristet": {
+                      "anyOf": [{ "type": "boolean" }, { "type": "null" }]
+                    }
                   },
-                  "required": ["aktenzeichen", "art", "eingelegtAm"],
+                  "required": [
+                    "aktenzeichen",
+                    "art",
+                    "eingelegtAm",
+                    "verfristet"
+                  ],
                   "type": "object"
                 }
               }

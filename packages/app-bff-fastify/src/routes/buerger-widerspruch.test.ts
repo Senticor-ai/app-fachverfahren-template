@@ -110,6 +110,66 @@ describe("BFF POST /api/buerger/antraege/:id/widerspruch", () => {
     await amt.close();
   });
 
+  it("FRISTPRÜFUNG: nach frischer Bekanntgabe (Abruf) ist der Rechtsbehelf NICHT verfristet (verfristet=false + fristAblaufIso)", async () => {
+    const { anna, antragId } = await mitBescheid();
+    // Bescheid abrufen → setzt case.disclosed zur realen Jetzt-Zeit (Bekanntgabe-Anker).
+    const abruf = await anna.inject({
+      method: "GET",
+      url: `/api/buerger/antraege/${antragId}/bescheid`,
+    });
+    expect(abruf.statusCode).toBe(200);
+    const res = await anna.inject({
+      method: "POST",
+      url: `/api/buerger/antraege/${antragId}/widerspruch`,
+      payload: {},
+    });
+    expect(res.statusCode).toBe(200);
+    const dto = res.json();
+    expect(dto.verfristet).toBe(false);
+    expect(typeof dto.fristAblaufIso).toBe("string");
+    await anna.close();
+  });
+
+  it("FRISTPRÜFUNG: eine lange zurückliegende Bekanntgabe macht den Rechtsbehelf verfristet (verfristet=true, aber 200 — nur geflaggt)", async () => {
+    const { caseStore, anna, antragId } = await mitBescheid();
+    // Alten Bekanntgabe-Anker pflanzen (2020) → 1-Monats-Frist längst abgelaufen.
+    await caseStore.appendAuditEvent({
+      auditEventId: "audit.disclosed-alt",
+      caseId: antragId,
+      tenantId: "tenant-1",
+      authorityId: "authority-1",
+      jurisdictionId: "de",
+      actorId: "actor.anna",
+      eventType: "case.disclosed",
+      purpose: "bekanntgabe",
+      legalBasisId: "§ 41 Abs. 2 VwVfG",
+      requestId: "req.test-alt",
+      payload: {},
+      occurredAt: "2020-01-01T00:00:00.000Z",
+    });
+    const res = await anna.inject({
+      method: "POST",
+      url: `/api/buerger/antraege/${antragId}/widerspruch`,
+      payload: {},
+    });
+    // Verfristung weist NICHT von sich aus zurück — der Rechtsbehelf wird eingelegt (200), nur geflaggt.
+    expect(res.statusCode).toBe(200);
+    expect(res.json().verfristet).toBe(true);
+    await anna.close();
+  });
+
+  it("FRISTPRÜFUNG: ohne Bekanntgabe-Anker ist verfristet=null (Frist nicht angelaufen)", async () => {
+    const { anna, antragId } = await mitBescheid();
+    const res = await anna.inject({
+      method: "POST",
+      url: `/api/buerger/antraege/${antragId}/widerspruch`,
+      payload: {},
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().verfristet).toBeNull();
+    await anna.close();
+  });
+
   it("verhindert den ZWEITEN Rechtsbehelf (409, append-only Audit ohne Doppel-Eintrag)", async () => {
     const { anna, antragId } = await mitBescheid();
     const erst = await anna.inject({

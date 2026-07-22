@@ -74,12 +74,19 @@ export const WiderspruchRequestSchema = Type.Object(
 export type WiderspruchRequestDto = Static<typeof WiderspruchRequestSchema>;
 
 /** Bestätigung des eingelegten Rechtsbehelfs: Aktenzeichen, Art (aus dem eingefrorenen Regime) und der
- *  Zeitpunkt des Eingangs (Fristwahrungs-Nachweis für die/den Bürger:in). */
+ *  Zeitpunkt des Eingangs (Fristwahrungs-Nachweis für die/den Bürger:in).
+ *
+ *  `verfristet` FLAGGT den regulären Fristablauf (§§ 187/188 BGB, aus dem eingefrorenen Regime + Bekanntgabe-
+ *  Anker berechnet) — es weist den Rechtsbehelf NICHT zurück (die Zulässigkeit inkl. § 58 Abs. 2 VwGO /
+ *  Wiedereinsetzung entscheidet die Behörde). `null`, wenn keine Bekanntgabe verankert ist (Frist nicht
+ *  angelaufen). `fristAblaufIso` ist der berechnete Fristablauf (nur gesetzt, wenn bestimmbar). */
 export const WiderspruchDtoSchema = Type.Object(
   {
     aktenzeichen: Type.String({ minLength: 1 }),
     art: RechtsbehelfArtSchema,
     eingelegtAm: Type.String({ minLength: 1 }),
+    verfristet: Type.Union([Type.Boolean(), Type.Null()]),
+    fristAblaufIso: Type.Optional(Type.String({ minLength: 1 })),
   },
   { additionalProperties: false },
 );
