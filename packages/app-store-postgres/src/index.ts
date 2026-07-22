@@ -166,3 +166,13 @@ export type {
   MigrationOptions,
   MigrationResult,
 } from "./migrate.js";
+
+export {
+  InMemoryKeyManagement,
+  PayloadShreddedError,
+  sealForSubject,
+  openSealed,
+  shredSubject,
+  type KeyManagement,
+  type SealedPayload,
+} from "./crypto-shred.js";
