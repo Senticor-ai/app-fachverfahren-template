@@ -15,3 +15,4 @@ export * from "./tarif.js";
 export * from "./rechtsbehelf-frist.js";
 export * from "./kalender.js";
 export * from "./aufbewahrung.js";
+export * from "./composable.js";
