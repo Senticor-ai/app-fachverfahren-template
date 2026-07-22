@@ -3,6 +3,8 @@ import {
   assertComposable,
   assertSpineAgent,
   certificationReadiness,
+  createInMemoryComposableRegistry,
+  istEnabled,
   istRechtsnah,
   type AgenticComposable,
   type SpineAgent,
@@ -129,6 +131,41 @@ describe("assertComposable", () => {
     );
     expect(() =>
       assertComposable(composable({ spine: spine({ autonomy: "AAL-5" }) })),
+    ).toThrow();
+  });
+});
+
+describe("ComposableRegistry", () => {
+  it("findet nach id[@version], listet, und filtert enabled (certified/active)", () => {
+    const reg = createInMemoryComposableRegistry([
+      composable({ id: "a", version: "1.0.0", status: "certified" }),
+      composable({ id: "a", version: "2.0.0", status: "candidate" }),
+      composable({ id: "b", version: "1.0.0", status: "active" }),
+    ]);
+    expect(reg.get("a", "1.0.0")?.status).toBe("certified");
+    expect(reg.get("a")?.version).toBe("2.0.0"); // zuletzt registrierte gewinnt
+    expect(reg.list()).toHaveLength(3);
+    // Nur certified/active sind enabled — das candidate a@2 fällt raus.
+    expect(
+      reg
+        .listEnabled()
+        .map((c) => `${c.id}@${c.version}`)
+        .sort(),
+    ).toEqual(["a@1.0.0", "b@1.0.0"]);
+  });
+
+  it("istEnabled: nur certified/active", () => {
+    expect(istEnabled(composable({ status: "certified" }))).toBe(true);
+    expect(istEnabled(composable({ status: "active" }))).toBe(true);
+    expect(istEnabled(composable({ status: "candidate" }))).toBe(false);
+    expect(istEnabled(composable({ status: "deprecated" }))).toBe(false);
+  });
+
+  it("weist ein kaputtes Composable schon beim Registrieren ab (assertComposable)", () => {
+    expect(() =>
+      createInMemoryComposableRegistry([
+        composable({ spine: spine({ autonomy: "AAL-5" }) }),
+      ]),
     ).toThrow();
   });
 });

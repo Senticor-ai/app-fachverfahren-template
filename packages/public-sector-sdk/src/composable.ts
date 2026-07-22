@@ -209,3 +209,40 @@ export function certificationReadiness(c: AgenticComposable): {
   }
   return { certifiable: fehlend.length === 0, fehlend };
 }
+
+/**
+ * Composable Registry (Blueprint §20/§32) — die aktive Steuerungsbasis für Discovery, Austauschbarkeit und
+ * Impact-Analyse. Auffindbar nach `id[@version]`; ohne Version gewinnt die zuletzt registrierte. Naht wie
+ * `ProcedureRegistry` (In-Memory-Stub im Template; chos-Graph hinter derselben Naht als PROD-Backing).
+ */
+export interface ComposableRegistry {
+  get(id: string, version?: string): AgenticComposable | undefined;
+  list(): AgenticComposable[];
+  /** Nur enabled/produktive Composables (`status` ∈ certified/active) — für die Laufzeit-Auswahl. */
+  listEnabled(): AgenticComposable[];
+}
+
+/** Ist der Status produktiv nutzbar (enabled)? certified/active zählen, restricted/deprecated/… nicht. */
+export function istEnabled(c: AgenticComposable): boolean {
+  return c.status === "certified" || c.status === "active";
+}
+
+/** Baut eine In-Memory-`ComposableRegistry` aus einer Liste von Composables (wirft bei wohlgeformten Verstößen
+ *  über `assertComposable` — ein kaputtes Composable darf gar nicht erst in die Registry). */
+export function createInMemoryComposableRegistry(
+  composables: readonly AgenticComposable[],
+): ComposableRegistry {
+  const byKey = new Map<string, AgenticComposable>();
+  const byId = new Map<string, AgenticComposable>();
+  for (const c of composables) {
+    assertComposable(c);
+    byKey.set(`${c.id}:${c.version}`, c);
+    byId.set(c.id, c); // zuletzt registrierte Version gewinnt bei versionsloser Abfrage
+  }
+  return {
+    get: (id, version) =>
+      version ? byKey.get(`${id}:${version}`) : byId.get(id),
+    list: () => [...byKey.values()],
+    listEnabled: () => [...byKey.values()].filter(istEnabled),
+  };
+}
