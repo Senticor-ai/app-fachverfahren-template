@@ -16,6 +16,8 @@ import {
   CaseErasureResultDtoSchema,
   RechtsbehelfEntscheidungRequestSchema,
   RechtsbehelfEntscheidungDtoSchema,
+  LegalHoldRequestSchema,
+  LegalHoldDtoSchema,
   ProcedureListDtoSchema,
   CaseDtoSchema,
   CaseIdParamsSchema,
@@ -133,6 +135,26 @@ function toDomainCase(c: AppCase): DomainCase {
   };
 }
 
+/** Der eventType, dessen JÜNGSTES Ereignis die effektive Löschsperre (Legal Hold) trägt. */
+const LEGAL_HOLD_EVENT_TYPE = "case.legal-hold.changed";
+
+/** Die EFFEKTIVE Löschsperre = der Stand des jüngsten `case.legal-hold.changed` (compute-on-read über das
+ *  append-only Audit). `undefined`, wenn nie gesetzt. `listAuditEvents` ist aufsteigend nach occurredAt →
+ *  der letzte Treffer ist der jüngste. Ein aktiver Hold blockiert die DSGVO-Löschung. */
+function effektiverLegalHold(
+  events: AppAuditEvent[],
+): { aktiv: boolean; grund: string; gesetztAm: string } | undefined {
+  let letzter: AppAuditEvent | undefined;
+  for (const e of events)
+    if (e.eventType === LEGAL_HOLD_EVENT_TYPE) letzter = e;
+  if (!letzter) return undefined;
+  return {
+    aktiv: letzter.payload["aktiv"] === true,
+    grund: String(letzter.payload["grund"] ?? ""),
+    gesetztAm: letzter.occurredAt,
+  };
+}
+
 function badRequest(
   reply: FastifyReply,
   request: FastifyRequest,
@@ -159,6 +181,11 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
   // DSGVO-Löschung braucht eine EIGENE, eng gefasste Permission (nie auf `case.decision.prepare` mitreiten).
   const erasureAuth = bffRouteAuth(
     { kind: "rbac", permission: builtInPermissions.casePiiErase.permission },
+    deps,
+  );
+  // Legal Hold: eigene Permission — die Sperre begrenzt das Löschrecht, reitet nicht darauf mit.
+  const legalHoldAuth = bffRouteAuth(
+    { kind: "rbac", permission: builtInPermissions.caseLegalHold.permission },
     deps,
   );
   const errorResponses = {
@@ -958,6 +985,24 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
           .send({ error: "not found", requestId: requestIdOf(request) });
       const appCase = found;
 
+      // LEGAL HOLD: ein aktiver Hold BLOCKIERT die Löschung (Beweissicherung, Rechtsstreit) → 409. Die Sperre
+      // ist der Stand des jüngsten `case.legal-hold.changed`-Ereignisses (append-only, compute-on-read).
+      let holdEvents: AppAuditEvent[];
+      try {
+        holdEvents = await deps.caseStore.listAuditEvents({
+          tenantId: session.tenantId,
+          caseId: appCase.caseId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      const hold = effektiverLegalHold(holdEvents);
+      if (hold?.aktiv)
+        return reply.code(409).send({
+          error: `unter Löschsperre (Legal Hold): ${hold.grund}`,
+          requestId: requestIdOf(request),
+        });
+
       // Reine Lösch-Ableitung: Tombstones je vorhandenem PII-Pfad. Fehlende/bereits getombstonete zählen nicht.
       const now = new Date().toISOString();
       const { data: redigiert, redacted } = redactData(
@@ -1118,6 +1163,78 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
         aktenzeichen: appCase.caseId,
         ausgang: body.ausgang,
         entschiedenAm: now,
+      });
+    },
+  );
+
+  // POST /api/cases/:id/legal-hold — einen Fall unter LÖSCHSPERRE stellen (`aktiv:true`) oder sie aufheben
+  // (`aktiv:false`), mit Pflicht-Grund (Issue #55). Append-only `case.legal-hold.changed`; die effektive
+  // Sperre ist der jüngste Stand. Ein aktiver Hold blockiert die DSGVO-Löschung (POST .../loeschung → 409).
+  // Eigene Permission `case.legal-hold` — die Sperre begrenzt das Löschrecht, reitet nicht darauf mit.
+  typed.post(
+    "/api/cases/:id/legal-hold",
+    {
+      config: legalHoldAuth.config,
+      preHandler: legalHoldAuth.preHandler,
+      schema: {
+        tags: ["cases"],
+        summary:
+          "Löschsperre (Legal Hold) setzen oder aufheben — blockiert die DSGVO-Löschung (auditiert)",
+        params: CaseIdParamsSchema,
+        body: LegalHoldRequestSchema,
+        response: {
+          200: LegalHoldDtoSchema,
+          ...errorResponses,
+        },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      const body = request.body;
+
+      let found: AppCase | undefined;
+      try {
+        found = await deps.caseStore.getCase({
+          tenantId: session.tenantId,
+          caseId: request.params.id,
+          scope: "authority",
+          authorityId: session.authorityId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      if (!found)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+      const appCase = found;
+
+      const now = new Date().toISOString();
+      const auditEvent: AppAuditEvent = {
+        auditEventId: `audit.${randomUUID()}`,
+        caseId: appCase.caseId,
+        tenantId: session.tenantId,
+        authorityId: session.authorityId,
+        jurisdictionId: session.jurisdictionId,
+        actorId: session.actorId,
+        eventType: LEGAL_HOLD_EVENT_TYPE,
+        purpose: "legal-hold",
+        // Die Löschsperre ist eine records-management-/Beweissicherungs-Handlung — DSGVO Art. 17 Abs. 3 (b/e).
+        legalBasisId: "DSGVO-Art17-Abs3",
+        requestId: requestIdOf(request),
+        payload: { aktiv: body.aktiv, grund: body.grund },
+        occurredAt: now,
+      };
+      try {
+        await deps.caseStore.appendAuditEvent(auditEvent);
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      return reply.send({
+        aktenzeichen: appCase.caseId,
+        aktiv: body.aktiv,
+        grund: body.grund,
+        gesetztAm: now,
       });
     },
   );

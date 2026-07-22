@@ -144,6 +144,12 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           url: "/api/cases/:id/audit",
           policy: "rbac:case.read",
         },
+        // Legal Hold (Löschsperre): eigene case.legal-hold-Permission — begrenzt das Löschrecht.
+        {
+          method: "POST",
+          url: "/api/cases/:id/legal-hold",
+          policy: "rbac:case.legal-hold",
+        },
         // DSGVO-Löschung (Art. 17 / §84 SGB X): eigene, eng gefasste case.pii.erase-Permission.
         {
           method: "POST",

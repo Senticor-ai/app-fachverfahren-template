@@ -148,6 +148,30 @@ export type RechtsbehelfEntscheidungDto = Static<
   typeof RechtsbehelfEntscheidungDtoSchema
 >;
 
+// LEGAL HOLD / Löschsperre (Issue #55): einen Fall unter Löschsperre stellen (`aktiv: true`) oder sie
+// aufheben (`aktiv: false`) — mit Pflicht-Grund. Ein aktiver Legal Hold BLOCKIERT die DSGVO-Löschung
+// (Beweissicherung, laufender Rechtsstreit). Die effektive Sperre ist der Stand des JÜNGSTEN
+// `case.legal-hold.changed`-Ereignisses (append-only, compute-on-read).
+export const LegalHoldRequestSchema = Type.Object(
+  {
+    aktiv: Type.Boolean(),
+    grund: Type.String({ minLength: 1, maxLength: 2000 }),
+  },
+  { additionalProperties: false },
+);
+export type LegalHoldRequestDto = Static<typeof LegalHoldRequestSchema>;
+
+export const LegalHoldDtoSchema = Type.Object(
+  {
+    aktenzeichen: Type.String({ minLength: 1 }),
+    aktiv: Type.Boolean(),
+    grund: Type.String({ minLength: 1 }),
+    gesetztAm: Type.String({ minLength: 1 }),
+  },
+  { additionalProperties: false },
+);
+export type LegalHoldDto = Static<typeof LegalHoldDtoSchema>;
+
 // N-AUGEN (Issue #56): eine explizite Freigabe eines Akteurs für EINEN Übergang. Server-autoritativ: der
 // Akteur kommt aus der Sitzung; `expectedVersion` bindet die Freigabe an den aktuellen Zustand (409 bei Drift).
 export const CaseApprovalRequestSchema = Type.Object(

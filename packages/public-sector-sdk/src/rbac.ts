@@ -121,6 +121,15 @@ export const builtInPermissions = {
     description:
       "Personenbezogene Falldaten löschen (DSGVO Art. 17 / §84 SGB X)",
   },
+  // ── Legal Hold (Löschsperre) ─────────────────────────────────────────────────────────────────────
+  // Einen Fall unter Löschsperre stellen bzw. sie aufheben (Beweissicherung, laufender Rechtsstreit,
+  // Ermittlung). EIGENE Permission, bewusst GETRENNT von `case.pii.erase`: die Sperre BEGRENZT das
+  // Löschrecht — sie darf nicht auf dem Löschrecht selbst mitreiten (sonst hebt der Löschende seine
+  // eigene Sperre auf). Ein aktiver Legal Hold blockiert die DSGVO-Löschung.
+  caseLegalHold: {
+    permission: "case.legal-hold",
+    description: "Einen Fall unter Löschsperre stellen oder sie aufheben",
+  },
 } as const satisfies Record<string, RbacPermission>;
 
 export const builtInRbacRegistry = {
@@ -167,6 +176,8 @@ export const builtInRbacRegistry = {
         builtInPermissions.registerAbruf,
         // Personenbezogene Falldaten auf Löschverlangen redigieren (DSGVO Art. 17 / §84 SGB X).
         builtInPermissions.casePiiErase,
+        // Löschsperre setzen/aufheben (Beweissicherung) — begrenzt das Löschrecht, reitet nicht darauf mit.
+        builtInPermissions.caseLegalHold,
       ],
       builtIn: true,
     },
