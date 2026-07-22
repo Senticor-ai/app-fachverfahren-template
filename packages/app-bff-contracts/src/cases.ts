@@ -110,6 +110,44 @@ export const CaseErasureResultDtoSchema = Type.Object(
 
 export type CaseErasureResultDto = Static<typeof CaseErasureResultDtoSchema>;
 
+// RECHTSBEHELFS-ENTSCHEIDUNG (Issue #61, Abhilfe/Nichtabhilfe): der behördenseitige Ausgang der Prüfung eines
+// eingelegten Rechtsbehelfs, als auditierte Entscheidung. REGIME-NEUTRAL (die Tenöre gelten für
+// Widerspruch/Einspruch gleichermaßen): `abhilfe` (voll abgeholfen), `teilabhilfe` (teilweise), `nichtabhilfe`
+// (zurückgewiesen/unbegründet → Vorlage an die Widerspruchsbehörde), `verworfen` (unzulässig, z. B. verfristet).
+// Die eigentliche VA-Rechtsfolge (Abhilfebescheid/Widerspruchsbescheid) läuft über die bestehende
+// Übergangs-/VA-Maschinerie — diese Entscheidung DOKUMENTIERT den Ausgang append-only (§ 72 VwGO).
+export const RechtsbehelfAusgangSchema = Type.Union([
+  Type.Literal("abhilfe"),
+  Type.Literal("teilabhilfe"),
+  Type.Literal("nichtabhilfe"),
+  Type.Literal("verworfen"),
+]);
+export type RechtsbehelfAusgang = Static<typeof RechtsbehelfAusgangSchema>;
+
+export const RechtsbehelfEntscheidungRequestSchema = Type.Object(
+  {
+    ausgang: RechtsbehelfAusgangSchema,
+    // Eine Rechtsbehelfs-Entscheidung ist zu begründen (Pflicht) — nie eine leere Entscheidung.
+    begruendung: Type.String({ minLength: 1, maxLength: 5000 }),
+  },
+  { additionalProperties: false },
+);
+export type RechtsbehelfEntscheidungRequestDto = Static<
+  typeof RechtsbehelfEntscheidungRequestSchema
+>;
+
+export const RechtsbehelfEntscheidungDtoSchema = Type.Object(
+  {
+    aktenzeichen: Type.String({ minLength: 1 }),
+    ausgang: RechtsbehelfAusgangSchema,
+    entschiedenAm: Type.String({ minLength: 1 }),
+  },
+  { additionalProperties: false },
+);
+export type RechtsbehelfEntscheidungDto = Static<
+  typeof RechtsbehelfEntscheidungDtoSchema
+>;
+
 // N-AUGEN (Issue #56): eine explizite Freigabe eines Akteurs für EINEN Übergang. Server-autoritativ: der
 // Akteur kommt aus der Sitzung; `expectedVersion` bindet die Freigabe an den aktuellen Zustand (409 bei Drift).
 export const CaseApprovalRequestSchema = Type.Object(

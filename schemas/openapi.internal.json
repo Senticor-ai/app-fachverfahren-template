@@ -2906,6 +2906,153 @@
         "tags": ["tasks"]
       }
     },
+    "/api/cases/{id}/rechtsbehelf/entscheidung": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "ausgang": {
+                    "anyOf": [
+                      { "enum": ["abhilfe"], "type": "string" },
+                      { "enum": ["teilabhilfe"], "type": "string" },
+                      { "enum": ["nichtabhilfe"], "type": "string" },
+                      { "enum": ["verworfen"], "type": "string" }
+                    ]
+                  },
+                  "begruendung": {
+                    "maxLength": 5000,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": ["ausgang", "begruendung"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "aktenzeichen": { "minLength": 1, "type": "string" },
+                    "ausgang": {
+                      "anyOf": [
+                        { "enum": ["abhilfe"], "type": "string" },
+                        { "enum": ["teilabhilfe"], "type": "string" },
+                        { "enum": ["nichtabhilfe"], "type": "string" },
+                        { "enum": ["verworfen"], "type": "string" }
+                      ]
+                    },
+                    "entschiedenAm": { "minLength": 1, "type": "string" }
+                  },
+                  "required": ["aktenzeichen", "ausgang", "entschiedenAm"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Über einen eingelegten Rechtsbehelf entscheiden (Abhilfe/Teilabhilfe/Nichtabhilfe/Verworfen, auditiert)",
+        "tags": ["cases"]
+      }
+    },
     "/api/cases/{id}/tasks": {
       "get": {
         "parameters": [

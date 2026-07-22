@@ -155,6 +155,12 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           url: "/api/cases/:id/progress",
           policy: "rbac:case.read",
         },
+        // Rechtsbehelfs-Entscheidung (Abhilfe/Nichtabhilfe): behördliche Entscheidung = case.decision.prepare.
+        {
+          method: "POST",
+          url: "/api/cases/:id/rechtsbehelf/entscheidung",
+          policy: "rbac:case.decision.prepare",
+        },
         {
           method: "GET",
           url: "/api/cases/:id/tasks",

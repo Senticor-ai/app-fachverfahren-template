@@ -14,6 +14,8 @@ import {
   CaseCreateRequestSchema,
   CaseErasureRequestSchema,
   CaseErasureResultDtoSchema,
+  RechtsbehelfEntscheidungRequestSchema,
+  RechtsbehelfEntscheidungDtoSchema,
   ProcedureListDtoSchema,
   CaseDtoSchema,
   CaseIdParamsSchema,
@@ -1014,6 +1016,109 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
         return storeUnavailable(request, reply);
       }
       return reply.send({ case: toCaseDto(updated), redactedPaths: redacted });
+    },
+  );
+
+  // POST /api/cases/:id/rechtsbehelf/entscheidung — die behördenseitige ENTSCHEIDUNG über einen eingelegten
+  // Rechtsbehelf (Issue #61, Abhilfe/Nichtabhilfe). Als AUDITIERTE Entscheidung (`case.objection.decided`),
+  // symmetrisch zur Einlegung (`case.objection` ist ebenfalls ein append-only Ereignis, KEIN Zustandsübergang —
+  // nicht jedes Verfahren hat einen Widerspruchs-Zustand). REGIME-NEUTRAL (der Ausgang gilt für
+  // Widerspruch/Einspruch gleichermaßen). Die eigentliche VA-Rechtsfolge (Abhilfebescheid/Widerspruchsbescheid,
+  // § 72 VwGO) läuft über die bestehende Übergangs-/VA-Maschinerie — hier wird der Ausgang dokumentiert.
+  typed.post(
+    "/api/cases/:id/rechtsbehelf/entscheidung",
+    {
+      config: writeAuth.config,
+      preHandler: writeAuth.preHandler,
+      schema: {
+        tags: ["cases"],
+        summary:
+          "Über einen eingelegten Rechtsbehelf entscheiden (Abhilfe/Teilabhilfe/Nichtabhilfe/Verworfen, auditiert)",
+        params: CaseIdParamsSchema,
+        body: RechtsbehelfEntscheidungRequestSchema,
+        response: {
+          200: RechtsbehelfEntscheidungDtoSchema,
+          ...errorResponses,
+        },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      const body = request.body;
+
+      let found: AppCase | undefined;
+      try {
+        found = await deps.caseStore.getCase({
+          tenantId: session.tenantId,
+          caseId: request.params.id,
+          scope: "authority",
+          authorityId: session.authorityId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      if (!found)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+      const appCase = found;
+
+      let events: AppAuditEvent[];
+      try {
+        events = await deps.caseStore.listAuditEvents({
+          tenantId: session.tenantId,
+          caseId: appCase.caseId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      // Ohne eingelegten Rechtsbehelf gibt es nichts zu entscheiden ⇒ 404 (kein Existenz-Orakel).
+      const objection = events.find((e) => e.eventType === "case.objection");
+      if (!objection)
+        return reply.code(404).send({
+          error: "kein Rechtsbehelf eingelegt",
+          requestId: requestIdOf(request),
+        });
+      // Einmaligkeit: ein bereits entschiedener Rechtsbehelf ⇒ 409 (append-only, kein Doppel-Eintrag).
+      if (events.some((e) => e.eventType === "case.objection.decided"))
+        return reply.code(409).send({
+          error: "Rechtsbehelf bereits entschieden",
+          requestId: requestIdOf(request),
+        });
+
+      // Rechtsgrundlage = die des eingelegten Rechtsbehelfs (das eingefrorene, regime-neutrale Norm-Regime) —
+      // nicht erfunden. Der Ausgang kommt aus dem Body (die fachliche Entscheidung der Behörde), die Identität
+      // + Zeit server-autoritativ.
+      const now = new Date().toISOString();
+      const auditEvent: AppAuditEvent = {
+        auditEventId: `audit.${randomUUID()}`,
+        caseId: appCase.caseId,
+        tenantId: session.tenantId,
+        authorityId: session.authorityId,
+        jurisdictionId: session.jurisdictionId,
+        actorId: session.actorId,
+        eventType: "case.objection.decided",
+        purpose: "rechtsbehelf-entscheidung",
+        legalBasisId: objection.legalBasisId,
+        requestId: requestIdOf(request),
+        payload: {
+          ausgang: body.ausgang,
+          begruendung: body.begruendung,
+          // Beweiskette: die Entscheidung referenziert die Einlegung, auf die sie sich bezieht.
+          objectionAuditEventId: objection.auditEventId,
+        },
+        occurredAt: now,
+      };
+      try {
+        await deps.caseStore.appendAuditEvent(auditEvent);
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      return reply.send({
+        aktenzeichen: appCase.caseId,
+        ausgang: body.ausgang,
+        entschiedenAm: now,
+      });
     },
   );
 }
