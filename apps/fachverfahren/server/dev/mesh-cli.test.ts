@@ -17,14 +17,22 @@ describe("Agenten-CLI (mesh-cli)", () => {
     expect(cases?.ok).toBe(true);
     expect(JSON.stringify(cases?.data)).toContain(CASE);
     expect(vermerke?.ok).toBe(true);
-    expect(
-      (vermerke?.data as { vermerke: unknown[] }).vermerke,
-    ).toHaveLength(3);
+    expect((vermerke?.data as { vermerke: unknown[] }).vermerke).toHaveLength(
+      3,
+    );
   });
 
   it("STATEFUL Batch: ein geschriebener Vermerk ist im selben Boot danach sichtbar", async () => {
     const results = await executeMeshCommands([
-      ["vermerk", "add", CASE, "--text", "Neuer Vermerk aus der CLI", "--kind", "notiz"],
+      [
+        "vermerk",
+        "add",
+        CASE,
+        "--text",
+        "Neuer Vermerk aus der CLI",
+        "--kind",
+        "notiz",
+      ],
       ["vermerk", "list", CASE],
     ]);
     expect(results[0]?.ok).toBe(true);
@@ -83,9 +91,7 @@ describe("Agenten-CLI (mesh-cli)", () => {
   });
 
   it("zeigt die moeglichen Uebergaenge (case actions)", async () => {
-    const [actions] = await executeMeshCommands([
-      ["case", "actions", CASE],
-    ]);
+    const [actions] = await executeMeshCommands([["case", "actions", CASE]]);
     expect(actions?.ok).toBe(true);
     // Der Demo-Fall steht in „in-bearbeitung": pausieren + abschliessen sind moeglich.
     expect(JSON.stringify(actions?.data)).toContain("pausieren");
@@ -100,7 +106,9 @@ describe("Agenten-CLI (mesh-cli)", () => {
     expect(results[0]?.ok).toBe(true);
     expect((results[0]?.data as { state: string }).state).toBe("pausiert");
     expect(results[1]?.ok).toBe(true);
-    expect((results[2]?.data as { state: string }).state).toBe("in-bearbeitung");
+    expect((results[2]?.data as { state: string }).state).toBe(
+      "in-bearbeitung",
+    );
   });
 
   it("Vier-Augen serverseitig: derselbe Akteur darf den Abschluss nicht selbst freigeben (403)", async () => {
@@ -145,7 +153,11 @@ describe("Agenten-CLI (mesh-cli)", () => {
       ["task", "list", CASE],
     ]);
     expect(results[0]?.ok).toBe(true);
-    const tasks = (results[1]?.data as { tasks: { taskId: string; data?: { erledigt?: boolean } }[] }).tasks;
+    const tasks = (
+      results[1]?.data as {
+        tasks: { taskId: string; data?: { erledigt?: boolean } }[];
+      }
+    ).tasks;
     const schritt = tasks.find((t) => t.taskId === "golden.schritt-1");
     expect(schritt?.data?.erledigt).toBe(true);
   });
@@ -179,7 +191,9 @@ describe("Agenten-CLI (mesh-cli)", () => {
   });
 
   it("case dump eines unbekannten Falls -> ok:false, 404", async () => {
-    const [dump] = await executeMeshCommands([["case", "dump", "case.gibtsnicht"]]);
+    const [dump] = await executeMeshCommands([
+      ["case", "dump", "case.gibtsnicht"],
+    ]);
     expect(dump?.ok).toBe(false);
     expect(dump?.status).toBe(404);
   });
@@ -219,5 +233,45 @@ describe("Agenten-CLI (mesh-cli)", () => {
     const { exitCode, text } = await runMeshCommand(["help"]);
     expect(exitCode).toBe(0);
     expect(text).toContain("Agenten-CLI");
+  });
+
+  it("composable list: zeigt die deklarierten Composables mit enabled/hasSpine", async () => {
+    const [res] = await executeMeshCommands([["composable", "list"]]);
+    expect(res?.ok).toBe(true);
+    const composables = (res?.data as { composables: { id: string }[] })
+      .composables;
+    const ids = composables.map((c) => c.id);
+    expect(ids).toContain("musterverfahren");
+    expect(ids).toContain("musterantrag");
+  });
+
+  it("composable show: Detail inkl. vollem Spine-Eskalationspfad + Zertifizierungsreife", async () => {
+    const [res] = await executeMeshCommands([
+      ["composable", "show", "musterverfahren"],
+    ]);
+    expect(res?.ok).toBe(true);
+    const d = res?.data as {
+      spine: { aufgaben: string[]; autonomy: string; rechtsnah: boolean };
+      certification: { certifiable: boolean };
+    };
+    // Der Nutzer-Mandat-Eskalationspfad: von Assistenz bis Subsumtion/Review.
+    expect(d.spine.aufgaben).toEqual([
+      "assistenz",
+      "strukturierung",
+      "pruefung",
+      "subsumtion",
+      "review",
+    ]);
+    expect(d.spine.autonomy).toBe("AAL-2");
+    expect(d.spine.rechtsnah).toBe(true);
+    expect(d.certification.certifiable).toBe(true);
+  });
+
+  it("composable show eines unbekannten Composables -> ok:false, 404", async () => {
+    const [res] = await executeMeshCommands([
+      ["composable", "show", "gibt-es-nicht"],
+    ]);
+    expect(res?.ok).toBe(false);
+    expect(res?.status).toBe(404);
   });
 });

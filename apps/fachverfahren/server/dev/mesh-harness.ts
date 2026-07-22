@@ -23,6 +23,7 @@ import {
   DEFAULT_TENANT_ID,
 } from "../auth/bootstrap.js";
 import { antragProcedure, dossierProcedure } from "../procedure.config.js";
+import { createComposableRegistry } from "../composables.config.js";
 import { seedGoldenMesh } from "./golden-fixture.js";
 
 /** Die feste Caseworker-Sitzung, unter der CLI/Selbsttest fahren (Rolle mit case.read + case.note.write). */
@@ -80,6 +81,7 @@ export async function buildSeededMeshApp(
       dossierProcedure,
       antragProcedure,
     ]),
+    composableRegistry: createComposableRegistry(),
     sessionResolver: resolver,
     auditSink: new NoopAuditSink(),
   });

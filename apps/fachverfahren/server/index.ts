@@ -47,6 +47,7 @@ import {
 } from "@senticor/app-store-postgres";
 import {
   createInMemoryProcedureRegistry,
+  type ComposableRegistry,
   type ProcedureRegistry,
 } from "@senticor/public-sector-sdk";
 import type { AiAssistPort } from "@senticor/platform-contracts";
@@ -62,6 +63,7 @@ import { seedReferenceDemo } from "./dev/reference-seed.js";
 import { seedGoldenMesh } from "./dev/golden-fixture.js";
 import { registerBoardRoutes } from "./kanban/routes.js";
 import { antragProcedure, dossierProcedure } from "./procedure.config.js";
+import { createComposableRegistry } from "./composables.config.js";
 import { registerUserRoutes } from "./users/routes.js";
 
 // App-Identität: der Renderer schreibt Domain-Token beim Scaffolding um — deshalb stehen
@@ -141,6 +143,8 @@ interface BffWiring {
    *  APP_STORE_MODE und wäre nicht seedbar). */
   wissenStore: WissenStore;
   procedureRegistry: ProcedureRegistry;
+  /** Registry der Agentic Composables (Blueprint v5.0) — deklarierte Fähigkeitseinheiten mit Spine-Agent. */
+  composableRegistry?: ComposableRegistry;
   sessionResolver: SessionResolver;
   auditSink: AuditSink;
   /** KI-Assistenz-Port, per Env gewählt (local-fake ODER echter Adapter). */
@@ -309,6 +313,8 @@ export async function startRuntime(
       dossierProcedure,
       antragProcedure,
     ]),
+    // Agentic Composables (Blueprint v5.0): die deklarierten Fähigkeitseinheiten mit Spine-Agent.
+    composableRegistry: createComposableRegistry(),
     sessionResolver: createCookieSessionResolver(authStore),
     auditSink: createAuditSinkFromEnv(env),
     // Port-Registry: KI-Anbieter per Env (local-fake default; AI_ASSIST_PROVIDER=ollama für den echten Adapter).

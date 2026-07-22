@@ -86,6 +86,16 @@ function routeFor(tokens: string[]): Route {
       return { method: "GET", url: "/api/procedures" };
     case "cases":
       return { method: "GET", url: "/api/cases" };
+    case "composable": {
+      // Discovery der Agentic Composables (Blueprint §33: alles per CLI). `list` | `show <id>`.
+      const sub = positionals[0] ?? "list";
+      if (sub === "list") return { method: "GET", url: "/api/composables" };
+      if (sub === "show") {
+        const id = p(1, "composableId");
+        return { method: "GET", url: `/api/composables/${enc(id)}` };
+      }
+      throw new Error(`unbekanntes composable-Kommando: ${sub} (list|show)`);
+    }
     case "case": {
       const sub = positionals[0] ?? "";
       if (sub === "create") {
@@ -98,14 +108,13 @@ function routeFor(tokens: string[]): Route {
             procedureId,
             procedureVersion: version,
             state: opt("state"),
-            ...(options["subject"]
-              ? { subjectIds: [options["subject"]] }
-              : {}),
+            ...(options["subject"] ? { subjectIds: [options["subject"]] } : {}),
           },
         };
       }
       const id = p(1, "caseId");
-      if (sub === "show") return { method: "GET", url: `/api/cases/${enc(id)}` };
+      if (sub === "show")
+        return { method: "GET", url: `/api/cases/${enc(id)}` };
       if (sub === "export")
         return { method: "GET", url: `/api/cases/${enc(id)}/vermerke/export` };
       if (sub === "tasks")
@@ -183,9 +192,7 @@ function routeFor(tokens: string[]): Route {
           body: {
             title: opt("title"),
             ...(options["kind"] ? { taskKind: options["kind"] } : {}),
-            ...(options["parent"]
-              ? { parentTaskId: options["parent"] }
-              : {}),
+            ...(options["parent"] ? { parentTaskId: options["parent"] } : {}),
             ...(options["due"] ? { dueAt: options["due"] } : {}),
           },
         };
@@ -201,7 +208,11 @@ function routeFor(tokens: string[]): Route {
       const taskId = p(1, "taskId");
       const url = `/api/tasks/${enc(taskId)}`;
       if (sub === "done")
-        return { method: "PATCH", url, body: { dataPatch: { erledigt: true } } };
+        return {
+          method: "PATCH",
+          url,
+          body: { dataPatch: { erledigt: true } },
+        };
       if (sub === "reopen")
         return {
           method: "PATCH",
@@ -250,7 +261,7 @@ function routeFor(tokens: string[]): Route {
     }
     default:
       throw new Error(
-        `unbekannte Gruppe: ${group} (procedures|cases|case|task|vermerk|wissen)`,
+        `unbekannte Gruppe: ${group} (procedures|cases|case|composable|task|vermerk|wissen)`,
       );
   }
 }

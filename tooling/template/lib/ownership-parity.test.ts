@@ -190,6 +190,16 @@ describe("ownership/scaffold parity", () => {
       pattern: "apps/*/server/procedure.config.ts",
       strategy: "consumer",
     });
+    // Die Composable-Naht bleibt ebenfalls beim Konsumenten (deklariert seine Composables + Spine-Agenten).
+    expect(
+      explainOwnership(
+        defaultOwnership,
+        "apps/fachverfahren/server/composables.config.ts",
+      ),
+    ).toEqual({
+      pattern: "apps/*/server/composables.config.ts",
+      strategy: "consumer",
+    });
     // Das übrige Server-Fundament bleibt Vorlagen-besitz (replace) — die Ausnahme ist chirurgisch.
     expect(
       explainOwnership(defaultOwnership, "apps/fachverfahren/server/index.ts"),

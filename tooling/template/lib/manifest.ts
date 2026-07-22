@@ -84,6 +84,11 @@ export const defaultOwnership: TemplateOwnership = {
     // `explainOwnership` nimmt das spezifischere Muster. Symmetrisch zur Antrag-Naht
     // src/leistung.config.ts, die als (default) merge-Pfad ohnehin unverwaltet bleibt.
     "apps/*/server/procedure.config.ts": "consumer",
+    // Die Composable-Naht: hier deklariert der Konsument seine Agentic Composables + Spine-Agenten (Blueprint
+    // v5.0), die ein generierender Build domänen-spezifisch schreibt. Wie procedure.config MUSS sie ein
+    // template:update überleben — sonst überschriebe das Upgrade die Composables des Konsumenten mit den
+    // neutralen Muster-Composables der Vorlage. `explainOwnership` nimmt das spezifischere Muster.
+    "apps/*/server/composables.config.ts": "consumer",
     "docs/domain/**": "consumer",
     "modules/*/**": "consumer",
   },
