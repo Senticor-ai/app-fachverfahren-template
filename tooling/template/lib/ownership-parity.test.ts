@@ -111,6 +111,7 @@ const updateUnmanagedPaths: string[] = [
   // Repo-Skripte außerhalb der verwalteten check-template-*/check-web|k8s-delivery/scaffold-*-Muster.
   "scripts/check-antrag-procedure.mts",
   "scripts/check-bpmn-example.mts",
+  "scripts/check-composables.mts",
   "scripts/check-css-token-aliases.mjs",
   "scripts/check-dev-dependencies.mjs",
   "scripts/check-dockerfile-paths.mjs",
