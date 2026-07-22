@@ -144,6 +144,12 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           url: "/api/cases/:id/audit",
           policy: "rbac:case.read",
         },
+        // DSGVO-Löschung (Art. 17 / §84 SGB X): eigene, eng gefasste case.pii.erase-Permission.
+        {
+          method: "POST",
+          url: "/api/cases/:id/loeschung",
+          policy: "rbac:case.pii.erase",
+        },
         {
           method: "GET",
           url: "/api/cases/:id/progress",

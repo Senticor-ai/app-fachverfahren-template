@@ -89,7 +89,8 @@ export const builtInPermissions = {
   // Einreichen mit. Bürger:innen zahlen ihre Gebühr; die Behörde sieht den Zahlstatus über die Fall-Sicht.
   paymentInitiate: {
     permission: "payment.initiate",
-    description: "Zahlung/Gebühr für einen eigenen Vorgang veranlassen und prüfen",
+    description:
+      "Zahlung/Gebühr für einen eigenen Vorgang veranlassen und prüfen",
   },
   // ── Bescheid-Zustellung (De-Mail/eBO-Naht) ──────────────────────────────────────────────────────
   // Einen Bescheid rechtssicher ZUSTELLEN + den Zustellstatus prüfen (VwZG · De-Mail/eBO). EIGENE
@@ -97,7 +98,8 @@ export const builtInPermissions = {
   // Außenwirkung (Zustellfiktion), nicht das interne Nachrichtenfach. Nur die Sachbearbeitung stellt zu.
   bescheidVersand: {
     permission: "bescheid.versand",
-    description: "Einen Bescheid rechtssicher zustellen und den Zustellstatus prüfen",
+    description:
+      "Einen Bescheid rechtssicher zustellen und den Zustellstatus prüfen",
   },
   // ── Register-/Nachweis-Abruf (Once-Only · NOOTS/EvidenceRetrieval) ───────────────────────────────
   // Einen Nachweis aus einem Register abrufen, damit die Bürger:in ihn NICHT erneut einreichen muss
@@ -105,7 +107,19 @@ export const builtInPermissions = {
   // datenschutzrelevante Handlung, getrennt vom Lesen des Vorgangs (case.read).
   registerAbruf: {
     permission: "register.abruf",
-    description: "Nachweis aus einem Register abrufen (Once-Only, zweckgebunden)",
+    description:
+      "Nachweis aus einem Register abrufen (Once-Only, zweckgebunden)",
+  },
+  // ── DSGVO-Löschung (Art. 17 / §84 SGB X) ─────────────────────────────────────────────────────────
+  // Personenbezogene Felder eines Falls löschen (referenzielle Redaction → Tombstone) + die Löschung
+  // append-only protokollieren. EIGENE, eng gefasste Permission — bewusst getrennt von
+  // `case.decision.prepare`: eine Löschung ist eine datenschutzrechtliche Handlung, kein
+  // Bearbeitungsschritt, und darf nie auf dem Entscheidungs-Vorbereitungsrecht mitreiten. Der
+  // eingefrorene Bescheid-VA (Audit-payload) ist strukturell ausgenommen; nur `case.data` wird redigiert.
+  casePiiErase: {
+    permission: "case.pii.erase",
+    description:
+      "Personenbezogene Falldaten löschen (DSGVO Art. 17 / §84 SGB X)",
   },
 } as const satisfies Record<string, RbacPermission>;
 
@@ -151,6 +165,8 @@ export const builtInRbacRegistry = {
         builtInPermissions.bescheidVersand,
         // Nachweise aus Registern abrufen (Once-Only) — die Bürger:in reicht nicht doppelt ein.
         builtInPermissions.registerAbruf,
+        // Personenbezogene Falldaten auf Löschverlangen redigieren (DSGVO Art. 17 / §84 SGB X).
+        builtInPermissions.casePiiErase,
       ],
       builtIn: true,
     },

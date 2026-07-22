@@ -12,6 +12,8 @@ import {
   CaseAuditListDtoSchema,
   CaseAuditQuerySchema,
   CaseCreateRequestSchema,
+  CaseErasureRequestSchema,
+  CaseErasureResultDtoSchema,
   ProcedureListDtoSchema,
   CaseDtoSchema,
   CaseIdParamsSchema,
@@ -25,6 +27,7 @@ import {
 import {
   CaseNotFoundError,
   CaseVersionConflictError,
+  redactData,
   verifyAuditChain,
   type AppAuditEvent,
   type AppCase,
@@ -149,6 +152,11 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
       kind: "rbac",
       permission: builtInPermissions.casePrepareDecision.permission,
     },
+    deps,
+  );
+  // DSGVO-Löschung braucht eine EIGENE, eng gefasste Permission (nie auf `case.decision.prepare` mitreiten).
+  const erasureAuth = bffRouteAuth(
+    { kind: "rbac", permission: builtInPermissions.casePiiErase.permission },
     deps,
   );
   const errorResponses = {
@@ -896,6 +904,116 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
         return storeUnavailable(request, reply);
       }
       return reply.send(toCaseDto(updated));
+    },
+  );
+
+  // POST /api/cases/:id/loeschung — DSGVO-LÖSCHUNG (Art. 17 / §84 SGB X, Issue #55). Redigiert die benannten
+  // personenbezogenen Pfade in `case.data` (referenzielle Redaction → Tombstone, reine Funktion `redactData`)
+  // und schreibt die Löschung ATOMAR als append-only Ereignis (`case.data.redacted`) — ohne die gelöschten
+  // Werte zu wiederholen. Behörden-scoped (getCase scope:"authority"), eigene Permission `case.pii.erase`.
+  //
+  // BEWUSST NUR `case.data`: der eingefrorene Bescheid-VA lebt in der Audit-payload (append-only, unveränderlich)
+  // und ist damit strukturell ausgenommen (Bestandskraft, Art. 17 Abs. 3) — eine Löschung der lebenden Daten
+  // berührt ihn nie. Die `legalBasisId` gibt die MENSCHLICHE Sachbearbeitung an (nie erfunden). LEGAL-HOLD /
+  // Retention (Löschung während gesetzlicher Aufbewahrungsfristen blockieren) ist ein bewusst getrennter,
+  // spec-gated Folge-Guard — er braucht die jurisdiktions-spezifische Fristen-Matrix.
+  typed.post(
+    "/api/cases/:id/loeschung",
+    {
+      config: erasureAuth.config,
+      preHandler: erasureAuth.preHandler,
+      schema: {
+        tags: ["cases"],
+        summary:
+          "Personenbezogene Falldaten löschen (DSGVO Art. 17 / §84 SGB X, referenzielle Redaction + append-only Audit)",
+        params: CaseIdParamsSchema,
+        body: CaseErasureRequestSchema,
+        response: {
+          200: CaseErasureResultDtoSchema,
+          422: ErrorEnvelopeSchema,
+          ...errorResponses,
+        },
+      },
+    },
+    async (request, reply) => {
+      const session = sessionOf(request);
+      const body = request.body;
+
+      let found: AppCase | undefined;
+      try {
+        found = await deps.caseStore.getCase({
+          tenantId: session.tenantId,
+          caseId: request.params.id,
+          scope: "authority",
+          authorityId: session.authorityId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      if (!found)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+      const appCase = found;
+
+      // Reine Lösch-Ableitung: Tombstones je vorhandenem PII-Pfad. Fehlende/bereits getombstonete zählen nicht.
+      const now = new Date().toISOString();
+      const { data: redigiert, redacted } = redactData(
+        appCase.data,
+        body.piiPaths,
+        now,
+      );
+      // Nichts zu löschen (Pfade fehlen oder schon getombstonet) → 422 statt eines leeren Version-Bumps.
+      // Idempotenz: ein zweiter Aufruf derselben Löschung trifft leere `redacted` → 422 (nichts mehr offen).
+      if (redacted.length === 0)
+        return reply.code(422).send({
+          error: "nichts zu löschen: keine der angegebenen PII-Pfade vorhanden",
+          requestId: requestIdOf(request),
+        });
+
+      const auditEvent: AppAuditEvent = {
+        auditEventId: `audit.${randomUUID()}`,
+        caseId: appCase.caseId,
+        tenantId: session.tenantId,
+        authorityId: session.authorityId,
+        jurisdictionId: session.jurisdictionId,
+        actorId: session.actorId,
+        eventType: "case.data.redacted",
+        purpose: "dsgvo-loeschung",
+        // Die Rechtsgrundlage kommt vom Menschen (nie erfunden); die Pfade werden protokolliert, NIE die Werte.
+        legalBasisId: body.legalBasisId,
+        requestId: requestIdOf(request),
+        payload: {
+          redactedPaths: redacted,
+          ...(body.begruendung !== undefined
+            ? { begruendung: body.begruendung }
+            : {}),
+        },
+        occurredAt: now,
+      };
+
+      let updated: AppCase;
+      try {
+        updated = await deps.caseStore.patchCaseData({
+          tenantId: session.tenantId,
+          caseId: appCase.caseId,
+          expectedVersion: body.expectedVersion,
+          newData: redigiert,
+          auditEvent,
+        });
+      } catch (error) {
+        if (error instanceof CaseVersionConflictError)
+          return reply.code(409).send({
+            error: "case version conflict",
+            requestId: requestIdOf(request),
+          });
+        if (error instanceof CaseNotFoundError)
+          return reply
+            .code(404)
+            .send({ error: "not found", requestId: requestIdOf(request) });
+        return storeUnavailable(request, reply);
+      }
+      return reply.send({ case: toCaseDto(updated), redactedPaths: redacted });
     },
   );
 }

@@ -81,6 +81,35 @@ export type CaseTransitionRequestDto = Static<
   typeof CaseTransitionRequestSchema
 >;
 
+// DSGVO-LÖSCHUNG (Art. 17 / §84 SGB X, Issue #55): redigiert benannte personenbezogene Pfade in `case.data`
+// durch Tombstones (referenzielle Redaction) + protokolliert die Löschung append-only. `expectedVersion`
+// erzwingt Optimistic-Locking. Die `legalBasisId` gibt die MENSCHLICHE Sachbearbeitung an (nie erfunden —
+// z. B. "DSGVO-Art17"); die `begruendung` ist ein optionaler Audit-Vermerk und darf KEINE gelöschten Werte
+// wiederholen. Der eingefrorene Bescheid-VA (Audit-payload) ist strukturell ausgenommen — nur `case.data`
+// wird redigiert (Bestandskraft, Art. 17 Abs. 3).
+export const CaseErasureRequestSchema = Type.Object(
+  {
+    expectedVersion: Type.Integer({ minimum: 1 }),
+    piiPaths: Type.Array(Type.String({ minLength: 1 }), { minItems: 1 }),
+    legalBasisId: Type.String({ minLength: 1 }),
+    begruendung: Type.Optional(Type.String({ minLength: 1 })),
+  },
+  { additionalProperties: false },
+);
+
+export type CaseErasureRequestDto = Static<typeof CaseErasureRequestSchema>;
+
+export const CaseErasureResultDtoSchema = Type.Object(
+  {
+    case: CaseDtoSchema,
+    // Die TATSÄCHLICH redigierten Pfade — fehlende oder bereits getombstonete zählen nicht (idempotent).
+    redactedPaths: Type.Array(Type.String({ minLength: 1 })),
+  },
+  { additionalProperties: false },
+);
+
+export type CaseErasureResultDto = Static<typeof CaseErasureResultDtoSchema>;
+
 // N-AUGEN (Issue #56): eine explizite Freigabe eines Akteurs für EINEN Übergang. Server-autoritativ: der
 // Akteur kommt aus der Sitzung; `expectedVersion` bindet die Freigabe an den aktuellen Zustand (409 bei Drift).
 export const CaseApprovalRequestSchema = Type.Object(
