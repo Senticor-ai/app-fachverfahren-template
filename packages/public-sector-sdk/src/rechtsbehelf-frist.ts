@@ -9,24 +9,13 @@
 // Regime als DATEN: `fristWert`/`fristEinheit` stammen aus dem EINGEFRORENEN Rechtsbehelf des VA
 // (regime-neutral — Widerspruch/Einspruch/Klage), nie aus einem hart kodierten „1 Monat".
 import type { RechtsbehelfConfig } from "./domain-kernel.js";
+import { addKalenderMonate } from "./kalender.js";
 
 /** Das für die Fristberechnung nötige Minimum aus dem (eingefrorenen) Rechtsbehelf-Regime. */
 export type RechtsbehelfFristRegime = Pick<
   RechtsbehelfConfig,
   "fristWert" | "fristEinheit"
 >;
-
-/** Addiert `n` Kalendermonate (UTC) mit Monatsende-Klemmung: 31.01. + 1 Monat → 28./29.02. (nicht 03.03.).
- *  Identische Semantik zur Client-Anzeige-Frist — die Trennung ist Autorität, nicht divergierende Arithmetik. */
-function addKalenderMonate(d: Date, n: number): void {
-  const tag = d.getUTCDate();
-  d.setUTCDate(1);
-  d.setUTCMonth(d.getUTCMonth() + n);
-  const letzterTag = new Date(
-    Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0),
-  ).getUTCDate();
-  d.setUTCDate(Math.min(tag, letzterTag));
-}
 
 /**
  * Der EXKLUSIVE Verfristungs-Zeitpunkt: der Beginn (00:00 UTC) des Tages NACH dem Fristablauf. Die Frist

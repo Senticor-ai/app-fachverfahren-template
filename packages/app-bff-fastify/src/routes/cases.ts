@@ -37,6 +37,8 @@ import {
   type AppCase,
 } from "@senticor/app-store-postgres";
 import {
+  aufbewahrungLaeuft,
+  aufbewahrungsende,
   berechneTarif,
   builtInPermissions,
   createFachlicheAuditEvent,
@@ -1005,6 +1007,26 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
 
       // Reine Lösch-Ableitung: Tombstones je vorhandenem PII-Pfad. Fehlende/bereits getombstonete zählen nicht.
       const now = new Date().toISOString();
+
+      // GESETZLICHE AUFBEWAHRUNGSFRIST (Records-Retention, Art. 17 Abs. 3 lit. b DSGVO): läuft am Verfahren
+      // eine deklarierte Frist (ab Fallabschluss), blockiert sie die Löschung → 409. Die FRIST ist data-driven
+      // am Verfahren deklariert (nie hier erfunden); fehlt sie, gibt es keine zusätzliche Sperre.
+      const procedure = deps.procedureRegistry.get(
+        appCase.procedureId,
+        appCase.procedureVersion,
+      );
+      if (
+        aufbewahrungLaeuft(appCase.closedAt, procedure?.aufbewahrungMonate, now)
+      ) {
+        const ende =
+          appCase.closedAt && procedure?.aufbewahrungMonate
+            ? aufbewahrungsende(appCase.closedAt, procedure.aufbewahrungMonate)
+            : null;
+        return reply.code(409).send({
+          error: `gesetzliche Aufbewahrungsfrist läuft${ende ? ` (bis ${ende})` : ""}`,
+          requestId: requestIdOf(request),
+        });
+      }
       const { data: redigiert, redacted } = redactData(
         appCase.data,
         body.piiPaths,

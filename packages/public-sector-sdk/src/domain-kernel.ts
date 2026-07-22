@@ -85,6 +85,11 @@ export interface ProcedureVersion {
   /** Verwaltungsakt-Fachlichkeit — vorhanden, wenn das Verfahren einen förmlichen Bescheid erlässt
    *  (mindestens ein Übergang trägt `issuesVerwaltungsakt`). Regime-neutral, data-driven. */
   verwaltungsakt?: VerwaltungsaktConfig;
+  /** Gesetzliche AUFBEWAHRUNGSFRIST in Monaten, gemessen ab Fallabschluss (`closedAt`) — data-driven am
+   *  Verfahren DEKLARIERT (welche §-Frist gilt, ist eine Fach-/Rechtsentscheidung; z. B. § 84 SGB X = 120).
+   *  Solange sie läuft, blockiert sie die DSGVO-Löschung (Art. 17 Abs. 3 lit. b DSGVO). Fehlt sie, gibt es
+   *  keine zusätzliche Sperre (Default unverändert). Enforcement: `aufbewahrungLaeuft` (aufbewahrung.ts). */
+  aufbewahrungMonate?: number;
 }
 
 export interface Application {
