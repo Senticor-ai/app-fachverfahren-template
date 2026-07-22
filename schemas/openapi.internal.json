@@ -4799,6 +4799,271 @@
         "tags": ["vermerke"]
       }
     },
+    "/api/composables": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "composables": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "assurance": { "minLength": 1, "type": "string" },
+                          "displayName": { "minLength": 1, "type": "string" },
+                          "enabled": { "type": "boolean" },
+                          "hasSpine": { "type": "boolean" },
+                          "id": { "minLength": 1, "type": "string" },
+                          "klasse": { "minLength": 1, "type": "string" },
+                          "status": { "minLength": 1, "type": "string" },
+                          "version": { "minLength": 1, "type": "string" }
+                        },
+                        "required": [
+                          "id",
+                          "version",
+                          "displayName",
+                          "klasse",
+                          "status",
+                          "assurance",
+                          "enabled",
+                          "hasSpine"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": ["composables"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Agentic Composables auflisten (Discovery — versionierte Fähigkeitseinheiten mit Spine-Agent)",
+        "tags": ["composables"]
+      }
+    },
+    "/api/composables/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "assurance": { "minLength": 1, "type": "string" },
+                    "certification": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "certifiable": { "type": "boolean" },
+                        "fehlend": {
+                          "items": { "type": "string" },
+                          "type": "array"
+                        }
+                      },
+                      "required": ["certifiable", "fehlend"],
+                      "type": "object"
+                    },
+                    "displayName": { "minLength": 1, "type": "string" },
+                    "enabled": { "type": "boolean" },
+                    "evals": { "items": { "type": "string" }, "type": "array" },
+                    "id": { "minLength": 1, "type": "string" },
+                    "klasse": { "minLength": 1, "type": "string" },
+                    "moduleId": { "minLength": 1, "type": "string" },
+                    "outcome": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "ergebnis": { "type": "string" },
+                        "fuerWen": { "type": "string" },
+                        "messung": { "type": "string" },
+                        "nichtScope": {
+                          "items": { "type": "string" },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "fuerWen",
+                        "ergebnis",
+                        "messung",
+                        "nichtScope"
+                      ],
+                      "type": "object"
+                    },
+                    "owners": {
+                      "additionalProperties": { "type": "string" },
+                      "type": "object"
+                    },
+                    "replaceableBy": {
+                      "items": { "type": "string" },
+                      "type": "array"
+                    },
+                    "spine": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "aufgaben": {
+                          "items": { "minLength": 1, "type": "string" },
+                          "type": "array"
+                        },
+                        "autonomy": { "minLength": 1, "type": "string" },
+                        "knowledgeDomains": {
+                          "items": { "minLength": 1, "type": "string" },
+                          "type": "array"
+                        },
+                        "rechtsnah": { "type": "boolean" },
+                        "role": { "minLength": 1, "type": "string" },
+                        "skills": {
+                          "items": { "minLength": 1, "type": "string" },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "role",
+                        "autonomy",
+                        "aufgaben",
+                        "skills",
+                        "knowledgeDomains",
+                        "rechtsnah"
+                      ],
+                      "type": "object"
+                    },
+                    "status": { "minLength": 1, "type": "string" },
+                    "version": { "minLength": 1, "type": "string" }
+                  },
+                  "required": [
+                    "id",
+                    "version",
+                    "displayName",
+                    "klasse",
+                    "status",
+                    "assurance",
+                    "enabled",
+                    "outcome",
+                    "owners",
+                    "evals",
+                    "replaceableBy",
+                    "certification"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Ein Composable im Detail — inkl. Contract Envelope, Spine-Agent und Zertifizierungsreife",
+        "tags": ["composables"]
+      }
+    },
     "/api/identity": {
       "get": {
         "responses": {
@@ -7694,6 +7959,10 @@
     {
       "description": "Bürger-Sicht auf die EIGENEN Anträge (Eigentümerschaft ausschliesslich aus der Sitzung)",
       "name": "buerger"
+    },
+    {
+      "description": "Agentic Composables (Blueprint v5.0) — Discovery der Fähigkeitseinheiten mit Spine-Agent",
+      "name": "composables"
     }
   ]
 }

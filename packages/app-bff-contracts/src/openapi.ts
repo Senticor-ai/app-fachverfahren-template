@@ -19,4 +19,9 @@ export const openApiTags = [
     description:
       "Bürger-Sicht auf die EIGENEN Anträge (Eigentümerschaft ausschliesslich aus der Sitzung)",
   },
+  {
+    name: "composables",
+    description:
+      "Agentic Composables (Blueprint v5.0) — Discovery der Fähigkeitseinheiten mit Spine-Agent",
+  },
 ] as const;

@@ -8,6 +8,7 @@ import type {
   WissenStore,
 } from "@senticor/app-store-postgres";
 import type {
+  ComposableRegistry,
   ProcedureRegistry,
   RbacRegistry,
 } from "@senticor/public-sector-sdk";
@@ -62,4 +63,8 @@ export interface BffDeps {
   /** Bescheid-PDF-Renderer als PORT (optional; die App-Komposition liefert die pdf-lib-Impl). Ohne ihn liefert
    *  die `.pdf`-Download-Route 501 — der JSON-/BescheidView-Pfad bleibt unberührt. */
   bescheidPdf?: BescheidPdfRenderer;
+  /** Registry der AGENTIC COMPOSABLES (Blueprint v5.0) — die deklarierten Fähigkeitseinheiten mit Spine-Agent.
+   *  Optional: ohne sie liefert `/api/composables` eine leere Liste (die deterministische Naht existiert
+   *  trotzdem). Die App-Komposition registriert die domänen-spezifischen Composables. */
+  composableRegistry?: ComposableRegistry;
 }

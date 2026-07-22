@@ -14,6 +14,7 @@ import {
   type WissenStore,
 } from "@senticor/app-store-postgres";
 import type {
+  ComposableRegistry,
   ProcedureRegistry,
   RbacRegistry,
 } from "@senticor/public-sector-sdk";
@@ -39,6 +40,7 @@ import { registerIdentityRoutes } from "./routes/identity.js";
 import { registerZustellungRoutes } from "./routes/zustellung.js";
 import { registerRegisterRoutes } from "./routes/register.js";
 import { registerCapabilitiesRoute } from "./routes/capabilities.js";
+import { registerComposableRoutes } from "./routes/composables.js";
 import { registerBuergerRoutes } from "./routes/buerger.js";
 import { registerCaseRoutes } from "./routes/cases.js";
 import { registerMailboxRoutes } from "./routes/mailbox.js";
@@ -78,6 +80,8 @@ export interface AppBffOptions {
   /** Bescheid-PDF-Renderer (pdf-lib). OPTIONAL: fehlt er, liefert die `.pdf`-Route 501 — der JSON-/BescheidView-
    *  Pfad bleibt unberührt. KEIN local-fake, weil das PDF-Rendering App-seitig (asset-nah) verortet ist. */
   bescheidPdf?: BescheidPdfRenderer;
+  /** Registry der Agentic Composables (Blueprint v5.0). OPTIONAL: fehlt sie, ist `/api/composables` leer. */
+  composableRegistry?: ComposableRegistry;
   /** ZONEN-ROUTE-ENFORCEMENT (BSI-Netzsegmentierung, Angriffsflächen-Reduktion): die Flächen, die DIESE Instanz servieren
    *  darf — aus dem Deploy-Env ZONE_SURFACES (aus derselben readZoneModel-Wahrheit wie die Netz-Segmentierung). Eine
    *  Routen-Familie wird NUR registriert, wenn ihre Flächen diese Menge schneiden (Infra-Familien ohne Flächen-Tag immer).
@@ -113,6 +117,9 @@ export async function appBff(
     wissenStore: opts.wissenStore ?? new InMemoryWissenStore(),
     // exactOptionalPropertyTypes: nur setzen, wenn geliefert (kein `bescheidPdf: undefined`).
     ...(opts.bescheidPdf ? { bescheidPdf: opts.bescheidPdf } : {}),
+    ...(opts.composableRegistry
+      ? { composableRegistry: opts.composableRegistry }
+      : {}),
   };
   app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error.validation) {
@@ -145,6 +152,8 @@ export async function appBff(
   }[] = [
     { surfaces: null, register: () => registerSessionRoute(app, deps) },
     { surfaces: null, register: () => registerCapabilitiesRoute(app, deps) },
+    // Agentic Composables (Blueprint v5.0): Discovery-Naht — quer, keine Fall-Daten, RBAC session.read.
+    { surfaces: null, register: () => registerComposableRoutes(app, deps) },
     { surfaces: null, register: () => registerAiAssistRoutes(app, deps) },
     // Identität/Vertrauen (BundID/eID): das SITZUNGS-eigene Subjekt — Infra (quer, keine Fall-Daten), RBAC session.read.
     { surfaces: null, register: () => registerIdentityRoutes(app, deps) },

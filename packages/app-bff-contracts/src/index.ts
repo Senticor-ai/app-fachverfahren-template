@@ -206,4 +206,14 @@ export {
   type WissenViewDto,
   type WissenViewListDto,
 } from "./verfahren-wissen.js";
+export {
+  ComposableSummaryDtoSchema,
+  ComposableListDtoSchema,
+  ComposableDetailDtoSchema,
+  SpineAgentDtoSchema,
+  type ComposableSummaryDto,
+  type ComposableListDto,
+  type ComposableDetailDto,
+  type SpineAgentDto,
+} from "./composables.js";
 export { openApiInfo, openApiTags } from "./openapi.js";

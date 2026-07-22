@@ -20,6 +20,7 @@ import {
 } from "@senticor/app-store-postgres";
 import {
   createInMemoryProcedureRegistry,
+  type ComposableRegistry,
   type ProcedureRegistry,
 } from "@senticor/public-sector-sdk";
 import {
@@ -75,6 +76,7 @@ export async function buildBffApp({
   mailbox = createLocalMailboxPort(),
   evidenceRetrieval = createLocalEvidenceRetrievalPort(),
   wissenStore = new InMemoryWissenStore(),
+  composableRegistry,
 }: {
   session?: ResolvedSession;
   appStore?: AppStore;
@@ -87,6 +89,7 @@ export async function buildBffApp({
   mailbox?: MailboxPort;
   evidenceRetrieval?: EvidenceRetrievalPort;
   wissenStore?: WissenStore;
+  composableRegistry?: ComposableRegistry;
 } = {}): Promise<{
   app: FastifyInstance;
   auditSink: MemoryAuditSink;
@@ -109,6 +112,7 @@ export async function buildBffApp({
     mailbox,
     evidenceRetrieval,
     wissenStore,
+    ...(composableRegistry ? { composableRegistry } : {}),
   });
   return { app, auditSink, appStore, caseStore, taskStore };
 }

@@ -208,6 +208,17 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           url: "/api/cases/:id/vermerke/:vermerkId/review",
           policy: "rbac:case.note.write",
         },
+        // Agentic-Composable-Discovery: read-only, jede Sitzung (session.read).
+        {
+          method: "GET",
+          url: "/api/composables",
+          policy: "rbac:session.read",
+        },
+        {
+          method: "GET",
+          url: "/api/composables/:id",
+          policy: "rbac:session.read",
+        },
         {
           method: "PATCH",
           url: "/api/tasks/:id",
