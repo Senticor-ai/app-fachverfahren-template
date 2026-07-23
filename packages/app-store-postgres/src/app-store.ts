@@ -1,5 +1,7 @@
 import { createPgClient, type PgClient } from "./client.js";
 import { createDefaultUserPreferences } from "./preferences.js";
+import { createChosClientFromEnv } from "./chos-client.js";
+import { ChosAppStore } from "./chos-app-store.js";
 
 export type ColorSchemePreference = "light" | "dark" | "system";
 
@@ -318,6 +320,17 @@ export class UnavailableAppStore implements AppStore {
 export function createAppStoreFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): AppStore {
+  // Ephemerer Preview-/Dev-Store (s. createAuthStoreFromEnv): APP_STORE_MODE=memory → prozess-lokaler In-Memory-Store.
+  if (env["APP_STORE_MODE"] === "memory") return new InMemoryAppStore();
+  // chos-Graph-Store: APP_STORE_MODE=chos + CHOS_API_URL (fail-closed ohne URL). Postgres bleibt der OSS-Default.
+  if (env["APP_STORE_MODE"] === "chos") {
+    const client = createChosClientFromEnv(env);
+    return client
+      ? new ChosAppStore(client)
+      : new UnavailableAppStore(
+          "CHOS_API_URL is required for APP_STORE_MODE=chos",
+        );
+  }
   const databaseUrl = env["APP_PG_URL"] ?? env["APP_PG_DIRECT_URL"];
   return databaseUrl
     ? new PostgresAppStore(databaseUrl)
@@ -388,7 +401,7 @@ function mailboxMessageFromRow(row: MailboxMessageRow): MailboxMessage {
   };
 }
 
-function mergeUserPreferences(
+export function mergeUserPreferences(
   current: UserPreferences,
   update: UserPreferencesUpdate,
 ): UserPreferences {

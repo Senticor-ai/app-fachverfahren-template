@@ -16,6 +16,7 @@ import {
   toContractSnapshot,
   type LeistungContractSnapshot,
 } from "../packages/fachverfahren-kit/src/contract-snapshot.ts";
+import { verifyDatenanbindung } from "../packages/fachverfahren-kit/src/lib/datenanbindung.ts";
 import { leistungConfig } from "../apps/fachverfahren/src/leistung.config.ts";
 
 const CONTRACT_URL = new URL(
@@ -142,6 +143,10 @@ if (!Array.isArray(suchfelder) || suchfelder.length < 1)
   fail(
     "contract.register.suchfelder muss mind. 1 Once-Only-Suchfeld enthalten.",
   );
+
+// DATENANBINDUNG (generische, sichere Naht): je deklarierte Anbindung Zweckbindung (Art. 5 DSGVO) + Verbindungsklasse
+// (BSI TR-03190 bei register/extern). Fehlt `datenanbindung` ganz → keine Mängel → kein Falsch-Block (additiv).
+for (const m of verifyDatenanbindung(snap).mangel) fail(m.text);
 
 // ── Ergebnis ──────────────────────────────────────────────────────────────────
 if (fehler.length > 0) {

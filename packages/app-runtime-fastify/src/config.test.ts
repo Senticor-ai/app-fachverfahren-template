@@ -30,6 +30,44 @@ describe("readRuntimeConfig", () => {
       tenant: { tenantId: "default", label: "Standardmandant" },
       delivery: { publicBaseUrl: "", serviceWorkerEnabled: false },
     });
+    // SENTINEL-DISZIPLIN: ohne ZONE_SURFACES-Schlüssel gibt es KEIN `zone`-Feld ⇒ das Frontend läuft fail-open (Ein-App).
+    expect(
+      (config.publicRuntimeConfig as { zone?: unknown }).zone,
+    ).toBeUndefined();
+  });
+
+  it("ZONE + ZONE_SURFACES ⇒ Zonen-Flächen in publicRuntimeConfig (Frontend-Filter-Quelle)", () => {
+    const config = readRuntimeConfig({
+      ZONE: "oeffentlich",
+      ZONE_SURFACES: "buerger",
+    });
+    expect(config.publicRuntimeConfig).toMatchObject({
+      zone: { id: "oeffentlich", allowedSurfaces: ["buerger"] },
+    });
+    const backoffice = readRuntimeConfig({
+      ZONE: "intern-fach",
+      ZONE_SURFACES: "sachbearbeitung, aufsicht",
+    });
+    expect(backoffice.publicRuntimeConfig).toMatchObject({
+      zone: {
+        id: "intern-fach",
+        allowedSurfaces: ["sachbearbeitung", "aufsicht"],
+      },
+    });
+  });
+
+  it('ZONE_SURFACES="" (zonierte STRUKTUR-Zone) ⇒ `zone` VORHANDEN mit leerer Fläche — NICHT fail-open', () => {
+    // Schlüssel gesetzt aber leer: das `zone`-Feld existiert (zoniert), allowedSurfaces=[] ⇒ Frontend blendet ALLES aus.
+    const config = readRuntimeConfig({
+      ZONE: "datenhaltung",
+      ZONE_SURFACES: "",
+    });
+    expect(config.publicRuntimeConfig).toMatchObject({
+      zone: { id: "datenhaltung", allowedSurfaces: [] },
+    });
+    expect(
+      (config.publicRuntimeConfig as { zone?: unknown }).zone,
+    ).toBeDefined();
   });
 
   it("lässt App-Identität und Static-Dir-Fallback per Overrides setzen", () => {

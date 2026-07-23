@@ -8,6 +8,7 @@ import {
 import { App } from "./App.js";
 import { AppErrorBoundary } from "./AppErrorBoundary.js";
 import { deliveryPath } from "./delivery-path.js";
+import { loadRuntimeConfig } from "./runtime-config.js";
 import { SessionProvider } from "./session.js";
 import "./styles.css";
 
@@ -39,21 +40,10 @@ createRoot(el).render(
 void configureBrowserRuntime();
 
 async function configureBrowserRuntime(): Promise<void> {
-  try {
-    // BASE_URL-relativ wie alle API-Aufrufe (board-client.ts): hinter dem Vorschau-Proxy
-    // liegen runtime-config.json und Service-Worker unter dem Präfix, nicht unter "/".
-    const response = await fetch(deliveryPath("runtime-config.json"), {
-      cache: "no-store",
-      credentials: "same-origin",
-    });
-    if (!response.ok) return;
-    const config = (await response.json()) as {
-      delivery?: { serviceWorkerEnabled?: boolean };
-    };
-    if (config.delivery?.serviceWorkerEnabled === true) {
-      await registerServiceWorker(deliveryPath("service-worker.js"));
-    }
-  } catch {
-    // Die Runtime-Konfiguration ist eine Verbesserung fuer Deployments; die App muss ohne sie starten.
+  // EINE Quelle (runtime-config.ts, memoisiert): denselben geladenen Wert liest der Zonen-Filter (app/zone.ts). BASE_URL-
+  // relativ wie alle API-Aufrufe — hinter dem Vorschau-Proxy liegen runtime-config.json und Service-Worker unterm Präfix.
+  const config = await loadRuntimeConfig();
+  if (config?.delivery?.serviceWorkerEnabled === true) {
+    await registerServiceWorker(deliveryPath("service-worker.js"));
   }
 }

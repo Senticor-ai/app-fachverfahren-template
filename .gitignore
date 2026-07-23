@@ -28,3 +28,6 @@ dist-types/
 # und der Deploy-Erfolgsmarker — untracked wären sie "Dirty"-Rauschen für die Provenienz-Tests.
 .local/
 .deployed-sha
+
+# Cognitive Hive Code local runtime
+.opencode

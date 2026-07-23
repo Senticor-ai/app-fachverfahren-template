@@ -1,7 +1,14 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { access, mkdir, readFile, readdir, stat } from "node:fs/promises";
-import { dirname, extname, join, relative, resolve } from "node:path";
+import {
+  dirname,
+  extname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+} from "node:path";
 import { promisify } from "node:util";
 import { parse as parseYaml } from "yaml";
 import { getGitCommit, getGitShortStatus } from "./git.ts";
@@ -11,6 +18,33 @@ import type { PackageJson } from "./structured-edit.ts";
 const execFileAsync = promisify(execFile);
 export const discoveryPath = "agent.discovery.json";
 export const defaultTaskSpecPath = "docs/examples/hundesteuer/app.spec.yaml";
+
+/** Ein Übergang der Fall/Dossier-Zustandsmaschine im governten Spec. `requiredPermission` ist optional
+ *  (die Naht/Runtime injiziert sonst die Stub-Konstante); `requiresFourEyes`/`closesCase` sind fachliche Wahrheit. */
+export interface SpecProcedureTransition {
+  from: string;
+  to: string;
+  action: string;
+  requiredPermission?: string;
+  requiresFourEyes?: boolean;
+  closesCase?: boolean;
+}
+
+/** OPTIONALER Dossier-Block: die SDK-`ProcedureVersion` (Zustandsmaschine + Rechtsgrundlagen) als DATEN im
+ *  governten `app.spec.yaml`. Seine PRÄSENZ markiert ein Fall/Dossier-Verfahren — Antrag-nur-Apps lassen ihn weg.
+ *  Spiegelt `apps/fachverfahren/server/procedure.config.ts` (`dossierProcedure`); ein späterer Emit-Schritt kann
+ *  daraus die Naht schreiben. Rechtsgrundlagen/Version werden NIE aus der BPMN erfunden. */
+export interface SpecProcedure {
+  procedureId: string;
+  version: string;
+  effectiveFrom?: string;
+  legalBasisIds: string[];
+  allowedStates: string[];
+  allowedTransitions: SpecProcedureTransition[];
+  /** OPTIONALE Provenienz: die FIM/KGSt-BPMN, aus der die Zustandsmaschine abgeleitet wurde (muss laut
+   *  check:bpmn-example mit ihr deckungsgleich sein). */
+  bpmnPath?: string;
+}
 
 export interface AppSpec {
   schemaVersion: string;
@@ -37,6 +71,8 @@ export interface AppSpec {
   workflows: string[];
   integrations: string[];
   humanApproval?: string[];
+  /** OPTIONAL: markiert ein Fall/Dossier-Verfahren (Antrag-nur-Apps lassen es weg). */
+  procedure?: SpecProcedure;
   domainVocabulary: string[];
 }
 
@@ -553,6 +589,33 @@ export async function appNew(
     return { status: "failed", spec, generated: [], preserved: [], failures };
   }
   const destination = join(root, spec.module.destination);
+  // TRAVERSAL-SCHUTZ: das Modul muss STRIKT im modules-Baum liegen. Die Spec-Pruefung vergleicht nur das
+  // PRAEFIX ("modules/") und laesst sich mit ".." aushebeln — erst das Aufloesen der Grenze erzwingt, was
+  // das Praefix meinte. Nachgewiesene Ausbrueche, die das Praefix passieren:
+  //   "modules/../../ausserhalb" -> /ausserhalb        (ausserhalb des Repos)
+  //   "modules/.."               -> /repo              (Repo-Wurzel: ueberschrieb die echte AGENTS.md)
+  //   "modules/../modules-evil"  -> /repo/modules-evil (im Repo, aber ausserhalb des modules-Baums →
+  //                                                     faellt aus den modules-Ownership-Regeln heraus)
+  assertInsideBoundary(join(root, "modules"), destination);
+  // JEDER Schreibpfad von app:new läuft durch diese zwei Wrapper — sie erzwingen die Modul-Grenze
+  // (siehe assertInsideBoundary). Damit ist „app:new scaffoldt ausschliesslich das Modul" eine
+  // durchgesetzte Invariante statt einer Konvention, auf die man sich verlässt.
+  const writeInModule = async (
+    target: string,
+    content: string,
+  ): Promise<void> => {
+    assertInsideBoundary(destination, target);
+    await writeFileAtomic(target, content);
+  };
+  const writeInModuleIfMissing = async (
+    target: string,
+    content: string,
+    preservedPaths: string[],
+    relativePath: string,
+  ): Promise<void> => {
+    assertInsideBoundary(destination, target);
+    await writeIfMissing(target, content, preservedPaths, relativePath);
+  };
   const contract = deriveModuleContract(spec);
   const migrationFile = `0001_create_${tableName(spec.module.id)}_cases.sql`;
   const storyFile = `${pascalCase(spec.module.id)}Screens.stories.tsx`;
@@ -584,90 +647,90 @@ export async function appNew(
     } else {
       preserved.push(spec.module.destination);
     }
-    await writeFileAtomic(
+    await writeInModule(
       join(destination, "AGENTS.md"),
       moduleAgentsContent(spec),
     );
-    await writeFileAtomic(
+    await writeInModule(
       join(destination, "module.contract.yaml"),
       stableStringify(contract),
     );
     const domainPath = join(destination, "domain.module.yaml");
     const existingDomain = await readOptional(domainPath);
     if (!existingDomain || existingDomain.includes("replace-with-domain-id")) {
-      await writeFileAtomic(domainPath, domainModuleYaml(spec));
+      await writeInModule(domainPath, domainModuleYaml(spec));
     } else {
       preserved.push(`${spec.module.destination}/domain.module.yaml`);
     }
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "contracts", "citizen-intake.screen.yaml"),
       screenContractYaml(spec, "citizen"),
       preserved,
       `${spec.module.destination}/contracts/citizen-intake.screen.yaml`,
     );
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "contracts", "caseworker-workspace.screen.yaml"),
       screenContractYaml(spec, "caseworker"),
       preserved,
       `${spec.module.destination}/contracts/caseworker-workspace.screen.yaml`,
     );
     if (hasAuditRoute) {
-      await writeIfMissing(
+      await writeInModuleIfMissing(
         join(destination, "contracts", "audit-workspace.screen.yaml"),
         screenContractYaml(spec, "audit"),
         preserved,
         `${spec.module.destination}/contracts/audit-workspace.screen.yaml`,
       );
     }
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "events", "events.yaml"),
       eventsYaml(spec),
       preserved,
       `${spec.module.destination}/events/events.yaml`,
     );
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "forms", "intake.form.schema.json"),
       intakeFormSchema(spec),
       preserved,
       `${spec.module.destination}/forms/intake.form.schema.json`,
     );
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "i18n", "de.json"),
       i18nJson(spec),
       preserved,
       `${spec.module.destination}/i18n/de.json`,
     );
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "migrations", "database", migrationFile),
       migrationSql(spec),
       preserved,
       `${spec.module.destination}/migrations/database/${migrationFile}`,
     );
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "permissions", "permissions.yaml"),
       permissionsYaml(spec),
       preserved,
       `${spec.module.destination}/permissions/permissions.yaml`,
     );
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "tests", `${spec.module.id}.test.ts`),
       moduleTestTs(spec),
       preserved,
       `${spec.module.destination}/tests/${spec.module.id}.test.ts`,
     );
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "ui", storyFile),
       screensStoryTsx(spec),
       preserved,
       `${spec.module.destination}/ui/${storyFile}`,
     );
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "ui", "screens.tsx"),
       screensTsx(spec),
       preserved,
       `${spec.module.destination}/ui/screens.tsx`,
     );
-    await writeIfMissing(
+    await writeInModuleIfMissing(
       join(destination, "compliance", "profile.example.json"),
       complianceProfileJson(spec),
       preserved,
@@ -1297,6 +1360,12 @@ async function validateDomainLeakage(root: string) {
       if (rel.startsWith(spec.module.destination)) {
         continue;
       }
+      // Das generierte Doc-Wiki-Manifest aggregiert Repo-Doku (inkl. Skills, die Beispiel-Verfahren wie
+      // Hundesteuer NENNEN) — Dokumentation, kein Runtime-Domaenencode. Der Leckage-Gate schuetzt AUTHORED
+      // Code vor hart kodiertem Domaenen-Vokabular; ein generiertes Doku-Aggregat ist bewusst ausgenommen.
+      if (rel.endsWith("docs-manifest.generated.ts")) {
+        continue;
+      }
       const text = await readFile(file, "utf8").catch(() => "");
       for (const term of terms) {
         // Wortgenau (\b…\b): sonst matcht „Hund" innerhalb von „Hundesteuer" und meldet die App-
@@ -1331,6 +1400,91 @@ async function listSkillNames(root: string) {
     .sort();
 }
 
+/** Strukturprüfung des OPTIONALEN Dossier-Blocks — dieselben Invarianten wie das Datei-Gate
+ *  scripts/check-procedure-contract.mts, aber lokal (Tooling darf nicht aus packages/ importieren). Prüft nur,
+ *  WENN ein Block da ist: mind. 1 Rechtsgrundlage; Übergänge referenzieren deklarierte Zustände; eindeutige
+ *  (from,action); mind. 1 schließender Übergang (closesCase); keine Sackgasse; kein verwaister Zustand. */
+function validateProcedureBlock(procedure: SpecProcedure): string[] {
+  const failures: string[] = [];
+  const fail = (m: string) => failures.push(`app spec procedure: ${m}`);
+
+  if (!procedure.procedureId) fail("procedureId fehlt/leer.");
+  if (!procedure.version) fail("version fehlt/leer.");
+  if (
+    procedure.effectiveFrom !== undefined &&
+    Number.isNaN(Date.parse(procedure.effectiveFrom))
+  )
+    fail(
+      `effectiveFrom ("${procedure.effectiveFrom}") ist kein gültiges ISO-Datum.`,
+    );
+
+  const legal = procedure.legalBasisIds;
+  if (!Array.isArray(legal) || legal.length < 1)
+    fail(
+      "legalBasisIds muss mind. 1 Rechtsgrundlage enthalten (nie erfunden).",
+    );
+  else if (legal.some((id) => !id || id.trim() === ""))
+    fail("legalBasisIds enthält einen leeren Eintrag.");
+
+  const states = procedure.allowedStates;
+  if (!Array.isArray(states) || states.length < 1) {
+    fail("allowedStates muss mind. 1 Zustand enthalten.");
+    return failures;
+  }
+  if (states.some((s) => !s || s.trim() === ""))
+    fail("allowedStates enthält einen leeren Zustand.");
+  if (new Set(states).size !== states.length)
+    fail("allowedStates enthält Duplikate.");
+
+  const transitions = procedure.allowedTransitions;
+  if (!Array.isArray(transitions) || transitions.length < 1) {
+    fail("allowedTransitions muss mind. 1 Übergang enthalten.");
+    return failures;
+  }
+
+  const known = new Set(states);
+  const pairs = new Set<string>();
+  for (const t of transitions) {
+    if (!known.has(t.from))
+      fail(`Übergang referenziert unbekannten from-Zustand "${t.from}".`);
+    if (!known.has(t.to))
+      fail(`Übergang referenziert unbekannten to-Zustand "${t.to}".`);
+    if (!t.action || t.action.trim() === "")
+      fail(`Übergang ${t.from}→${t.to} hat keine action.`);
+    const key = `${t.from} ${t.action}`;
+    if (pairs.has(key))
+      fail(
+        `Mehrdeutiger Übergang: (from "${t.from}", action "${t.action}") mehrfach definiert.`,
+      );
+    pairs.add(key);
+  }
+
+  const schliessende = transitions.filter((t) => t.closesCase === true);
+  if (schliessende.length < 1)
+    fail(
+      "kein schließender Übergang (closesCase: true) — der Fall kann nicht abgeschlossen werden.",
+    );
+
+  const hatAusgang = new Set(transitions.map((t) => t.from));
+  const geschlosseneZiele = new Set(schliessende.map((t) => t.to));
+  for (const s of states)
+    if (!hatAusgang.has(s) && !geschlosseneZiele.has(s))
+      fail(
+        `Zustand "${s}" hat keinen ausgehenden Übergang und ist kein geschlossener Zustand (Sackgasse).`,
+      );
+
+  const beruehrt = new Set<string>();
+  for (const t of transitions) {
+    beruehrt.add(t.from);
+    beruehrt.add(t.to);
+  }
+  for (const s of states)
+    if (!beruehrt.has(s))
+      fail(`Zustand "${s}" wird von keinem Übergang referenziert (verwaist).`);
+
+  return failures;
+}
+
 function validateAppSpecShape(spec: AppSpec) {
   const failures: string[] = [];
   if (spec.schemaVersion !== "1.0.0") {
@@ -1339,7 +1493,13 @@ function validateAppSpecShape(spec: AppSpec) {
   if (!spec.module?.id || !spec.module?.destination) {
     failures.push("app spec missing module id or destination");
   }
-  if (!spec.module?.destination?.startsWith("modules/")) {
+  // `..`-Segmente hebeln die Praefix-Pruefung aus: "modules/.." und "modules/../apps" beginnen mit
+  // "modules/", zeigen nach dem Aufloesen aber auf die Repo-Wurzel bzw. aus dem modules-Baum heraus.
+  // Der Spec faellt deshalb SAUBER durch die Validierung (status "failed" mit Meldung) — der
+  // Write-Boundary-Guard bleibt die letzte Verteidigungslinie fuer fehlgeleitete Schreibpfade.
+  if (spec.module?.destination?.split("/").includes("..")) {
+    failures.push("module destination must not contain .. segments");
+  } else if (!spec.module?.destination?.startsWith("modules/")) {
     failures.push("module destination must be under modules/");
   }
   if (!spec.acceptanceCriteria?.length) {
@@ -1356,6 +1516,10 @@ function validateAppSpecShape(spec: AppSpec) {
     (typeof spec.fim.services !== "object" || Array.isArray(spec.fim.services))
   ) {
     failures.push("app spec fim services must be an object when provided");
+  }
+  // OPTIONALER Dossier-Block — nur prüfen, wenn er da ist (Antrag-nur-Apps bleiben valide).
+  if (spec.procedure) {
+    failures.push(...validateProcedureBlock(spec.procedure));
   }
   return failures;
 }
@@ -1462,6 +1626,28 @@ async function createDomainModuleSkeleton(destination: string) {
   );
   await writeFileAtomic(join(destination, "migrations/database/.gitkeep"), "");
   await writeFileAtomic(join(destination, "migrations/documents/.gitkeep"), "");
+}
+
+// Write-Boundary: wirft, wenn ein Schreibziel AUSSERHALB der erlaubten Grenze liegt.
+//
+// WARUM: `writeFileAtomic` legt jeden Pfad einfach an — es gibt sonst KEINE Durchsetzung. Die Regel
+// „app:new scaffoldt ausschliesslich das Modul" galt bisher nur BY CONSTRUCTION (jeder Write ist
+// `join(destination, …)`) und war durch keinen Guard und keinen Exklusivitäts-Test gedeckt: ein
+// fehlgeleitetes Ziel (etwa in den Vorlagen-eigenen apps-server-Bäumen) schlüge STILL durch — grüne
+// Tests, aber verletzter Governance-Scope, geclobberte Ownership und ein blinder agent:verify-Report.
+// Lieber laut scheitern als still danebenschreiben.
+// (Zeilen-Kommentar statt Block: Ownership-Globs enthalten die Zeichenfolge, die einen Block beendet.)
+function assertInsideBoundary(boundary: string, target: string): void {
+  const rel = relative(resolve(boundary), resolve(target));
+  // `rel === ""` heisst: das Ziel IST die Grenze selbst — das ist KEIN „strikt darunter" und muss ebenso
+  // scheitern. Ohne diesen Fall zeigte `module.destination: "modules/.."` auf das Repo-Wurzelverzeichnis
+  // (relative(root, root) === "", also weder ".."-Praefix noch absolut) und app:new ueberschrieb dort die
+  // echte AGENTS.md des Repos — nachgewiesen, nicht theoretisch.
+  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) {
+    throw new Error(
+      `app:new: Ziel ausserhalb der erlaubten Grenze — "${target}" liegt nicht strikt unter "${boundary}"`,
+    );
+  }
 }
 
 async function writeIfMissing(

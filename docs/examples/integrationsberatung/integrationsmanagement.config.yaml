@@ -1,0 +1,157 @@
+# Integrationsmanagement — synthetische Verfahrenskonfiguration (Case-Management / DOSSIER)
+#
+# Rein SYNTHETISCH: keine echten Personen/PII, keine IP. Diese Datei ist DATEN (kein Code) und dokumentiert die
+# Konfiguration eines Dossier-Fachverfahrens für die Integrationsberatung:
+#   * die Fall-Zustandsmaschine (ProcedureVersion) — deterministisch aus integrationsmanagement.bpmn ableitbar
+#     über die Template-Stub-Engine (packages/workflow-bpmn-stub · bpmnToProcedureVersion, ADR-0002);
+#   * die fachlichen Enums als DATEN (Handlungsfelder, Phasen, Ziel-Status, Rechtsgrundlagen);
+#   * ein synthetisches Beispiel-Dossier als Prop-Vorlage für die Kit-Komponente `DossierAkte360`.
+#
+# Rechtsgrundlagen (legalBasisIds) werden NIE erfunden — sie stammen aus dieser Konfiguration und fließen über die
+# ProcedureRegistry-Naht (createInMemoryProcedureRegistry) in den Server; die BFF/Governance-Schicht erzwingt
+# Vier-Augen dort, wo die abgeleitete Transition requiresFourEyes trägt.
+
+procedure:
+  procedureId: integrationsmanagement
+  version: "2026.1"
+  displayName: Integrationsmanagement
+  # Kommt aus der Konfiguration, nicht aus der BPMN.
+  legalBasisIds:
+    - de-aufenthg-43
+    - de-aufenthg-44
+    - de-aufenthg-44a
+    - de-aufenthg-45a
+    - de-vwv-integrationsmanagement-2023
+    - de-flueag-17
+    - de-flueag-18
+
+# Aus integrationsmanagement.bpmn abgeleitete SDK-ProcedureVersion (allowedStates + allowedTransitions).
+# requiredPermission ist die Stub-Konstante "case.decision.prepare"; feinere RBAC lebt in der Governance-Schicht.
+stateMachine:
+  initial: aufgenommen
+  allowedStates:
+    - aufgenommen
+    - aktiv
+    - pausiert
+    - abgeschlossen
+  allowedTransitions:
+    - { from: aufgenommen, to: aktiv, action: aktivieren }
+    - { from: aktiv, to: pausiert, action: pausieren }
+    - { from: pausiert, to: aktiv, action: fortsetzen } # Wiederaufnahme aus Pause
+    # closesCase: der Reducer stempelt closedAt. Abgeleitet aus senticor:closesCase="true" am Flow — NICHT aus
+    # einem <endEvent>, weil der Abschluss-Zustand wiederaufnehmbar ist (ein Endereignis hätte keine
+    # ausgehenden Flüsse).
+    - {
+        from: aktiv,
+        to: abgeschlossen,
+        action: abschließen,
+        requiresFourEyes: true,
+        closesCase: true,
+      }
+    - { from: abgeschlossen, to: aktiv, action: wiederaufnehmen } # abgeschlossenen Fall wiederaufnehmen
+
+# ── Fachliche Enums als DATEN (data-driven; die Kit-Komponente kennt KEINE dieser Literale) ──────────────
+enums:
+  handlungsfelder:
+    - { key: sprache, label: Sprache }
+    - { key: arbeit, label: Arbeit }
+    - { key: wohnen, label: Wohnen }
+    - { key: bildung, label: Bildung }
+    - { key: gesundheit, label: Gesundheit }
+    - { key: finanzen, label: Finanzen }
+    - { key: aufenthaltsrecht, label: Aufenthaltsrecht }
+    - { key: soziales, label: Soziales }
+  integrationsphasen:
+    - { key: erstaufnahme, label: Erstaufnahme }
+    - { key: orientierung, label: Orientierung }
+    - { key: integration, label: Integration }
+    - { key: verfestigung, label: Verfestigung }
+  zielStatus:
+    - { key: neu, label: neu, tone: neu }
+    - { key: laufend, label: laufend, tone: info }
+    - { key: erreicht, label: erreicht, tone: ok }
+  rechtsgrundlagen:
+    - { key: de-aufenthg-43, label: "§ 43 AufenthG (Integrationskurs)" }
+    - {
+        key: de-aufenthg-44,
+        label: "§ 44 AufenthG (Berechtigung zur Teilnahme)",
+      }
+    - { key: de-aufenthg-44a, label: "§ 44a AufenthG (Teilnahmeverpflichtung)" }
+    - {
+        key: de-aufenthg-45a,
+        label: "§ 45a AufenthG (Berufsbezogene Sprachförderung)",
+      }
+    - {
+        key: de-vwv-integrationsmanagement-2023,
+        label: "VwV Integrationsmanagement 2023",
+      }
+    - { key: de-flueag-17, label: "§ 17 FlüAG (Integrationsmanagement)" }
+    - { key: de-flueag-18, label: "§ 18 FlüAG (Förderung)" }
+
+# ── Synthetisches Beispiel-Dossier: Prop-Vorlage für die Kit-Komponente DossierAkte360 ───────────────────
+# Nur synthetische Personen (subject.1 / "Klient:in A"). Keine erfundenen Klarnamen/PII.
+exampleDossier:
+  titel: Klient:in A
+  untertitel: Fall FALL-2026-0001
+  subjectId: subject.1
+  phase: orientierung
+  state: aktiv
+  merkmale:
+    - { label: Phase, value: Orientierung, tone: info }
+    - { label: Sprache, value: Beispielisch }
+  stammdaten:
+    - { label: Geburtsdatum, value: "01.01.1990" }
+    - { label: Nationalität, value: Musterland }
+    - { label: Muttersprache, value: Beispielisch }
+    - { label: Anschrift, value: "Musterstraße 1, 00000 Musterstadt" }
+  ziele:
+    - id: ziel.1
+      titel: Sprachkurs B1 abschließen
+      handlungsfeld: sprache
+      status: laufend
+      frist: "30.09.2026"
+      schritte:
+        - { id: s.1, label: Kurs anmelden, erledigt: true }
+        - { id: s.2, label: Modul 1 besuchen, erledigt: true }
+        - { id: s.3, label: Modul 2 besuchen, erledigt: false }
+        - { id: s.4, label: Prüfung ablegen, erledigt: false }
+    - id: ziel.2
+      titel: Ausbildungsplatz finden
+      handlungsfeld: arbeit
+      status: neu
+      schritte:
+        - { id: s.5, label: Bewerbungsunterlagen erstellen, erledigt: false }
+  termine:
+    - {
+        id: t.1,
+        titel: Beratungsgespräch,
+        zeit: "20.07.2026, 10:00",
+        beschreibung: Zielvereinbarung fortschreiben,
+      }
+    - {
+        id: t.2,
+        titel: Nachweis Sprachkurs,
+        zeit: "05.07.2026",
+        beschreibung: Teilnahmebestätigung ausstehend,
+      }
+  notizen:
+    - {
+        id: n.1,
+        autor: SB,
+        zeit: "10.06.2026, 09:15",
+        text: "Klient:in wünscht Termine bevorzugt vormittags.",
+      }
+  verlauf:
+    - { id: v.1, titel: Fall aufgenommen, zeit: "01.06.2026", state: done }
+    - {
+        id: v.2,
+        titel: In Betreuung aktiviert,
+        zeit: "03.06.2026",
+        state: done,
+      }
+    - {
+        id: v.3,
+        titel: Zielvereinbarung erstellt,
+        zeit: "10.06.2026",
+        state: current,
+      }

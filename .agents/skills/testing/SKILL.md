@@ -32,6 +32,43 @@ pnpm --filter @senticor/fachverfahren emit:contract
 Bei schmalen Änderungen darf zunächst ein Pakettest laufen. Vor Abschluss
 einer plattformweiten Änderung müssen die Standardchecks versucht werden.
 
+## Wo die Tests WIRKLICH laufen (Ebenen — ehrlich)
+
+`pnpm run test` ist bewusst die schnelle Ebene (Node, kein Browser, keine DB) —
+Projekte `unit` + `template-tooling`. Die schwereren Ebenen sind eigene Kommandos:
+
+- **Stories als Tests im ECHTEN Browser** — `pnpm run test:storybook`
+  (`--project storybook`): jede Story rendert headless in Chromium (`@vitest/
+  browser` + Playwright), führt `play`-Interaktionen aus UND prüft Axe-A11y
+  (`.storybook/preview.ts` `a11y.test = "error"` → Verstoß = rot). ~39 Stories.
+- **Komponenten im ECHTEN Browser** — `pnpm run test:browser`
+  (`vitest.browser.config.ts`, Chromium/Playwright headless): die
+  `*.browser.test.tsx` (z. B. `KanbanBoard` Drag&Drop — braucht echte
+  Pointer-Events). KEIN jsdom/happy-dom im Repo — Komponententests sind ECHTER Browser.
+- **Gebautes SPA + echter HTTP-Smoke** — `pnpm run test:e2e`
+  (`tests/e2e/*.e2e.test.ts`): baut das reale Bundle, bootet den Server, prüft
+  Persona-Routen + `/livez` via `app.inject()`. Kein Browser, KEINE DB.
+- **Postgres-Integration** — die Store-Vertragstests
+  (`packages/app-store-postgres/src/*.test.ts`) laufen parametrisiert über
+  InMemory + Chos-Fake IMMER, und über **echtes Postgres NUR wenn**
+  `APP_PG_DIRECT_URL`/`APP_PG_URL` gesetzt ist (`describe.skipIf`). Lokal liefert
+  `docker-compose.yml` (postgres:16) die DB; Migrationen via `pnpm run db:migrate`
+  (Direct-URL). **Automatisiert:** `pnpm run test:pg` fährt über **testcontainers**
+  (`tests/pg/global-setup.ts`) selbst einen echten Postgres hoch, migriert und
+  lässt die Store-Tests gegen die echte DB laufen — GRACEFUL-SKIP ohne Docker
+  (dann InMemory/Fake). Bei Rancher/colima `DOCKER_HOST` +
+  `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE` auf den Socket setzen. Der schnelle
+  `test`-Lauf enthält den PG-Pfad bewusst NICHT (kein Docker-Zwang).
+- **Golden-Fixture/Referenz-Seed** — `apps/fachverfahren/server/dev/*.test.ts`
+  (self-test der DEV-Seed-Daten; die Seed selbst läuft nur unter
+  `APP_STORE_MODE=memory`, ist verfahrens-neutral + synthetisch).
+
+- **HTTP-Mocks (MSW)** — `*.browser.test.tsx` können echte HTTP-Aufrufe gegen
+  MSW-MOCKDATEN fahren: `setupWorker` (aus `msw/browser`) fängt die relativen
+  `/api/*`-fetches im echten Browser ab (Worker: `public/mockServiceWorker.js`).
+  Beispiel: `apps/fachverfahren/src/antrag-client.browser.test.tsx` testet den
+  realen HTTP-Client (fetch + DTO→Vorgang-Mapping) ohne laufenden Server.
+
 ## Evidence
 
 Fehler nicht nur im Chat beschreiben. Wenn ein Test Evidence erzeugt, nutze den

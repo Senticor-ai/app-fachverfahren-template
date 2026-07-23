@@ -13,8 +13,8 @@ import {
 } from "@senticor/fachverfahren-kit";
 import {
   allowedPersonas,
-  PERSONA_HOME,
   personaDescriptors,
+  personaRoute,
 } from "../personas.js";
 import { useSession } from "../session.js";
 import { store } from "../store.js";
@@ -51,9 +51,9 @@ export function BoardsShell({
       // Boards = WORKSPACE-Navigation, keine Persona: keine aktive Rolle vortäuschen
       // (Boards-only-Konten haben ggf. gar keinen Arbeitsbereich). Der Wechsler zeigt
       // die zugewiesenen Arbeitsbereiche als Einstiege.
-      onPersonaChange={(next) => navigate(PERSONA_HOME[next])}
+      onPersonaChange={(next) => navigate(personaRoute(next, store.config))}
       personas={personaDescriptors(
-        allowedPersonas(principal, capabilities),
+        allowedPersonas(principal, capabilities, store.config),
         store.config,
       )}
       activeNavKey={activeNavKey}

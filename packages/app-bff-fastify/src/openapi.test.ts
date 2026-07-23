@@ -8,7 +8,12 @@ import {
   MemoryAuditSink,
   NoSessionResolver,
 } from "@senticor/app-runtime-fastify";
-import { InMemoryAppStore } from "@senticor/app-store-postgres";
+import {
+  InMemoryAppStore,
+  InMemoryCaseStore,
+  InMemoryTaskStore,
+} from "@senticor/app-store-postgres";
+import { createInMemoryProcedureRegistry } from "@senticor/public-sector-sdk";
 import { registerOpenApiCollector, registerOpenApiRoute } from "./openapi.js";
 import { appBff } from "./plugin.js";
 
@@ -28,6 +33,9 @@ async function buildPair({ collectorFirst = true } = {}): Promise<{
   apps.push(publicApp, internalApp);
   const bffOptions = {
     appStore: new InMemoryAppStore(),
+    caseStore: new InMemoryCaseStore(),
+    taskStore: new InMemoryTaskStore(),
+    procedureRegistry: createInMemoryProcedureRegistry([]),
     sessionResolver: new NoSessionResolver(),
     auditSink: new MemoryAuditSink(),
   };
@@ -43,7 +51,7 @@ async function buildPair({ collectorFirst = true } = {}): Promise<{
 }
 
 describe("OpenAPI intern-only", () => {
-  it("liefert intern ein Dokument mit ALLEN sechs BFF-Operationen", async () => {
+  it("liefert intern ein Dokument mit ALLEN dreiundfünfzig BFF-Operationen", async () => {
     const { internalApp } = await buildPair();
     const response = await internalApp.inject({
       method: "GET",
@@ -54,10 +62,51 @@ describe("OpenAPI intern-only", () => {
     const doc = response.json();
     expect(doc.info.title).toBe("App-BFF-API");
     expect(Object.keys(doc.paths).sort()).toEqual([
+      "/api/ai/assist",
+      "/api/buerger/antraege",
+      "/api/buerger/antraege/{id}",
+      "/api/buerger/antraege/{id}/bescheid",
+      "/api/buerger/antraege/{id}/bescheid.pdf",
+      "/api/buerger/antraege/{id}/nachweise",
+      "/api/buerger/antraege/{id}/nachweise/{attachmentId}",
+      "/api/buerger/antraege/{id}/rueckforderung/zahlung",
+      "/api/buerger/antraege/{id}/widerspruch",
       "/api/capabilities",
+      "/api/cases",
+      "/api/cases/{id}",
+      "/api/cases/{id}/allowed-actions",
+      "/api/cases/{id}/approvals",
+      "/api/cases/{id}/audit",
+      "/api/cases/{id}/legal-hold",
+      "/api/cases/{id}/loeschung",
+      "/api/cases/{id}/progress",
+      "/api/cases/{id}/rechtsbehelf/entscheidung",
+      "/api/cases/{id}/tasks",
+      "/api/cases/{id}/transitions",
+      "/api/cases/{id}/vermerke",
+      "/api/cases/{id}/vermerke/export",
+      "/api/cases/{id}/vermerke/ki",
+      "/api/cases/{id}/vermerke/{vermerkId}/review",
+      "/api/composables",
+      "/api/composables/{id}",
+      "/api/composables/{id}/evidence",
+      "/api/composables/{id}/spine/{aufgabe}",
+      "/api/identity",
+      "/api/identity/assurance",
       "/api/mailbox",
+      "/api/payment",
+      "/api/payment/{paymentId}",
       "/api/preferences",
+      "/api/procedures",
+      "/api/register/evidence",
       "/api/session",
+      "/api/tasks/{id}",
+      "/api/verfahren/{procedureId}/{version}/wissen",
+      "/api/verfahren/{procedureId}/{version}/wissen/export",
+      "/api/verfahren/{procedureId}/{version}/wissen/ki",
+      "/api/verfahren/{procedureId}/{version}/wissen/{eintragId}/review",
+      "/api/zustellung",
+      "/api/zustellung/{deliveryId}",
     ]);
     const operations = Object.values(
       doc.paths as Record<string, Record<string, unknown>>,
@@ -67,6 +116,53 @@ describe("OpenAPI intern-only", () => {
       "get",
       "get",
       "get",
+      "get",
+      "get",
+      "get",
+      "get",
+      "get",
+      "get",
+      "get",
+      "get",
+      "get",
+      "get",
+      "get",
+      "get",
+      "get",
+      "get",
+      "get",
+      "get",
+      "get",
+      "get",
+      "get",
+      "get",
+      "get",
+      "get",
+      "get",
+      "patch",
+      "post",
+      "post",
+      "post",
+      "post",
+      "post",
+      "post",
+      "post",
+      "post",
+      "post",
+      "post",
+      "post",
+      "post",
+      "post",
+      "post",
+      "post",
+      "post",
+      "post",
+      "post",
+      "post",
+      "post",
+      "post",
+      "post",
+      "post",
       "post",
       "put",
     ]);

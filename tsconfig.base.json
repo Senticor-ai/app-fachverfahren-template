@@ -36,6 +36,9 @@
       "@senticor/provider-dvc-generic": [
         "packages/provider-dvc-generic/src/index.ts"
       ],
+      "@senticor/provider-ai-ollama": [
+        "packages/provider-ai-ollama/src/index.ts"
+      ],
       "@senticor/conformance-kit": ["packages/conformance-kit/src/index.ts"],
       "@senticor/migration-kit": ["packages/migration-kit/src/index.ts"],
       "@senticor/app-store-postgres": [
@@ -48,6 +51,9 @@
         "packages/app-bff-contracts/src/index.ts"
       ],
       "@senticor/app-bff-fastify": ["packages/app-bff-fastify/src/index.ts"],
+      "@senticor/workflow-bpmn-stub": [
+        "packages/workflow-bpmn-stub/src/index.ts"
+      ],
       "@senticor/jurisdiction-eu": ["jurisdictions/eu/src/index.ts"],
       "@senticor/jurisdiction-de": ["jurisdictions/de/src/index.ts"]
     }

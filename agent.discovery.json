@@ -117,6 +117,26 @@
     {
       "id": "skill:deutschland-plattform-anforderungen",
       "path": ".agents/skills/deutschland-plattform-anforderungen/SKILL.md"
+    },
+    {
+      "id": "skill:dossier-fallmanagement",
+      "path": ".agents/skills/dossier-fallmanagement/SKILL.md"
+    },
+    {
+      "id": "skill:bpmn-prozess-workflow",
+      "path": ".agents/skills/bpmn-prozess-workflow/SKILL.md"
+    },
+    {
+      "id": "skill:governance-vier-augen",
+      "path": ".agents/skills/governance-vier-augen/SKILL.md"
+    },
+    {
+      "id": "skill:ki-assistenz",
+      "path": ".agents/skills/ki-assistenz/SKILL.md"
+    },
+    {
+      "id": "skill:domaenen-backend-modul",
+      "path": ".agents/skills/domaenen-backend-modul/SKILL.md"
     }
   ],
   "componentLibraries": [

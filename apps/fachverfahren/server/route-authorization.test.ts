@@ -16,8 +16,11 @@ import {
   InMemoryAppStore,
   InMemoryAuditStore,
   InMemoryAuthStore,
+  InMemoryCaseStore,
   InMemoryKanbanStore,
+  InMemoryTaskStore,
 } from "@senticor/app-store-postgres";
+import { createInMemoryProcedureRegistry } from "@senticor/public-sector-sdk";
 import fastify, { type FastifyInstance } from "fastify";
 import { describe, expect, it } from "vitest";
 import {
@@ -83,6 +86,9 @@ async function buildAppAndCollect(): Promise<CollectedRoute[]> {
   registerAuditRoutes(app, { authStore, auditStore });
   await app.register(appBff, {
     appStore: new InMemoryAppStore(),
+    caseStore: new InMemoryCaseStore(),
+    taskStore: new InMemoryTaskStore(),
+    procedureRegistry: createInMemoryProcedureRegistry([]),
     sessionResolver: new NoSessionResolver(),
     auditSink: new MemoryAuditSink(),
   });
@@ -120,6 +126,177 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           url: "/api/capabilities",
           policy: "rbac:session.read",
         },
+        { method: "GET", url: "/api/procedures", policy: "rbac:case.read" },
+        { method: "GET", url: "/api/cases", policy: "rbac:case.read" },
+        {
+          method: "POST",
+          url: "/api/cases",
+          policy: "rbac:case.decision.prepare",
+        },
+        { method: "GET", url: "/api/cases/:id", policy: "rbac:case.read" },
+        {
+          method: "GET",
+          url: "/api/cases/:id/allowed-actions",
+          policy: "rbac:case.read",
+        },
+        {
+          method: "GET",
+          url: "/api/cases/:id/audit",
+          policy: "rbac:case.read",
+        },
+        // Legal Hold (Löschsperre): eigene case.legal-hold-Permission — begrenzt das Löschrecht.
+        {
+          method: "POST",
+          url: "/api/cases/:id/legal-hold",
+          policy: "rbac:case.legal-hold",
+        },
+        // DSGVO-Löschung (Art. 17 / §84 SGB X): eigene, eng gefasste case.pii.erase-Permission.
+        {
+          method: "POST",
+          url: "/api/cases/:id/loeschung",
+          policy: "rbac:case.pii.erase",
+        },
+        {
+          method: "GET",
+          url: "/api/cases/:id/progress",
+          policy: "rbac:case.read",
+        },
+        // Rechtsbehelfs-Entscheidung (Abhilfe/Nichtabhilfe): behördliche Entscheidung = case.decision.prepare.
+        {
+          method: "POST",
+          url: "/api/cases/:id/rechtsbehelf/entscheidung",
+          policy: "rbac:case.decision.prepare",
+        },
+        {
+          method: "GET",
+          url: "/api/cases/:id/tasks",
+          policy: "rbac:case.read",
+        },
+        {
+          method: "POST",
+          url: "/api/cases/:id/tasks",
+          policy: "rbac:case.decision.prepare",
+        },
+        {
+          method: "POST",
+          url: "/api/cases/:id/transitions",
+          policy: "rbac:case.decision.prepare",
+        },
+        // Aktenvermerke (append-only): Lesen = case.read; Schreiben (Mensch + KI) = eigene case.note.write.
+        {
+          method: "GET",
+          url: "/api/cases/:id/vermerke",
+          policy: "rbac:case.read",
+        },
+        {
+          method: "POST",
+          url: "/api/cases/:id/vermerke",
+          policy: "rbac:case.note.write",
+        },
+        {
+          method: "GET",
+          url: "/api/cases/:id/vermerke/export",
+          policy: "rbac:case.read",
+        },
+        {
+          method: "POST",
+          url: "/api/cases/:id/vermerke/ki",
+          policy: "rbac:case.note.write",
+        },
+        {
+          method: "POST",
+          url: "/api/cases/:id/vermerke/:vermerkId/review",
+          policy: "rbac:case.note.write",
+        },
+        // Agentic-Composable-Discovery: read-only, jede Sitzung (session.read).
+        {
+          method: "GET",
+          url: "/api/composables",
+          policy: "rbac:session.read",
+        },
+        {
+          method: "GET",
+          url: "/api/composables/:id",
+          policy: "rbac:session.read",
+        },
+        // Evidence-Ledger: behördliche Oversight-Sicht (case.read).
+        {
+          method: "GET",
+          url: "/api/composables/:id/evidence",
+          policy: "rbac:case.read",
+        },
+        // Spine-Run: agentische (KI-)Handlung → ai.assist (nur Sachbearbeitung).
+        {
+          method: "POST",
+          url: "/api/composables/:id/spine/:aufgabe",
+          policy: "rbac:ai.assist",
+        },
+        {
+          method: "PATCH",
+          url: "/api/tasks/:id",
+          policy: "rbac:case.decision.prepare",
+        },
+        // KI-Assistenz (assistiv, HCAI): eigene ai.assist-Permission (nur Sachbearbeitung).
+        {
+          method: "POST",
+          url: "/api/ai/assist",
+          policy: "rbac:ai.assist",
+        },
+        // Bürger-Sicht auf die EIGENEN Anträge: eine eigene Routen-Familie mit EIGENEN Permissions.
+        // Bewusst `rbac:` und NICHT `rbac-scoped:` wie die Mailbox — hier gibt es keine Scope-WAHL:
+        // die Route IST der Scope, er kommt nicht von der Leitung (scopeOf läse Query/Body).
+        // Und NIE `case.read`/`case.decision.prepare`: das sind die Behörden-Rechte über ALLE Fälle.
+        {
+          method: "GET",
+          url: "/api/buerger/antraege",
+          policy: "rbac:case.own.read",
+        },
+        {
+          method: "POST",
+          url: "/api/buerger/antraege",
+          policy: "rbac:case.own.submit",
+        },
+        {
+          method: "GET",
+          url: "/api/buerger/antraege/:id",
+          policy: "rbac:case.own.read",
+        },
+        {
+          method: "GET",
+          url: "/api/buerger/antraege/:id/bescheid",
+          policy: "rbac:case.own.read",
+        },
+        {
+          method: "GET",
+          url: "/api/buerger/antraege/:id/bescheid.pdf",
+          policy: "rbac:case.own.read",
+        },
+        // Nachweis-Upload (Byte-Transfer): Lesen/Download = case.own.read, Hochladen = case.own.submit.
+        {
+          method: "GET",
+          url: "/api/buerger/antraege/:id/nachweise",
+          policy: "rbac:case.own.read",
+        },
+        {
+          method: "POST",
+          url: "/api/buerger/antraege/:id/nachweise",
+          policy: "rbac:case.own.submit",
+        },
+        {
+          method: "GET",
+          url: "/api/buerger/antraege/:id/nachweise/:attachmentId",
+          policy: "rbac:case.own.read",
+        },
+        {
+          method: "POST",
+          url: "/api/buerger/antraege/:id/widerspruch",
+          policy: "rbac:case.own.submit",
+        },
+        {
+          method: "POST",
+          url: "/api/buerger/antraege/:id/rueckforderung/zahlung",
+          policy: "rbac:case.own.submit",
+        },
         {
           method: "GET",
           url: "/api/mailbox",
@@ -143,6 +320,75 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           policy: "rbac:preferences.write",
         },
         { method: "GET", url: "/api/session", policy: "rbac:session.read" },
+        // N-Augen-Freigabe-Sammlung (Issue #56): Vorbereiten/Freigeben = case.decision.prepare.
+        {
+          method: "POST",
+          url: "/api/cases/:id/approvals",
+          policy: "rbac:case.decision.prepare",
+        },
+        // Fachdienst-Durchstiche (Port-Seams): Identität (BundID/eID), Zahlung (ePayBL), Register-Abruf
+        // (NOOTS/Once-Only), Bescheid-Zustellung (De-Mail/eBO) — je eigene, deny-by-default RBAC-Permission.
+        {
+          method: "GET",
+          url: "/api/identity",
+          policy: "rbac:session.read",
+        },
+        {
+          method: "POST",
+          url: "/api/identity/assurance",
+          policy: "rbac:session.read",
+        },
+        {
+          method: "POST",
+          url: "/api/payment",
+          policy: "rbac:payment.initiate",
+        },
+        {
+          method: "GET",
+          url: "/api/payment/:paymentId",
+          policy: "rbac:payment.initiate",
+        },
+        {
+          method: "POST",
+          url: "/api/register/evidence",
+          policy: "rbac:register.abruf",
+        },
+        {
+          method: "POST",
+          url: "/api/zustellung",
+          policy: "rbac:bescheid.versand",
+        },
+        {
+          method: "GET",
+          url: "/api/zustellung/:deliveryId",
+          policy: "rbac:bescheid.versand",
+        },
+        // Verfahrens-Wiki: Lesen = case.read; Schreiben (Mensch + KI) = case.note.write.
+        {
+          method: "GET",
+          url: "/api/verfahren/:procedureId/:version/wissen",
+          policy: "rbac:case.read",
+        },
+        {
+          method: "GET",
+          url: "/api/verfahren/:procedureId/:version/wissen/export",
+          policy: "rbac:case.read",
+        },
+        {
+          method: "POST",
+          url: "/api/verfahren/:procedureId/:version/wissen",
+          policy: "rbac:case.note.write",
+        },
+        {
+          method: "POST",
+          url: "/api/verfahren/:procedureId/:version/wissen/ki",
+          policy: "rbac:case.note.write",
+        },
+        {
+          method: "POST",
+          url: "/api/verfahren/:procedureId/:version/wissen/:eintragId/review",
+          policy: "rbac:case.note.write",
+        },
         // Workspace-APIs brauchen Permissions — nie nur „eingeloggt".
         {
           method: "GET",

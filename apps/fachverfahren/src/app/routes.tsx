@@ -1,29 +1,55 @@
 // routes — bindet jede klassifizierte Route (route-gates.ts) an ihre Sicht (src/pages/*).
 // Record<AppRoutePath, …> erzwingt Vollständigkeit in beide Richtungen: ein Gate ohne
 // Sicht oder eine Sicht ohne Gate ist ein Typfehler, kein Laufzeit-Loch.
+import { lazy, Suspense } from "react";
 import { Navigate } from "react-router-dom";
 import { LandingPage } from "../LandingPage.js";
 import { AdminUsersRoute } from "../pages/admin-users.js";
+import { AmtAktePage } from "../pages/amt-akte.js";
+import { AmtAktenPage } from "../pages/amt-akten.js";
+import { AmtVerfahrenWikiPage } from "../pages/amt-verfahren-wiki.js";
 import { AmtEingangPage } from "../pages/amt-eingang.js";
 import { AmtVorgangPage } from "../pages/amt-vorgang.js";
 import { AufsichtPage } from "../pages/aufsicht.js";
 import { BoardDetailPage } from "../pages/board-detail.js";
 import { BoardsListPage } from "../pages/boards-list.js";
 import { BuergerAnmeldenPage } from "../pages/buerger-anmelden.js";
+import { BuergerAntragPage } from "../pages/buerger-antrag.js";
+import { BuergerAntraegePage } from "../pages/buerger-antraege.js";
+import { BuergerBescheidPage } from "../pages/buerger-bescheid.js";
 import { BuergerBestaetigungPage } from "../pages/buerger-bestaetigung.js";
+import { BuergerPostfachPage } from "../pages/buerger-postfach.js";
 import { BuergerStartPage } from "../pages/buerger-start.js";
 import { KontoPasswortPage } from "../pages/konto-passwort.js";
 import type { AppRouteDefinition } from "./route-definition.js";
 import { routeGates, type AppRoutePath } from "./route-gates.js";
 
+// Doku-Wiki lazy: das generierte docs-manifest ist gross (komplette Repo-Doku) — eigener Chunk statt
+// Haupt-Bundle-Bloat. Named export via .then-Mapping (App-Konvention sind benannte Exporte).
+const HilfePage = lazy(() =>
+  import("../pages/hilfe.js").then((m) => ({ default: m.HilfePage })),
+);
+
 const routeElements: Record<AppRoutePath, React.JSX.Element> = {
   "/": <LandingPage />,
   "/login": <Navigate to="/" replace />,
+  "/hilfe": (
+    <Suspense fallback={<div className="p-6 text-sm">Lade Doku…</div>}>
+      <HilfePage />
+    </Suspense>
+  ),
   "/buerger": <BuergerStartPage />,
   "/buerger/anmelden": <BuergerAnmeldenPage />,
   "/buerger/bestaetigung/:id": <BuergerBestaetigungPage />,
+  "/buerger/antraege": <BuergerAntraegePage />,
+  "/buerger/antrag/:id": <BuergerAntragPage />,
+  "/buerger/bescheid/:id": <BuergerBescheidPage />,
+  "/buerger/postfach": <BuergerPostfachPage />,
   "/amt": <AmtEingangPage />,
   "/amt/vorgang/:id": <AmtVorgangPage />,
+  "/amt/akten": <AmtAktenPage />,
+  "/amt/akte/:id": <AmtAktePage />,
+  "/amt/verfahren/:procedureId/:version/wiki": <AmtVerfahrenWikiPage />,
   "/aufsicht": <AufsichtPage />,
   "/boards": <BoardsListPage />,
   "/boards/:boardId": <BoardDetailPage />,

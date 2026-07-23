@@ -139,6 +139,22 @@ function buildPublicRuntimeConfig(
       publicBaseUrl: publicBaseUrl ?? "",
       serviceWorkerEnabled,
     },
+    // ZONE (BSI-Netzsegmentierung): die Flächen, die DIESE Instanz servieren darf — aus dem Deploy-Env ZONE_SURFACES
+    // (dieselbe readZoneModel-Wahrheit wie die Netz-Segmentierung + das BFF-Route-Gate). Das Frontend blendet Flächen
+    // außerhalb dieser Menge aus (Experience-Filter). Das SIGNAL ist die PRÄSENZ des Schlüssels, NICHT sein Inhalt: fehlt
+    // ZONE_SURFACES ⇒ KEIN `zone`-Feld ⇒ das Frontend läuft fail-open (ALLE Flächen, Ein-App). Gesetzt (auch "") ⇒ zoniert:
+    // `allowedSurfaces` (leer bei einer reinen Struktur-Zone ⇒ das Frontend zeigt KEINE Fläche, NIE fail-open).
+    ...(env["ZONE_SURFACES"] === undefined
+      ? {}
+      : {
+          zone: {
+            id: env["ZONE"]?.trim() ?? "",
+            allowedSurfaces: env["ZONE_SURFACES"]
+              .split(",")
+              .map((surface) => surface.trim())
+              .filter(Boolean),
+          },
+        }),
   };
 }
 

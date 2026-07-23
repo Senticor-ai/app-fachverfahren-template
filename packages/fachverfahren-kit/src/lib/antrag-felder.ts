@@ -5,9 +5,21 @@
 // Der `AntragStepper` RENDERT nur und delegiert jede fachliche Entscheidung hierher — so ist die Subsumtion
 // deterministisch prüfbar (und die Klasse „getippte Zahl kommt als String an, `switch` matcht nie" strukturell
 // ausgeschlossen).
+// Die reinen Pfad-/Wert-Utils leben jetzt im SDK (geteilt mit dem server-autoritativen Fall-Guard) — hier mit
+// echten Namen importiert (damit die übrigen Funktionen dieser Datei sie nutzen) UND re-exportiert (damit
+// bestehende Kit-Importe `import { getPath } from ".../antrag-felder"` bitidentisch bleiben).
+import {
+  asString,
+  getPath,
+  istDateiWert,
+  parsePath,
+  type DateiWert,
+} from "@senticor/public-sector-sdk";
 import type { Codeliste, FeldDef, FeldOption, StepDef } from "../types.js";
 
 export type Antragsdaten = Record<string, unknown>;
+export { asString, getPath, istDateiWert, parsePath };
+export type { DateiWert };
 // `FeldOption` ist EINE Wahrheit in ../types (schlank value/label + optionale M1-Codelisten-Signale
 // markierung/merkmale) — hier re-exportiert, damit bestehende Importe aus `lib/antrag-felder` gültig bleiben.
 export type { FeldOption };
@@ -15,42 +27,10 @@ export type { FeldOption };
  *  Provenienz) teilen sich EINE Auflösung über `FeldDef.optionsRef`. */
 export type Datenlisten = Record<string, FeldOption[]>;
 export type Codelisten = Record<string, Codeliste>;
-/** Datei-Metadaten eines `file`-Felds — der echte Inhalt wandert in PROD über den Port. */
-export type DateiWert = { name: string; groesse: number };
-
-// ── Pfad-Zugriff auf das verschachtelte Antragsdaten-Objekt über "a.b.c"- UND "a[0].b"-Feldpfade ───────────────
-// WURZEL-FIX (Live-Audit): Feldpfade tragen ARRAY-INDIZES der Form "posten[0].wert" — der Antrag erhebt je LISTEN-
-// EINTRAG (je Objekt) mehrere Felder. Ein reines split(".") speicherte/las den LITERAL-Key "posten[0]" statt posten[0]
-// → a.posten blieb undefined, die Eingabe erreichte die Berechnung nie (immer 0/provisional). parsePath zerlegt jeden
-// Pfad in Tokens (String-Key | numerischer Index), sodass get/set Objekte UND Arrays korrekt traversieren + aufbauen.
-type PathToken = string | number;
-/** Zerlegt "posten[0].wert" → ["posten", 0, "wert"]; "a.b" → ["a","b"]; "x[1][2]" → ["x",1,2]. Rein, testbar. */
-export function parsePath(path: string): PathToken[] {
-  const tokens: PathToken[] = [];
-  for (const seg of path.split(".")) {
-    const m = seg.match(/^([^[\]]*)((?:\[\d+\])*)$/);
-    if (!m) {
-      tokens.push(seg);
-      continue;
-    } // untypisches Segment → als Literal-Key (rückwärtskompatibel)
-    if (m[1]) tokens.push(m[1]);
-    for (const idx of m[2].match(/\d+/g) ?? []) tokens.push(Number(idx));
-  }
-  return tokens;
-}
-
-/** Liest einen Wert aus dem verschachtelten Objekt/Array anhand des Feldpfads (z. B. "posten[0].wert"). */
-export function getPath(obj: Antragsdaten, path: string): unknown {
-  return parsePath(path).reduce<unknown>((acc, key) => {
-    if (acc == null || typeof acc !== "object") return undefined;
-    if (typeof key === "number")
-      return Array.isArray(acc) ? (acc as unknown[])[key] : undefined;
-    return (acc as Antragsdaten)[key];
-  }, obj);
-}
+// parsePath/getPath/asString/istDateiWert + DateiWert kommen jetzt aus dem SDK (siehe Re-Export oben).
 
 /** Setzt einen Wert im verschachtelten Objekt/Array (immutabel) anhand des Feldpfads — legt Zwischen-Knoten je
- *  Token-Typ an (numerischer Token → Array, String-Token → Objekt). */
+ *  Token-Typ an (numerischer Token → Array, String-Token → Objekt). Bleibt im Kit (nur die Antrags-UX setzt Werte). */
 export function setPath(
   obj: Antragsdaten,
   path: string,
@@ -74,25 +54,6 @@ export function setPath(
     return base;
   };
   return setAt(obj, 0) as Antragsdaten;
-}
-
-/** Feldwert als String (für Text-Inputs/Validierung) — undefined/null → "", boolean → "true"/"false",
- *  Datei-Wert → Dateiname, sonstige Objekte → "" (nie "[object Object]"). */
-export function asString(v: unknown): string {
-  if (v === undefined || v === null) return "";
-  if (typeof v === "boolean") return v ? "true" : "false";
-  if (typeof v === "object") return istDateiWert(v) ? v.name : "";
-  return String(v);
-}
-
-/** Type-Guard: ist der Wert ein Datei-Wert ({ name, groesse })? */
-export function istDateiWert(v: unknown): v is DateiWert {
-  return (
-    !!v &&
-    typeof v === "object" &&
-    typeof (v as { name?: unknown }).name === "string" &&
-    typeof (v as { groesse?: unknown }).groesse === "number"
-  );
 }
 
 // ── Auswahl-Optionen auflösen: inline (`options`) ODER data-driven (`optionsRef` → datenlisten|codelisten) ──

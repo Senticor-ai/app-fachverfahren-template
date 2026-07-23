@@ -1117,12 +1117,12 @@ async function testAgentReadiness() {
     specPath: defaultTaskSpecPath,
     dryRun: false,
   });
-  const before = await snapshotDirectory(join(root, "modules", "dog-tax"));
+  const before = await snapshotDirectory(join(root, "modules", "hundesteuer"));
   const second = await appNew(root, {
     specPath: defaultTaskSpecPath,
     dryRun: false,
   });
-  const after = await snapshotDirectory(join(root, "modules", "dog-tax"));
+  const after = await snapshotDirectory(join(root, "modules", "hundesteuer"));
   const differences = compareSnapshots(before, after);
   const failures = [
     ...(result.status === "ok" ? [] : result.failures),
@@ -1160,7 +1160,7 @@ async function testGoldenGeneratedApp() {
   });
   const context = await buildAgentContext(target, {
     taskPath: defaultTaskSpecPath,
-    paths: ["modules/dog-tax"],
+    paths: ["modules/hundesteuer"],
   });
   const failures = [
     ...(appResult.status === "ok" ? [] : appResult.failures),

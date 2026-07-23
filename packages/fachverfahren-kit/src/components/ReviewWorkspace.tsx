@@ -372,8 +372,12 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
                   // Vier-Augen-Buttons lösen jetzt WIRKLICH den Übergang aus (denselben Port wie das EntscheidungPanel) —
                   // mit `akteur`, sodass der Vier-Augen-Schutz (store: andere Person als der Ersteller) greift. Danach
                   // schließt die Sicht (zurück in den Arbeitsvorrat).
+                  // Das `await` ist tragend: OHNE es resolved dieses Promise SOFORT, `onClose()` liefe auch
+                  // bei einer Ablehnung (403 Vier-Augen, 409 Konflikt) und die Prüfsicht schlösse sich, als
+                  // sei freigegeben worden. Die Ablehnung entkäme zudem dem catch in FourEyesReview.lauf,
+                  // das die Fehlermeldung ansagt. Erst nach ERFOLG schließen.
                   onFreigeben={async () => {
-                    port.uebergang(
+                    await port.uebergang(
                       vorgang.id,
                       vierAugenTransition.to,
                       rolle,
@@ -385,7 +389,7 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
                   {...(ablehnTransition
                     ? {
                         onAblehnen: async (grund: string) => {
-                          port.uebergang(
+                          await port.uebergang(
                             vorgang.id,
                             ablehnTransition.to,
                             rolle,

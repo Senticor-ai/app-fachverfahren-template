@@ -1,0 +1,70 @@
+{{- if .Values.deadlineWorker.enabled }}
+# Fristen-Scan-CronJob (Issue #58): der zeitgetriebene Tick, der den reinen Motor
+# (runDeadlineScanForTenants) EINMAL pro Lauf über APP_TENANT_IDS fährt und sich beendet.
+# concurrencyPolicy=Forbid verhindert Überlappungen; ohne Mandanten ist der Lauf ein No-op
+# (der Worker beendet mit 0), damit der CronJob nicht rot läuft, bevor ein Mandant konfiguriert ist.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "fachverfahren.fullname" . }}-deadline-scan
+  labels:
+    {{- include "fachverfahren.labels" . | nindent 4 }}
+    app.kubernetes.io/component: deadline-scan
+spec:
+  schedule: {{ .Values.deadlineWorker.schedule | quote }}
+  concurrencyPolicy: {{ .Values.deadlineWorker.concurrencyPolicy }}
+  startingDeadlineSeconds: {{ .Values.deadlineWorker.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: {{ .Values.deadlineWorker.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.deadlineWorker.failedJobsHistoryLimit }}
+  jobTemplate:
+    metadata:
+      labels:
+        {{- include "fachverfahren.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: deadline-scan
+    spec:
+      backoffLimit: {{ .Values.deadlineWorker.backoffLimit }}
+      activeDeadlineSeconds: {{ .Values.deadlineWorker.activeDeadlineSeconds }}
+      template:
+        metadata:
+          labels:
+            {{- include "fachverfahren.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: deadline-scan
+        spec:
+          serviceAccountName: {{ include "fachverfahren.serviceAccountName" . }}
+          automountServiceAccountToken: false
+          restartPolicy: {{ .Values.deadlineWorker.restartPolicy }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: deadline-scan
+              image: {{ include "fachverfahren.image" . | quote }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command: ["node", "apps/fachverfahren/dist-server/deadline-worker.js"]
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              envFrom:
+                - configMapRef:
+                    name: {{ include "fachverfahren.fullname" . }}-runtime
+                {{- range .Values.secretRefs }}
+                - secretRef:
+                    name: {{ . | quote }}
+                {{- end }}
+              env:
+                - name: APP_TENANT_IDS
+                  value: {{ .Values.deadlineWorker.tenantIds | quote }}
+                {{- with .Values.extraEnv }}
+                {{- toYaml . | nindent 16 }}
+                {{- end }}
+              resources:
+                {{- toYaml .Values.deadlineWorker.resources | nindent 16 }}
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+{{- end }}

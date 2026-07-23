@@ -1,5 +1,5 @@
-// route-gating.guard.test.ts — Vertrag des Routen-Baums: die Landing ("/") ist die EINZIGE
-// unauthentifizierte Route (plus /login-Alias); ALLE Persona- und Workspace-Routen liegen
+// route-gating.guard.test.ts — Vertrag des Routen-Baums: unauthentifiziert sind nur die Landing ("/"),
+// der /login-Alias und das Doku-Wiki ("/hilfe", nicht sensibel); ALLE Persona- und Workspace-Routen liegen
 // hinter GENAU EINEM Session-Gate (RequireSessionOutlet-Layout-Route). Seit Issue #35 ist
 // der Vertrag STRUKTURELL statt Quelltext-Grep: die abgenommene Klassifizierung lebt als
 // pure Daten in src/app/route-gates.ts, und der aus den Deskriptoren gebaute react-router-
@@ -37,11 +37,22 @@ describe("App-Routen — Session-Gate", () => {
     expect(routeGates).toEqual({
       "/": { kind: "public" },
       "/login": { kind: "public" },
+      "/hilfe": { kind: "public" },
       "/buerger": { kind: "persona", persona: "buerger" },
       "/buerger/anmelden": { kind: "persona", persona: "buerger" },
       "/buerger/bestaetigung/:id": { kind: "persona", persona: "buerger" },
+      "/buerger/antraege": { kind: "persona", persona: "buerger" },
+      "/buerger/antrag/:id": { kind: "persona", persona: "buerger" },
+      "/buerger/bescheid/:id": { kind: "persona", persona: "buerger" },
+      "/buerger/postfach": { kind: "persona", persona: "buerger" },
       "/amt": { kind: "persona", persona: "sachbearbeitung" },
       "/amt/vorgang/:id": { kind: "persona", persona: "sachbearbeitung" },
+      "/amt/akten": { kind: "persona", persona: "sachbearbeitung" },
+      "/amt/akte/:id": { kind: "persona", persona: "sachbearbeitung" },
+      "/amt/verfahren/:procedureId/:version/wiki": {
+        kind: "persona",
+        persona: "sachbearbeitung",
+      },
       "/aufsicht": { kind: "persona", persona: "aufsicht" },
       "/boards": {
         kind: "permission",
@@ -67,14 +78,16 @@ describe("App-Routen — Session-Gate", () => {
     }
   });
 
-  it("es gibt genau EINE RequireSessionOutlet-Layout-Route — und nur / + /login davor", () => {
+  it("es gibt genau EINE RequireSessionOutlet-Layout-Route — davor nur die öffentlichen /, /login, /hilfe", () => {
     const gates = tree.filter(
       (route) => gateType(route) === RequireSessionOutlet,
     );
     expect(gates).toHaveLength(1);
 
+    // /hilfe (Doku-Wiki) ist bewusst öffentlich: Doku ist nicht sensibel und soll im Golden Template ohne
+    // Login aufrufbar sein (fuer Mensch + Agent). Die einzige weitere Ausnahme zur „alles hinter Session"-Regel.
     const topLevelPaths = tree.map((route) => route.path ?? "(layout)");
-    expect(topLevelPaths).toEqual(["/", "/login", "(layout)", "*"]);
+    expect(topLevelPaths).toEqual(["/", "/login", "/hilfe", "(layout)", "*"]);
   });
 
   it("alle Persona- und Workspace-Routen stehen INNERHALB des Gates", () => {
@@ -91,10 +104,17 @@ describe("App-Routen — Session-Gate", () => {
       "/buerger",
       "/buerger/anmelden",
       "/buerger/bestaetigung/:id",
+      "/buerger/antraege",
+      "/buerger/antrag/:id",
+      "/buerger/bescheid/:id",
+      "/buerger/postfach",
     ]);
     expect(childPaths(personaGroups[1] as RouteObject)).toEqual([
       "/amt",
       "/amt/vorgang/:id",
+      "/amt/akten",
+      "/amt/akte/:id",
+      "/amt/verfahren/:procedureId/:version/wiki",
     ]);
     expect(childPaths(personaGroups[2] as RouteObject)).toEqual(["/aufsicht"]);
 

@@ -75,6 +75,95 @@ export type {
   TenantScope,
   VersionedMutation,
 } from "./kanban-store.js";
+export {
+  CaseNotFoundError,
+  CaseVersionConflictError,
+  createCaseStoreFromEnv,
+  InMemoryCaseStore,
+  PostgresCaseStore,
+  UnavailableCaseStore,
+} from "./case-store.js";
+export type {
+  AppAuditEvent,
+  AppCase,
+  CaseStore,
+  ListCasesQuery,
+  PatchCaseDataInput,
+  PatchCaseStateInput,
+} from "./case-store.js";
+export {
+  createTaskStoreFromEnv,
+  InMemoryTaskStore,
+  PostgresTaskStore,
+  TaskNotFoundError,
+  TaskVersionConflictError,
+  UnavailableTaskStore,
+} from "./task-store.js";
+export type {
+  AppTask,
+  ChildFlagAggregate,
+  ListTasksQuery,
+  TaskPatch,
+  TaskState,
+  TaskStore,
+} from "./task-store.js";
+export {
+  createWissenStoreFromEnv,
+  InMemoryWissenStore,
+  PostgresWissenStore,
+  UnavailableWissenStore,
+} from "./wissen-store.js";
+export type {
+  VerfahrensWissenEintrag,
+  WissenQuery,
+  WissenStore,
+} from "./wissen-store.js";
+export {
+  ChosConflictError,
+  ChosEntityNotFoundError,
+  createChosClientFromEnv,
+  HttpChosClient,
+  InMemoryChosClient,
+} from "./chos-client.js";
+export type {
+  ChosClient,
+  ChosEntity,
+  ChosEvent,
+  HttpChosClientOptions,
+} from "./chos-client.js";
+export {
+  DEADLINE_OVERDUE,
+  DEADLINE_SINCE_KEY,
+  DEADLINE_STATUS_KEY,
+  findDueDeadlines,
+  runDeadlineScan,
+  runDeadlineScanForTenants,
+} from "./deadline-scan.js";
+export { ChosCaseStore } from "./chos-case-store.js";
+export { ChosWissenStore } from "./chos-wissen-store.js";
+export { ChosTaskStore } from "./chos-task-store.js";
+export { ChosAuthStore } from "./chos-auth-store.js";
+export { ChosAuditStore } from "./chos-audit-store.js";
+export { ChosAppStore } from "./chos-app-store.js";
+export { ChosKanbanStore } from "./chos-kanban-store.js";
+export {
+  auditEntryHash,
+  auditStreamOrder,
+  chainAuditEvent,
+  hashChainEntry,
+  verifyAuditChain,
+} from "./audit-chain.js";
+export type { AuditChainResult } from "./audit-chain.js";
+export {
+  InMemoryEvidenceLedger,
+  evidenceEntryHash,
+  verifyEvidenceChain,
+} from "./evidence-ledger.js";
+export type {
+  EvidenceEntry,
+  EvidenceAppendInput,
+  EvidenceLedger,
+} from "./evidence-ledger.js";
 export { nextPositionKey } from "./position.js";
 export {
   defaultMigrationOptionsFromEnv,
@@ -89,3 +178,19 @@ export type {
   MigrationOptions,
   MigrationResult,
 } from "./migrate.js";
+
+export {
+  InMemoryKeyManagement,
+  PayloadShreddedError,
+  sealForSubject,
+  openSealed,
+  shredSubject,
+  type KeyManagement,
+  type SealedPayload,
+} from "./crypto-shred.js";
+
+export {
+  redactData,
+  isTombstone,
+  type RedactionTombstone,
+} from "./redaction.js";

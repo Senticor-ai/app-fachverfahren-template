@@ -13,6 +13,8 @@ export * from "./lib/interpreter.js";
 export * from "./lib/dokument-extraktion.js";
 // Nachweis-Upload-Regeln als DATEN: accept-Attribut, Einschränkungs-Text + reine Fail-Fast-Vorprüfung (Typ/Größe).
 export * from "./lib/nachweis-pruefung.js";
+// Generische, sichere Datenanbindung (Register/intern/extern): Selector + Gruppierung + Zweckbindungs-/BSI-Prüfung.
+export * from "./lib/datenanbindung.js";
 
 // UI-Bausteine (Tailwind + shadcn/ui OSS) — konsumieren ausschließlich den Vertrag (config/port/vorgang).
 export * from "./ui/badge.js";
@@ -147,6 +149,8 @@ export * from "./components/DescriptionList.js";
 export * from "./components/SummaryList.js";
 export * from "./components/Timeline.js";
 export * from "./components/Callout.js";
+// ── Dossier/Fallakte (Case-Management): die generische 360°-Sicht (Stammdaten · Ziele · Termine · Notizen · Verlauf). ──
+export * from "./components/DossierAkte360.js";
 
 // ── KI-Anbindung (Port-only, EU-AI-Act): transparente Assistenz + Chat-Port + Agenten-UX-Primitives ──
 // Vendor-neutral, kein Netz/Modell im Kit — echte Modelle docken an die Ports an. Mensch entscheidet (reviewErforderlich).
@@ -158,6 +162,10 @@ export * from "./components/StreamingText.js";
 export * from "./components/AgentTrace.js";
 export * from "./components/ToolCallCard.js";
 export * from "./components/AssistentPanel.js";
+
+// ── KI-Kennzahlen: EINE reine Aggregations-Wahrheit. Quoten beziehen sich IMMER auf die BEWERTETEN
+//    Vorgänge; `aktiv: false` = kein Modell gebunden → Sichten zeigen „—", nie eine erfundene 0. ──
+export * from "./lib/ki-kennzahlen.js";
 
 // ── KI-Steuerung: der Mensch schaltet die KI (Präferenz-Schicht), humanOversight unabschaltbar; localStorage-Hook. ──
 export * from "./lib/ki-steuerung.js";

@@ -33,15 +33,19 @@ describe("deliveryPath — BASE_URL-relative Auslieferungspfade", () => {
   });
 });
 
-describe("main.tsx — keine root-absoluten Auslieferungspfade", () => {
-  const mainSource = () =>
-    readFile(new URL("../src/main.tsx", import.meta.url), "utf8");
+describe("Auslieferungspfade — keine root-absoluten Pfade", () => {
+  const read = (rel: string) => readFile(new URL(rel, import.meta.url), "utf8");
 
-  it("runtime-config.json und Service-Worker laufen über deliveryPath", async () => {
-    const source = await mainSource();
+  it("runtime-config.json wird im geteilten Lader (runtime-config.ts) über deliveryPath geladen", async () => {
+    // Seit dem EINEN memoisierten Lader lebt der Fetch in runtime-config.ts (main.tsx + der Zonen-Filter teilen ihn).
+    const source = await read("../src/runtime-config.ts");
     expect(source).not.toContain('fetch("/runtime-config.json"');
-    expect(source).not.toContain('registerServiceWorker("/service-worker.js")');
     expect(source).toContain('deliveryPath("runtime-config.json")');
+  });
+
+  it("main.tsx lädt den Service-Worker über deliveryPath (kein root-absoluter Pfad)", async () => {
+    const source = await read("../src/main.tsx");
+    expect(source).not.toContain('registerServiceWorker("/service-worker.js")');
     expect(source).toContain('deliveryPath("service-worker.js")');
   });
 });

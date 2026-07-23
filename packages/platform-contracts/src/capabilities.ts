@@ -10,7 +10,8 @@ export type CapabilityId =
   | "notification"
   | "workflow"
   | "audit"
-  | "ai-assist";
+  | "ai-assist"
+  | "blob-storage";
 
 export type DataClassification =
   "public" | "internal" | "confidential" | "restricted" | "special-category";

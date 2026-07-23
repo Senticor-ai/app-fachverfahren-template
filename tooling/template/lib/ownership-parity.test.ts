@@ -32,6 +32,8 @@ import { isRenderedRepoPath } from "./render.ts";
 const updateUnmanagedPaths: string[] = [
   // Repo-/Editor-/Toolchain-Konfiguration der Konsumenten: nach dem Scaffold deren Hoheit.
   ".dockerignore",
+  // Lokales Dev-Postgres (Ein-Kommando-Start): Konsumenten betreiben ihre DB selbst (Compose/k8s/Cloud).
+  "docker-compose.yml",
   ".editorconfig",
   ".env.example",
   ".gitignore",
@@ -47,7 +49,11 @@ const updateUnmanagedPaths: string[] = [
   "vitest.browser.config.ts",
   "vitest.config.ts",
   "vitest.e2e.config.ts",
+  // Postgres-Integrationstest-Konfig (testcontainers) — wie vitest.e2e/browser Konsumenten-Hoheit.
+  "vitest.pg.config.ts",
   "vitest.shims.d.ts",
+  // MSW-Service-Worker (generiert, Test-Artefakt für vitest-browser) — Konsumenten-Hoheit.
+  "public/mockServiceWorker.js",
   ".storybook/**",
   // Konsumenten-CI und -Git-Hooks: laufen im Konsumenten-Repo, dessen Entwickler entscheiden.
   ".github/workflows/**",
@@ -72,15 +78,17 @@ const updateUnmanagedPaths: string[] = [
   "apps/*/index.html",
   "apps/*/leistung.contract.json",
   "apps/*/package.json",
+  "apps/*/procedure.contract.json",
   "apps/*/scripts/**",
   "apps/*/src/**",
   "apps/*/tests/**",
   "apps/*/tsconfig.json",
   "apps/*/tsconfig.server.json",
   "apps/*/vite.config.ts",
-  // Lokale Entwicklungsumgebung + E2E: Konsumenten-Hoheit.
+  // Lokale Entwicklungsumgebung + E2E + PG-Testcontainer-Setup: Konsumenten-Hoheit.
   "dev/**",
   "tests/e2e/**",
+  "tests/pg/**",
   // Doku außerhalb der verwalteten docs/agents|assets|reference|capabilities-Bäume.
   "docs/UX-UPGRADE-PLAN.md",
   "docs/adr/**",
@@ -101,6 +109,9 @@ const updateUnmanagedPaths: string[] = [
   // Lockfiles divergieren legitim (siehe deploy-demo-consumer.sh: bewusst nicht template-managed).
   "pnpm-lock.yaml",
   // Repo-Skripte außerhalb der verwalteten check-template-*/check-web|k8s-delivery/scaffold-*-Muster.
+  "scripts/check-antrag-procedure.mts",
+  "scripts/check-bpmn-example.mts",
+  "scripts/check-composables.mts",
   "scripts/check-css-token-aliases.mjs",
   "scripts/check-dev-dependencies.mjs",
   "scripts/check-dockerfile-paths.mjs",
@@ -108,6 +119,7 @@ const updateUnmanagedPaths: string[] = [
   "scripts/check-esm-policy.mjs",
   "scripts/check-leistung-contract.mts",
   "scripts/check-motion-tokens.mjs",
+  "scripts/check-procedure-contract.mts",
   "scripts/check-pwa-browser.mjs",
   "scripts/check-pwa-runtime.mjs",
   "scripts/check-storybook-coverage.mjs",
@@ -122,6 +134,9 @@ const updateUnmanagedPaths: string[] = [
   "scripts/dev-api.test.mjs",
   "scripts/evidence-build.mjs",
   "scripts/motion-baseline.json",
+  // PDF/A-Konvertierung des Bescheids (open source, Python/pikepdf, kein Java) — polyglottes Tool
+  // + Doku; Toolchain-Bereitstellung (venv/ICC) ist Umgebungsentscheidung des Konsumenten.
+  "scripts/pdfa/**",
   "scripts/smoke-generated-app.sh",
   "scripts/test-generated-app-ci.guard.test.ts",
   "scripts/test-generated-app-ci.sh",
@@ -162,6 +177,34 @@ describe("ownership/scaffold parity", () => {
       "packages/app-store-postgres/src/index.ts",
     );
     expect(sample).toEqual({ pattern: "packages/*/**", strategy: "replace" });
+  });
+
+  it("hält die Dossier-Naht beim Konsumenten — sonst überschriebe template:update sein Verfahren", () => {
+    // procedure.config.ts trägt das Verfahren des Konsumenten (dossierProcedure). Fiele sie unter
+    // apps/*/server/** = replace, überschriebe JEDES Upgrade sie mit dem neutralen Musterverfahren.
+    expect(
+      explainOwnership(
+        defaultOwnership,
+        "apps/fachverfahren/server/procedure.config.ts",
+      ),
+    ).toEqual({
+      pattern: "apps/*/server/procedure.config.ts",
+      strategy: "consumer",
+    });
+    // Die Composable-Naht bleibt ebenfalls beim Konsumenten (deklariert seine Composables + Spine-Agenten).
+    expect(
+      explainOwnership(
+        defaultOwnership,
+        "apps/fachverfahren/server/composables.config.ts",
+      ),
+    ).toEqual({
+      pattern: "apps/*/server/composables.config.ts",
+      strategy: "consumer",
+    });
+    // Das übrige Server-Fundament bleibt Vorlagen-besitz (replace) — die Ausnahme ist chirurgisch.
+    expect(
+      explainOwnership(defaultOwnership, "apps/fachverfahren/server/index.ts"),
+    ).toEqual({ pattern: "apps/*/server/**", strategy: "replace" });
   });
 
   it.skipIf(!isPristineTemplate)(

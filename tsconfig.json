@@ -6,6 +6,7 @@
     { "path": "packages/public-sector-ui" },
     { "path": "packages/provider-local" },
     { "path": "packages/provider-local-auth" },
+    { "path": "packages/provider-ai-ollama" },
     { "path": "packages/provider-codesphere" },
     { "path": "packages/provider-dvc-generic" },
     { "path": "packages/conformance-kit" },
@@ -14,6 +15,7 @@
     { "path": "packages/app-runtime-fastify" },
     { "path": "packages/app-bff-contracts" },
     { "path": "packages/app-bff-fastify" },
+    { "path": "packages/workflow-bpmn-stub" },
     { "path": "jurisdictions/eu" },
     { "path": "jurisdictions/de" }
   ]

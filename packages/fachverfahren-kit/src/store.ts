@@ -8,6 +8,7 @@ import { create, type StoreApi, type UseBoundStore } from "zustand";
 import type {
   LeistungConfig,
   Vorgang,
+  VorgangPersistence,
   VorgangPort,
   Transition,
 } from "./types.js";
@@ -34,15 +35,27 @@ export interface FachverfahrenStore<T> extends VorgangPort<T> {
   transitionsFrom(status: string, rolle?: string): Transition[];
 }
 
-/** Baut den Store für EINE Leistung. `jahr` injiziert (kein `new Date()` in der Logik → deterministisch/testbar). */
+/** Baut den Store für EINE Leistung. `jahr` injiziert (kein `new Date()` in der Logik → deterministisch/testbar).
+ *  `persistence` (optional): bindet den Store an eine Aufbewahrungs-Naht (PROD: HTTP gegen das BFF). Ist sie
+ *  gesetzt, ist der SERVER die Wahrheit — der DEV-`config.seed` entfällt, der Anfangs-Snapshot ist leer, bis
+ *  `laden()` hydriert. Ohne `persistence` bleibt alles wie bisher (In-Memory + Seed, rückwärtskompatibel). */
 export function createFachverfahrenStore<T = Record<string, unknown>>(
   config: LeistungConfig<T>,
-  opts: { jahr?: number; now?: () => string } = {},
+  opts: {
+    jahr?: number;
+    now?: () => string;
+    persistence?: VorgangPersistence<T>;
+  } = {},
 ): FachverfahrenStore<T> {
   const jahr = opts.jahr ?? 2026;
   const now = opts.now ?? (() => new Date().toISOString());
+  const persistence = opts.persistence;
   const vorgangsnummer = makeVorgangsnummer(jahr);
 
+  // Der Config-Seed ist der ANFANGSBESTAND — auch mit Persistenz. `laden()` ERSETZT ihn bei der
+  // Hydration durch die Server-Wahrheit; wer nicht hydriert (z. B. eine SB-Sicht, die den Demo-
+  // Bestand zeigt), behält den Seed. So teilen Bürger- und SB-Sicht EINE Store-Instanz, ohne dass
+  // die eine der anderen den Bestand wegzieht.
   const seed = config.seed?.({ vorgangsnummer }) ?? [];
   const use = create<{ vorgaenge: Vorgang<T>[] }>(() => ({ vorgaenge: seed }));
 
@@ -63,8 +76,26 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
     list: () => use.getState().vorgaenge,
     get: (id) => use.getState().vorgaenge.find((v) => v.id === id),
 
-    einreichen: (antragsdaten, erbrachteNachweise) => {
-      const ki = { confidence: 0, flags: [] as string[] };
+    // Hydriert den Snapshot aus der Persistenz-Naht (PROD: GET) — und ERSETZT dabei den bisherigen
+    // Bestand (Seed) durch die Server-Wahrheit. Ohne Persistenz existiert die Methode nicht (der
+    // In-Memory-Store trägt seinen Bestand selbst: Seed + eingereichte Vorgänge).
+    ...(persistence
+      ? {
+          laden: async () => {
+            const vorgaenge = await persistence.laden();
+            use.setState({ vorgaenge });
+          },
+        }
+      : {}),
+
+    // ASYNC nur der SIGNATUR nach: dieser DEV-Store rechnet rein lokal und synchron. Der Vertrag ist
+    // async, damit die PROD-Implementierung (HTTP gegen das BFF) überhaupt typisierbar ist — vorher
+    // schloss die synchrone Signatur jede server-gestützte Umsetzung aus.
+    einreichen: async (antragsdaten, erbrachteNachweise) => {
+      // KEINE KI-Einschätzung: an diesen Store ist KEIN Modell gebunden (der AiAssistPort ist eine
+      // Naht ohne Adapter). Die Vorfassung schrieb hier hart `{confidence: 0, flags: []}` — das las
+      // sich in der Aufsicht als „die KI war zu 0 % sicher" statt „es lief gar keine KI". `ki` bleibt
+      // deshalb UNGESETZT, bis ein Adapter den Vorgang wirklich bewertet.
       // DEFENSIV wie transitionsFrom (fail-closed gegen unvollständig generierte Config): OHNE Initial-Status kann kein
       // Vorgang eröffnet werden — sprechender Fehler statt stiller TypeError, der die Bürger-Navigation verschluckt.
       const initialStatus = config.statusMachine?.initial;
@@ -90,7 +121,6 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
         status: initialStatus,
         // berechnung ist optional — unter exactOptionalPropertyTypes nur setzen, wenn vorhanden.
         ...(berechnung ? { berechnung } : {}),
-        ki,
         // NACHWEIS-RECONCILE (Wurzel-Fix „hochgeladener Nachweis landet nicht beim Sachbearbeiter"): die aus der Config
         // abgeleitete SOLL-Liste mit den TATSÄCHLICH eingereichten Dateien (keyed by Nachweis-Id) mergen — wo ein Upload
         // existiert, hochgeladen:true + Datei-Metadaten ablegen. Rein data-driven über die Id, kein Verfahrens-Literal.
@@ -102,11 +132,20 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
           { ts: now(), aktion: "Antrag eingegangen", rolle: "buerger" },
         ],
       };
+      // Mit Persistenz: erst SPEICHERN, dann den kanonischen Vorgang (Server vergibt id/Nummer/Zeit) in
+      // den Snapshot übernehmen. Der Server ist die Quelle der id — sonst zeigte die Bestätigungsseite eine
+      // Client-id, die nach einem Reload nicht mehr existierte. Wirft die Persistenz (Netz/403/…), landet
+      // NICHTS im Snapshot und der Fehler propagiert an den Aufrufer (AntragStepper meldet ihn sichtbar).
+      if (persistence) {
+        const kanonisch = await persistence.einreichen(v);
+        setState((vs) => [kanonisch, ...vs]);
+        return kanonisch;
+      }
       setState((vs) => [v, ...vs]);
       return v;
     },
 
-    uebergang: (id, to, rolle, detail, akteur) => {
+    uebergang: async (id, to, rolle, detail, akteur) => {
       const v = store.get(id);
       if (!v) throw new Error(`Vorgang ${id} nicht gefunden`);
       const t = config.statusMachine.transitions.find(
@@ -153,7 +192,7 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
       );
     },
 
-    lookupRegister: (query) => {
+    lookupRegister: async (query) => {
       const q = query.toLowerCase().trim();
       if (!q) return undefined;
       return config.register.mock?.find((r) =>

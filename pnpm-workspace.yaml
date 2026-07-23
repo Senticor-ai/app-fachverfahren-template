@@ -11,8 +11,15 @@ preferWorkspacePackages: true
 verifyDepsBeforeRun: false
 
 allowBuilds:
+  # testcontainers-transitiv (ssh2 = Remote-Docker über SSH, hier ungenutzt; cpu-features = optionale
+  # native SSH-Beschleunigung). Kein Build-Script nötig — lokaler Docker-Socket reicht.
+  cpu-features: false
   esbuild: false
   msw: true
+  # protobufjs (transitiv über die OTel-SDK): kein Build-Script nötig — der OTLP-Exporter läuft über HTTP+JSON,
+  # nicht protobuf. Bewusst false (kein postinstall-codegen).
+  protobufjs: false
+  ssh2: false
 
 catalog:
   "@types/node": ^24.13.3

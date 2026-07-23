@@ -31,12 +31,12 @@ describe("agent platform contract", () => {
   it("selects minimal task context for the Hundesteuer spec", async () => {
     const context = await buildAgentContext(root, {
       taskPath: "docs/examples/hundesteuer/app.spec.yaml",
-      paths: ["modules/dog-tax"],
+      paths: ["modules/hundesteuer"],
     });
     expect(context.taskId).toBe("hundesteuer");
     expect(context.selectedCapabilities).toContain("identity-and-trust");
     expect(context.selectedSources).toEqual(["fimportal"]);
-    expect(context.writeBoundaries).toContain("modules/dog-tax");
+    expect(context.writeBoundaries).toContain("modules/hundesteuer");
     expect(context.writeBoundaries).toContain(".agent/sources/");
     expect(context.nextCommands.map((command) => command.id)).toContain(
       "fetch-governed-source:fimportal",
@@ -58,10 +58,10 @@ describe("agent platform contract", () => {
       join(root, "docs/examples/hundesteuer/app.spec.yaml"),
     );
     const contract = deriveModuleContract(spec);
-    expect(contract.moduleId).toBe("dog-tax");
+    expect(contract.moduleId).toBe("hundesteuer");
     expect(contract.consumedCapabilities).toContain("payment");
-    expect(contract.allowedDomainPaths).toContain("modules/dog-tax");
-    expect(contract.permissions).toContain("dog-tax.auditor");
+    expect(contract.allowedDomainPaths).toContain("modules/hundesteuer");
+    expect(contract.permissions).toContain("hundesteuer.auditor");
     expect(JSON.stringify(contract)).toContain("AuditPort");
   });
 
@@ -81,19 +81,19 @@ describe("agent platform contract", () => {
       });
       expect(first.status).toBe("ok");
       expect(first.generated).toContain(
-        "modules/dog-tax/contracts/audit-workspace.screen.yaml",
+        "modules/hundesteuer/contracts/audit-workspace.screen.yaml",
       );
       expect(first.generated).toContain(
-        "modules/dog-tax/ui/DogTaxScreens.stories.tsx",
+        "modules/hundesteuer/ui/HundesteuerScreens.stories.tsx",
       );
       expect(first.generated).toContain(
-        "modules/dog-tax/migrations/database/0001_create_dog_tax_cases.sql",
+        "modules/hundesteuer/migrations/database/0001_create_hundesteuer_cases.sql",
       );
       expect(first.generated).toContain(
-        "modules/dog-tax/compliance/profile.example.json",
+        "modules/hundesteuer/compliance/profile.example.json",
       );
       expect(second.status).toBe("ok");
-      expect(second.preserved).toContain("modules/dog-tax");
+      expect(second.preserved).toContain("modules/hundesteuer");
     } finally {
       await rm(temp, { recursive: true, force: true });
     }
@@ -151,6 +151,150 @@ describe("agent platform contract", () => {
     } finally {
       await rm(temp, { recursive: true, force: true });
     }
+  });
+
+  it("wirft bei JEDEM module.destination, das per .. aus dem modules-Baum ausbricht (Traversal-Schutz)", async () => {
+    // Alle drei passieren die Praefix-Pruefung ("modules/") und brachen vorher aus. Der mittlere Fall war
+    // der gefaehrlichste: destination === Repo-Wurzel → app:new ueberschrieb die echte AGENTS.md
+    // (relative(root, root) === "" — weder ".."-Praefix noch absolut).
+    const ausbrueche = [
+      "modules/../../ausserhalb", // ausserhalb des Repos
+      "modules/..", // Repo-Wurzel
+      "modules/../modules-evil", // im Repo, aber ausserhalb des modules-Baums
+    ];
+    for (const destination of ausbrueche) {
+      const temp = await mkdtemp(join(tmpdir(), "agent-app-new-escape-"));
+      try {
+        // Eine echte Repo-Datei, die app:new NIEMALS anfassen darf.
+        await writeFile(join(temp, "AGENTS.md"), "ORIGINAL");
+        const source = await readStructuredFile<AppSpec>(
+          join(root, "docs/examples/hundesteuer/app.spec.yaml"),
+        );
+        const spec = {
+          ...source,
+          id: "escape",
+          fim: source.fim
+            ? { sourceId: source.fim.sourceId, rootId: source.fim.rootId }
+            : undefined,
+          module: { ...source.module, id: "escape", destination },
+        };
+        const specPath = "docs/examples/escape/app.spec.yaml";
+        await mkdir(join(temp, "docs/examples/escape"), { recursive: true });
+        await writeFile(
+          join(temp, specPath),
+          `${JSON.stringify(spec, null, 2)}\n`,
+        );
+
+        // Der Spec faellt SAUBER durch die Validierung (governed-build-Fehlerkanal) — nicht als
+        // Exception tief im Schreibpfad. Der Write-Boundary-Guard bleibt die letzte Verteidigungslinie.
+        const result = await appNew(temp, { specPath });
+        expect(result.status, `destination "${destination}"`).toBe("failed");
+        expect(result.failures ?? []).toContain(
+          "module destination must not contain .. segments",
+        );
+        // ... und nichts angefasst haben.
+        expect(await readFile(join(temp, "AGENTS.md"), "utf8")).toBe(
+          "ORIGINAL",
+        );
+      } finally {
+        await rm(temp, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("validates the OPTIONAL dossier procedure block (rejects malformed, accepts valid, stays optional)", async () => {
+    const source = await readStructuredFile<AppSpec>(
+      join(root, "docs/examples/hundesteuer/app.spec.yaml"),
+    );
+    const base = {
+      ...source,
+      fim: source.fim
+        ? { sourceId: source.fim.sourceId, rootId: source.fim.rootId }
+        : undefined,
+    };
+    const validProcedure = {
+      procedureId: "integrationsmanagement",
+      version: "2026.1",
+      legalBasisIds: ["de-aufenthg-43"],
+      allowedStates: ["aufgenommen", "aktiv", "abgeschlossen"],
+      allowedTransitions: [
+        { from: "aufgenommen", to: "aktiv", action: "aktivieren" },
+        {
+          from: "aktiv",
+          to: "abgeschlossen",
+          action: "abschliessen",
+          requiresFourEyes: true,
+          closesCase: true,
+        },
+        { from: "abgeschlossen", to: "aktiv", action: "wiederaufnehmen" },
+      ],
+    };
+
+    async function runWith(
+      procedure: unknown,
+    ): Promise<{ status: string; failures: string[] }> {
+      const temp = await mkdtemp(join(tmpdir(), "agent-app-new-proc-"));
+      try {
+        const spec = {
+          ...base,
+          id: "proc",
+          module: {
+            ...base.module,
+            id: "proc-service",
+            destination: "modules/proc-service",
+          },
+          ...(procedure !== undefined ? { procedure } : {}),
+        };
+        const specPath = "docs/examples/proc/app.spec.yaml";
+        await mkdir(join(temp, "docs/examples/proc"), { recursive: true });
+        await writeFile(
+          join(temp, specPath),
+          `${JSON.stringify(spec, null, 2)}\n`,
+        );
+        const result = await appNew(temp, { specPath });
+        return { status: result.status, failures: result.failures ?? [] };
+      } finally {
+        await rm(temp, { recursive: true, force: true });
+      }
+    }
+
+    // Valide → nicht abgelehnt.
+    expect((await runWith(validProcedure)).status).not.toBe("failed");
+
+    // Ohne den schließenden Übergang → kein closesCase → abgelehnt.
+    const noClose = await runWith({
+      ...validProcedure,
+      allowedTransitions: validProcedure.allowedTransitions.filter(
+        (t) => !("closesCase" in t),
+      ),
+    });
+    expect(noClose.status).toBe("failed");
+    expect(
+      noClose.failures.some((f) => f.includes("schließender Übergang")),
+    ).toBe(true);
+
+    // Übergang auf einen unbekannten Zustand → abgelehnt.
+    const dangling = await runWith({
+      ...validProcedure,
+      allowedTransitions: [
+        ...validProcedure.allowedTransitions,
+        {
+          from: "aktiv",
+          to: "nirgendwo",
+          action: "abzweigen",
+          closesCase: true,
+        },
+      ],
+    });
+    expect(dangling.status).toBe("failed");
+    expect(
+      dangling.failures.some((f) =>
+        f.includes('unbekannten to-Zustand "nirgendwo"'),
+      ),
+    ).toBe(true);
+
+    // OHNE procedure-Block bleibt der Spec valide (Optionalität — Antrag-nur-Apps).
+    expect((await runWith(undefined)).status).not.toBe("failed");
   });
 
   it("rejects stale report task hashes", async () => {

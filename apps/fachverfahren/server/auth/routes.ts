@@ -37,6 +37,11 @@ import {
   isDuplicateUserError,
 } from "@senticor/app-store-postgres";
 import { permissionsForRole } from "./workspace-permissions.js";
+import {
+  registerOidcRoutes,
+  type OidcConfig,
+  type OidcRouteDeps,
+} from "./oidc-routes.js";
 
 export type RegistrationMode = "disabled" | "open_unverified";
 
@@ -67,6 +72,12 @@ export interface AuthRouteDeps {
   rateLimiter?: RateLimiter;
   now?: () => Date;
   generateId?: (prefix: string) => string;
+  /** OPT-IN OIDC (Keycloak): gesetzt registriert die /auth/oidc/*-Routen (Authorization Code + PKCE). */
+  oidcConfig?: OidcConfig;
+  /** fetch fuer den OIDC-Flow injizierbar (Mock-IdP im Test). */
+  oidcFetch?: typeof fetch;
+  /** JWKS-Key-Resolver fuer OIDC injizierbar (Test). */
+  oidcKeySetFor?: OidcRouteDeps["keySetFor"];
 }
 
 interface BootstrapRequestBody {
@@ -569,6 +580,19 @@ export function registerAuthRoutes(
       return reply.code(204).send();
     },
   );
+
+  // OPT-IN OIDC (Keycloak): nur wenn konfiguriert, registriere die /auth/oidc/*-Routen (public, Login-Flow).
+  if (deps.oidcConfig) {
+    const oidcDeps: OidcRouteDeps = {
+      authStore: deps.authStore,
+      config: deps.oidcConfig,
+      publicRoute,
+      ...(deps.oidcFetch ? { fetchImpl: deps.oidcFetch } : {}),
+      ...(deps.oidcKeySetFor ? { keySetFor: deps.oidcKeySetFor } : {}),
+      ...(deps.now ? { now: deps.now } : {}),
+    };
+    registerOidcRoutes(app, oidcDeps);
+  }
 }
 
 export async function issueSession(

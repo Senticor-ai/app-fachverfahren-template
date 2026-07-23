@@ -77,16 +77,19 @@ export function EntscheidungPanel<T = Record<string, unknown>>({
     );
   }
 
-  function ausloesen(t: Transition) {
+  async function ausloesen(t: Transition) {
     const text = (detail[t.to] ?? "").trim();
     if (t.detailPflicht && !text) {
       setFehler(`"${t.label}" erfordert eine Begründung.`);
       return;
     }
     try {
-      // Übergang über den Port — DEV: Zustand-Store, PROD: SDK/Fastify. 4-Augen wird serverseitig erzwungen;
-      // der akteur macht den Vier-Augen-Nachweis in der History führbar (zwei VERSCHIEDENE Personen).
-      port.uebergang(vorgang.id, t.to, rolle, text || undefined, akteur);
+      // Übergang über den Port — DEV: Zustand-Store, PROD: HTTP gegen das BFF. 4-Augen wird serverseitig
+      // erzwungen; der akteur macht den Vier-Augen-Nachweis in der History führbar (zwei VERSCHIEDENE
+      // Personen). Das `await` ist tragend: der Port ist async, und OHNE await fängt dieses try/catch die
+      // Ablehnung (403 Vier-Augen, 409 Konflikt, Netzfehler) NICHT mehr — sie liefe als unbehandelte
+      // Rejection ins Leere und die Oberfläche meldete einen Erfolg, den es nicht gab.
+      await port.uebergang(vorgang.id, t.to, rolle, text || undefined, akteur);
       setFehler(null);
       onEntschieden?.(t.to);
     } catch (e) {
@@ -138,7 +141,7 @@ export function EntscheidungPanel<T = Record<string, unknown>>({
               <Button
                 variant={variant}
                 className="w-full justify-between"
-                onClick={() => ausloesen(t)}
+                onClick={() => void ausloesen(t)}
               >
                 {t.label}
                 {Icon && <Icon className="h-4 w-4" aria-hidden="true" />}

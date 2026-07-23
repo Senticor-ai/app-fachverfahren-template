@@ -1,0 +1,56 @@
+{
+  "procedureId": "musterverfahren",
+  "version": "1.0.0",
+  "effectiveFrom": "2026-01-01T00:00:00.000Z",
+  "legalBasisIds": [
+    "muster-satzung-1"
+  ],
+  "allowedStates": [
+    "eingegangen",
+    "in-bearbeitung",
+    "pausiert",
+    "abgeschlossen"
+  ],
+  "allowedTransitions": [
+    {
+      "from": "eingegangen",
+      "to": "in-bearbeitung",
+      "action": "annehmen",
+      "requiredPermission": "case.decision.prepare",
+      "requiresFourEyes": false,
+      "closesCase": false
+    },
+    {
+      "from": "in-bearbeitung",
+      "to": "pausiert",
+      "action": "pausieren",
+      "requiredPermission": "case.decision.prepare",
+      "requiresFourEyes": false,
+      "closesCase": false
+    },
+    {
+      "from": "pausiert",
+      "to": "in-bearbeitung",
+      "action": "fortsetzen",
+      "requiredPermission": "case.decision.prepare",
+      "requiresFourEyes": false,
+      "closesCase": false
+    },
+    {
+      "from": "in-bearbeitung",
+      "to": "abgeschlossen",
+      "action": "abschließen",
+      "requiredPermission": "case.decision.prepare",
+      "requiresFourEyes": true,
+      "closesCase": true
+    },
+    {
+      "from": "abgeschlossen",
+      "to": "in-bearbeitung",
+      "action": "wiederaufnehmen",
+      "requiredPermission": "case.decision.prepare",
+      "requiresFourEyes": false,
+      "closesCase": false
+    }
+  ]
+}

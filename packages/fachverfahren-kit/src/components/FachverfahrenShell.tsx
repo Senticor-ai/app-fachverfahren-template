@@ -14,10 +14,13 @@
 import {
   Database,
   FileText,
+  FolderOpen,
   Home,
   Inbox,
   LayoutGrid,
+  ListChecks,
   LineChart,
+  Mail,
   ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
@@ -27,7 +30,7 @@ import { cn } from "../lib/utils.js";
 import { Badge } from "../ui/badge.js";
 import { useKommuneTheme, KommuneLogo } from "./KommuneTheme.js";
 import {
-  DEFAULT_PERSONAS,
+  mergePersonas,
   PersonaSwitcher,
   type Persona,
   type PersonaDescriptor,
@@ -118,13 +121,32 @@ function navFor<T>(
           icon: FileText,
           href: "/buerger/anmelden",
         });
+        // „Meine Anträge": die eigenen, server-persistierten Vorgänge (echte Route /buerger/antraege).
+        items.push({
+          key: "antraege",
+          label: "Meine Anträge",
+          icon: ListChecks,
+          href: "/buerger/antraege",
+        });
       }
+      // Postfach: Bescheide/Nachrichten der Behörde — IMMER verfügbar (jedes Verfahren hat ein Postfach),
+      // unabhängig von antrag.steps. Echte App-Route /buerger/postfach (Shell-Nav == App-Routen, Audit D3-1).
+      items.push({
+        key: "postfach",
+        label: "Postfach",
+        icon: Mail,
+        href: "/buerger/postfach",
+      });
       items.push(boardsNavItem());
       return items;
     }
     case "sachbearbeitung": {
       const items: ShellNavItem[] = [
         { key: "eingang", label: "Eingangskorb", icon: Inbox, href: "/amt" },
+        // Fall-/Dossier-Akten (Case-Management): /amt/akten ist eine ECHTE App-Route (routes.tsx) und
+        // listet mandanten-scoped die Akten der Behörde; für reine Antrags-Verfahren ohne Fälle zeigt sie
+        // ihren Leerzustand. Kein toter Nav-Eintrag (Audit D3-1: Shell-Nav == App-Routen).
+        { key: "akten", label: "Akten", icon: FolderOpen, href: "/amt/akten" },
       ];
       if ((config.register?.mock?.length ?? 0) > 0) {
         items.push({
@@ -151,8 +173,23 @@ function navFor<T>(
         },
         boardsNavItem(),
       ];
-    default:
-      return [];
+    default: {
+      // VERFAHRENS-EIGENE Persona (nicht die 3 Defaults): daten-getriebener Fallback statt leerer Sidebar —
+      // Home-Einstieg aus dem Descriptor (home/routePrefix) + Team-Workspace. Die tailored Nav der 3 Defaults
+      // bleibt oben unveraendert; so bekommt jede Persona eine funktionierende Sidebar.
+      const desc = config.personas?.find((p) => p.key === persona);
+      const home = desc?.home ?? desc?.routePrefix;
+      const items: ShellNavItem[] = [];
+      if (home !== undefined)
+        items.push({
+          key: "home",
+          label: desc?.label ?? "Start",
+          icon: Home,
+          href: home,
+        });
+      items.push(boardsNavItem());
+      return items;
+    }
   }
 }
 
@@ -163,16 +200,14 @@ function boardsNavItem(): ShellNavItem {
   return { key: "boards", label: "Boards", icon: LayoutGrid, href: "/boards" };
 }
 
-/** Generische, verfahrens-neutrale Rollen-Überschrift in der Sidebar. */
-const ROLLEN_LABEL: Record<Persona, string> = {
-  buerger: "Bürger:in",
-  sachbearbeitung: "Sachbearbeitung",
-  aufsicht: "Aufsicht",
-};
-
-/** Überschrift/Badge-Text: aktive Persona oder der neutrale Workspace-Kontext. */
-function kontextLabel(persona: Persona | undefined): string {
-  return persona ? ROLLEN_LABEL[persona] : "Team-Workspace";
+/** Überschrift/Badge-Text: das LABEL der aktiven Persona AUS DEN DATEN (Descriptor) — für beliebige
+ *  verfahrens-eigene Personas, nicht nur die 3 Defaults. Fallback: der Persona-Key, sonst Workspace-Kontext. */
+function kontextLabel(
+  persona: Persona | undefined,
+  personas: readonly PersonaDescriptor[],
+): string {
+  if (!persona) return "Team-Workspace";
+  return personas.find((p) => p.key === persona)?.label ?? persona;
 }
 
 const MAIN_ID = "main-content";
@@ -191,8 +226,10 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
   showDemoBadge = true,
 }: FachverfahrenShellProps<T>): React.JSX.Element {
   // DATA-DRIVEN Rollen: explizite Prop > verfahrensspezifische Rollen aus dem Vertrag (config.personas, aus dem
-  // Fachkonzept) > generische DEFAULT_PERSONAS. So spiegeln die 3 Sichten das jeweilige Verfahren, ohne Hardcode.
-  const personaList = personas ?? config.personas ?? DEFAULT_PERSONAS;
+  // Fachkonzept), PER KEY über die generischen DEFAULT_PERSONAS gelegt. So spiegeln die Sichten das jeweilige
+  // Verfahren, ohne Hardcode — und ein TEIL-Modell (nur ein Arbeitsbereich abgeleitet) lässt die übrigen Sichten
+  // generisch stehen, statt sie verschwinden zu lassen (per-key fail-open, s. mergePersonas).
+  const personaList = personas ?? mergePersonas(config.personas);
   // Wechsler nur zeigen, wenn es etwas zu wechseln gibt: mehr als ein Arbeitsbereich —
   // oder Workspace-Modus (keine aktive Persona) mit mindestens einem Einstieg.
   const showSwitcher =
@@ -299,11 +336,11 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
         {/* Persona-spezifische Navigation (data-driven). */}
         <nav
           className="flex-1 overflow-y-auto px-2 py-3"
-          aria-label={`Navigation — ${kontextLabel(persona)}`}
+          aria-label={`Navigation — ${kontextLabel(persona, personaList)}`}
         >
           <div className="mb-4">
             <div className="px-2 pb-1 text-xs font-semibold uppercase tracking-wider text-sidebar-muted">
-              {kontextLabel(persona)}
+              {kontextLabel(persona, personaList)}
             </div>
             <ul className="flex flex-col gap-0.5">{nav.map(renderNavItem)}</ul>
           </div>
@@ -356,7 +393,7 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
             {/* Aktive Rolle als ruhiger Kontext-Hinweis. */}
             <Badge tone="info" className="hidden sm:inline-flex">
               <ShieldCheck className="h-3 w-3" aria-hidden="true" />
-              {kontextLabel(persona)}
+              {kontextLabel(persona, personaList)}
             </Badge>
             {/* Demo-/Datenschutz-Transparenz (synthetische Daten — keine Echtdaten).
                 Im Team-Workspace (echte Arbeitsdaten) via showDemoBadge=false abgeschaltet. */}

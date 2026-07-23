@@ -8,7 +8,35 @@ import {
   type ResolvedSession,
   type SessionResolver,
 } from "@senticor/app-runtime-fastify";
-import { InMemoryAppStore, type AppStore } from "@senticor/app-store-postgres";
+import {
+  InMemoryAppStore,
+  InMemoryCaseStore,
+  InMemoryTaskStore,
+  InMemoryEvidenceLedger,
+  InMemoryWissenStore,
+  type AppStore,
+  type CaseStore,
+  type EvidenceLedger,
+  type TaskStore,
+  type WissenStore,
+} from "@senticor/app-store-postgres";
+import {
+  createInMemoryProcedureRegistry,
+  type ComposableRegistry,
+  type ProcedureRegistry,
+} from "@senticor/public-sector-sdk";
+import {
+  createLocalAiAssistPort,
+  createLocalEvidenceRetrievalPort,
+  createLocalIdentityAndTrustPort,
+  createLocalMailboxPort,
+  createLocalPaymentPort,
+  type AiAssistPort,
+  type EvidenceRetrievalPort,
+  type IdentityAndTrustPort,
+  type MailboxPort,
+  type PaymentPort,
+} from "@senticor/platform-contracts";
 import { appBff } from "./plugin.js";
 
 export function stubResolver(session: ResolvedSession): SessionResolver {
@@ -41,20 +69,55 @@ export function caseworkerSession(
 export async function buildBffApp({
   session,
   appStore = new InMemoryAppStore(),
+  caseStore = new InMemoryCaseStore(),
+  taskStore = new InMemoryTaskStore(),
+  procedureRegistry = createInMemoryProcedureRegistry([]),
+  aiAssist = createLocalAiAssistPort(),
+  payment = createLocalPaymentPort(),
+  identityAndTrust = createLocalIdentityAndTrustPort(),
+  mailbox = createLocalMailboxPort(),
+  evidenceRetrieval = createLocalEvidenceRetrievalPort(),
+  wissenStore = new InMemoryWissenStore(),
+  composableRegistry,
+  evidenceLedger = new InMemoryEvidenceLedger(),
 }: {
   session?: ResolvedSession;
   appStore?: AppStore;
+  caseStore?: CaseStore;
+  taskStore?: TaskStore;
+  procedureRegistry?: ProcedureRegistry;
+  aiAssist?: AiAssistPort;
+  payment?: PaymentPort;
+  identityAndTrust?: IdentityAndTrustPort;
+  mailbox?: MailboxPort;
+  evidenceRetrieval?: EvidenceRetrievalPort;
+  wissenStore?: WissenStore;
+  composableRegistry?: ComposableRegistry;
+  evidenceLedger?: EvidenceLedger;
 } = {}): Promise<{
   app: FastifyInstance;
   auditSink: MemoryAuditSink;
   appStore: AppStore;
+  caseStore: CaseStore;
+  taskStore: TaskStore;
 }> {
   const auditSink = new MemoryAuditSink();
   const app = fastify({ logger: false });
   await app.register(appBff, {
     appStore,
+    caseStore,
+    taskStore,
+    procedureRegistry,
     sessionResolver: session ? stubResolver(session) : new NoSessionResolver(),
     auditSink,
+    aiAssist,
+    payment,
+    identityAndTrust,
+    mailbox,
+    evidenceRetrieval,
+    wissenStore,
+    ...(composableRegistry ? { composableRegistry } : {}),
+    evidenceLedger,
   });
-  return { app, auditSink, appStore };
+  return { app, auditSink, appStore, caseStore, taskStore };
 }

@@ -2,14 +2,16 @@
 // Persona-Wechsel + Nav-Klicks → Router. (Verbatim aus App.tsx extrahiert.)
 import { useNavigate } from "react-router-dom";
 import {
+  DEFAULT_PERSONAS,
   FachverfahrenShell,
   type Persona,
+  type PersonaDescriptor,
   type ShellNavItem,
 } from "@senticor/fachverfahren-kit";
 import {
   allowedPersonas,
-  PERSONA_HOME,
   personaDescriptors,
+  personaRoute,
 } from "../personas.js";
 import { useSession } from "../session.js";
 import { store } from "../store.js";
@@ -26,7 +28,10 @@ export function Shell({
 }): React.JSX.Element {
   const navigate = useNavigate();
   const { principal, capabilities } = useSession();
-  const onPersonaChange = (next: Persona) => navigate(PERSONA_HOME[next]);
+  // Ziel des Wechsels aus DERSELBEN Wahrheit wie die Landing-Einstiege (config.personas → home),
+  // mit der App-Routen-Konvention als Fallback.
+  const onPersonaChange = (next: Persona) =>
+    navigate(personaRoute(next, store.config));
   const onNavigate = (item: ShellNavItem) => {
     if (item.href) navigate(item.href);
   };
@@ -40,7 +45,7 @@ export function Shell({
       // Der Wechsler zeigt NUR zugewiesene Arbeitsbereiche (bei ≤1 blendet ihn die
       // Shell aus) — Erlebnis-Filter, keine Autorisierung.
       personas={personaDescriptors(
-        allowedPersonas(principal, capabilities),
+        allowedPersonas(principal, capabilities, store.config),
         store.config,
       )}
     >
@@ -49,9 +54,18 @@ export function Shell({
   );
 }
 
-// ── URL ↔ Persona. Die Shell-Personas hängen am Pfad-Präfix (PERSONA_HOME in personas.ts). ──
-export function personaFromPath(pathname: string): Persona {
-  if (pathname.startsWith("/amt")) return "sachbearbeitung";
-  if (pathname.startsWith("/aufsicht")) return "aufsicht";
-  return "buerger";
+// ── URL ↔ Persona: daten-getrieben über `routePrefix` (längster Match gewinnt) statt hart kodierter Pfade.
+// So ordnet auch eine verfahrens-eigene Persona (z.B. `/beschaffung`) ihre URLs korrekt zu. Ohne `personas`
+// gelten die 3 Default-Präfixe (/buerger,/amt,/aufsicht) → unverändertes Verhalten. Fallback = erste Persona.
+export function personaFromPath(
+  pathname: string,
+  personas: readonly PersonaDescriptor[] = DEFAULT_PERSONAS,
+): Persona {
+  const kandidaten = personas
+    .filter((p) => p.routePrefix)
+    .sort((a, b) => (b.routePrefix?.length ?? 0) - (a.routePrefix?.length ?? 0));
+  for (const p of kandidaten) {
+    if (p.routePrefix && pathname.startsWith(p.routePrefix)) return p.key;
+  }
+  return personas[0]?.key ?? "buerger";
 }

@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.strict.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "types": ["node"],
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "references": [{ "path": "../platform-contracts" }],
+  "include": ["src/**/*.ts"]
+}

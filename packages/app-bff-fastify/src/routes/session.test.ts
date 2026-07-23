@@ -3,7 +3,12 @@
 import fastify, { type FastifyInstance } from "fastify";
 import { afterEach, describe, expect, it } from "vitest";
 import { MemoryAuditSink } from "@senticor/app-runtime-fastify";
-import { InMemoryAppStore } from "@senticor/app-store-postgres";
+import {
+  InMemoryAppStore,
+  InMemoryCaseStore,
+  InMemoryTaskStore,
+} from "@senticor/app-store-postgres";
+import { createInMemoryProcedureRegistry } from "@senticor/public-sector-sdk";
 import { appBff } from "../plugin.js";
 import { buildBffApp, citizenSession, stubResolver } from "../test-helpers.js";
 
@@ -75,7 +80,7 @@ describe("GET /api/session", () => {
 });
 
 describe("GET /api/capabilities", () => {
-  it("liefert sortierte Permissions inkl. der neuen Mailbox-Schreibrechte", async () => {
+  it("liefert sortierte Permissions inkl. Mailbox-Schreibrechte und der EIGENEN Vorgänge", async () => {
     ({ app } = await buildBffApp({ session: citizenSession() }));
     const response = await app.inject({
       method: "GET",
@@ -85,12 +90,20 @@ describe("GET /api/capabilities", () => {
     const body = response.json();
     expect(body.rbacRoles).toEqual(["citizen"]);
     expect(body.permissions).toEqual([
+      // Die Bürgerrolle darf ihre EIGENEN Vorgänge lesen/einreichen — aber NIE `case.read`:
+      // das ist die Behörden-Sicht über ALLE Fälle der Behörde.
+      "case.own.read",
+      "case.own.submit",
       "mailbox.own.read",
       "mailbox.own.write",
+      // Die eigene Gebühr veranlassen/prüfen (ePayBL-Naht) — getrennt vom Einreichen.
+      "payment.initiate",
       "preferences.read",
       "preferences.write",
       "session.read",
     ]);
+    expect(body.permissions).not.toContain("case.read");
+    expect(body.permissions).not.toContain("case.decision.prepare");
   });
 
   it("caseworker erhält die authority-Schreibrechte", async () => {
@@ -125,6 +138,9 @@ describe("ErrorHandler-Kapselung", () => {
     app = fastify({ logger: false });
     await app.register(appBff, {
       appStore: new InMemoryAppStore(),
+      caseStore: new InMemoryCaseStore(),
+      taskStore: new InMemoryTaskStore(),
+      procedureRegistry: createInMemoryProcedureRegistry([]),
       sessionResolver: stubResolver(citizenSession()),
       auditSink,
     });

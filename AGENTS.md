@@ -39,6 +39,49 @@ Ein neues Fachverfahren entsteht, indem GENAU EINE Datei mit Fachdaten gefüllt
 wird — die Austausch-Naht (nächster Abschnitt). Es wird nichts neu gebaut, was
 im Kit existiert.
 
+## Doktrin: Fachverfahren als agentic-composable Netz aus Bausteinen
+
+Ein Fachverfahren wird als **Netz aus Bausteinen** gedacht — jeder Baustein ist
+eine **Zuständigkeit der Ablauforganisation** (Bürgerdienst · Fachprüfung ·
+Datenanbindung · Aufsicht · das Backend), besetzbar durch **Mensch ODER Agent
+ODER beide**. Die Bausteine folgen der fachlichen Zuständigkeit (aus dem
+Fachkonzept: Prozesse, Rollen, `statusMachine`-Transitionen mit `rollen[]`/
+Vier-Augen), NICHT technischer Willkür. Ein Baustein bündelt Können, Wissen und
+Nachweise; die Bausteine spielen über typisierte Verträge auf drei Ebenen
+zusammen — governt und evidenziert, zu Build- UND Laufzeit. Mensch und Agent
+sind **gleichrangige Peer-Knoten**.
+
+Was das Template davon HEUTE trägt (der OSS-Runtime-Anteil):
+
+- **KOORDINATION — der Aktenvermerk als Blackboard** *(gebaut)*. Die geteilte
+  Fall-Akte ist der Arbeitsraum, in den Mensch UND Agent gleichrangig
+  **typisierte Zellen** schreiben (`kind` ∈ hypothese/teilergebnis/frage/befund/
+  entscheidung/notiz), jede mit Peer-Kennung (`urheber` = `human:<rolle>` ODER
+  Modell/Agent), Sichtbarkeit und Threading — append-only im Fall-Audit, KI-Zellen
+  prüfpflichtig (HITL). Routen unter `/api/cases/:id/vermerke*` (Skill
+  `dossier-fallmanagement`). Damit dokumentieren Mensch und Agent DASSELBE, für
+  beide les- und nutzbar. Ein Agent **steuert** dieses Mesh headless über die
+  **Agenten-CLI** (`apps/fachverfahren/server/dev/mesh-cli.ts`, Package-Script
+  `mesh`) gegen eine deterministische **Golden Fixture** — ohne Browser/Server/
+  finalen Build, über dieselben Routen (die CLI reimplementiert nichts).
+- **FÄHIGKEIT — austauschbare Ports** *(teilweise)*. Capabilities sind Ports mit
+  Conformance-Vertrag und per Env wählbaren Anbietern (`AiAssistPort` local↔ollama,
+  `BlobStoragePort`); ein Baustein konsumiert sie governt (RBAC), nie einen
+  konkreten Anbieter (Skill `ki-assistenz`, `platform/capabilities.json`).
+- **DATEN — Datenanbindung** *(dünn)*. Register/Nachweise als Daten-Naht
+  (`leistung.config` `register`/`nachweise()`, Nachweis-Upload über `BlobStoragePort`).
+
+**Ehrlich abgegrenzt:** das VOLLE Mesh (GraphStore-Substrat, Capability-Mesh mit
+`governedDispatch`, evaluiertes Qualitäts-Routing, das selbst-wachsende
+Skill-Learning, der offene Runtime-Kernel) lebt hinter der Naht in **chos-code**
+(governter Build-/Runtime-Agent) und wird über dieselben Store-/Port-Verträge
+angebunden — das Template ist die **standalone-lauffähige OSS-Seite** (Open-Core:
+OPEN = Runtime/Verträge; PROPRIETÄR = kuratiertes Wissen + getunte Agenten/Evals).
+Ein Baustein/eine neue Zuständigkeit fügst du daher HIER als DATEN + Vertrag hinzu:
+Rolle/Permission (`rbac.ts`), Zustände/Übergänge (`procedure.config`/`leistung.config`),
+konsumierte Capability (Port + `capabilities.json`), Beiträge in die geteilte Akte
+(Vermerke) — nie als handverdrahteter Monolith.
+
 ## PLAN vs. IST
 
 Dieses Dokument und alle Pfadangaben darin beschreiben den IST-Stand des
@@ -76,7 +119,7 @@ optional):
 | Feld               | Vertrag                                                                                                                                                                                                                                                               |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`, `label`      | Slug und Anzeigename der Leistung                                                                                                                                                                                                                                     |
-| `kommune`          | Trägerin der Leistung, z. B. `"Stadt Musterstadt"`                                                                                                                                                                                                                    |
+| `kommune`          | Trägerin / erlassende Stelle der Leistung — Kommune ODER Behörde ODER interne Stelle, z. B. `"Stadt Musterstadt"`, `"Bundesamt für …"`, `"Zentrale Vergabe"`                                                                                                                                                                                                                    |
 | `rechtsgrundlagen` | Liste `{ norm, titel, satzung? }` — nur belegte Normen, nie erfunden                                                                                                                                                                                                  |
 | `antrag.steps`     | Schritte mit Feldern (`FeldDef`: `name/label/typ/required/pattern/onceOnly/…`); jedes Pflichtfeld mit passender Validierung                                                                                                                                           |
 | `statusMachine`    | `initial` + `states` (Endzustände mit `terminal: true`) + `transitions` (`rollen`, kritische Entscheidungen mit `vierAugen: true`, `detailPflicht`)                                                                                                                   |
@@ -251,9 +294,15 @@ pnpm run agent:context -- --task <app-spec> --paths <pfad>
 `agent.discovery.json` ist die öffentliche Discovery-API. `agent:context`
 liefert `nextCommands`, `validationProfiles` und `writeBoundaries`;
 `agent:verify` validiert einen Abschlussbericht mit echten
-`commandsExecuted`. Kurzskills liegen kanonisch unter `.agents/skills/`;
-Startpunkt für Fachverfahren-Builds ist
-`.agents/skills/fachverfahren-app/SKILL.md`.
+`commandsExecuted`. Kurzskills liegen kanonisch unter `.agents/skills/`.
+
+Zuerst den Verfahrenstyp wählen: `docs/agents/fachverfahren-typen.md` ist der
+Wegweiser (Antrag/Vorgang vs. Fall/Dossier/Case-Management) mit den passenden
+Skills und Paket-Ankern. Startpunkt für Antrag/Vorgang-Builds ist
+`.agents/skills/fachverfahren-app/SKILL.md`; für Fall/Dossier-Verfahren
+`.agents/skills/dossier-fallmanagement/SKILL.md` (mit BPMN
+`.agents/skills/bpmn-prozess-workflow/SKILL.md` und Governance
+`.agents/skills/governance-vier-augen/SKILL.md`).
 
 Gouvernierte Webquellen stehen in `sources/registry.yaml`; für registrierte
 Quellen `source:fetch` statt beliebiger Netzwerkzugriffe verwenden.

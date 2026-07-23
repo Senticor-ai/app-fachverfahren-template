@@ -117,7 +117,14 @@ export interface Vorgang<TAntragsdaten = Record<string, unknown>> {
   antragsdaten: TAntragsdaten;
   status: string; // ein Schlüssel aus config.statusMachine.states
   berechnung?: Berechnung;
-  ki: KiEinschaetzung;
+  /** Die KI-Einschätzung — OPTIONAL, und die Abwesenheit ist eine EIGENE Aussage: „kein Modell hat
+   *  diesen Vorgang bewertet". Das ist NICHT dasselbe wie `confidence: 0` („ein Modell lief und war
+   *  unsicher"). Vorfassung: Pflichtfeld — dadurch MUSSTE jeder Schreibpfad einen Wert erfinden
+   *  (echter Antrag: hart 0, Demo-Seed: hart 0.94), und das Aufsicht-Dashboard mittelte beide zu
+   *  einer KI-Leistungskennzahl, die nie jemand gemessen hat. Auswertende Sichten MÜSSEN daher
+   *  über `ki !== undefined` filtern und die Bezugsgröße ausweisen (n von m bewertet), statt
+   *  Unbewertetes als Null zu zählen. */
+  ki?: KiEinschaetzung;
   nachweise: Nachweis[];
   history: VorgangHistorie[];
 }
@@ -138,6 +145,29 @@ export interface Transition {
   rollen: string[]; // wer den Übergang auslösen darf
   vierAugen?: boolean;
   detailPflicht?: boolean; // Begründung/Detail erforderlich (z.B. bei Ablehnung)
+  /** Erlässt dieser Übergang einen förmlichen VERWALTUNGSAKT? Dann friert der Server beim Übergang den
+   *  Bescheid ein (Tenor aus der Berechnung + Rechtsbehelf-Snapshot + Hash). Data-driven, symmetrisch zu
+   *  `vierAugen`. Die server-seitige Ableitung (statusMachineToProcedureVersion) mappt es auf
+   *  CaseTransition.issuesVerwaltungsakt; das Drift-Gate check:antrag-procedure sichert die Deckung. */
+  erlaesstBescheid?: boolean;
+  /** SCHLIESST dieser Übergang den Fall, OHNE dass sein Zielzustand terminal ist? Für einen WIEDERAUFNEHMBAREN
+   *  Abschluss (resumable-closed): z. B. `festgesetzt` schließt den Antrag, bleibt aber über einen Widerspruch
+   *  wieder-öffenbar (hat ausgehende Übergänge) — ein terminaler Zustand dürfte das nicht. Symmetrisch zum
+   *  BPMN-Muster (senticor:closesCase). Die Ableitung mappt `terminal(to) ODER closesCase` → CaseTransition.closesCase. */
+  closesCase?: boolean;
+  /** Eigenes VA-Regime NUR für den von DIESEM Übergang erlassenen Bescheid (überschreibt das Verfahrens-Regime
+   *  config.zustellung). Z. B. der Widerspruchsbescheid ist mit KLAGE (§ 74 VwGO) anzufechten, nicht erneut mit
+   *  Widerspruch (ADR-0006 §3). Die Ableitung reicht es an CaseTransition.verwaltungsakt durch. */
+  verwaltungsakt?: VerwaltungsaktConfig;
+  /** STELLT eine Forderung/Sollstellung (Rückforderung, ADR-0007): der Server schreibt beim Übergang ein
+   *  append-only `forderung.gestellt`-Ereignis mit SERVER-AUTORITATIVER Höhe (aus `tarif` + der client-
+   *  gewählten Kategorie unter `diskriminator`) + Fälligkeit (now + `zahlungsfristTage`). Der Server übernimmt
+   *  NIE einen client-gelieferten Betrag. Data-driven, symmetrisch zu `erlaesstBescheid`. */
+  stelltForderung?: StelltForderungConfig;
+  /** DATA-DRIVEN GUARD: der Übergang ist nur erlaubt, wenn die Bedingung über die Falldaten (case.data)
+   *  erfüllt ist. Der Server (transitionCase) wertet ihn autoritativ aus (→ CaseTransition.guard). Erzwingt
+   *  WORKFLOW-KONSISTENZ über die deklarierte Datenlage, KEINE Autorisierung (case.data ist client-geliefert). */
+  guard?: Bedingung;
 }
 export interface StatusMachine {
   initial: string; // Status bei Antrags-Eingang ("eingegangen")
@@ -294,6 +324,20 @@ export interface EPaymentConfig {
   titel?: string | undefined;
 }
 
+/** Rechtsbehelfs-Regime als DATEN (kit-Spiegel des SDK-`RechtsbehelfConfig` — der Kit importiert das SDK
+ *  bewusst nicht, browser-neutral). Regime-NEUTRAL: `widerspruch` (VwVfG), `einspruch` (AO — für ein
+ *  Abgaben-/Steuerverfahren ist Widerspruch FALSCH) oder `klage` (VwGO). BescheidView rendert die Belehrung
+ *  daraus statt aus hart kodierten Literalen. */
+export interface RechtsbehelfConfig {
+  art: "widerspruch" | "einspruch" | "klage";
+  fristWert: number;
+  fristEinheit: "monat" | "woche" | "tag";
+  /** Bei welcher Stelle der Rechtsbehelf einzulegen ist (z. B. „der erlassenden Behörde"). */
+  stelle: string;
+  /** Die Rechtsgrundlage des Rechtsbehelfs (z. B. „§ 68 ff. VwGO", „§ 347 AO"). */
+  norm: string;
+}
+
 /** Zustellungs-/Bekanntgabe-Signal: schaltet Bescheid-Tab (PdfViewer) + Bürger-Postfach frei. */
 export interface ZustellungConfig {
   /** ISO-Datum der rechtlichen Bekanntgabe (§ 41 VwVfG) — maßgeblich für den Fristlauf. */
@@ -309,6 +353,37 @@ export interface ZustellungConfig {
   fiktionNorm?: string | undefined;
   /** URL des Bescheid-PDFs — gesetzt ⇒ Bescheid-Tab (PdfViewer) + Postfach-Dokument. */
   bescheidUrl?: string | undefined;
+  /** Regime des Rechtsbehelfs (Widerspruch/Einspruch/Klage) — data-driven statt der hart kodierten
+   *  VwVfG-Widerspruch-Belehrung. Wird beim Erlass in den Bescheid eingefroren. Fehlt sie, fällt
+   *  BescheidView auf die generische Widerspruchs-Belehrung zurück (Abwärtskompatibilität). */
+  rechtsbehelf?: RechtsbehelfConfig | undefined;
+}
+
+/** VA-Regime als DATEN (kit-Spiegel des SDK-`VerwaltungsaktConfig`): Rechtsbehelf + Bekanntgabefiktion eines
+ *  förmlichen Bescheids. Für ein pro-Übergang abweichendes Regime (z. B. Widerspruchsbescheid = Klage). */
+export interface VerwaltungsaktConfig {
+  rechtsbehelf: RechtsbehelfConfig;
+  fiktionTage: number;
+  fiktionNorm: string;
+}
+
+/** Eine Tarif-Position: Kategorie → fester Betrag (Cent). kit-Spiegel des SDK-`TarifPosition`. */
+export interface TarifPosition {
+  kategorie: string;
+  betragCent: number;
+  label?: string;
+}
+/** Server-hinterlegter Tarif (Gebührensatzung als DATEN). kit-Spiegel des SDK-`TarifTabelle`. */
+export interface TarifTabelle {
+  positionen: TarifPosition[];
+  defaultCent?: number;
+}
+/** Konfiguration einer Sollstellung an einem Übergang (Rückforderung): server-autoritative Höhe aus `tarif`
+ *  + der client-gewählten Kategorie unter dem Datenpfad `diskriminator`; Zahlungsfrist in Tagen (Default 30). */
+export interface StelltForderungConfig {
+  tarif: TarifTabelle;
+  diskriminator: string;
+  zahlungsfristTage?: number;
 }
 
 /** Eine zu überwachende Frist (spiegelt TerminFristPanel `FristItem` — `status` exakt-optional, ohne `| undefined`). */
@@ -364,40 +439,16 @@ export interface NormRef {
   status: "belegt" | "annahme";
 }
 
-/** Vergleichsoperator einer Feld-Bedingung. `gesetzt`/`nicht-gesetzt` prüfen nur Anwesenheit (ohne `wert`). */
-export type BedingungOperator =
-  | "=="
-  | "!="
-  | ">"
-  | ">="
-  | "<"
-  | "<="
-  | "in"
-  | "nicht-in"
-  | "gesetzt"
-  | "nicht-gesetzt";
-
-/** Prädikat über EIN Antragsfeld (Feldpfad wie in `FeldDef.name`). Der reine Interpreter wertet es tolerant gegen
- *  die Antragsdaten aus (Zahl/String/Boolean-Koerzierung), sodass die Subsumtion — z. B. Schwelle `>= 3` — greift. */
-export interface FeldBedingung {
-  feld: string;
-  op: BedingungOperator;
-  /** Vergleichswert (bei `in`/`nicht-in` eine Menge); entfällt bei `gesetzt`/`nicht-gesetzt`. */
-  wert?: string | number | boolean | (string | number)[];
-}
-
-/** Boolesche Verknüpfung von Bedingungen (rekursiv). Genau EINE Kombinator-Angabe je Gruppe. */
-export interface BedingungGruppe {
-  /** UND — alle Teil-Bedingungen müssen erfüllt sein. */
-  alle?: Bedingung[];
-  /** ODER — mindestens eine Teil-Bedingung muss erfüllt sein. */
-  eine?: Bedingung[];
-  /** NICHT — die Teil-Bedingung muss NICHT erfüllt sein. */
-  nicht?: Bedingung;
-}
-
-/** Generische, verfahrensfreie Bedingung — Blatt (`FeldBedingung`) oder Gruppe. Vom Interpreter ausgewertet. */
-export type Bedingung = FeldBedingung | BedingungGruppe;
+// Bedingungs-Typen leben jetzt im SDK (EINE Wahrheit für Client-Antrag UND server-autoritativen Fall-Guard,
+// packages/public-sector-sdk/src/rules.ts). Hier importiert (damit die übrigen Typen dieser Datei `Bedingung`
+// nutzen) UND re-exportiert (damit bestehende Kit-Importe unverändert gültig bleiben).
+import type {
+  BedingungOperator,
+  FeldBedingung,
+  BedingungGruppe,
+  Bedingung,
+} from "@senticor/public-sector-sdk";
+export type { BedingungOperator, FeldBedingung, BedingungGruppe, Bedingung };
 
 /** Eine Staffel/Stufe einer Gebühren-/Tariftabelle. Greift, wenn `bedingung` über die Antragsdaten erfüllt ist;
  *  fehlt `bedingung`, ist die Staffel der Auffang/Default. `betrag` in der NATÜRLICHEN Haupteinheit (kein Cent). */
@@ -620,6 +671,47 @@ export interface VoiceConfig {
   euResidenzErforderlich?: boolean;
 }
 
+/** GENERISCHE, sichere DATENANBINDUNG als DATEN (ein Baustein / eine zuständige Stelle): verallgemeinert das heute
+ *  verstreute `register`/`registerRefs`/`fimRefs`/`nachweise` zu EINER zweckgebundenen, sicherheits-klassifizierten
+ *  Sicht. Der `art`-Flavor unterscheidet Register (NOOTS/Registermodernisierung) · interne Systeme (E-Akte/HR/Vergabe)
+ *  · externe Dienste (Zahlung/Zustellung) — als DATEN, kein Sonderweg im Code. `verbindungsklasse` = Sicherheitsstufe
+ *  nach BSI TR-03190; `zweck` = DSGVO-Zweckbindung (Pflicht). Optional/additiv — der Kit-Code liest sie noch nicht. */
+export interface Datenanbindung {
+  /** Name der Quelle/des Systems (z. B. „Melderegister", „E-Akte", „HR-System", „ePayBL"). */
+  quelle: string;
+  /** Ausprägung (Flavor) — als DATEN. */
+  art: "register" | "intern" | "extern";
+  /** Interop-Richtung: abruf (inbound-Nachweis, Once-Only) vs. meldung (outbound). */
+  richtung: "abruf" | "meldung";
+  /** Zweckbindung (Pflicht, DSGVO): WOFÜR die Daten angebunden werden. */
+  zweck: string;
+  /** BSI-TR-03190-Verbindungsklasse (Sicherheitsstufe der Anbindung; höher = mehr Nachweis/Prüfung). */
+  verbindungsklasse?: 1 | 2 | 3 | 4;
+  /** Schutzbedarf der Daten (BSI IT-Grundschutz). */
+  schutzbedarf?: "offen" | "intern" | "vertraulich" | "streng-vertraulich";
+  /** Antragsfelder, die über diese Anbindung abgerufen/gemeldet werden. */
+  felder?: string[];
+  /** Datenformat/Schema des Austauschs (z. B. „XMeld", „XGewerbe", ein FIM-Datenschema). */
+  datenformat?: string;
+  /** Norm-/Rechtsgrundlage der Anbindung. */
+  normRef?: NormRef;
+  /** MESH-NAHT: das DATENPRODUKT (Composable des geteilten Backends), das diese Anbindung LIEFERT. Verknüpft die
+   *  Datenanbindung mit dem Agentic-Composable-Mesh (composables.config): das Bürger-Frontend deklariert den
+   *  Abruf/die Meldung, das geteilte, wachsende Backend stellt sie als wiederverwendbares Datenprodukt bereit
+   *  (publish/consume). OPTIONAL/additiv — ohne die Referenz ist die Anbindung eine reine Punkt-zu-Punkt-Deklaration. */
+  datenprodukt?: {
+    /** Id des bereitstellenden Composables/Datenprodukts (AgenticComposable.id im geteilten Backend). */
+    composableId: string;
+    /** Der gelieferte Outcome/das Ergebnis (Anzeige/Katalog) — z. B. „verifizierte Meldeadresse". */
+    ergebnis?: string;
+  };
+  /** DURCHSTICH-SCHALTER (mock ↔ real): `mock` = eine Proxy-/Mock-Zelle im geteilten Backend liefert den
+   *  Interop-Durchstich VOR der echten Integration (Register/Zahlung/Zustellung); `real` = die produktive
+   *  Anbindung. Als DATEN geflippt (kein Code-Sonderweg). Fehlt der Wert ⇒ `mock` (sicherer Default: ein
+   *  generiertes Verfahren läuft E2E, bevor eine echte Fremdanbindung steht). */
+  provider?: "mock" | "real";
+}
+
 export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   id: string; // slug, z.B. "leistung"
   label: string; // Anzeigename der Leistung
@@ -652,6 +744,10 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   fimRefs?: FimRef[];
   /** FRISTEN-TYPEN als DATEN (Norm-Regel „X ab Ankerdatum") — unabhängig von konkreten Frist-Instanzen. */
   fristenTypen?: FristTyp[];
+  /** GENERISCHE DATENANBINDUNG als DATEN (Baustein): Register/NOOTS · interne Systeme · externe Dienste —
+   *  verallgemeinert `register`/`registerRefs`/`fimRefs`/`nachweise` zu EINER zweckgebundenen, sicherheits-
+   *  klassifizierten Sicht. OPTIONAL/additiv — bestehende Configs bleiben unverändert. */
+  datenanbindung?: Datenanbindung[];
   statusMachine: StatusMachine;
   /** ESCAPE-HATCH für nicht-tabellarische Subsumtion (Tatbestand→Rechtsfolge): reine, testbare, deterministische
    *  Berechnung (kein Datum/Random). OPTIONAL — fehlt sie, ist die Daten-Auswertung von `tarif` durch den reinen
@@ -686,16 +782,66 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   seed?: (helpers: {
     vorgangsnummer: () => string;
   }) => Vorgang<TAntragsdaten>[];
-  /** VERFAHRENSSPEZIFISCHE Rollen für den PersonaSwitcher (aus dem Fachkonzept, z.B. Bauherr:in/Entwurfsverfasser:in/
-   *  Bauaufsicht statt generisch). Fehlt es, nutzt die Shell die generischen DEFAULT_PERSONAS. Die `key`s bleiben die
-   *  drei kanonischen Rollen (buerger/sachbearbeitung/aufsicht) — nur Label/Untertitel sind verfahrensspezifisch. */
+  /** DIE EINE WAHRHEIT DER SICHTUMSCHALTUNG: die VERFAHRENSSPEZIFISCHEN Arbeitsbereiche (aus dem Personas-Artefakt des
+   *  Fachkonzepts abgeleitet, z.B. Bauherr:in/Entwurfsverfasser:in/Bauaufsicht statt generisch). Landing (Bereichs-
+   *  Einstiege) UND Shell (PersonaSwitcher) rendern die Sichten NUR hieraus — es gibt kein zweites, hartkodiertes
+   *  Bereichs-Array mehr. Die `key`s bleiben die drei kanonischen Rollen (buerger/sachbearbeitung/aufsicht — der
+   *  Typ-Vertrag, an dem Routing/Zuweisung hängen); Label/Untertitel/Beschreibung/`home`-Route sind die
+   *  verfahrensspezifischen DATEN.
+   *
+   *  FEHLT das Feld, greifen die generischen DEFAULT_PERSONAS (FAIL-OPEN — bestehende Apps und die unveränderte
+   *  Vorlage laufen unverändert weiter). Rein daten-getrieben + JSON-serialisierbar: eine generierende Fabrik schreibt
+   *  es deterministisch in die Naht, der Vertrags-Snapshot (`emit:contract`) trägt es mit. */
   personas?: readonly import("./components/PersonaSwitcher.js").PersonaDescriptor[];
 }
 
-/** DATENSCHICHT-PORT — die EINE Schnittstelle, die der Kit nutzt. DEV: Zustand-Store. PROD: SDK/Fastify. */
+/**
+ * PERSISTENZ-NAHT des Vorgang-Stores — die dünne Grenze zwischen fachlicher Berechnung (bleibt im
+ * Kit-Store, EIN Ort) und Aufbewahrung (In-Memory-DEV vs. HTTP gegen das BFF).
+ *
+ * WARUM HIER und nicht als zweite Store-Implementierung: die Vorgang-Konstruktion (abgeleitete Felder,
+ * Tarif-BERECHNUNG, Nachweis-Reconcile) ist Domänen-Logik, die der Server nicht kann (seine rootDir-
+ * Mauer sperrt die fachliche Config aus). Sie darf deshalb NICHT in einem HTTP-Port dupliziert werden.
+ * Der Store rechnet den Vorgang wie bisher und übergibt das FERTIGE Ergebnis an diese Naht — „der
+ * Client rechnet, der Server bewahrt auf".
+ */
+export interface VorgangPersistence<TAntragsdaten = Record<string, unknown>> {
+  /** Lädt die persistierten Vorgänge (PROD: GET /api/buerger/antraege). Bestimmt den Anfangs-Snapshot;
+   *  ersetzt den DEV-`config.seed` (der Server ist dann die Wahrheit, nicht die Config). */
+  laden(): Promise<Vorgang<TAntragsdaten>[]>;
+  /** Persistiert einen neu eingereichten (bereits FERTIG gerechneten) Vorgang und gibt die KANONISCHE
+   *  Fassung zurück — der Server vergibt id/vorgangsnummer/Eingangszeitpunkt verbindlich. Der Store
+   *  übernimmt die Rückgabe in den Snapshot, damit ein Reload später denselben Vorgang findet. */
+  einreichen(vorgang: Vorgang<TAntragsdaten>): Promise<Vorgang<TAntragsdaten>>;
+}
+
+/**
+ * DATENSCHICHT-PORT — die EINE Schnittstelle, die der Kit nutzt. DEV: Zustand-Store (In-Memory).
+ * PROD: HTTP gegen das BFF.
+ *
+ * DER SCHNITT (bewusst asymmetrisch, NICHT „alles async"):
+ *  - LESEN (`list`/`get`) ist SYNCHRON — es liest den lokalen Snapshot. Die Bausteine rufen `port.list()`
+ *    im Render-Body (z. B. AufsichtDashboard), und die App abonniert den Snapshot über
+ *    `useSyncExternalStore` (app/use-store-version.ts). Beides verlangt einen synchronen, referenz-
+ *    stabilen Lesepfad; ein `Promise` hier zerstörte die Reaktivität ohne jeden Gewinn.
+ *  - SCHREIBEN (`einreichen`/`uebergang`) und der REGISTER-Lookup sind ASYNC — sie gehen in PROD über
+ *    das Netz. Die Vorfassung typisierte sie synchron (`einreichen(): Vorgang`); damit war eine
+ *    server-gestützte Implementierung nicht einmal TIPPBAR, und die Zusage „PROD: dieselbe
+ *    Schnittstelle gegen SDK/Fastify" war durch die Signatur widerlegt. Genau deshalb blieb die
+ *    Bürger-Seite ein Browser-Store: ein Reload löschte jeden Antrag.
+ *  - `laden` HYDRIERT den Snapshot aus der Wahrheit hinter dem Port (PROD: GET; DEV: no-op).
+ *
+ * Schreibende Aufrufe können FEHLSCHLAGEN (Netz, 403 Vier-Augen, 409 Konflikt) — Aufrufer MÜSSEN das
+ * Promise abwarten und den Fehler behandeln; ein nicht abgewartetes Reject wäre ein stiller Verlust.
+ */
 export interface VorgangPort<TAntragsdaten = Record<string, unknown>> {
+  /** SYNCHRON aus dem lokalen Snapshot (siehe Schnitt oben) — nach `laden()` server-gedeckt. */
   list(): Vorgang<TAntragsdaten>[];
+  /** SYNCHRON aus dem lokalen Snapshot (siehe Schnitt oben). */
   get(id: string): Vorgang<TAntragsdaten> | undefined;
+  /** Lädt den Snapshot aus der Wahrheit hinter dem Port (PROD: GET /api/vorgaenge; DEV: no-op).
+   *  OPTIONAL/additiv: ein Port ohne Hydration (reiner In-Memory-DEV-Store) lässt es weg. */
+  laden?(): Promise<void>;
   /** Bürger-Antrag absenden → neuer Vorgang im Initialstatus + History-Eintrag. `erbrachteNachweise` (optional, generisch)
    *  = die vom Bürger hochgeladenen Dateien, keyed by Nachweis-Id → der Vorgang trägt sie als „hochgeladen" (sonst
    *  zeigte der Sachbearbeiter für JEDEN Nachweis „Fehlt", egal was hochgeladen wurde). */
@@ -705,7 +851,7 @@ export interface VorgangPort<TAntragsdaten = Record<string, unknown>> {
       string,
       { name: string; groesse: number } | null
     >,
-  ): Vorgang<TAntragsdaten>;
+  ): Promise<Vorgang<TAntragsdaten>>;
   /** Status-Übergang (SB-Entscheidung) — prüft die Transition + schreibt History (4-Augen serverseitig in PROD).
    *  `akteur` (optional): pseudonyme Kennung des Handelnden → landet als `history[].akteur` und macht Vier-Augen
    *  nachweisbar; bei `vierAugen`-Transitionen prüft schon der DEV-Store, dass ZWEI VERSCHIEDENE Akteure handeln. */
@@ -715,7 +861,7 @@ export interface VorgangPort<TAntragsdaten = Record<string, unknown>> {
     rolle: string,
     detail?: string,
     akteur?: string,
-  ): void;
-  /** Once-Only-Lookup gegen das Register. */
-  lookupRegister(query: string): Record<string, string> | undefined;
+  ): Promise<void>;
+  /** Once-Only-Lookup gegen das Register (in PROD ein Netz-Aufruf gegen ein Fremdregister). */
+  lookupRegister(query: string): Promise<Record<string, string> | undefined>;
 }

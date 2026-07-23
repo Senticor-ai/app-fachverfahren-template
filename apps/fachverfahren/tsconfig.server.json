@@ -15,6 +15,8 @@
     { "path": "../../packages/app-bff-fastify" },
     { "path": "../../packages/app-runtime-fastify" },
     { "path": "../../packages/app-store-postgres" },
+    { "path": "../../packages/platform-contracts" },
+    { "path": "../../packages/provider-ai-ollama" },
     { "path": "../../packages/provider-local-auth" }
   ],
   "include": ["server/**/*.ts"]

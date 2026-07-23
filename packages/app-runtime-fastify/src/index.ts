@@ -40,6 +40,7 @@ export {
 } from "./hooks.js";
 export { logAudit, logError, logInfo } from "./logging.js";
 export { RuntimeMetrics, label } from "./metrics.js";
+export { startTelemetry, type TelemetryHandle } from "./telemetry.js";
 export {
   startRuntime,
   type InternalRouteRegistrar,

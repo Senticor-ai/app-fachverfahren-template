@@ -77,6 +77,18 @@ export const defaultOwnership: TemplateOwnership = {
     // der Konsument brach mit TS-Fehlern gegen die alte Paket-API (Deploy-Run 29241279544).
     "packages/*/**": "replace",
     "apps/*/src/domain/**": "consumer",
+    // DIE EINE Dossier-Naht: hier steht das Verfahren des Konsumenten (dossierProcedure), das ein
+    // generierender Build schreibt — sie MUSS ein template:update überleben. Ohne diese speziellere
+    // Ausnahme fiele sie unter `apps/*/server/**: replace` und das Upgrade überschriebe bei JEDEM Lauf
+    // das Verfahren des Konsumenten mit dem neutralen Musterverfahren der Vorlage (Datenverlust).
+    // `explainOwnership` nimmt das spezifischere Muster. Symmetrisch zur Antrag-Naht
+    // src/leistung.config.ts, die als (default) merge-Pfad ohnehin unverwaltet bleibt.
+    "apps/*/server/procedure.config.ts": "consumer",
+    // Die Composable-Naht: hier deklariert der Konsument seine Agentic Composables + Spine-Agenten (Blueprint
+    // v5.0), die ein generierender Build domänen-spezifisch schreibt. Wie procedure.config MUSS sie ein
+    // template:update überleben — sonst überschriebe das Upgrade die Composables des Konsumenten mit den
+    // neutralen Muster-Composables der Vorlage. `explainOwnership` nimmt das spezifischere Muster.
+    "apps/*/server/composables.config.ts": "consumer",
     "docs/domain/**": "consumer",
     "modules/*/**": "consumer",
   },

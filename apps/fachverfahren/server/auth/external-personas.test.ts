@@ -36,15 +36,17 @@ describe("parseExternalPersonaClaim", () => {
     });
   });
 
-  it("unbekannte Werte werden gefiltert und zum Auditieren gemeldet", () => {
+  it("verfahrens-eigene Persona-Claims werden AKZEPTIERT (Personas sind offen, nichts ignoriert)", () => {
+    // Personas sind Erlebnis, keine Autz: ein IdP darf verfahrens-eigene Personas (z.B. `hausmeister`)
+    // liefern. Sie werden uebernommen (kanonisch sortiert: Default-Personas zuerst), nichts wird ignoriert.
     expect(
       parseExternalPersonaClaim({
         [PERSONA_CLAIM]: ["sachbearbeitung", "hausmeister"],
       }),
     ).toEqual({
       kind: "present",
-      personas: ["sachbearbeitung"],
-      ignored: ["hausmeister"],
+      personas: ["sachbearbeitung", "hausmeister"],
+      ignored: [],
     });
   });
 

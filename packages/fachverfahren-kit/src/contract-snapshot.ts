@@ -26,10 +26,15 @@ export interface LeistungContractSnapshot {
   fimRefs?: LeistungConfig["fimRefs"];
   /** FRISTEN-TYPEN als echte Zeilen. */
   fristenTypen?: LeistungConfig["fristenTypen"];
+  /** GENERISCHE DATENANBINDUNG als echte Zeilen (Register/intern/extern, zweckgebunden + BSI-klassifiziert). */
+  datenanbindung?: LeistungConfig["datenanbindung"];
   statusMachine: LeistungConfig["statusMachine"];
   register: LeistungConfig["register"];
   detailSektionen: LeistungConfig["detailSektionen"];
   ki?: LeistungConfig["ki"];
+  /** WELLE 1c: die Zuständigkeiten (personas) mit ihren KI-Fähigkeiten je Zuständigkeit (faehigkeiten + AAL) — der
+   *  Laufzeit-Spiegel der CHOS-governance.faehigkeiten; das nicht-JSON-fähige `icon` ist abgestreift. */
+  personas?: LeistungConfig["personas"];
   /** ESCAPE-HATCH-Präsenz: nur gesetzt, wenn eine `berechne`-Funktion statt eines `tarif` genutzt wird. */
   berechne?: "[function]";
   /** ESCAPE-HATCH-Präsenz: nur gesetzt, wenn eine `nachweise`-Funktion statt der Codelisten-Ableitung genutzt wird. */
@@ -68,10 +73,17 @@ export function toContractSnapshot<T = Record<string, unknown>>(
     ...(config.registerRefs ? { registerRefs: config.registerRefs } : {}),
     ...(config.fimRefs ? { fimRefs: config.fimRefs } : {}),
     ...(config.fristenTypen ? { fristenTypen: config.fristenTypen } : {}),
+    ...(config.datenanbindung ? { datenanbindung: config.datenanbindung } : {}),
     statusMachine: config.statusMachine,
     register: config.register,
     detailSektionen: config.detailSektionen,
     ...(config.ki ? { ki: config.ki } : {}),
+    // WELLE 1c: die Zuständigkeiten (personas) mit ihren KI-Fähigkeiten je Zuständigkeit (faehigkeiten + AAL) fließen in den
+    // Contract — der Laufzeit-Spiegel der CHOS-governance.faehigkeiten. Das `icon` (LucideIcon) ist NICHT JSON-serialisierbar
+    // und wird abgestreift; nur wenn die Config personas deklariert (sonst leitet die App generische Defaults ab).
+    ...(config.personas
+      ? { personas: config.personas.map(({ icon: _icon, ...rest }) => rest) }
+      : {}),
     // Escape-Hatches nur als Präsenz-Marker (nicht JSON-serialisierbar) — und nur, wenn tatsächlich genutzt.
     ...(config.berechne ? { berechne: "[function]" as const } : {}),
     ...(config.nachweise ? { nachweise: "[function]" as const } : {}),

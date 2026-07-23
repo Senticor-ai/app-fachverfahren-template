@@ -1,0 +1,3 @@
+# PDF/A-Konvertierung des Bescheids — OPEN SOURCE, KEIN JAVA (kein veraPDF nötig zum ERZEUGEN).
+# pikepdf ist qpdf-basiert (C++), rein pip-installierbar. Konvertierung + Marker-Verifikation.
+pikepdf>=9,<11

@@ -362,9 +362,10 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
   );
 
   const allActive = active.size === alleStatusKeys.length;
-  // Hinweis-Zähler: Vorgänge mit KI-Flags (Aufmerksamkeit nötig).
+  // Hinweis-Zähler: Vorgänge mit KI-Flags (Aufmerksamkeit nötig). Ein Vorgang OHNE KI-Bewertung
+  // (`ki === undefined`) hat keine Flags — er zählt hier korrekt nicht mit.
   const flaggedCount = useMemo(
-    () => alle.filter((v) => v.ki.flags.length > 0).length,
+    () => alle.filter((v) => (v.ki?.flags.length ?? 0) > 0).length,
     [alle],
   );
 
@@ -551,9 +552,9 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                             {ber ? ber.betrag : "—"}
                           </strong>
                         </span>
-                        {v.ki.flags.length > 0 && (
+                        {(v.ki?.flags.length ?? 0) > 0 && (
                           <span className="ps-inbox__mobile-card-flags">
-                            {v.ki.flags.map((flag) => (
+                            {(v.ki?.flags ?? []).map((flag) => (
                               <FlagIndikator key={flag} flag={flag} />
                             ))}
                           </span>
@@ -610,9 +611,9 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                             {ber ? ber.betrag : "—"}
                           </strong>
                         </span>
-                        {v.ki.flags.length > 0 && (
+                        {(v.ki?.flags.length ?? 0) > 0 && (
                           <span className="ps-inbox__mobile-card-flags">
-                            {v.ki.flags.map((flag) => (
+                            {(v.ki?.flags ?? []).map((flag) => (
                               <FlagIndikator key={flag} flag={flag} />
                             ))}
                           </span>
@@ -744,9 +745,9 @@ export function Arbeitsvorrat<T = Record<string, unknown>>({
                             <span className="font-mono text-xs font-medium text-primary group-hover:underline">
                               {v.vorgangsnummer}
                             </span>
-                            {v.ki.flags.length > 0 && (
+                            {(v.ki?.flags.length ?? 0) > 0 && (
                               <div className="mt-1 flex flex-wrap gap-1.5">
-                                {v.ki.flags.map((flag) => (
+                                {(v.ki?.flags ?? []).map((flag) => (
                                   <FlagIndikator key={flag} flag={flag} />
                                 ))}
                               </div>

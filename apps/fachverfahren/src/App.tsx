@@ -11,11 +11,17 @@ import { buildAppRouteChildren } from "./app/build-routes.js";
 import { FirstRunGate } from "./app/guards.js";
 import { appRoutes } from "./app/routes.js";
 import { personaFromPath } from "./app/shell.js";
+import { filterRoutesByZone, useZoneAllowedSurfaces } from "./app/zone.js";
 
 export function App(): React.JSX.Element {
+  // ZONEN-EXPERIENCE-FILTER: läuft die Instanz in einer Zone (ZONE_SURFACES → runtime-config), werden Flächen außerhalb
+  // der Zone ausgeblendet — dieselbe Wahrheit wie das BFF-Route-Gate + die NetworkPolicy. Fail-open bis geladen / ohne Zone.
+  const allowedSurfaces = useZoneAllowedSurfaces();
   return (
     <FirstRunGate>
-      <Routes>{buildAppRouteChildren(appRoutes)}</Routes>
+      <Routes>
+        {buildAppRouteChildren(filterRoutesByZone(appRoutes, allowedSurfaces))}
+      </Routes>
     </FirstRunGate>
   );
 }

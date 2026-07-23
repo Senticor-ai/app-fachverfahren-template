@@ -36,6 +36,23 @@ describe("RuntimeMetrics", () => {
     expect(rendered).toContain(
       'http_request_duration_seconds_sum{method="GET",route="/assets/*",status="200"} 0.5',
     );
+    // Latenz-HISTOGRAMM (Issue #54): beide 0.25s-Beobachtungen liegen in le=0.25 (kumulativ), aber NICHT in
+    // le=0.1; +Inf/_count = Gesamtzahl → p95/p99 via histogram_quantile möglich.
+    expect(rendered).toContain(
+      "# TYPE http_request_duration_seconds histogram",
+    );
+    expect(rendered).toContain(
+      'http_request_duration_seconds_bucket{method="GET",route="/assets/*",status="200",le="0.25"} 2',
+    );
+    expect(rendered).toContain(
+      'http_request_duration_seconds_bucket{method="GET",route="/assets/*",status="200",le="0.1"} 0',
+    );
+    expect(rendered).toContain(
+      'http_request_duration_seconds_bucket{method="GET",route="/assets/*",status="200",le="+Inf"} 2',
+    );
+    expect(rendered).toContain(
+      'http_request_duration_seconds_count{method="GET",route="/assets/*",status="200"} 2',
+    );
     expect(rendered).toContain(
       'app_build_info{version="1.2.3",git_sha="abc123",image_digest="sha256:feed"} 1',
     );

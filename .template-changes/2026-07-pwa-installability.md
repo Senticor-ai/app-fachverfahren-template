@@ -1,6 +1,8 @@
+---
 bump: patch
 updateMode: review
 migration: none
+---
 
 # PWA-Installierbarkeit
 

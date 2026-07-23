@@ -5,8 +5,8 @@
   "displayName": "Hundesteuer",
   "module":
     {
-      "id": "dog-tax",
-      "destination": "modules/dog-tax",
+      "id": "hundesteuer",
+      "destination": "modules/hundesteuer",
       "owner": "demo-domain",
       "lifecycle": "example-generated",
       "riskClass": "medium",
@@ -76,9 +76,9 @@
   "permittedExternalSources": ["fimportal"],
   "routes":
     [
-      { "path": "/services/dog-tax", "surface": "citizen" },
-      { "path": "/cases/dog-tax", "surface": "caseworker" },
-      { "path": "/audit/dog-tax", "surface": "audit" },
+      { "path": "/services/hundesteuer", "surface": "citizen" },
+      { "path": "/cases/hundesteuer", "surface": "caseworker" },
+      { "path": "/audit/hundesteuer", "surface": "audit" },
     ],
   "workflows": ["registration-created", "decision-prepared", "audit-reviewed"],
   "integrations": ["mailbox", "payment"],

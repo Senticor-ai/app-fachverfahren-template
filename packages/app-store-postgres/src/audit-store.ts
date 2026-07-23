@@ -1,4 +1,6 @@
 import { createPgClient, type PgClient } from "./client.js";
+import { createChosClientFromEnv } from "./chos-client.js";
+import { ChosAuditStore } from "./chos-audit-store.js";
 
 /** Ereignis-Katalog (MVP, offen erweiterbar): jede sicherheitsrelevante administrative
  *  Aktion erzeugt ein Event — Compliance-by-Design (Nachvollziehbarkeit, Evidenz).
@@ -81,6 +83,17 @@ export class UnavailableAuditStore implements AuditStore {
 export function createAuditStoreFromEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): AuditStore {
+  // Ephemerer Preview-/Dev-Store (s. createAuthStoreFromEnv): APP_STORE_MODE=memory → prozess-lokaler In-Memory-Store.
+  if (env["APP_STORE_MODE"] === "memory") return new InMemoryAuditStore();
+  // chos-Graph-Store: APP_STORE_MODE=chos + CHOS_API_URL (fail-closed ohne URL). Postgres bleibt der OSS-Default.
+  if (env["APP_STORE_MODE"] === "chos") {
+    const client = createChosClientFromEnv(env);
+    return client
+      ? new ChosAuditStore(client)
+      : new UnavailableAuditStore(
+          "CHOS_API_URL is required for APP_STORE_MODE=chos",
+        );
+  }
   const databaseUrl = env["APP_PG_URL"] ?? env["APP_PG_DIRECT_URL"];
   return databaseUrl
     ? new PostgresAuditStore(databaseUrl)

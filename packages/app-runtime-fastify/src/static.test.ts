@@ -94,11 +94,13 @@ describe("Static-Delivery-Vertrag", () => {
     expect(response.headers["cache-control"]).toBe("no-store");
   });
 
-  it("beantwortet fehlende Dateien MIT Extension als 404-JSON, nie als SPA", async () => {
-    const response = await app.inject({ method: "GET", url: "/fehlt.js" });
-    expect(response.statusCode).toBe(404);
-    expect(response.headers["cache-control"]).toBe("no-store");
-    expect(response.json()).toEqual({ status: "not-found" });
+  it("beantwortet fehlende Dateien mit BEKANNTER Asset-Extension als 404-JSON, nie als SPA", async () => {
+    for (const url of ["/fehlt.js", "/fehlt.css", "/bild.png"]) {
+      const response = await app.inject({ method: "GET", url });
+      expect(response.statusCode, url).toBe(404);
+      expect(response.headers["cache-control"]).toBe("no-store");
+      expect(response.json()).toEqual({ status: "not-found" });
+    }
   });
 
   it("fällt für extensionslose Pfade auf das SPA-Index zurück (no-store)", async () => {
@@ -109,6 +111,20 @@ describe("Static-Delivery-Vertrag", () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers["cache-control"]).toBe("no-store");
     expect(response.body).toContain('id="root"');
+  });
+
+  it("fällt für Client-Routen mit Punkt im letzten Segment auf das SPA-Index zurück (Deep-Link/Reload einer Akte)", async () => {
+    // Echte caseIds sind punkthaltig (case.<uuid>); ohne den History-Fallback lieferte /amt/akte/case.x
+    // beim direkten Aufruf/Reload ein 404-JSON statt der App. `.demo-igm-0001` ist KEINE Asset-Extension.
+    for (const url of [
+      "/amt/akte/case.demo-igm-0001",
+      "/amt/akte/case.a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    ]) {
+      const response = await app.inject({ method: "GET", url });
+      expect(response.statusCode, url).toBe(200);
+      expect(response.headers["cache-control"]).toBe("no-store");
+      expect(response.body).toContain('id="root"');
+    }
   });
 
   it("beantwortet HEAD ohne Body, mit denselben Cache-Headern", async () => {

@@ -11,10 +11,12 @@ import {
   CardHeader,
   CardTitle,
   Input,
+  mergePersonas,
   type Persona,
 } from "@senticor/fachverfahren-kit";
 import { apiPath } from "./board-client.js";
 import { useSession } from "./session.js";
+import { store } from "./store.js";
 
 type WorkspaceRole = "admin" | "member" | "citizen";
 
@@ -36,12 +38,13 @@ interface ManagedUser {
   createdAt: string;
 }
 
-/** Anzeige-Reihenfolge = kanonische Personas-Reihenfolge. */
-const ARBEITSBEREICHE: ReadonlyArray<{ key: Persona; label: string }> = [
-  { key: "buerger", label: "Bürger:in" },
-  { key: "sachbearbeitung", label: "Sachbearbeitung" },
-  { key: "aufsicht", label: "Aufsicht" },
-];
+/** Die zuweisbaren Arbeitsbereiche AUS DEN DATEN (mergePersonas: Default-Personas + verfahrens-eigene) —
+ *  so kann ein Admin auch verfahrens-eigene Personas (Beschaffung/HR) zuweisen, nicht nur die 3 kanonischen. */
+const ARBEITSBEREICHE: ReadonlyArray<{ key: Persona; label: string }> =
+  mergePersonas(store.config.personas).map((p) => ({
+    key: p.key,
+    label: p.label,
+  }));
 
 const ROLLEN_BADGE: Record<
   WorkspaceRole,

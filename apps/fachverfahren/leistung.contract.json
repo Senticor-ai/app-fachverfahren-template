@@ -104,12 +104,45 @@
       {
         "key": "festgesetzt",
         "label": "Festgesetzt",
-        "tone": "ok",
-        "terminal": true
+        "tone": "ok"
       },
       {
         "key": "abgelehnt",
         "label": "Abgelehnt",
+        "tone": "block",
+        "terminal": true
+      },
+      {
+        "key": "widerspruch_in_pruefung",
+        "label": "Widerspruch in Prüfung",
+        "tone": "warn"
+      },
+      {
+        "key": "abgeholfen",
+        "label": "Abgeholfen",
+        "tone": "ok",
+        "terminal": true
+      },
+      {
+        "key": "widerspruch_zurueckgewiesen",
+        "label": "Widerspruch zurückgewiesen",
+        "tone": "block",
+        "terminal": true
+      },
+      {
+        "key": "rueckforderung_festgesetzt",
+        "label": "Rückforderung festgesetzt",
+        "tone": "warn"
+      },
+      {
+        "key": "erstattet",
+        "label": "Erstattet",
+        "tone": "ok",
+        "terminal": true
+      },
+      {
+        "key": "niedergeschlagen",
+        "label": "Niedergeschlagen",
         "tone": "block",
         "terminal": true
       }
@@ -138,7 +171,9 @@
         "rollen": [
           "sachbearbeitung"
         ],
-        "vierAugen": true
+        "vierAugen": true,
+        "erlaesstBescheid": true,
+        "closesCase": true
       },
       {
         "from": "review_noetig",
@@ -147,7 +182,9 @@
         "rollen": [
           "sachbearbeitung"
         ],
-        "vierAugen": true
+        "vierAugen": true,
+        "erlaesstBescheid": true,
+        "closesCase": true
       },
       {
         "from": "in_pruefung",
@@ -156,6 +193,100 @@
         "rollen": [
           "sachbearbeitung"
         ],
+        "detailPflicht": true
+      },
+      {
+        "from": "festgesetzt",
+        "to": "widerspruch_in_pruefung",
+        "label": "Widerspruch bearbeiten",
+        "rollen": [
+          "sachbearbeitung"
+        ]
+      },
+      {
+        "from": "widerspruch_in_pruefung",
+        "to": "abgeholfen",
+        "label": "Abhilfe",
+        "rollen": [
+          "sachbearbeitung"
+        ],
+        "vierAugen": true,
+        "detailPflicht": true
+      },
+      {
+        "from": "widerspruch_in_pruefung",
+        "to": "widerspruch_zurueckgewiesen",
+        "label": "Widerspruch zurückweisen",
+        "rollen": [
+          "sachbearbeitung"
+        ],
+        "vierAugen": true,
+        "detailPflicht": true,
+        "erlaesstBescheid": true,
+        "verwaltungsakt": {
+          "rechtsbehelf": {
+            "art": "klage",
+            "fristWert": 1,
+            "fristEinheit": "monat",
+            "stelle": "das zuständige Verwaltungsgericht",
+            "norm": "§ 74 VwGO"
+          },
+          "fiktionTage": 4,
+          "fiktionNorm": "§ 41 Abs. 2 VwVfG"
+        }
+      },
+      {
+        "from": "festgesetzt",
+        "to": "rueckforderung_festgesetzt",
+        "label": "Rückforderung festsetzen",
+        "rollen": [
+          "sachbearbeitung"
+        ],
+        "vierAugen": true,
+        "detailPflicht": true,
+        "erlaesstBescheid": true,
+        "stelltForderung": {
+          "tarif": {
+            "positionen": [
+              {
+                "kategorie": "standard",
+                "betragCent": 5000,
+                "label": "Standard"
+              },
+              {
+                "kategorie": "express",
+                "betragCent": 9000,
+                "label": "Express"
+              },
+              {
+                "kategorie": "gebuehrenfrei",
+                "betragCent": 0,
+                "label": "Gebührenfrei"
+              }
+            ],
+            "defaultCent": 0
+          },
+          "diskriminator": "anliegen.kategorie",
+          "zahlungsfristTage": 30
+        }
+      },
+      {
+        "from": "rueckforderung_festgesetzt",
+        "to": "erstattet",
+        "label": "Erstattung bestätigen",
+        "rollen": [
+          "sachbearbeitung"
+        ],
+        "vierAugen": true
+      },
+      {
+        "from": "rueckforderung_festgesetzt",
+        "to": "niedergeschlagen",
+        "label": "Forderung niederschlagen",
+        "rollen": [
+          "sachbearbeitung"
+        ],
+        "vierAugen": true,
         "detailPflicht": true
       }
     ]

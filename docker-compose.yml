@@ -1,0 +1,33 @@
+# Lokale Entwicklungs-Datenbank (das EINE fehlende Stück für den Ein-Kommando-Start).
+#
+#   docker compose up -d
+#
+# Startet ein Postgres, das exakt zu `APP_PG_URL` (postgres://app:app@127.0.0.1:5432/app) und zum
+# k8s-Manifest dev/postgres.yaml passt. Danach in zwei Terminals:
+#
+#   pnpm run dev:api   # Migrationen + App-Runtime auf http://127.0.0.1:8080
+#   pnpm run dev       # Vite-Dev-Server, proxied /auth + /api an die Runtime
+#
+# Ersetzt den schwergewichtigen Rancher/k8s-Weg für die reine lokale Entwicklung. NUR für Dev
+# (Default-Credentials) — NIE in Produktion. Produktion nutzt helm + einen betriebenen Cluster-DB.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fachverfahren-postgres
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - fachverfahren-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  fachverfahren-pgdata:

@@ -141,8 +141,36 @@ export const leistungConfig: LeistungConfig = {
       { key: "eingegangen", label: "Eingegangen", tone: "neu" },
       { key: "in_pruefung", label: "In Prüfung", tone: "info" },
       { key: "review_noetig", label: "Review nötig", tone: "warn" },
-      { key: "festgesetzt", label: "Festgesetzt", tone: "ok", terminal: true },
+      // WIEDERAUFNEHMBARER Abschluss: festgesetzt schließt den Antrag (closesCase am Festsetzen-Übergang),
+      // ist aber NICHT terminal — ein Widerspruch (§ 68 ff. VwGO) öffnet den Fall in den Widerspruchs-Zweig.
+      { key: "festgesetzt", label: "Festgesetzt", tone: "ok" },
       { key: "abgelehnt", label: "Abgelehnt", tone: "block", terminal: true },
+      // Widerspruchs-Verfahren (ADR-0006): Bearbeitung → Abhilfe (§ 72 VwGO) oder Zurückweisung (§ 73 VwGO).
+      {
+        key: "widerspruch_in_pruefung",
+        label: "Widerspruch in Prüfung",
+        tone: "warn",
+      },
+      { key: "abgeholfen", label: "Abgeholfen", tone: "ok", terminal: true },
+      {
+        key: "widerspruch_zurueckgewiesen",
+        label: "Widerspruch zurückgewiesen",
+        tone: "block",
+        terminal: true,
+      },
+      // Rückforderungs-Verfahren (ADR-0007): Rückforderungsbescheid + Sollstellung → Erstattung/Niederschlagung.
+      {
+        key: "rueckforderung_festgesetzt",
+        label: "Rückforderung festgesetzt",
+        tone: "warn",
+      },
+      { key: "erstattet", label: "Erstattet", tone: "ok", terminal: true },
+      {
+        key: "niedergeschlagen",
+        label: "Niedergeschlagen",
+        tone: "block",
+        terminal: true,
+      },
     ],
     transitions: [
       {
@@ -163,6 +191,10 @@ export const leistungConfig: LeistungConfig = {
         label: "Festsetzen",
         rollen: ["sachbearbeitung"],
         vierAugen: true,
+        // Die Festsetzung ERLÄSST den Verwaltungsakt → der Server friert beim Übergang den Bescheid ein.
+        erlaesstBescheid: true,
+        // Schließt den Fall (festgesetzt ist wiederaufnehmbar-geschlossen, nicht terminal).
+        closesCase: true,
       },
       {
         from: "review_noetig",
@@ -170,12 +202,94 @@ export const leistungConfig: LeistungConfig = {
         label: "Festsetzen (Zweitfreigabe)",
         rollen: ["sachbearbeitung"],
         vierAugen: true,
+        erlaesstBescheid: true,
+        closesCase: true,
       },
       {
         from: "in_pruefung",
         to: "abgelehnt",
         label: "Ablehnen",
         rollen: ["sachbearbeitung"],
+        detailPflicht: true,
+      },
+      // ── Widerspruchs-Verfahren (ADR-0006) — auf der GENERISCHEN Übergangs-Maschinerie ────────────────
+      {
+        from: "festgesetzt",
+        to: "widerspruch_in_pruefung",
+        label: "Widerspruch bearbeiten",
+        rollen: ["sachbearbeitung"],
+      },
+      {
+        from: "widerspruch_in_pruefung",
+        to: "abgeholfen",
+        label: "Abhilfe",
+        rollen: ["sachbearbeitung"],
+        vierAugen: true,
+        detailPflicht: true,
+      },
+      {
+        from: "widerspruch_in_pruefung",
+        to: "widerspruch_zurueckgewiesen",
+        label: "Widerspruch zurückweisen",
+        rollen: ["sachbearbeitung"],
+        vierAugen: true,
+        detailPflicht: true,
+        // Der Widerspruchsbescheid IST ein Verwaltungsakt → einfrieren; aber mit EIGENEM Regime: anzufechten
+        // mit der KLAGE (§ 74 VwGO), nicht erneut mit Widerspruch (ADR-0006 §3).
+        erlaesstBescheid: true,
+        verwaltungsakt: {
+          rechtsbehelf: {
+            art: "klage",
+            fristWert: 1,
+            fristEinheit: "monat",
+            stelle: "das zuständige Verwaltungsgericht",
+            norm: "§ 74 VwGO",
+          },
+          fiktionTage: 4,
+          fiktionNorm: "§ 41 Abs. 2 VwVfG",
+        },
+      },
+      // ── Rückforderungs-Verfahren (ADR-0007) — Sollstellung server-autoritativ über den Tarif ─────────
+      {
+        from: "festgesetzt",
+        to: "rueckforderung_festgesetzt",
+        label: "Rückforderung festsetzen",
+        rollen: ["sachbearbeitung"],
+        vierAugen: true,
+        detailPflicht: true,
+        // Der Rückforderungsbescheid IST ein Verwaltungsakt (Standard-Widerspruch-Regime aus config.zustellung).
+        erlaesstBescheid: true,
+        // SOLLSTELLUNG: die Höhe kommt SERVER-AUTORITATIV aus dem Tarif + der gewählten Kategorie — nie vom Client.
+        stelltForderung: {
+          tarif: {
+            positionen: [
+              { kategorie: "standard", betragCent: 5000, label: "Standard" },
+              { kategorie: "express", betragCent: 9000, label: "Express" },
+              {
+                kategorie: "gebuehrenfrei",
+                betragCent: 0,
+                label: "Gebührenfrei",
+              },
+            ],
+            defaultCent: 0,
+          },
+          diskriminator: "anliegen.kategorie",
+          zahlungsfristTage: 30,
+        },
+      },
+      {
+        from: "rueckforderung_festgesetzt",
+        to: "erstattet",
+        label: "Erstattung bestätigen",
+        rollen: ["sachbearbeitung"],
+        vierAugen: true,
+      },
+      {
+        from: "rueckforderung_festgesetzt",
+        to: "niedergeschlagen",
+        label: "Forderung niederschlagen",
+        rollen: ["sachbearbeitung"],
+        vierAugen: true,
         detailPflicht: true,
       },
     ],
@@ -211,13 +325,34 @@ export const leistungConfig: LeistungConfig = {
       ],
     },
   ],
+  // Zustellung/Bekanntgabe + Rechtsbehelfs-REGIME als DATEN. Das neutrale Musterverfahren ist ein
+  // allgemeines Verwaltungsverfahren → Widerspruch/VwGO/VwVfG. Ein Abgaben-/Steuerverfahren (AO-Regime)
+  // setzt hier stattdessen Einspruch/§ 347 AO/§ 122 Abs. 2 AO — der Bescheid trägt dann die RICHTIGE
+  // Belehrung, statt der früher hart kodierten Widerspruchs-Belehrung. Diese Werte werden beim Erlass in
+  // den Bescheid EINGEFROREN (bestandskraft-fest), nicht beim Abruf live gelesen.
+  zustellung: {
+    fiktionTage: 4,
+    fiktionNorm: "§ 41 Abs. 2 VwVfG",
+    rechtsbehelf: {
+      art: "widerspruch",
+      fristWert: 1,
+      fristEinheit: "monat",
+      stelle: "der erlassenden Behörde",
+      norm: "§ 68 ff. VwGO",
+    },
+  },
   ki: { schwelleAutonom: 0.9 },
+  // DEMO-SEED OHNE KI-BEWERTUNG: an dieses Musterverfahren ist KEIN Modell gebunden (der AiAssistPort
+  // ist eine Naht ohne Adapter) — also ist kein Vorgang bewertet, und `ki` bleibt ungesetzt. Die
+  // Vorfassung stempelte hier frei erfundene Konfidenzen (0.94/0.72/0.55) auf die Demo-Vorgänge; das
+  // Aufsicht-Dashboard mittelte sie zu „Ø KI-Konfidenz 94 %" und wies eine Modell-Leistung aus, die
+  // nie gemessen wurde. Sobald ein Adapter Vorgänge WIRKLICH bewertet, füllen sich die Kennzahlen
+  // von selbst — bis dahin zeigen sie ehrlich „kein KI-Modell aktiv".
   seed: ({ vorgangsnummer }) => {
     const mk = (
       min: number,
       status: string,
       antragsdaten: MusterAntrag,
-      ki?: { confidence: number; flags: string[] },
     ): Vorgang<MusterAntrag> => {
       const vn = vorgangsnummer();
       return {
@@ -229,7 +364,6 @@ export const leistungConfig: LeistungConfig = {
         antragsdaten,
         status,
         berechnung: berechneDemo(antragsdaten),
-        ki: ki ?? { confidence: 0.94, flags: [] },
         nachweise: [],
         history: [
           {
@@ -251,35 +385,25 @@ export const leistungConfig: LeistungConfig = {
         },
         anliegen: { kategorie: "standard" },
       }),
-      mk(
-        180,
-        "in_pruefung",
-        {
-          antragsteller: {
-            vorname: "Kim",
-            nachname: "Beispiel",
-            plz: "12347",
-            ort: "Musterstadt",
-            bekannt: true,
-          },
-          anliegen: { kategorie: "express" },
+      mk(180, "in_pruefung", {
+        antragsteller: {
+          vorname: "Kim",
+          nachname: "Beispiel",
+          plz: "12347",
+          ort: "Musterstadt",
+          bekannt: true,
         },
-        { confidence: 0.72, flags: ["angabe_unklar"] },
-      ),
-      mk(
-        600,
-        "review_noetig",
-        {
-          antragsteller: {
-            vorname: "Sam",
-            nachname: "Vorlage",
-            plz: "12345",
-            ort: "Musterstadt",
-          },
-          anliegen: { kategorie: "standard" },
+        anliegen: { kategorie: "express" },
+      }),
+      mk(600, "review_noetig", {
+        antragsteller: {
+          vorname: "Sam",
+          nachname: "Vorlage",
+          plz: "12345",
+          ort: "Musterstadt",
         },
-        { confidence: 0.55, flags: ["nachweis_fehlt"] },
-      ),
+        anliegen: { kategorie: "standard" },
+      }),
       mk(1440, "festgesetzt", {
         antragsteller: {
           vorname: "Toni",

@@ -25,6 +25,18 @@ Komponenten-Bibliothek gebaut — die neutrale Fastify-Web-Runtime existiert in
 `apps/fachverfahren/server`, die Bausteine existieren in
 `packages/fachverfahren-kit`.
 
+## Golden Example (kanonische Referenz)
+
+`docs/examples/hundesteuer/app.spec.yaml` (+ `agent-prompt.md`,
+`gtc-builder-vorhaben.md`) ist das vollständig durchdeklinierte Referenz-
+Fachverfahren dieses Kits — der Default von `app:new` und die Grundlage der
+Scaffold-Selbsttests (`agent-platform.test.ts`, Agent-Readiness, Golden-
+Generated-App). Orientiere jedes neue Verfahren daran (Bürger-/Sachbearbeitungs-/
+Aufsichts-Surface, `berechne()`-Fachlogik, Contracts, Migrationen). Der Domänen-
+Slug ist durchgehend `hundesteuer` (kanonisch, deutsch) — NIE eine englische
+oder erfundene Variante (`dog-tax` o. Ä.); ein abweichender Slug driftet den Build
+(alle `modules/<domain>/`-Pfade MÜSSEN exakt diesen einen Slug tragen).
+
 ## Workflow (Naht füllen)
 
 1. `AGENTS.md` lesen: Naht-Vertrag, Annahme-DATEN-Konvention, Pfad-Karte.
@@ -37,7 +49,7 @@ Komponenten-Bibliothek gebaut — die neutrale Fastify-Web-Runtime existiert in
    ```
 
 3. `apps/fachverfahren/src/leistung.config.ts` mit den Werten des
-   freigegebenen Fachkonzepts füllen: `id/label/kommune`,
+   freigegebenen Fachkonzepts füllen: `id/label/kommune` (Trägerin = Kommune/Behörde/interne Stelle),
    `rechtsgrundlagen` (nur belegt), `antrag.steps` (Pflichtfelder mit
    Validierung; Bürger-Felder zusätzlich mit `leichteSprache`/`hintEinfach`
    im selben Schritt — siehe „Bürger-Sprache" unten), `statusMachine`
@@ -83,6 +95,96 @@ Komponenten-Bibliothek gebaut — die neutrale Fastify-Web-Runtime existiert in
    Start den Admin auf der Landing (`/`) mit dem Bootstrap-Token einrichten
    (Default `dev-setup`, nur lokal). Die login-freie Sichtprüfung der
    Bausteine läuft über `pnpm run storybook`.
+
+## Bescheid / Verwaltungsakt (der Anspruchs-Lebenszyklus)
+
+Erlässt das Verfahren einen förmlichen Bescheid, ist er ein **eingefrorener
+Verwaltungsakt** — der Bürger kann ihn selbst herunterladen, und er ist
+bestandskraft-fest (er darf NICHT aus der lebenden Config neu gerendert werden;
+sonst änderte eine Tarif-/Regime-Umstellung rückwirkend einen VA von 2024). Der
+gesamte Mechanismus (Einfrieren am Übergang, Bekanntgabe als `case.disclosed`,
+Bürger-Download `GET /api/buerger/antraege/:id/bescheid` als JSON mit Hash-Beweis
+UND `GET /api/buerger/antraege/:id/bescheid.pdf` als echtes, selbsttragendes
+PDF-Langzeitdokument — eingebettete Schrift, Hash sichtbar + in den Metadaten;
+`BescheidView` zeigt beides über den `pdfDownloadUrl`-Prop) ist im Template
+GEBAUT — als Agent deklarierst du nur DATEN in `leistung.config.ts`:
+
+1. Der bescheid-erlassende Übergang der `statusMachine` trägt
+   `erlaesstBescheid: true` (neben `vierAugen: true` — eine Festsetzung ist
+   vier-augen-pflichtig). Der Tenor wird aus `berechne` (der Berechnung des
+   Vorgangs) eingefroren; du lieferst keinen Bescheid-Text.
+2. `zustellung.rechtsbehelf` setzt das REGIME der Belehrung — **data-driven,
+   nicht hart kodiert**: `art: "widerspruch"` (VwGO/VwVfG, allgemeines
+   Verfahren), `"einspruch"` (AO — für ein Abgaben-/Steuerverfahren ist
+   Widerspruch FALSCH) oder `"klage"`, plus `fristWert/fristEinheit/stelle/norm`
+   und `fiktionTage/fiktionNorm` (Bekanntgabefiktion, Default 4 Tage PostModG).
+3. Der Server braucht dieselbe Zustandsmaschine (er kann `leistung.config` nicht
+   importieren — rootDir-Mauer). Spiegle `verwaltungsakt` +
+   `erlaesstBescheid` in `apps/fachverfahren/server/procedure.config.ts`; das
+   Gate `pnpm run check:antrag-procedure` erzwingt die Deckung (schlägt bei
+   Drift an).
+
+Der PDF-Renderer (`apps/fachverfahren/server/bescheid/pdf.ts`) ist **template-
+getrieben** (`BescheidTemplate` = geordnete Sektionen als DATEN) und **KI-
+assistierbar**: `bescheid/ki-entwurf.ts` lässt den chos-Agenten (AiAssistPort,
+AAL-2 „Advise") eine Begründung ENTWERFEN — limited-risk, `reviewRequired:true`
+(HITL); erst nach menschlicher Freigabe wird der Text eine Freitext-Sektion. Der
+Renderer selbst ruft NIE die KI (Determinismus). Du musst hier nichts tun — das
+greift automatisch, sobald das Verfahren einen Bescheid erlässt.
+
+Der Bürger-Antrag ist server-persistent (überlebt Reload): `/buerger/antraege`
+(Meine Anträge), `/buerger/antrag/:id` (Status) und `/buerger/bescheid/:id`
+(Bescheid) sind fertige Sichten — sie erscheinen automatisch, sobald das
+Verfahren einen Bescheid erlässt.
+
+## Weitere Bürger-Journeys (GEBAUT)
+
+Über den Bescheid hinaus sind diese Bürger-Wege fertig verdrahtet (owner-scoped,
+Eigentümerschaft AUSSCHLIESSLICH aus der Session; DTOs in
+`@senticor/app-bff-contracts`, eine fremde/nicht vorhandene Kennung → 404):
+
+- **Rechtsbehelf einlegen**: `POST /api/buerger/antraege/:id/widerspruch`
+  (`case.own.submit`) — setzt einen erlassenen Bescheid voraus (sonst 404),
+  einmalig (409), hält den Rechtsbehelf append-only als `case.objection` fest
+  (Eingangszeitpunkt = Fristwahrung); Art/Norm aus dem EINGEFRORENEN Regime. UI:
+  „Widerspruch einlegen" auf `/buerger/bescheid/:id`.
+- **Nachweise hoch-/herunterladen**: `POST|GET /api/buerger/antraege/:id/nachweise`
+  (+ `…/:attachmentId`) — Byte-Transfer über den austauschbaren `BlobStoragePort`
+  (Größe + SHA-256 server-berechnet), Referenz append-only im
+  `nachweis.uploaded`-Audit (einzige Zuordnung Anlage↔Antrag). UI: Nachweis-Sektion
+  auf `/buerger/antrag/:id`.
+- **Postfach**: `GET /api/mailbox?box=inbox&scope=own` → die generische
+  `Postfach`-Kit-Komponente unter `/buerger/postfach` (Bescheide/Nachrichten der
+  Behörde inkl. Zustellnachweis/Bekanntgabe).
+
+## Rechtsbehelfs- & Rückforderungs-Verfahren (GEBAUT, data-driven)
+
+Über den Erst-Bescheid hinaus trägt die `statusMachine` zwei WEITERE Fall-Zweige,
+die auf DERSELBEN generischen Übergangs-Maschinerie (`POST /api/cases/:id/
+transitions`, RBAC + Vier-Augen + append-only Audit) laufen — du deklarierst nur
+Zustände/Übergänge als DATEN (ADR-0006 / ADR-0007):
+
+- **Wiederaufnehmbarer Abschluss** (`Transition.closesCase: true`): ein Übergang
+  darf den Fall SCHLIESSEN, ohne dass sein Zielzustand `terminal` ist — nötig für
+  ein `festgesetzt`, das ein Widerspruch wieder öffnet (symmetrisch zum BPMN-
+  `senticor:closesCase`). Ein terminaler Zustand dürfte keine ausgehenden Übergänge haben.
+- **Widerspruchs-Verfahren**: `festgesetzt → widerspruch_in_pruefung →
+  abgeholfen | widerspruch_zurueckgewiesen` (Vier-Augen). Der Widerspruchsbescheid
+  ist ein VA mit EIGENEM Rechtsbehelfsregime (KLAGE, nicht erneut Widerspruch) —
+  dafür trägt der Übergang ein per-Übergang-Override `Transition.verwaltungsakt`
+  (überschreibt `zustellung.rechtsbehelf`); ohne Override gilt das Verfahrens-Regime.
+- **Rückforderungs-Verfahren**: `festgesetzt → rueckforderung_festgesetzt →
+  erstattet | niedergeschlagen`. Der stellende Übergang trägt
+  `Transition.stelltForderung: { tarif, diskriminator, zahlungsfristTage }` — der
+  Server schreibt eine **Sollstellung** (`forderung.gestellt`) mit SERVER-
+  AUTORITATIVER Höhe (`berechneTarif(tarif, case.data[diskriminator])`, nie ein
+  client-gelieferter Betrag). Der offene Restbetrag ist eine reine Ableitung
+  (`forderungsstandAusAudit`, SDK). Zahlungseingang verbuchen:
+  `POST /api/buerger/antraege/:id/rueckforderung/zahlung` (owner-scoped, Betrag
+  server-verifiziert via PaymentPort, idempotent je `paymentId`). Mahnwesen: der
+  zeitgetriebene Worker `apps/fachverfahren/server/forderung-mahnung.ts`
+  (`worker:mahnung`, CronJob-Muster wie der Fristen-Scanner) mahnt überfällige
+  offene Forderungen (idempotent — die Mahnung verlängert die Frist).
 
 ## Bürger-Sprache: Leichte Sprache und Fachbegriffe
 
