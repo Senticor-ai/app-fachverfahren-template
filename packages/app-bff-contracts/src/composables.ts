@@ -119,3 +119,38 @@ export const SpineRunResultDtoSchema = Type.Object(
   { additionalProperties: false },
 );
 export type SpineRunResultDto = Static<typeof SpineRunResultDtoSchema>;
+
+// EVIDENCE-LEDGER (Blueprint §15.3 / §27): der hash-verkettete, tamper-evidente Nachweis agentischer
+// Governance-Handlungen (Spine-Vorschläge). Nur Metadaten — nie der Vorschlagsinhalt (kein PII).
+export const EvidenceEntryDtoSchema = Type.Object(
+  {
+    evidenceId: Type.String({ minLength: 1 }),
+    entryType: Type.String({ minLength: 1 }),
+    actorId: Type.String({ minLength: 1 }),
+    summary: Type.String(),
+    refs: Type.Record(Type.String(), Type.String()),
+    occurredAt: Type.String({ minLength: 1 }),
+    prevHash: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+    entryHash: Type.String({ minLength: 1 }),
+  },
+  { additionalProperties: false },
+);
+export type EvidenceEntryDto = Static<typeof EvidenceEntryDtoSchema>;
+
+export const EvidenceLedgerDtoSchema = Type.Object(
+  {
+    ledgerId: Type.String({ minLength: 1 }),
+    entries: Type.Array(EvidenceEntryDtoSchema),
+    /** Verifikation der Hash-Kette: valid + Länge + optional der Index des ersten Bruchs. */
+    chain: Type.Object(
+      {
+        valid: Type.Boolean(),
+        length: Type.Integer({ minimum: 0 }),
+        brokenAt: Type.Optional(Type.Integer({ minimum: 0 })),
+      },
+      { additionalProperties: false },
+    ),
+  },
+  { additionalProperties: false },
+);
+export type EvidenceLedgerDto = Static<typeof EvidenceLedgerDtoSchema>;

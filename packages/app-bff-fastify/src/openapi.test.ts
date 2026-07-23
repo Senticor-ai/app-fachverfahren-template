@@ -51,7 +51,7 @@ async function buildPair({ collectorFirst = true } = {}): Promise<{
 }
 
 describe("OpenAPI intern-only", () => {
-  it("liefert intern ein Dokument mit ALLEN zweiundfünfzig BFF-Operationen", async () => {
+  it("liefert intern ein Dokument mit ALLEN dreiundfünfzig BFF-Operationen", async () => {
     const { internalApp } = await buildPair();
     const response = await internalApp.inject({
       method: "GET",
@@ -89,6 +89,7 @@ describe("OpenAPI intern-only", () => {
       "/api/cases/{id}/vermerke/{vermerkId}/review",
       "/api/composables",
       "/api/composables/{id}",
+      "/api/composables/{id}/evidence",
       "/api/composables/{id}/spine/{aufgabe}",
       "/api/identity",
       "/api/identity/assurance",
@@ -111,6 +112,7 @@ describe("OpenAPI intern-only", () => {
       doc.paths as Record<string, Record<string, unknown>>,
     ).flatMap((path) => Object.keys(path));
     expect(operations.sort()).toEqual([
+      "get",
       "get",
       "get",
       "get",

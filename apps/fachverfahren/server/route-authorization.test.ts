@@ -219,6 +219,12 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           url: "/api/composables/:id",
           policy: "rbac:session.read",
         },
+        // Evidence-Ledger: behördliche Oversight-Sicht (case.read).
+        {
+          method: "GET",
+          url: "/api/composables/:id/evidence",
+          policy: "rbac:case.read",
+        },
         // Spine-Run: agentische (KI-)Handlung → ai.assist (nur Sachbearbeitung).
         {
           method: "POST",

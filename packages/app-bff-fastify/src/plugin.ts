@@ -10,6 +10,7 @@ import {
   InMemoryWissenStore,
   type AppStore,
   type CaseStore,
+  type EvidenceLedger,
   type TaskStore,
   type WissenStore,
 } from "@senticor/app-store-postgres";
@@ -82,6 +83,8 @@ export interface AppBffOptions {
   bescheidPdf?: BescheidPdfRenderer;
   /** Registry der Agentic Composables (Blueprint v5.0). OPTIONAL: fehlt sie, ist `/api/composables` leer. */
   composableRegistry?: ComposableRegistry;
+  /** Hash-verketteter Evidence-Ledger (Blueprint §15.3). OPTIONAL: fehlt er, keine Evidence-Kette. */
+  evidenceLedger?: EvidenceLedger;
   /** ZONEN-ROUTE-ENFORCEMENT (BSI-Netzsegmentierung, Angriffsflächen-Reduktion): die Flächen, die DIESE Instanz servieren
    *  darf — aus dem Deploy-Env ZONE_SURFACES (aus derselben readZoneModel-Wahrheit wie die Netz-Segmentierung). Eine
    *  Routen-Familie wird NUR registriert, wenn ihre Flächen diese Menge schneiden (Infra-Familien ohne Flächen-Tag immer).
@@ -120,6 +123,7 @@ export async function appBff(
     ...(opts.composableRegistry
       ? { composableRegistry: opts.composableRegistry }
       : {}),
+    ...(opts.evidenceLedger ? { evidenceLedger: opts.evidenceLedger } : {}),
   };
   app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error.validation) {

@@ -305,4 +305,21 @@ describe("Agenten-CLI (mesh-cli)", () => {
     expect(res?.ok).toBe(false);
     expect(res?.status).toBe(422);
   });
+
+  it("composable evidence: Spine-Handlungen landen hash-verkettet im Ledger (stateful, verifizierbar)", async () => {
+    const results = await executeMeshCommands([
+      ["composable", "spine", "musterverfahren", "assistenz", "--input", "{}"],
+      ["composable", "spine", "musterverfahren", "pruefung", "--input", "{}"],
+      ["composable", "evidence", "musterverfahren"],
+    ]);
+    expect(results[2]?.ok).toBe(true);
+    const ev = results[2]?.data as {
+      entries: { prevHash: string | null; entryHash: string }[];
+      chain: { valid: boolean; length: number };
+    };
+    expect(ev.entries).toHaveLength(2);
+    expect(ev.entries[0]?.prevHash).toBeNull();
+    expect(ev.entries[1]?.prevHash).toBe(ev.entries[0]?.entryHash);
+    expect(ev.chain).toEqual({ valid: true, length: 2 });
+  });
 });

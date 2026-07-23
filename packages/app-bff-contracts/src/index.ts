@@ -214,6 +214,8 @@ export {
   ComposableSpineParamsSchema,
   SpineRunRequestSchema,
   SpineRunResultDtoSchema,
+  EvidenceEntryDtoSchema,
+  EvidenceLedgerDtoSchema,
   type ComposableSummaryDto,
   type ComposableListDto,
   type ComposableDetailDto,
@@ -221,5 +223,7 @@ export {
   type ComposableSpineParamsDto,
   type SpineRunRequestDto,
   type SpineRunResultDto,
+  type EvidenceEntryDto,
+  type EvidenceLedgerDto,
 } from "./composables.js";
 export { openApiInfo, openApiTags } from "./openapi.js";

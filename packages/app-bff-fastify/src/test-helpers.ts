@@ -12,9 +12,11 @@ import {
   InMemoryAppStore,
   InMemoryCaseStore,
   InMemoryTaskStore,
+  InMemoryEvidenceLedger,
   InMemoryWissenStore,
   type AppStore,
   type CaseStore,
+  type EvidenceLedger,
   type TaskStore,
   type WissenStore,
 } from "@senticor/app-store-postgres";
@@ -77,6 +79,7 @@ export async function buildBffApp({
   evidenceRetrieval = createLocalEvidenceRetrievalPort(),
   wissenStore = new InMemoryWissenStore(),
   composableRegistry,
+  evidenceLedger = new InMemoryEvidenceLedger(),
 }: {
   session?: ResolvedSession;
   appStore?: AppStore;
@@ -90,6 +93,7 @@ export async function buildBffApp({
   evidenceRetrieval?: EvidenceRetrievalPort;
   wissenStore?: WissenStore;
   composableRegistry?: ComposableRegistry;
+  evidenceLedger?: EvidenceLedger;
 } = {}): Promise<{
   app: FastifyInstance;
   auditSink: MemoryAuditSink;
@@ -113,6 +117,7 @@ export async function buildBffApp({
     evidenceRetrieval,
     wissenStore,
     ...(composableRegistry ? { composableRegistry } : {}),
+    evidenceLedger,
   });
   return { app, auditSink, appStore, caseStore, taskStore };
 }

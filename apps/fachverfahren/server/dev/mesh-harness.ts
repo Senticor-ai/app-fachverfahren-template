@@ -8,6 +8,7 @@ import {
   InMemoryAppStore,
   InMemoryCaseStore,
   InMemoryTaskStore,
+  InMemoryEvidenceLedger,
   InMemoryWissenStore,
 } from "@senticor/app-store-postgres";
 import {
@@ -82,6 +83,7 @@ export async function buildSeededMeshApp(
       antragProcedure,
     ]),
     composableRegistry: createComposableRegistry(),
+    evidenceLedger: new InMemoryEvidenceLedger(),
     sessionResolver: resolver,
     auditSink: new NoopAuditSink(),
   });

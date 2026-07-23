@@ -150,9 +150,20 @@ export {
   auditEntryHash,
   auditStreamOrder,
   chainAuditEvent,
+  hashChainEntry,
   verifyAuditChain,
 } from "./audit-chain.js";
 export type { AuditChainResult } from "./audit-chain.js";
+export {
+  InMemoryEvidenceLedger,
+  evidenceEntryHash,
+  verifyEvidenceChain,
+} from "./evidence-ledger.js";
+export type {
+  EvidenceEntry,
+  EvidenceAppendInput,
+  EvidenceLedger,
+} from "./evidence-ledger.js";
 export { nextPositionKey } from "./position.js";
 export {
   defaultMigrationOptionsFromEnv,

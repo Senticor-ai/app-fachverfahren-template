@@ -33,32 +33,41 @@ function sortRecursive(value: JsonValue): JsonValue {
   return value;
 }
 
+/** Die EINE Hash-Ketten-Primitive: SHA-256 über die kanonischen Bytes der inhaltstragenden Felder INKL.
+ *  `prevHash` (die Verkettung). Geteilt vom fachlichen Audit UND vom Evidence-Ledger (Blueprint §15.3), damit
+ *  es nur EINE kanonische Serialisierung/Hash-Wahrheit gibt — nie divergierende Ketten-Arithmetik. */
+export function hashChainEntry(
+  content: Record<string, unknown>,
+  prevHash: string | null,
+): string {
+  return createHash("sha256")
+    .update(canonicalize({ prevHash, ...content }), "utf8")
+    .digest("hex");
+}
+
 /** Der `entryHash` eines Ereignisses: SHA-256 über die kanonischen Bytes ALLER inhaltstragenden Felder INKL.
  *  `prevHash`. Die Ketten-Felder `entryHash`/`prevHash` selbst gehen NICHT ein (prevHash schon — als Verkettung). */
 export function auditEntryHash(
   event: AppAuditEvent,
   prevHash: string | null,
 ): string {
-  return createHash("sha256")
-    .update(
-      canonicalize({
-        prevHash,
-        auditEventId: event.auditEventId,
-        caseId: event.caseId,
-        tenantId: event.tenantId,
-        authorityId: event.authorityId,
-        jurisdictionId: event.jurisdictionId,
-        actorId: event.actorId,
-        eventType: event.eventType,
-        purpose: event.purpose,
-        legalBasisId: event.legalBasisId,
-        requestId: event.requestId,
-        payload: event.payload,
-        occurredAt: event.occurredAt,
-      }),
-      "utf8",
-    )
-    .digest("hex");
+  return hashChainEntry(
+    {
+      auditEventId: event.auditEventId,
+      caseId: event.caseId,
+      tenantId: event.tenantId,
+      authorityId: event.authorityId,
+      jurisdictionId: event.jurisdictionId,
+      actorId: event.actorId,
+      eventType: event.eventType,
+      purpose: event.purpose,
+      legalBasisId: event.legalBasisId,
+      requestId: event.requestId,
+      payload: event.payload,
+      occurredAt: event.occurredAt,
+    },
+    prevHash,
+  );
 }
 
 /** Deterministische Stream-Reihenfolge (occurredAt, dann auditEventId als Tiebreak) — EINE Wahrheit für

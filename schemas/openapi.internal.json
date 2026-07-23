@@ -5064,6 +5064,130 @@
         "tags": ["composables"]
       }
     },
+    "/api/composables/{id}/evidence": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "chain": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "brokenAt": { "minimum": 0, "type": "integer" },
+                        "length": { "minimum": 0, "type": "integer" },
+                        "valid": { "type": "boolean" }
+                      },
+                      "required": ["valid", "length"],
+                      "type": "object"
+                    },
+                    "entries": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "actorId": { "minLength": 1, "type": "string" },
+                          "entryHash": { "minLength": 1, "type": "string" },
+                          "entryType": { "minLength": 1, "type": "string" },
+                          "evidenceId": { "minLength": 1, "type": "string" },
+                          "occurredAt": { "minLength": 1, "type": "string" },
+                          "prevHash": {
+                            "anyOf": [
+                              { "minLength": 1, "type": "string" },
+                              { "type": "null" }
+                            ]
+                          },
+                          "refs": {
+                            "additionalProperties": { "type": "string" },
+                            "type": "object"
+                          },
+                          "summary": { "type": "string" }
+                        },
+                        "required": [
+                          "evidenceId",
+                          "entryType",
+                          "actorId",
+                          "summary",
+                          "refs",
+                          "occurredAt",
+                          "prevHash",
+                          "entryHash"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "ledgerId": { "minLength": 1, "type": "string" }
+                  },
+                  "required": ["ledgerId", "entries", "chain"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Evidence-Ledger eines Composables — hash-verketteter, verifizierbarer Nachweis der Spine-Handlungen",
+        "tags": ["composables"]
+      }
+    },
     "/api/composables/{id}/spine/{aufgabe}": {
       "post": {
         "parameters": [

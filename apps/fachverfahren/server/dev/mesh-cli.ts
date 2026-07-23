@@ -111,8 +111,13 @@ function routeFor(tokens: string[]): Route {
           body: { input },
         };
       }
+      if (sub === "evidence") {
+        // Der hash-verkettete Evidence-Ledger der Spine-Handlungen (exportierbar + verifizierbar).
+        const id = p(1, "composableId");
+        return { method: "GET", url: `/api/composables/${enc(id)}/evidence` };
+      }
       throw new Error(
-        `unbekanntes composable-Kommando: ${sub} (list|show|spine)`,
+        `unbekanntes composable-Kommando: ${sub} (list|show|spine|evidence)`,
       );
     }
     case "case": {

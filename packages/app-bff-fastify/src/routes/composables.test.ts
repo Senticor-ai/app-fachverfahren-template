@@ -201,3 +201,67 @@ describe("BFF Spine-Run POST /api/composables/:id/spine/:aufgabe", () => {
     await app.close();
   });
 });
+
+describe("BFF Evidence-Ledger GET /api/composables/:id/evidence", () => {
+  it("jede Spine-Handlung landet hash-verkettet im Ledger; die Kette verifiziert", async () => {
+    const { app } = await appWith([composable()]);
+    // Zwei Spine-Läufe erzeugen zwei Evidence-Einträge.
+    for (const aufgabe of ["assistenz", "pruefung"]) {
+      const r = await app.inject({
+        method: "POST",
+        url: `/api/composables/musterverfahren/spine/${aufgabe}`,
+        payload: { input: {}, caseId: "case.demo" },
+      });
+      expect(r.statusCode).toBe(200);
+    }
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/composables/musterverfahren/evidence",
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.entries).toHaveLength(2);
+    // Hash-Kette: Genesis prevHash=null, zweiter verweist auf den ersten.
+    expect(body.entries[0].prevHash).toBeNull();
+    expect(body.entries[1].prevHash).toBe(body.entries[0].entryHash);
+    expect(body.chain).toEqual({ valid: true, length: 2 });
+    // Nur Metadaten — der Vorschlags-INHALT (rationale/confidence/value) taucht NICHT auf.
+    expect(body.entries[0].refs.aufgabe).toBe("assistenz");
+    expect(body.entries[0].suggestion).toBeUndefined();
+    const asJson = JSON.stringify(body.entries);
+    expect(asJson).not.toContain("rationale");
+    expect(asJson).not.toContain("confidence");
+    await app.close();
+  });
+
+  it("leerer Ledger für ein Composable ohne Spine-Läufe (chain valid, length 0)", async () => {
+    const { app } = await appWith([composable()]);
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/composables/musterverfahren/evidence",
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().chain).toEqual({ valid: true, length: 0 });
+    await app.close();
+  });
+
+  it("404 für ein unbekanntes Composable", async () => {
+    const { app } = await appWith([composable()]);
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/composables/gibt-es-nicht/evidence",
+    });
+    expect(res.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it("403 für die Bürger-Rolle (Evidence ist behördliche Oversight, case.read)", async () => {
+    const { app } = await appWith([composable()], citizenSession());
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/composables/musterverfahren/evidence",
+    });
+    expect(res.statusCode).toBe(403);
+    await app.close();
+  });
+});

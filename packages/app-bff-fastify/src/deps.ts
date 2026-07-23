@@ -4,6 +4,7 @@ import type { AuditSink, SessionResolver } from "@senticor/app-runtime-fastify";
 import type {
   AppStore,
   CaseStore,
+  EvidenceLedger,
   TaskStore,
   WissenStore,
 } from "@senticor/app-store-postgres";
@@ -67,4 +68,7 @@ export interface BffDeps {
    *  Optional: ohne sie liefert `/api/composables` eine leere Liste (die deterministische Naht existiert
    *  trotzdem). Die App-Komposition registriert die domänen-spezifischen Composables. */
   composableRegistry?: ComposableRegistry;
+  /** Hash-verketteter Evidence-Ledger (Blueprint §15.3) für agentische Governance-Handlungen (Spine-Vorschläge).
+   *  Optional: ohne ihn werden Spine-Handlungen nur ins app-data-Audit geschrieben (nicht hash-verkettet). */
+  evidenceLedger?: EvidenceLedger;
 }

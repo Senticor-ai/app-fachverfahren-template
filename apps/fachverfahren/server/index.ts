@@ -37,10 +37,12 @@ import {
   createKanbanStoreFromEnv,
   createTaskStoreFromEnv,
   createWissenStoreFromEnv,
+  InMemoryEvidenceLedger,
   type AppStore,
   type AuditStore,
   type AuthStore,
   type CaseStore,
+  type EvidenceLedger,
   type KanbanStore,
   type TaskStore,
   type WissenStore,
@@ -145,6 +147,8 @@ interface BffWiring {
   procedureRegistry: ProcedureRegistry;
   /** Registry der Agentic Composables (Blueprint v5.0) — deklarierte Fähigkeitseinheiten mit Spine-Agent. */
   composableRegistry?: ComposableRegistry;
+  /** Hash-verketteter Evidence-Ledger (Blueprint §15.3) für die Spine-Handlungen. */
+  evidenceLedger?: EvidenceLedger;
   sessionResolver: SessionResolver;
   auditSink: AuditSink;
   /** KI-Assistenz-Port, per Env gewählt (local-fake ODER echter Adapter). */
@@ -315,6 +319,8 @@ export async function startRuntime(
     ]),
     // Agentic Composables (Blueprint v5.0): die deklarierten Fähigkeitseinheiten mit Spine-Agent.
     composableRegistry: createComposableRegistry(),
+    // Evidence-Ledger (Blueprint §15.3): hash-verketteter Nachweis der Spine-Handlungen (Template-Stub In-Memory).
+    evidenceLedger: new InMemoryEvidenceLedger(),
     sessionResolver: createCookieSessionResolver(authStore),
     auditSink: createAuditSinkFromEnv(env),
     // Port-Registry: KI-Anbieter per Env (local-fake default; AI_ASSIST_PROVIDER=ollama für den echten Adapter).
