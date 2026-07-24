@@ -1,7 +1,12 @@
 // composables-mounted.test — die AUTO-MONTAGE der CHOS-emittierten Manifeste (Ziel-1 S8, „CHOS GENERATES").
 // Deckt: Fallback ohne `.chos/` (Muster bleiben), Auto-Mount emittierter Manifeste, Anspruch ∧ Beleg (certified
 // ohne Verdikt → candidate; MIT verdientem Verdikt → enabled), fail-closed reject (über-autonom → übersprungen).
-import { createHash } from "node:crypto";
+import {
+  createHash,
+  generateKeyPairSync,
+  sign as edSign,
+  type KeyObject,
+} from "node:crypto";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -9,7 +14,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { istEnabled } from "@senticor/public-sector-sdk";
 import {
   COMPOSABLE_CERT_PREDICATE_TYPE,
+  COMPOSABLE_CERT_SIGNATURE_DOMAIN,
   IN_TOTO_STATEMENT_TYPE,
+  stableStringify,
   type CertScenarioRecord,
   type MeshCertFile,
   type MeshComposableManifest,
@@ -62,40 +69,76 @@ const ALL_PASS: Pick<CertScenarioRecord, "id" | "axis" | "ok">[] = [
   { id: "verantwortung-a", axis: "verantwortung", ok: true },
 ];
 
-/** Ein VERDIENTES Verdikt-Artefakt für ein Manifest (Digest gegen die kanonischen Manifest-Bytes). */
+// Der CHOS-Cert-Signer (asymmetrisch, Ed25519); der ÖFFENTLICHE Key reist als well-known Datei cert-signing-key.pub.
+const CERT_PUBKEY_FILE = "cert-signing-key.pub";
+let signerPriv: KeyObject;
+let signerPub: string;
+
+/** Schreibt den vertrauten ÖFFENTLICHEN Cert-Signing-Key als well-known Datei (Trust-Anker fürs KIT). */
+function writePubkey(dir: string, pub: string = signerPub): void {
+  writeFileSync(path.join(dir, CERT_PUBKEY_FILE), pub + "\n");
+}
+
+/** ECHTE Ed25519-Attestation über `sha256(stableStringify(statement))` unter der Cert-Domäne (CHOS-Signier-Pfad). */
+function attestFor(
+  statement: unknown,
+  priv: KeyObject = signerPriv,
+  pub: string = signerPub,
+): { alg: string; publicKey: string; sig: string } {
+  const digest = createHash("sha256").update(stableStringify(statement)).digest("hex");
+  const sig = edSign(
+    null,
+    Buffer.from(`${COMPOSABLE_CERT_SIGNATURE_DOMAIN}\0${digest}`, "utf8"),
+    priv,
+  ).toString("base64url");
+  return { alg: "Ed25519", publicKey: pub, sig };
+}
+
+/** Ein VERDIENTES, SIGNIERTES Verdikt-Artefakt für ein Manifest (Digest gegen die kanonischen Manifest-Bytes). */
 function earnedCert(id: string, manifestSha256: string): MeshCertFile {
+  const statement = {
+    _type: IN_TOTO_STATEMENT_TYPE,
+    subject: [{ name: id, digest: { sha256: manifestSha256 } }],
+    predicateType: COMPOSABLE_CERT_PREDICATE_TYPE,
+    predicate: {
+      composableId: id,
+      domain: "musterverfahren",
+      scorerBaseline: { ok: true },
+      scenarios: ALL_PASS as CertScenarioRecord[],
+      earned: true,
+      finishedAt: "2026-07-24T00:00:00.000Z",
+    },
+  };
   return {
     schemaVersion: 1,
-    statement: {
-      _type: IN_TOTO_STATEMENT_TYPE,
-      subject: [{ name: id, digest: { sha256: manifestSha256 } }],
-      predicateType: COMPOSABLE_CERT_PREDICATE_TYPE,
-      predicate: {
-        composableId: id,
-        domain: "musterverfahren",
-        scorerBaseline: { ok: true },
-        scenarios: ALL_PASS as CertScenarioRecord[],
-        earned: true,
-        finishedAt: "2026-07-24T00:00:00.000Z",
-      },
-    },
+    statement,
     signature: { alg: "HMAC-SHA256", sig: "deadbeef" },
+    attestation: attestFor(statement),
   };
 }
 
-/** Schreibt ein Manifest (+ optional sein Verdikt) in ein Mount-Verzeichnis; gibt den Manifest-Digest zurück. */
+/** Schreibt ein Manifest (+ optional sein signiertes Verdikt + Trust-Anker) in ein Mount-Verzeichnis; gibt den
+ *  Manifest-Digest zurück. `certOverride` erlaubt gezielte Manipulation (z. B. Signatur zerstören). */
 function writeManifest(
   dir: string,
   m: MeshComposableManifest,
-  opts: { withEarnedCert?: boolean } = {},
+  opts: {
+    withEarnedCert?: boolean;
+    withPubkey?: boolean;
+    certOverride?: (cert: MeshCertFile) => MeshCertFile;
+  } = {},
 ): string {
   const bytes = serialize(m);
   writeFileSync(path.join(dir, `${m.id}.json`), bytes);
   const digest = sha256(bytes);
+  if (opts.withPubkey ?? opts.withEarnedCert) writePubkey(dir);
   if (opts.withEarnedCert) {
+    const cert = opts.certOverride
+      ? opts.certOverride(earnedCert(m.id, digest))
+      : earnedCert(m.id, digest);
     writeFileSync(
       path.join(dir, `${m.id}.cert.json`),
-      serialize(earnedCert(m.id, digest)),
+      serialize(cert),
     );
   }
   return digest;
@@ -106,6 +149,9 @@ describe("loadMountedComposables — Auto-Mount der CHOS-Manifeste", () => {
 
   beforeEach(() => {
     dir = mkdtempSync(path.join(tmpdir(), "chos-mesh-"));
+    const kp = generateKeyPairSync("ed25519");
+    signerPriv = kp.privateKey;
+    signerPub = kp.publicKey.export({ format: "der", type: "spki" }).toString("base64url");
   });
   afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
@@ -157,6 +203,37 @@ describe("loadMountedComposables — Auto-Mount der CHOS-Manifeste", () => {
     expect(load.composables).toHaveLength(1);
     expect(load.composables[0]!.status).toBe("certified");
     expect(istEnabled(load.composables[0]!)).toBe(true);
+  });
+
+  it("kappt certified mit GEFÄLSCHTER Cert-Signatur auf candidate (fail-closed, kein Über-Claim)", () => {
+    writeManifest(
+      dir,
+      manifest({ certification: { status: "certified", cal: 3 } }),
+      {
+        withEarnedCert: true,
+        certOverride: (cert) => ({
+          ...cert,
+          attestation: { ...cert.attestation!, sig: "A".repeat(86) },
+        }),
+      },
+    );
+    const load = loadMountedComposables(dir);
+    expect(load.composables).toHaveLength(1);
+    expect(load.composables[0]!.status).toBe("candidate");
+    expect(istEnabled(load.composables[0]!)).toBe(false);
+  });
+
+  it("kappt certified fail-closed, wenn KEIN vertrauenswürdiger Cert-Signing-Public-Key vorliegt (absent key)", () => {
+    // Verdikt verdient+signiert, aber cert-signing-key.pub NICHT geschrieben ⇒ Signatur unverifizierbar ⇒ candidate.
+    writeManifest(
+      dir,
+      manifest({ certification: { status: "certified", cal: 3 } }),
+      { withEarnedCert: true, withPubkey: false },
+    );
+    const load = loadMountedComposables(dir);
+    expect(load.composables).toHaveLength(1);
+    expect(load.composables[0]!.status).toBe("candidate");
+    expect(istEnabled(load.composables[0]!)).toBe(false);
   });
 
   it("überspringt ein über-autonomes rechtsnahes Manifest fail-closed (kein stilles Kappen)", () => {

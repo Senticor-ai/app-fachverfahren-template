@@ -10,13 +10,33 @@
 //
 // FAIL-CLOSED: fehlend/unlesbar/inkongruent/veraltet/in-sich-inkonsistent ⇒ NICHT valid ⇒ NICHT earned (kein Raten).
 //
-// SIGNATUR (HMAC): der Spine-Key liegt CHOS-seitig; dieses Repo hat ihn NICHT. Ohne einen injizierten
-// `verifySignature`-Callback prüft diese Funktion die Signatur NICHT (das ist eine bewusste, ehrliche Grenze —
-// `signatureChecked:false` reist im Ergebnis mit). Teilt der Betrieb den Verify-Schlüssel mit dem KIT, reicht er
-// `verifySignature` + `statementPayload` durch und die HMAC-Echtheit fließt fail-closed ins Verdikt ein.
+// SIGNATUR (ASYMMETRISCH, Ed25519): CHOS signiert das Verdikt-Statement zusätzlich zur CHOS-internen HMAC mit einem
+// ASYMMETRISCHEN Cert-Signing-Key und lässt die Signatur + den ÖFFENTLICHEN Verify-Key mitreisen (`attestation`). Der
+// KIT prüft sie mit dem PUBLIC Key — er kann VERIFIZIEREN, aber NIE FÄLSCHEN (der private Signier-Key bleibt CHOS-seitig).
+// TRUST-ANKER: der ÖFFENTLICHE Key kommt OUT-OF-BAND (`opts.certSigningPublicKey` — vom Aufrufer aus einer well-known
+// Datei `cert-signing-key.pub` bzw. ENV aufgelöst); der IN der `attestation` mitgereiste `publicKey` ist NUR Auditdatum
+// und muss dem vertrauten Key GLEICHEN (sonst fälschte ein Angreifer Signatur+Key gemeinsam). Fehlt der vertraute Key,
+// bleibt die Signatur ungeprüft (`signatureChecked:false`) — der Aufrufer kappt dann deklariertes certified/active
+// fail-closed auf candidate. Eine vorhandene, aber GEBROCHENE/fremde Attestation ⇒ NICHT valid (forged/unsigniert).
+// (Der ältere HMAC-Injektions-Seam `verifySignature`+`statementPayload` bleibt rückwärts-kompatibel erhalten.)
 //
-// REIN: keine relativen Runtime-Imports, kein I/O — damit dieses Modul sowohl im Paket-Build als auch direkt über
-// `node --experimental-strip-types` (das precommit-Gate `check-composables.mts`) ladbar ist.
+// REIN: keine Laufzeit-Imports, KEIN node:crypto, kein I/O — dieses Paket ist plattform-agnostisch (kein @types/node).
+// Die kryptografischen Primitive (sha256, Ed25519-Verify) werden vom NODE-Aufrufer INJIZIERT (opts.sha256Hex /
+// opts.verifyEd25519); die SICHERHEITS-Logik (Attestation-Form, Trust-Anker-Gleichheit, Domäne, Digest-Quelle) bleibt
+// hier EINE Wahrheit. So bleibt das Modul auch über `node --experimental-strip-types` (check-composables.mts) ladbar.
+
+/** Signatur-Domäne der Ed25519-Cert-Attestation — byte-gleich zu CHOS `COMPOSABLE_CERT_SIGNATURE_DOMAIN`. */
+export const COMPOSABLE_CERT_SIGNATURE_DOMAIN = "senticor/composable-cert/v1";
+
+/** Kanonische (schlüssel-sortierte) Serialisierung — byte-gleich zu CHOS `stableStringify` (verbund-edge-verify.ts).
+ *  Der Cert-Signatur-Digest ist `sha256(stableStringify(statement))`; die KIT-Seite MUSS exakt so serialisieren. REIN. */
+export function stableStringify(v: unknown): string {
+  if (v === undefined || v === null) return "null";
+  if (typeof v !== "object") return JSON.stringify(v);
+  if (Array.isArray(v)) return "[" + v.map(stableStringify).join(",") + "]";
+  const o = v as Record<string, unknown>;
+  return "{" + Object.keys(o).sort().map((k) => JSON.stringify(k) + ":" + stableStringify(o[k])).join(",") + "}";
+}
 
 // ── Manifest-Typen (die EINE Identität einer zuständigen Stelle, CHOS mesh-derive/mesh-emit) ─────────────────────────
 /** Eine Anspruchsgrundlage im Manifest (Rechtsgrundlage der Stelle). */
@@ -123,6 +143,9 @@ export interface MeshCertFile {
   schemaVersion?: number;
   statement?: MeshCertStatement;
   signature?: { alg?: string; sig?: string };
+  /** ASYMMETRISCHE (Ed25519) Attestation — grenzübergreifend mit dem PUBLIC Key prüfbar. `publicKey` = base64url-SPKI
+   *  (nur Auditdatum; die Autorität kommt aus `opts.certSigningPublicKey`, gegen den `publicKey` gleichen muss). */
+  attestation?: { alg?: string; publicKey?: string; sig?: string };
   countersign?: { signer?: string; at?: string; sig?: string }[];
 }
 
@@ -149,7 +172,8 @@ export interface MeshCertVerification {
   valid: boolean;
   /** VERDIENT: valid ∧ Baseline ok ∧ alle drei Achsen nachgerechnet bestanden. */
   earned: boolean;
-  /** Wurde die HMAC-Signatur geprüft? (nur, wenn `verifySignature` + `statementPayload` übergeben wurden). */
+  /** Wurde die kryptografische Signatur geprüft? (nur, wenn ein vertrauter Cert-Signing-Public-Key vorlag UND die
+   *  Ed25519-Attestation dagegen gültig verifizierte; bzw. der ältere injizierte HMAC-Verifier bestand). */
   signatureChecked: boolean;
   countersigned: boolean;
   axes?: Record<CertAxis, CertAxisVerdict>;
@@ -162,10 +186,19 @@ export interface MeshCertVerifyOptions {
   /** SHA-256 (hex) der EXAKTEN Manifest-Bytes — für die Frische-Prüfung (Digest im Subjekt). `null`/undefined ⇒ Frische
    *  wird NICHT geprüft (der Aufrufer hat das Manifest nicht); das Verdikt kann dann veraltet sein (ehrlich gemeldet). */
   manifestSha256?: string | null;
-  /** Optionaler HMAC-Verifier (der Betrieb teilt den Spine-Verify-Key mit dem KIT). Ohne ihn bleibt die Signatur
-   *  ungeprüft (signatureChecked=false). */
+  /** Der VERTRAUTE (out-of-band) ÖFFENTLICHE Cert-Signing-Key (base64url-SPKI) — der TRUST-ANKER der Ed25519-Attestation.
+   *  Der Aufrufer löst ihn aus der well-known Datei `cert-signing-key.pub` neben den Verdikten bzw. aus ENV auf. Fehlt er
+   *  (`null`/undefined), bleibt die Signatur ungeprüft (signatureChecked=false) — der Aufrufer kappt certified fail-closed. */
+  certSigningPublicKey?: string | null;
+  /** INJIZIERTE sha256-Hex-Funktion (node:crypto beim Aufrufer) — der Cert-Signatur-Digest ist
+   *  `sha256Hex(stableStringify(statement))`. Ohne sie (oder ohne verifyEd25519) bleibt die Attestation ungeprüft. */
+  sha256Hex?: (input: string) => string;
+  /** INJIZIERTE public-only Ed25519-Verifikation (node:crypto beim Aufrufer): Nachricht = `${domain}\0${digestHex}`,
+   *  `publicKey`/`signature` base64url. Die Autoritäts-/Form-Prüfung (Trust-Anker-Gleichheit, alg, Domäne) bleibt HIER. */
+  verifyEd25519?: (publicKey: string, domain: string, digestHex: string, signature: string | undefined) => boolean;
+  /** ÄLTERER, rückwärts-kompatibler HMAC-Injektions-Seam (nur genutzt, wenn KEINE asymmetrische Prüfung möglich ist). */
   verifySignature?: (payload: string, sig: string | undefined) => boolean;
-  /** Kanonische Serialisierung des Statements für den Signatur-Payload (muss byte-gleich zur CHOS-Signier-Seite sein). */
+  /** Kanonische Serialisierung des Statements für den HMAC-Payload (muss byte-gleich zur CHOS-Signier-Seite sein). */
   statementPayload?: (statement: MeshCertStatement) => string;
 }
 
@@ -229,9 +262,29 @@ export function verifyMeshCertStructure(
       "earned-Flag ≠ nachgerechnete Achsen-Belege — das Verdikt ist in sich inkonsistent (kein Vertrauen).",
     );
   }
-  // Optionale HMAC-Prüfung (nur mit geteiltem Verify-Key).
+  // KRYPTOGRAFISCHE Signatur-Prüfung (fail-closed):
+  //   1) ASYMMETRISCH (bevorzugt): gegen den VERTRAUTEN Cert-Signing-Public-Key (out-of-band) — der KIT prüft mit dem
+  //      PUBLIC Key und kann NIE fälschen. Der in der Attestation mitgereiste `publicKey` ist nur Auditdatum und muss
+  //      dem vertrauten Key GLEICHEN; die Ed25519-Signatur geht über `sha256(stableStringify(statement))` unter der
+  //      Cert-Domäne. Fehlt/bricht/fremd ⇒ Reason (forged/unsigniert) ⇒ NICHT valid.
+  //   2) HMAC (rückwärts-kompatibel): nur, wenn KEIN vertrauter Key vorliegt und ein Verifier injiziert wurde.
   let signatureChecked = false;
-  if (opts.verifySignature && opts.statementPayload && st) {
+  if (st && opts.certSigningPublicKey && opts.sha256Hex && opts.verifyEd25519) {
+    const att = file.attestation;
+    const digest = opts.sha256Hex(stableStringify(st));
+    const okSig =
+      !!att &&
+      att.alg === "Ed25519" &&
+      typeof att.publicKey === "string" &&
+      att.publicKey === opts.certSigningPublicKey &&
+      opts.verifyEd25519(att.publicKey, COMPOSABLE_CERT_SIGNATURE_DOMAIN, digest, att.sig);
+    if (okSig) signatureChecked = true;
+    else {
+      reasons.push(
+        "Cert-Signatur (Ed25519) ungültig/fehlend gegen den vertrauten Cert-Signing-Public-Key — das Verdikt ist nicht authentisch (gefälscht/unsigniert oder von fremdem Signer).",
+      );
+    }
+  } else if (opts.verifySignature && opts.statementPayload && st) {
     signatureChecked = true;
     if (!opts.verifySignature(opts.statementPayload(st), file.signature?.sig)) {
       reasons.push(

@@ -16,7 +16,7 @@
 //
 // FALLBACK: fehlt `.chos/mesh/composables/` (Template ohne Build), lädt nichts — der Aufrufer fällt sauber auf die
 // hand-deklarierten Muster-Composables zurück. Best-effort/fail-open: ein Lese-/Scan-Fehler wirft NIE nach oben.
-import { createHash } from "node:crypto";
+import { createHash, createPublicKey, verify as ed25519Verify } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import {
@@ -31,6 +31,40 @@ import {
 
 const sha256 = (buf: Buffer): string =>
   createHash("sha256").update(buf).digest("hex");
+
+/** node:crypto-Primitive für den PURE-Package-Injektions-Seam (die Sicherheits-Logik lebt in verifyMeshCertStructure). */
+const sha256Hex = (s: string): string => createHash("sha256").update(s).digest("hex");
+const verifyEd25519 = (
+  publicKey: string,
+  domain: string,
+  digestHex: string,
+  signature: string | undefined,
+): boolean => {
+  if (!signature || typeof publicKey !== "string") return false;
+  try {
+    const pub = createPublicKey({ key: Buffer.from(publicKey, "base64url"), format: "der", type: "spki" });
+    if (pub.asymmetricKeyType !== "ed25519") return false;
+    return ed25519Verify(null, Buffer.from(`${domain}\0${digestHex}`, "utf8"), pub, Buffer.from(signature, "base64url"));
+  } catch {
+    return false;
+  }
+};
+
+/** Well-known Dateiname des vertrauten ÖFFENTLICHEN Cert-Signing-Keys (Spiegel CHOS COMPOSABLE_CERT_PUBKEY_FILE). */
+const CERT_PUBKEY_FILE = "cert-signing-key.pub";
+
+/** Löst den VERTRAUTEN Cert-Signing-Public-Key auf: ENV CHOS_CERT_SIGNING_PUBKEY → sonst die well-known Datei
+ *  `cert-signing-key.pub` neben den Verdikten. Fehlt beides ⇒ null (Signatur ungeprüft ⇒ certified fail-closed gekappt). */
+function trustedCertKey(dir: string): string | null {
+  const env = process.env["CHOS_CERT_SIGNING_PUBKEY"];
+  if (env && env.trim()) return env.trim();
+  try {
+    const s = readFileSync(path.join(dir, CERT_PUBKEY_FILE), "utf8").trim();
+    return s || null;
+  } catch {
+    return null;
+  }
+}
 
 const msg = (e: unknown): string =>
   e instanceof Error ? e.message : String(e);
@@ -120,6 +154,8 @@ export function loadMountedComposables(
   const uebersprungen: { file: string; grund: string }[] = [];
   if (!existsSync(dir)) return { composables, uebersprungen };
 
+  const trusted = trustedCertKey(dir);
+
   let entries: string[];
   try {
     entries = readdirSync(dir).filter(
@@ -147,8 +183,9 @@ export function loadMountedComposables(
     const manifest = parsed as MeshComposableManifest;
     const id = manifest.id.trim();
 
-    // Attestation aus dem daneben liegenden Verdikt (Frische gegen die EXAKTEN Manifest-Bytes). Fehlt/unlesbar/
-    // ungültig ⇒ {valid:false,earned:false} ⇒ der Mapper kappt deklariertes certified/active auf candidate.
+    // Attestation aus dem daneben liegenden Verdikt (Frische gegen die EXAKTEN Manifest-Bytes + Ed25519-Signatur gegen
+    // den vertrauten PUBLIC Key). Fehlt/unlesbar/ungültig/unsigniert ⇒ earned:false ⇒ der Mapper kappt deklariertes
+    // certified/active fail-closed auf candidate (kein Über-Claim ohne verdienten UND authentischen Beleg).
     let attestation = { valid: false, earned: false };
     const certPath = path.join(dir, `${id}.cert.json`);
     if (existsSync(certPath)) {
@@ -157,8 +194,12 @@ export function loadMountedComposables(
         const v = verifyMeshCertStructure(cert, {
           composableId: id,
           manifestSha256: sha256(raw),
+          certSigningPublicKey: trusted,
+          sha256Hex,
+          verifyEd25519,
         });
-        attestation = { valid: v.valid, earned: v.earned };
+        // earned NUR mit verifizierter Signatur (fehlt der vertraute Key ⇒ signatureChecked=false ⇒ gekappt).
+        attestation = { valid: v.valid, earned: v.earned && v.signatureChecked };
       } catch {
         /* unlesbares Verdikt → attestation bleibt {false,false} (fail-closed: gekappt) */
       }

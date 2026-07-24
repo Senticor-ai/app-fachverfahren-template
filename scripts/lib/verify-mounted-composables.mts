@@ -10,10 +10,13 @@
 // damit `check-composables.mts` es über `node --experimental-strip-types` laden kann. Die volle Mapper-Runde
 // (Manifest → AgenticComposable via assertComposable) prüft die vitest-Suite (composable-manifest.test.ts).
 //
-// SIGNATUR (HMAC): der Spine-Verify-Key liegt CHOS-seitig und ist hier NICHT verfügbar — die Prüfung ist rein
-// strukturell (in-toto-Hülle, earned ≡ Achsen, Frische). Die HMAC-Echtheits-Prüfung ist ein bewusster Folgeschritt
-// (Verify-Key mit dem KIT teilen → verifySignature durchreichen); das ist im Report ehrlich markiert.
-import { createHash } from "node:crypto";
+// SIGNATUR (ASYMMETRISCH, Ed25519): CHOS signiert das Verdikt mit einem Cert-Signing-Key und lässt den ÖFFENTLICHEN
+// Verify-Key als well-known Datei `cert-signing-key.pub` neben den Verdikten mitreisen (bzw. via ENV
+// CHOS_CERT_SIGNING_PUBKEY). Dieses Gate löst den vertrauten PUBLIC Key auf und prüft die Attestation fail-closed:
+// ein deklariert enabled Composable ist NUR mit VERDIENTEM UND signatur-verifiziertem Verdikt „verdient". Fehlt der
+// vertraute Key (kein cert-signing-key.pub / kein ENV), bleibt die Signatur ungeprüft ⇒ certified/active wird
+// fail-closed als nicht-verdient behandelt (kein Über-Claim ohne Authentizitäts-Beleg).
+import { createHash, createPublicKey, verify as ed25519Verify } from "node:crypto";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import path from "node:path";
 import {
@@ -24,8 +27,43 @@ import {
 
 const ENABLED_STATUS = new Set(["certified", "active"]);
 
+/** Well-known Dateiname des vertrauten ÖFFENTLICHEN Cert-Signing-Keys (Spiegel CHOS COMPOSABLE_CERT_PUBKEY_FILE). */
+const CERT_PUBKEY_FILE = "cert-signing-key.pub";
+
 const sha256 = (buf: Buffer): string =>
   createHash("sha256").update(buf).digest("hex");
+
+/** node:crypto-Primitive für den PURE-Package-Injektions-Seam (die Sicherheits-Logik lebt in verifyMeshCertStructure). */
+const sha256Hex = (s: string): string => createHash("sha256").update(s).digest("hex");
+const verifyEd25519 = (
+  publicKey: string,
+  domain: string,
+  digestHex: string,
+  signature: string | undefined,
+): boolean => {
+  if (!signature || typeof publicKey !== "string") return false;
+  try {
+    const pub = createPublicKey({ key: Buffer.from(publicKey, "base64url"), format: "der", type: "spki" });
+    if (pub.asymmetricKeyType !== "ed25519") return false;
+    return ed25519Verify(null, Buffer.from(`${domain}\0${digestHex}`, "utf8"), pub, Buffer.from(signature, "base64url"));
+  } catch {
+    return false;
+  }
+};
+
+/** Löst den VERTRAUTEN Cert-Signing-Public-Key auf: ENV CHOS_CERT_SIGNING_PUBKEY (der stärkere, operator-gepinnte
+ *  Anker) → sonst die well-known Datei `cert-signing-key.pub` neben den Verdikten. Fehlt beides ⇒ null (Signatur
+ *  bleibt ungeprüft; certified wird dann fail-closed gekappt). */
+function resolveTrustedCertKey(dir: string): string | null {
+  const env = process.env.CHOS_CERT_SIGNING_PUBKEY;
+  if (env && env.trim()) return env.trim();
+  try {
+    const s = readFileSync(path.join(dir, CERT_PUBKEY_FILE), "utf8").trim();
+    return s || null;
+  } catch {
+    return null;
+  }
+}
 
 export interface MountedComposableReport {
   ok: boolean;
@@ -60,6 +98,8 @@ export function verifyMountedComposables(dir: string): MountedComposableReport {
   if (!existsSync(dir)) {
     return { ok: true, checked: 0, verdient: 0, fehler: [], hinweise: [] };
   }
+
+  const trusted = resolveTrustedCertKey(dir);
 
   const entries = readdirSync(dir).filter(
     (f) => f.endsWith(".json") && !f.endsWith(".cert.json"),
@@ -103,22 +143,34 @@ export function verifyMountedComposables(dir: string): MountedComposableReport {
     const v = verifyMeshCertStructure(certParsed, {
       composableId: id,
       manifestSha256: sha256(raw),
+      certSigningPublicKey: trusted,
+      sha256Hex,
+      verifyEd25519,
     });
-    if (v.earned) {
-      verdient++;
-      if (!v.signatureChecked)
-        hinweise.push(
-          `${id}: Verdikt strukturell VERDIENT (earned ≡ Achsen, Frische ok) — HMAC-Signatur ungeprüft (Verify-Key nicht geteilt; Folgeschritt).`,
-        );
+    // BELEGT = strukturell verdient UND kryptografisch signatur-verifiziert (Ed25519 gegen den vertrauten PUBLIC Key).
+    const belegt = v.earned && v.signatureChecked;
+    if (belegt) verdient++;
+    else if (v.earned && !v.signatureChecked && certVorhanden) {
+      hinweise.push(
+        `${id}: Verdikt strukturell VERDIENT (earned ≡ Achsen, Frische ok), aber Signatur UNGEPRÜFT — ${
+          trusted
+            ? "Attestation fehlt/ungültig gegen den vertrauten Cert-Signing-Public-Key"
+            : `kein vertrauenswürdiger Cert-Signing-Public-Key (weder ${CERT_PUBKEY_FILE} neben den Verdikten noch ENV CHOS_CERT_SIGNING_PUBKEY)`
+        }; certified/active wird fail-closed als nicht-verdient behandelt.`,
+      );
     }
 
-    // FAIL-CLOSED: deklariert enabled ⇒ verdientes Verdikt Pflicht.
-    if (ENABLED_STATUS.has(status) && !v.earned) {
+    // FAIL-CLOSED: deklariert enabled ⇒ VERDIENTES UND signatur-verifiziertes Verdikt Pflicht.
+    if (ENABLED_STATUS.has(status) && !belegt) {
       fehler.push(
-        `${id} ist deklariert „${status}" (enabled), aber ohne VERDIENTES Eval-Verdikt — ${
-          certVorhanden
-            ? v.reasons.join("; ")
-            : `kein ${id}.cert.json vorhanden`
+        `${id} ist deklariert „${status}" (enabled), aber ohne VERDIENTES, signatur-verifiziertes Eval-Verdikt — ${
+          !certVorhanden
+            ? `kein ${id}.cert.json vorhanden`
+            : v.reasons.length
+              ? v.reasons.join("; ")
+              : !trusted
+                ? `kein vertrauenswürdiger Cert-Signing-Public-Key (${CERT_PUBKEY_FILE}/ENV CHOS_CERT_SIGNING_PUBKEY fehlt) ⇒ Signatur nicht verifizierbar`
+                : "Signatur der Attestation nicht verifiziert"
         } (deklariert ≠ verdient, fail-closed).`,
       );
     }
