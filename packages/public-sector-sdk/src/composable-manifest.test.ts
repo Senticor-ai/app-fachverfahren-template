@@ -29,7 +29,7 @@ function manifest(
 ): MeshComposableManifest {
   return {
     schemaVersion: 1,
-    domain: "hundesteuer",
+    domain: "musterverfahren",
     id: "sachbearbeitung",
     titel: "Sachbearbeitung / Fachdienst",
     art: "flaeche",
@@ -79,7 +79,7 @@ function certFile(opts: {
       predicateType: COMPOSABLE_CERT_PREDICATE_TYPE,
       predicate: {
         composableId: opts.id,
-        domain: "hundesteuer",
+        domain: "musterverfahren",
         scorerBaseline: { ok: opts.baselineOk ?? true },
         scenarios: opts.scenarios as CertScenarioRecord[],
         earned,
@@ -103,7 +103,7 @@ describe("mapManifestToComposable — Mount-Mapper", () => {
     expect(c.id).toBe("sachbearbeitung");
     expect(c.displayName).toContain("Sachbearbeitung");
     expect(c.spine?.skills).toContain("normbezogene-pruefung");
-    expect(c.spine?.knowledgeDomains).toContain("hundesteuer");
+    expect(c.spine?.knowledgeDomains).toContain("musterverfahren");
     expect(c.spine?.knowledgeDomains).toContain("pack:kommunalabgaben");
     expect(c.assurance).toBe("CAL-2");
     expect(c.moduleId).toBe("sachbearbeitung");
@@ -131,7 +131,7 @@ describe("mapManifestToComposable — Mount-Mapper", () => {
   it("mountet ein rein strukturelles Manifest ohne KI-Fähigkeiten als deterministisches Composable (ohne Spine)", () => {
     const m: MeshComposableManifest = {
       schemaVersion: 1,
-      domain: "hundesteuer",
+      domain: "musterverfahren",
       id: "datenanbindung",
       titel: "Datenanbindung",
       art: "struktur",
