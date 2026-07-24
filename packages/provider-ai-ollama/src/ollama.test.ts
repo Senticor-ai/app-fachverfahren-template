@@ -108,6 +108,67 @@ describe("Ollama AiAssistPort — adapterspezifische Invarianten", () => {
     }
   });
 
+  it("converse: der Verlauf reist als echte Chat-Rollen an /api/chat; HCAI-Marker hart gesetzt", async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(
+        JSON.stringify({ message: { content: "Geerdete Antwort." } }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    ) as unknown as typeof fetch;
+    const port = createOllamaAiAssistPort({
+      baseUrl: "http://ollama.test:11434",
+      model: "qwen3",
+      fetchImpl,
+    });
+    expect(port.converse).toBeDefined();
+    const res = await port.converse!(sampleContext(), {
+      task: "composable-chat:musterverfahren",
+      history: [
+        { role: "user", text: "Welche Frist gilt?" },
+        { role: "assistant", text: "Ein Monat." },
+        { role: "user", text: "Und die Rechtsgrundlage?" },
+      ],
+      input: { wissen: [{ quelle: "wissen.1", text: "Fristwissen" }] },
+      maxClass: "limited-risk",
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.value.value).toBe("Geerdete Antwort.");
+    expect(res.value.marking).toBe("ki-vorschlag");
+    expect(res.value.reviewRequired).toBe(true);
+    // Wire-Check: /api/chat mit system-Kontext + den drei Verlaufs-Zügen als Rollen.
+    const mock = fetchImpl as unknown as ReturnType<typeof vi.fn>;
+    const [url, init] = mock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://ollama.test:11434/api/chat");
+    const body = JSON.parse(String(init.body)) as {
+      messages: { role: string; content: string }[];
+    };
+    expect(body.messages[0]?.role).toBe("system");
+    expect(body.messages.slice(1).map((m) => m.role)).toEqual([
+      "user",
+      "assistant",
+      "user",
+    ]);
+  });
+
+  it("converse: high-risk wird VOR jedem Netzaufruf abgelehnt", async () => {
+    const fetchImpl = stubOk();
+    const port = createOllamaAiAssistPort({
+      baseUrl: "http://ollama.test:11434",
+      model: "qwen3",
+      fetchImpl,
+    });
+    const res = await port.converse!(sampleContext(), {
+      task: "binding-legal-decision",
+      history: [{ role: "user", text: "Entscheide!" }],
+      input: {},
+      maxClass: "high-risk",
+    });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error.code).toBe("ai-assist/high-risk-refused");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("createOllamaAiAssistPortFromEnv liest baseUrl/model aus der Umgebung", () => {
     const port = createOllamaAiAssistPortFromEnv({
       OLLAMA_BASE_URL: "http://ollama.intern:11434",

@@ -216,6 +216,11 @@ export {
   SpineRunResultDtoSchema,
   EvidenceEntryDtoSchema,
   EvidenceLedgerDtoSchema,
+  ComposableChatTurnDtoSchema,
+  ComposableChatDateiUploadSchema,
+  ComposableChatDateiRefDtoSchema,
+  ComposableChatRequestSchema,
+  ComposableChatReplyDtoSchema,
   type ComposableSummaryDto,
   type ComposableListDto,
   type ComposableDetailDto,
@@ -225,5 +230,10 @@ export {
   type SpineRunResultDto,
   type EvidenceEntryDto,
   type EvidenceLedgerDto,
+  type ComposableChatTurnDto,
+  type ComposableChatDateiUploadDto,
+  type ComposableChatDateiRefDto,
+  type ComposableChatRequestDto,
+  type ComposableChatReplyDto,
 } from "./composables.js";
 export { openApiInfo, openApiTags } from "./openapi.js";

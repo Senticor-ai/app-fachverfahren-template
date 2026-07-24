@@ -132,6 +132,18 @@ function nurWissen(
   return eintraege.filter((e) => e.art !== REVIEW_ART);
 }
 
+/** EINE Wahrheit der KI-LESE-KURATION: die Einträge, die ein Agent als Kontext konsumieren darf —
+ *  Prüf-Marker heraus, VERWORFENES KI-Wissen heraus (fail-safe: es darf keine künftige Antwort
+ *  kontaminieren). Konsumiert von der KI-Wissens-Route, dem Export UND dem Composable-Chat. */
+export function kuratierteWissensEintraege(
+  eintraege: VerfahrensWissenEintrag[],
+): VerfahrensWissenEintrag[] {
+  const reviews = reviewMapOf(eintraege);
+  return nurWissen(eintraege).filter(
+    (e) => reviewStatusOf(e, reviews) !== "verworfen",
+  );
+}
+
 export function registerVerfahrenWissenRoutes(
   app: FastifyInstance,
   deps: BffDeps,
@@ -246,9 +258,7 @@ export function registerVerfahrenWissenRoutes(
         return storeUnavailable(request, reply);
       }
       // Fail-safe am LESE-Kontext: verworfenes KI-Wissen darf den nächsten KI-Vorschlag NICHT kontaminieren.
-      const wikiReviews = reviewMapOf(bisher);
-      const wiki = nurWissen(bisher)
-        .filter((e) => reviewStatusOf(e, wikiReviews) !== "verworfen")
+      const wiki = kuratierteWissensEintraege(bisher)
         .map((e) => ({
           art: e.art,
           urheber: e.urheber,
@@ -376,9 +386,9 @@ export function registerVerfahrenWissenRoutes(
       return reply.send({
         procedureId: request.params.procedureId,
         procedureVersion: request.params.version,
-        eintraege: nurWissen(eintraege)
-          .filter((e) => reviewStatusOf(e, reviews) !== "verworfen")
-          .map((e) => toExportEintrag(e, reviews)),
+        eintraege: kuratierteWissensEintraege(eintraege).map((e) =>
+          toExportEintrag(e, reviews),
+        ),
       });
     },
   );

@@ -5,6 +5,8 @@ import type { FastifyInstance } from "fastify";
 import type { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 import { randomUUID } from "node:crypto";
 import {
+  ComposableChatRequestSchema,
+  ComposableChatReplyDtoSchema,
   ComposableDetailDtoSchema,
   ComposableListDtoSchema,
   ComposableSpineParamsSchema,
@@ -13,11 +15,15 @@ import {
   EvidenceLedgerDtoSchema,
   ErrorEnvelopeSchema,
   CaseIdParamsSchema,
+  type ComposableChatDateiRefDto,
   type ComposableDetailDto,
   type ComposableSummaryDto,
   type EvidenceEntryDto,
 } from "@senticor/app-bff-contracts";
-import type { EvidenceEntry } from "@senticor/app-store-postgres";
+import type {
+  EvidenceEntry,
+  VerfahrensWissenEintrag,
+} from "@senticor/app-store-postgres";
 import {
   builtInPermissions,
   certificationReadiness,
@@ -25,12 +31,19 @@ import {
   HITL_PFLICHT_AUFGABEN,
   istEnabled,
   istRechtsnah,
+  neutralisiereInjektion,
   type AgenticComposable,
   type SpineAufgabe,
 } from "@senticor/public-sector-sdk";
-import type { PortCallContext } from "@senticor/platform-contracts";
+import type {
+  AiChatTurn,
+  AttachmentRef,
+  PortCallContext,
+} from "@senticor/platform-contracts";
 import type { BffDeps } from "../deps.js";
 import { bffRouteAuth, requestIdOf, sessionOf } from "../route-auth.js";
+import { storeUnavailable } from "../store-error.js";
+import { kuratierteWissensEintraege } from "./verfahren-wissen.js";
 
 function toSummary(c: AgenticComposable): ComposableSummaryDto {
   return {
@@ -79,6 +92,30 @@ function toDetail(c: AgenticComposable): ComposableDetailDto {
     certification: certificationReadiness(c),
   };
 }
+
+/** BlobStorage-AttachmentRef → Wire-DTO (identische Felder, explizit gemappt). */
+function toDateiRef(ref: AttachmentRef): ComposableChatDateiRefDto {
+  return {
+    attachmentId: ref.attachmentId,
+    fileName: ref.fileName,
+    mimeType: ref.mimeType,
+    sizeBytes: ref.sizeBytes,
+    checksumSha256: ref.checksumSha256,
+  };
+}
+
+/** Textartige MIME-Typen, deren Inhalt die Antwort ERDEN darf (dekodiert, injektions-neutralisiert,
+ *  gedeckelt). Binärdateien reisen nur als Metadaten — nie Roh-Bytes an das Modell. */
+function istTextartig(mimeType: string): boolean {
+  return (
+    mimeType.startsWith("text/") ||
+    mimeType === "application/json" ||
+    mimeType === "application/xml"
+  );
+}
+
+/** Obergrenze je Datei-Erdungstext (PII-/Kontext-Deckel). */
+const DATEI_TEXT_DECKEL = 20_000;
 
 function toEvidenceDto(e: EvidenceEntry): EvidenceEntryDto {
   return {
@@ -266,6 +303,284 @@ export function registerComposableRoutes(
         rechtsnah: HITL_PFLICHT_AUFGABEN.includes(aufgabe as SpineAufgabe),
         autonomy: found.spine.autonomy,
         suggestion: result.value,
+      });
+    },
+  );
+
+  // POST /api/composables/:id/chat — das Composable als LINGUISTISCHER Agent (Ziel-1 S5): eine governed
+  // Konversations-Runde mit dem Spine-Agent. GOVERNED heißt: (1) nur mit deklariertem Spine + Autonomie
+  // oberhalb AAL-0 (deny-by-default aus dem Manifest); (2) GEERDET auf das kuratierte Verfahrens-Wissen der
+  // knowledgeDomains (dieselbe Kurations-Wahrheit wie das Wiki — verworfenes KI-Wissen kontaminiert nie);
+  // die zitierfähigen Quellen leitet der SERVER ab, nie die Modell-Antwort (keine erfundenen Normen);
+  // (3) HITL: die Antwort ist ein AiSuggestion-VORSCHLAG (reviewRequired=true, limited-risk) — nie eine
+  // Entscheidung; (4) EVIDENZIERT: jede Runde landet als chat.turn hash-verkettet im Evidence-Ledger (nur
+  // Metadaten, nie Inhalt). Datei rein/raus über den BlobStoragePort (Muster Nachweis-Upload).
+  typed.post(
+    "/api/composables/:id/chat",
+    {
+      config: spineAuth.config,
+      preHandler: spineAuth.preHandler,
+      schema: {
+        tags: ["composables"],
+        summary:
+          "Mit dem Spine-Agent eines Composables chatten (geerdet, evidenziert, HCAI — reviewRequired, nie eine Entscheidung)",
+        params: CaseIdParamsSchema,
+        body: ComposableChatRequestSchema,
+        response: {
+          200: ComposableChatReplyDtoSchema,
+          400: ErrorEnvelopeSchema,
+          422: ErrorEnvelopeSchema,
+          503: ErrorEnvelopeSchema,
+          ...errorResponses,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const found = deps.composableRegistry?.get(id);
+      if (!found)
+        return reply
+          .code(404)
+          .send({ error: "not found", requestId: requestIdOf(request) });
+      // Chat ist eine agentische (linguistische) Fähigkeit — ohne Spine gibt es sie nicht (deny-by-default).
+      if (!found.spine)
+        return reply.code(404).send({
+          error: "dieses Composable hat keinen Spine-Agent",
+          requestId: requestIdOf(request),
+        });
+      // AAL-0 = Deterministic only: das Manifest erlaubt KEINE agentische Konversation (Autonomie-Decke).
+      if (found.spine.autonomy === "AAL-0")
+        return reply.code(422).send({
+          error:
+            "Autonomie AAL-0 (deterministic only) erlaubt keine agentische Konversation",
+          requestId: requestIdOf(request),
+        });
+
+      const session = sessionOf(request);
+      const now = new Date().toISOString();
+      const context: PortCallContext = {
+        requestId: requestIdOf(request),
+        tenantId: session.tenantId,
+        authorityId: session.authorityId,
+        jurisdictionId: session.jurisdictionId,
+        actor: { actorId: session.actorId, actorType: "employee" },
+        purpose: "composable-chat",
+      };
+
+      // ── ERDUNG: kuratiertes Verfahrens-Wissen der knowledgeDomains (Domain ↔ procedureId-Konvention). ──
+      const domains = found.spine.knowledgeDomains;
+      const verfahren = deps.procedureRegistry
+        .list()
+        .filter((p) => domains.includes(p.procedureId));
+      let wissen: VerfahrensWissenEintrag[] = [];
+      try {
+        for (const p of verfahren) {
+          const eintraege = await deps.wissenStore.listEintraege({
+            tenantId: session.tenantId,
+            authorityId: session.authorityId,
+            procedureId: p.procedureId,
+            procedureVersion: p.version,
+          });
+          wissen = wissen.concat(kuratierteWissensEintraege(eintraege));
+        }
+      } catch {
+        // Fail-closed: ohne lesbare Wissens-Basis keine „geerdete" Antwort vortäuschen.
+        return storeUnavailable(request, reply);
+      }
+      const wissenKontext = wissen.map((e) => ({
+        quelle: `wissen:${e.eintragId}`,
+        art: e.art,
+        text: neutralisiereInjektion(e.text),
+      }));
+      // Zitierfähige Quellen leitet der SERVER ab (Evidence-Wahrheit) — nie aus der Modell-Antwort.
+      const quellen = [
+        ...wissen.map((e) => `wissen:${e.eintragId}`),
+        ...domains.map((d) => `domain:${d}`),
+      ];
+
+      // ── Datei-IN: BlobStorage-Ablage; textartige Inhalte erden zusätzlich (neutralisiert, gedeckelt). ──
+      const dateienRein: AttachmentRef[] = [];
+      const dateiKontext: {
+        fileName: string;
+        mimeType: string;
+        sizeBytes: number;
+        text?: string;
+      }[] = [];
+      for (const datei of request.body.dateien ?? []) {
+        const bytes = new Uint8Array(
+          Buffer.from(datei.contentBase64, "base64"),
+        );
+        if (bytes.byteLength === 0)
+          return reply.code(400).send({
+            error: `leerer oder ungültiger Inhalt: ${datei.fileName}`,
+            requestId: requestIdOf(request),
+          });
+        const put = await deps.blobStorage.put(
+          { ...context, purpose: "composable-chat-datei" },
+          { fileName: datei.fileName, mimeType: datei.mimeType, bytes },
+        );
+        if (!put.ok)
+          return reply.code(503).send({
+            error: put.error.message,
+            requestId: requestIdOf(request),
+          });
+        dateienRein.push(put.value);
+        dateiKontext.push({
+          fileName: put.value.fileName,
+          mimeType: put.value.mimeType,
+          sizeBytes: put.value.sizeBytes,
+          ...(istTextartig(datei.mimeType)
+            ? {
+                text: neutralisiereInjektion(
+                  Buffer.from(bytes).toString("utf8"),
+                ).slice(0, DATEI_TEXT_DECKEL),
+              }
+            : {}),
+        });
+      }
+
+      // ── Provider-Runde: converse (Chat-Naht) mit suggest-Fallback (Verlauf reist im input). ──────────
+      const history: AiChatTurn[] = [
+        ...(request.body.verlauf ?? []).map(
+          (t): AiChatTurn => ({
+            role: t.rolle === "assistent" ? "assistant" : "user",
+            text: t.text,
+          }),
+        ),
+        { role: "user", text: request.body.nachricht },
+      ];
+      const task = `composable-chat:${id}`;
+      const input: Record<string, unknown> = {
+        composable: {
+          id: found.id,
+          displayName: found.displayName,
+          klasse: found.klasse,
+          autonomy: found.spine.autonomy,
+          aufgaben: found.spine.aufgaben,
+          knowledgeDomains: domains,
+        },
+        regeln: [
+          "Antworte NUR geerdet auf die mitgegebenen Wissenseinträge (wissen[]) und Dateien.",
+          "Zitiere Belege über ihre quelle (wissen:<eintragId>); erfinde NIE Normen oder Paragraphen.",
+          "Du berätst nur (Advise) — du triffst keine Entscheidung.",
+        ],
+        wissen: wissenKontext,
+        ...(dateiKontext.length > 0 ? { dateien: dateiKontext } : {}),
+        ...(request.body.caseId ? { caseId: request.body.caseId } : {}),
+      };
+      const result = deps.aiAssist.converse
+        ? await deps.aiAssist.converse(context, {
+            task,
+            history,
+            input,
+            maxClass: "limited-risk",
+          })
+        : await deps.aiAssist.suggest(context, {
+            task,
+            input: { ...input, verlauf: history },
+            maxClass: "limited-risk",
+          });
+      if (!result.ok) {
+        const status =
+          result.error.code === "ai-assist/high-risk-refused" ? 422 : 503;
+        return reply.code(status).send({
+          error: result.error.message,
+          requestId: requestIdOf(request),
+        });
+      }
+      const antwortText =
+        typeof result.value.value === "string"
+          ? result.value.value
+          : JSON.stringify(result.value.value);
+
+      // ── Datei-OUT: die Antwort zusätzlich als Markdown-Datei ablegen + zurückgeben. ─────────────────
+      let dateiRaus:
+        | { ref: AttachmentRef; contentBase64: string }
+        | undefined;
+      if (request.body.antwortAlsDatei === true) {
+        const bytes = new Uint8Array(Buffer.from(antwortText, "utf8"));
+        const put = await deps.blobStorage.put(
+          { ...context, purpose: "composable-chat-antwort" },
+          {
+            fileName: `antwort-${id}-${Date.now()}.md`,
+            mimeType: "text/markdown",
+            bytes,
+          },
+        );
+        if (!put.ok)
+          return reply.code(503).send({
+            error: put.error.message,
+            requestId: requestIdOf(request),
+          });
+        dateiRaus = {
+          ref: put.value,
+          contentBase64: Buffer.from(bytes).toString("base64"),
+        };
+      }
+
+      const geerdet = wissen.length > 0;
+      await deps.auditSink.emit({
+        kind: "app-data",
+        event: createAppDataAuditEvent({
+          eventType: "composable.chat.turn",
+          actorId: session.actorId,
+          tenantId: session.tenantId,
+          requestId: requestIdOf(request),
+          summary: `Chat-Runde für Composable '${id}' (${result.value.modelId}, ${wissen.length} Wissenseinträge)`,
+          resource: { type: "composable-chat", id },
+        }),
+      });
+      // EVIDENCE-LEDGER (Blueprint §15.3): jede Chat-Runde hash-verkettet + tamper-evident — NUR Metadaten
+      // (Akteur/Modell/Erdung/Datei-Referenzen), NIE der Nachrichten-/Antwort-Inhalt (kein PII in der Kette).
+      if (deps.evidenceLedger) {
+        await deps.evidenceLedger.append({
+          evidenceId: `ev.${randomUUID()}`,
+          ledgerId: `composable:${id}`,
+          tenantId: session.tenantId,
+          actorId: session.actorId,
+          entryType: "chat.turn",
+          summary: `Chat-Runde (${result.value.modelId}) — ${geerdet ? "geerdet" : "ungeerdet"}`,
+          refs: {
+            composableId: id,
+            modelId: result.value.modelId,
+            geerdet: String(geerdet),
+            wissensEintraege: String(wissen.length),
+            ...(request.body.caseId ? { caseId: request.body.caseId } : {}),
+            ...(dateienRein.length > 0
+              ? {
+                  dateienRein: dateienRein
+                    .map((r) => r.attachmentId)
+                    .join(","),
+                }
+              : {}),
+            ...(dateiRaus ? { dateiRaus: dateiRaus.ref.attachmentId } : {}),
+          },
+          occurredAt: now,
+        });
+      }
+
+      return reply.code(200).send({
+        composableId: id,
+        autonomy: found.spine.autonomy,
+        rechtsnah: istRechtsnah(found.spine),
+        antwort: {
+          ...result.value,
+          value: antwortText,
+        },
+        erdung: {
+          geerdet,
+          wissensEintraege: wissen.length,
+          quellen,
+        },
+        dateienRein: dateienRein.map(toDateiRef),
+        ...(dateiRaus
+          ? {
+              datei: {
+                ref: toDateiRef(dateiRaus.ref),
+                contentBase64: dateiRaus.contentBase64,
+              },
+            }
+          : {}),
       });
     },
   );

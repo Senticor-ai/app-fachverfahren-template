@@ -348,7 +348,11 @@
     }
   ],
   "ki": {
-    "schwelleAutonom": 0.9
+    "schwelleAutonom": 0.9,
+    "chat": {
+      "zweck": "Composable-Assistent: beantwortet Fragen geerdet auf das Verfahrens-Wissen — beratend, nie entscheidend.",
+      "quelle": "AiAssistPort der Server-Komposition (Provider per Env)"
+    }
   },
   "berechne": "[function]",
   "seedCount": 4,

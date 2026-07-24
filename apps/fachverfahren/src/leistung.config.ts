@@ -341,7 +341,17 @@ export const leistungConfig: LeistungConfig = {
       norm: "§ 68 ff. VwGO",
     },
   },
-  ki: { schwelleAutonom: 0.9 },
+  ki: {
+    schwelleAutonom: 0.9,
+    // DATEN-Signal (Ziel-1 S5): das Verfahren BIETET den Composable-Assistenten an (/amt/assistent,
+    // AssistentPanel + KiChatPort→BFF-Adapter). Die Antworten liefert der AiAssistPort der Server-
+    // Komposition (AI_ASSIST_PROVIDER=local|ollama) — geerdet auf das Verfahrens-Wissen, HITL.
+    chat: {
+      zweck:
+        "Composable-Assistent: beantwortet Fragen geerdet auf das Verfahrens-Wissen — beratend, nie entscheidend.",
+      quelle: "AiAssistPort der Server-Komposition (Provider per Env)",
+    },
+  },
   // DEMO-SEED OHNE KI-BEWERTUNG: an dieses Musterverfahren ist KEIN Modell gebunden (der AiAssistPort
   // ist eine Naht ohne Adapter) — also ist kein Vorgang bewertet, und `ki` bleibt ungesetzt. Die
   // Vorfassung stempelte hier frei erfundene Konfidenzen (0.94/0.72/0.55) auf die Demo-Vorgänge; das

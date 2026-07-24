@@ -250,11 +250,39 @@ export interface AiSuggestion {
   reviewRequired: true;
 }
 
+/** Ein Zug eines Chat-Verlaufs (Konversations-Naht des AiAssistPort). Nur Text — Dateien reisen als
+ *  Referenz/Metadaten im strukturierten `input` (PII-arm), nie als Roh-Bytes durch den Port. */
+export interface AiChatTurn {
+  role: "user" | "assistant";
+  text: string;
+}
+
+/** Eine GOVERNED Konversations-Runde: Verlauf + strukturierter (PII-armer) Kontext. Der Kontext trägt die
+ *  ERDUNG (z.B. kuratierte Wissenseinträge) als DATEN — der Provider erfindet keine Quellen. */
+export interface AiConverseRequest {
+  /** Wozu konversiert wird, z.B. "composable-chat:musterverfahren". */
+  task: string;
+  /** Der bisherige Verlauf INKLUSIVE der neuen Nutzer-Nachricht als letztem `user`-Zug. */
+  history: AiChatTurn[];
+  /** Strukturierter, PII-armer Kontext (Erdungs-Wissen, Datei-Metadaten, Regeln). */
+  input: Record<string, unknown>;
+  /** Höchste akzeptierte Klasse — high-risk wird abgelehnt (kein autonomes rechtsnahes Entscheiden). */
+  maxClass?: AiAssistClass;
+}
+
 export interface AiAssistPort {
   descriptor: CapabilityDescriptor;
   suggest(
     context: PortCallContext,
     request: AiSuggestRequest,
+  ): Promise<CapabilityResponse<AiSuggestion>>;
+  /** KONVERSATION (optional, additiv): eine Chat-Runde mit Verlauf. Die Antwort bleibt die EINE
+   *  Transparenz-Form `AiSuggestion` (marking/reviewRequired/limited-risk) — ein Chat-Zug ist ein
+   *  Vorschlag, nie eine Entscheidung. Adapter OHNE converse bleiben gültig: der Aufrufer fällt
+   *  auf `suggest` zurück (Verlauf reist dann strukturiert im `input`). */
+  converse?(
+    context: PortCallContext,
+    request: AiConverseRequest,
   ): Promise<CapabilityResponse<AiSuggestion>>;
 }
 

@@ -13,6 +13,7 @@ import {
   capabilityOk,
   defaultSemantics,
   type AiAssistPort,
+  type AiConverseRequest,
   type AiSuggestion,
   type CapabilityResponse,
   type PortCallContext,
@@ -33,6 +34,11 @@ export interface OllamaAiAssistConfig {
 /** Ollamas /api/generate-Antwort (nur das Feld, das wir lesen). */
 interface OllamaGenerateResponse {
   response?: unknown;
+}
+
+/** Ollamas /api/chat-Antwort (nur das Feld, das wir lesen). */
+interface OllamaChatResponse {
+  message?: { content?: unknown };
 }
 
 /**
@@ -111,6 +117,75 @@ export function createOllamaAiAssistPort(
         confidence: UNCALIBRATED_CONFIDENCE,
         modelId,
         rationale: `OSS-Vorschlag von ${modelId} für Aufgabe '${request.task}'. Konfidenz ist nicht modell-kalibriert (Ollama liefert keine Wahrscheinlichkeit); menschlich zu prüfen.`,
+        sources: [`ollama:${baseUrl}`],
+        marking: "ki-vorschlag",
+        euAiActClass: "limited-risk",
+        reviewRequired: true,
+      };
+      return capabilityOk(suggestion);
+    },
+    // KONVERSATION über Ollamas /api/chat: der Verlauf reist als echte Chat-Rollen (system/user/assistant),
+    // die ERDUNG (Wissen/Regeln/Dateien) als System-Kontext. DIESELBEN drei Invarianten wie suggest.
+    async converse(
+      _context: PortCallContext,
+      request: AiConverseRequest,
+    ): Promise<CapabilityResponse<AiSuggestion>> {
+      // (2) high-risk wird VOR jedem Netzaufruf abgelehnt — Governance vor Modell.
+      if (request.maxClass === "high-risk") {
+        return capabilityFailure(
+          "ai-assist/high-risk-refused",
+          "KI darf rechtsnahe Entscheidungen nicht autonom treffen (assistiv/limited-risk).",
+          { retryable: false, classification: "confidential" },
+        );
+      }
+
+      const messages = [
+        { role: "system", content: buildPrompt(request.task, request.input) },
+        ...request.history.map((t) => ({
+          role: t.role === "assistant" ? "assistant" : "user",
+          content: t.text,
+        })),
+      ];
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      let text: string;
+      try {
+        const res = await fetchImpl(`${baseUrl}/api/chat`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ model: config.model, messages, stream: false }),
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          // (3) fail-closed: Non-2xx → explizites Scheitern, kein fabrizierter Vorschlag.
+          return capabilityFailure(
+            "ai-assist/provider-unavailable",
+            `Ollama antwortete mit HTTP ${res.status}.`,
+            { retryable: res.status >= 500, classification: "confidential" },
+          );
+        }
+        const data = (await res.json()) as OllamaChatResponse;
+        text =
+          typeof data.message?.content === "string"
+            ? data.message.content.trim()
+            : "";
+      } catch (error) {
+        // (3) fail-closed: Netzfehler/Timeout → explizites Scheitern (retryable), NIE Erfindung.
+        return capabilityFailure(
+          "ai-assist/provider-unavailable",
+          `Ollama nicht erreichbar (${baseUrl}): ${describeError(error)}`,
+          { retryable: true, classification: "confidential" },
+        );
+      } finally {
+        clearTimeout(timer);
+      }
+
+      // (1) HCAI/EU-AI-Act-Invarianten hart gesetzt — der Adapter darf sie NIE dem Modell überlassen.
+      const suggestion: AiSuggestion = {
+        value: text,
+        confidence: UNCALIBRATED_CONFIDENCE,
+        modelId,
+        rationale: `OSS-Konversationsantwort von ${modelId} für Aufgabe '${request.task}'. Konfidenz ist nicht modell-kalibriert; menschlich zu prüfen.`,
         sources: [`ollama:${baseUrl}`],
         marking: "ki-vorschlag",
         euAiActClass: "limited-risk",

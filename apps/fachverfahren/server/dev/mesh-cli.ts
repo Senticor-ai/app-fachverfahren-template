@@ -87,7 +87,8 @@ function routeFor(tokens: string[]): Route {
     case "cases":
       return { method: "GET", url: "/api/cases" };
     case "composable": {
-      // Agentic Composables (Blueprint §33: alles per CLI). `list` | `show <id>` | `spine <id> <aufgabe>`.
+      // Agentic Composables (Blueprint §33: alles per CLI).
+      // `list` | `show <id>` | `spine <id> <aufgabe>` | `chat <id> --message` | `evidence <id>`.
       const sub = positionals[0] ?? "list";
       if (sub === "list") return { method: "GET", url: "/api/composables" };
       if (sub === "show") {
@@ -111,13 +112,29 @@ function routeFor(tokens: string[]): Route {
           body: { input },
         };
       }
+      if (sub === "chat") {
+        // Eine governed Chat-Runde mit dem Spine-Agent (geerdet + evidenziert, Ziel-1 S5). Plattformregel §9:
+        // was die UI kann (AssistentPanel), geht auch deterministisch per CLI — dieselbe Route, EINE Wahrheit.
+        const id = p(1, "composableId");
+        return {
+          method: "POST",
+          url: `/api/composables/${enc(id)}/chat`,
+          body: {
+            nachricht: opt("message"),
+            ...(options["case"] ? { caseId: options["case"] } : {}),
+            ...(options["als-datei"] === "true"
+              ? { antwortAlsDatei: true }
+              : {}),
+          },
+        };
+      }
       if (sub === "evidence") {
         // Der hash-verkettete Evidence-Ledger der Spine-Handlungen (exportierbar + verifizierbar).
         const id = p(1, "composableId");
         return { method: "GET", url: `/api/composables/${enc(id)}/evidence` };
       }
       throw new Error(
-        `unbekanntes composable-Kommando: ${sub} (list|show|spine|evidence)`,
+        `unbekanntes composable-Kommando: ${sub} (list|show|spine|chat|evidence)`,
       );
     }
     case "case": {
@@ -571,6 +588,10 @@ const USAGE = `mesh — Agenten-CLI fuer das Fachverfahren-Mesh (Golden Fixture,
   wissen add <procedureId> <version> --text T [--kind K]
   wissen ki <procedureId> <version> --task T
   wissen review <procedureId> <version> <eintragId> --entscheidung bestaetigt|verworfen
+  composable list|show <id>                   Agentic Composables entdecken (Contract Envelope + Spine)
+  composable spine <id> <aufgabe> [--input json]   Spine-Aufgabe ausfuehren (Vorschlag, reviewRequired)
+  composable chat <id> --message T [--case C] [--als-datei]   Governed Chat-Runde (geerdet + evidenziert)
+  composable evidence <id>                    Hash-verketteter Evidence-Ledger (chat.turn + spine.suggestion)
   smoke [procedureId]                          Selbstverifikation: faehrt das Verfahren create -> Abschluss (ist es fahrbar?)
   script --file plan.json                     Batch: JSON string[][], STATEFUL in einem App-Boot
 

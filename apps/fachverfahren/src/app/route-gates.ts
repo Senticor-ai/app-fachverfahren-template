@@ -36,6 +36,9 @@ export const routeGates = {
   "/amt/akte/:id": personaGate("sachbearbeitung"),
   // Verfahrens-Wiki: generelles Wissen + Fähigkeiten EINES Verfahrens (verfahrens-scoped).
   "/amt/verfahren/:procedureId/:version/wiki": personaGate("sachbearbeitung"),
+  // Composable-Assistent (Ziel-1 S5): chattbare Agentic Composables (governed, geerdet, evidenziert).
+  // Persona-Gate = Erlebnis; die Autorisierung (ai.assist) erzwingt der BFF an der Chat-Route.
+  "/amt/assistent": personaGate("sachbearbeitung"),
   "/aufsicht": personaGate("aufsicht"),
   // Team-Workspace: echte Autorisierung (Permission), Redirect-Ziel "/" —
   // /boards als Fallback ergäbe hier eine Schleife.

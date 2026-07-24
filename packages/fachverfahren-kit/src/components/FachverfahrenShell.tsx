@@ -12,6 +12,7 @@
 // de-public-administration: deutschsprachige Verwaltungs-Oberfläche (lang="de"), klare Landmarks
 // (banner/navigation/main/contentinfo), Tastatur-erst (Skip-Link), Demo-Transparenz (synthetische Daten).
 import {
+  Bot,
   Database,
   FileText,
   FolderOpen,
@@ -156,6 +157,17 @@ function navFor<T>(
           // Kein dediziertes Register-Route in der App-Shell → auf den Amt-Eingang zeigen (echte Route), statt
           // via *-Fallback den Nutzer aus der Amt-Persona zu werfen (Audit D3-1). App.tsx kann später /amt/register ergänzen.
           href: "/amt",
+        });
+      }
+      // DATEN-Signal ki.chat (Ziel-1 S5): das Verfahren BIETET einen Composable-Assistenten an → der
+      // Nav-Eintrag erscheint nur dann (dasselbe bedingte Muster wie „Register"). /amt/assistent ist eine
+      // ECHTE App-Route (routes.tsx — Shell-Nav == App-Routen, Audit D3-1).
+      if (config.ki?.chat) {
+        items.push({
+          key: "assistent",
+          label: "Assistent",
+          icon: Bot,
+          href: "/amt/assistent",
         });
       }
       items.push(boardsNavItem());

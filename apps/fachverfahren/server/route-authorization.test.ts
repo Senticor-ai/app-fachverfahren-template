@@ -231,6 +231,12 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           url: "/api/composables/:id/spine/:aufgabe",
           policy: "rbac:ai.assist",
         },
+        // Composable-Chat (Ziel-1 S5): governed Konversations-Runde → ai.assist (nur Sachbearbeitung).
+        {
+          method: "POST",
+          url: "/api/composables/:id/chat",
+          policy: "rbac:ai.assist",
+        },
         {
           method: "PATCH",
           url: "/api/tasks/:id",

@@ -53,6 +53,7 @@ describe("App-Routen — Session-Gate", () => {
         kind: "persona",
         persona: "sachbearbeitung",
       },
+      "/amt/assistent": { kind: "persona", persona: "sachbearbeitung" },
       "/aufsicht": { kind: "persona", persona: "aufsicht" },
       "/boards": {
         kind: "permission",
@@ -115,6 +116,7 @@ describe("App-Routen — Session-Gate", () => {
       "/amt/akten",
       "/amt/akte/:id",
       "/amt/verfahren/:procedureId/:version/wiki",
+      "/amt/assistent",
     ]);
     expect(childPaths(personaGroups[2] as RouteObject)).toEqual(["/aufsicht"]);
 

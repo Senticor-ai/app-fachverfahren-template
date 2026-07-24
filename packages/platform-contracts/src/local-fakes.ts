@@ -126,6 +126,34 @@ export function createLocalAiAssistPort(
       };
       return capabilityOk(suggestion);
     },
+    // KONVERSATION (deterministisch, ohne Modell/Netz): echoet die letzte Nutzer-Nachricht + die Anzahl
+    // der mitgegebenen Erdungs-Einträge — dieselben HCAI-Invarianten wie suggest (reviewRequired, marking).
+    async converse(_context, request) {
+      const modelId = options.aiAssistModel ?? "ollama:qwen3";
+      if (request.maxClass === "high-risk") {
+        return capabilityFailure(
+          "ai-assist/high-risk-refused",
+          "KI darf rechtsnahe Entscheidungen nicht autonom treffen (assistiv/limited-risk).",
+          { retryable: false, classification: "confidential" },
+        );
+      }
+      const letzte =
+        [...request.history].reverse().find((t) => t.role === "user")?.text ??
+        "";
+      const wissen = request.input["wissen"];
+      const anzahl = Array.isArray(wissen) ? wissen.length : 0;
+      const suggestion: AiSuggestion = {
+        value: `Lokale OSS-Antwort auf: "${letzte}" (geerdet auf ${anzahl} Wissenseinträge; synthetisch, menschlich zu prüfen).`,
+        confidence: 0.5,
+        modelId,
+        rationale: `Lokale OSS-Konversation (${modelId}) für Aufgabe '${request.task}' — deterministisch, ohne Modell/Netz.`,
+        sources: ["local-fake"],
+        marking: "ki-vorschlag",
+        euAiActClass: "limited-risk",
+        reviewRequired: true,
+      };
+      return capabilityOk(suggestion);
+    },
   };
 }
 

@@ -306,6 +306,27 @@ describe("Agenten-CLI (mesh-cli)", () => {
     expect(res?.status).toBe(422);
   });
 
+  it("composable chat: governed Chat-Runde -> Vorschlag mit reviewRequired + Erdungs-Block + chat.turn-Evidence", async () => {
+    const results = await executeMeshCommands([
+      ["composable", "chat", "musterverfahren", "--message", "Welche Frist gilt?"],
+      ["composable", "evidence", "musterverfahren"],
+    ]);
+    expect(results[0]?.ok).toBe(true);
+    const d = results[0]?.data as {
+      antwort: { reviewRequired: boolean; marking: string };
+      erdung: { geerdet: boolean; quellen: string[] };
+    };
+    expect(d.antwort.reviewRequired).toBe(true);
+    expect(d.antwort.marking).toBe("ki-vorschlag");
+    expect(d.erdung.quellen).toContain("domain:musterverfahren");
+    const ev = results[1]?.data as {
+      entries: { entryType: string }[];
+      chain: { valid: boolean };
+    };
+    expect(ev.entries.some((e) => e.entryType === "chat.turn")).toBe(true);
+    expect(ev.chain.valid).toBe(true);
+  });
+
   it("composable evidence: Spine-Handlungen landen hash-verkettet im Ledger (stateful, verifizierbar)", async () => {
     const results = await executeMeshCommands([
       ["composable", "spine", "musterverfahren", "assistenz", "--input", "{}"],
