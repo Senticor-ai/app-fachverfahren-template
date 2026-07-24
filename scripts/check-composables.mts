@@ -17,7 +17,10 @@ import {
   certificationReadiness,
   istEnabled,
 } from "../packages/public-sector-sdk/src/composable.ts";
-import { composables } from "../apps/fachverfahren/server/composables.config.ts";
+// Die MUSTER-Composables aus der I/O-freien Deklarations-Naht (composables.muster) — der fs-gestützte Mount-Loader
+// (composables.config → composables-mounted) ist nicht strip-types-ladbar; die gemounteten Stellen prüft dieses Gate
+// getrennt über verifyMountedComposables (Schritt 4).
+import { composables } from "../apps/fachverfahren/server/composables.muster.ts";
 import { verifyMountedComposables } from "./lib/verify-mounted-composables.mts";
 
 const fehler: string[] = [];
