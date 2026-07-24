@@ -8,6 +8,7 @@
 import {
   createChosAgentClientFromEnv,
   createChosAiAssistPort,
+  createComposableEngineClientFromEnv,
   createLocalAiAssistPort,
   type AiAssistPort,
 } from "@senticor/platform-contracts";
@@ -19,6 +20,9 @@ import { createOllamaAiAssistPortFromEnv } from "@senticor/provider-ai-ollama";
  *  - `AI_ASSIST_PROVIDER=ollama`: echter Ollama-Adapter (OLLAMA_BASE_URL/OLLAMA_MODEL).
  *  - `AI_ASSIST_PROVIDER=chos`: chos-code als Kernel für agentische KI (Cognitive Hive OS, AAL-2 Advise über
  *    Handoff Envelope) — braucht `CHOS_AGENT_URL` (bzw. `CHOS_API_URL`), sonst Fehler (fail-closed).
+ *  - `AI_ASSIST_PROVIDER=composable-container`: eine als CONTAINER ausgerollte, zertifizierte Composable-Stelle
+ *    (Ziel-1 S6/S7) — der Container exponiert seine opencode-Engine (`COMPOSABLE_ENGINE_URL` +
+ *    `COMPOSABLE_ENGINE_PASSWORD`); der KIT ist ein CLIENT (kein in-process-Kernel). Fehlt eine Pflicht-Env → Fehler.
  * Unbekannter Wert → Fehler (fail-closed).
  */
 export function createAiAssistPortFromEnv(
@@ -35,7 +39,15 @@ export function createAiAssistPortFromEnv(
       );
     return createChosAiAssistPort(client);
   }
+  if (provider === "composable-container") {
+    const client = createComposableEngineClientFromEnv(env);
+    if (!client)
+      throw new Error(
+        "AI_ASSIST_PROVIDER=composable-container requires COMPOSABLE_ENGINE_URL and COMPOSABLE_ENGINE_PASSWORD",
+      );
+    return createChosAiAssistPort(client);
+  }
   throw new Error(
-    `AI_ASSIST_PROVIDER must be local, ollama or chos, got: ${provider}`,
+    `AI_ASSIST_PROVIDER must be local, ollama, chos or composable-container, got: ${provider}`,
   );
 }

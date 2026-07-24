@@ -11,12 +11,14 @@
 //  3) EINDEUTIG: keine doppelte (id,version) — die Registry-Auflösung bliebe sonst mehrdeutig.
 //
 // Läuft ohne Bundler via `node --experimental-strip-types` — direkt auf die .ts-Quellen.
+import path from "node:path";
 import {
   assertComposable,
   certificationReadiness,
   istEnabled,
 } from "../packages/public-sector-sdk/src/composable.ts";
 import { composables } from "../apps/fachverfahren/server/composables.config.ts";
+import { verifyMountedComposables } from "./lib/verify-mounted-composables.mts";
 
 const fehler: string[] = [];
 const fail = (m: string) => fehler.push(m);
@@ -50,6 +52,17 @@ for (const c of composables) {
   gesehen.add(key);
 }
 
+// ── 4) GEMOUNTETE Stellen: Anspruch ∧ Beleg (Ziel-1 S7) ─────────────────────
+// Ein aus einem CHOS-Mesh-Manifest gemountetes Composable darf NUR enabled sein, wenn ein VERDIENTES, strukturell
+// nachgerechnetes Eval-Verdikt daneben liegt („Evals AUSGEFÜHRT statt deklariert"). Fehlt das Manifest-Verzeichnis,
+// ist das ein No-Op (die generierte App muss keine gemounteten Stellen haben). Verzeichnis via arg/Env überschreibbar.
+const mountDir =
+  process.argv[2] ??
+  process.env["MOUNTED_COMPOSABLES_DIR"] ??
+  path.join(".chos", "mesh", "composables");
+const mounted = verifyMountedComposables(path.resolve(mountDir));
+for (const f of mounted.fehler) fail(`gemountet: ${f}`);
+
 if (fehler.length > 0) {
   console.error("check:composables FEHLGESCHLAGEN:");
   for (const f of fehler) console.error(`  - ${f}`);
@@ -57,6 +70,8 @@ if (fehler.length > 0) {
 }
 
 const spines = composables.filter((c) => c.spine).length;
+for (const h of mounted.hinweise) console.log(`  · ${h}`);
 console.log(
-  `composables ok — ${composables.length} deklariert · ${enabledCount} enabled · ${spines} mit Spine-Agent · alle wohlgeformt + zertifiziert-vollständig.`,
+  `composables ok — ${composables.length} deklariert · ${enabledCount} enabled · ${spines} mit Spine-Agent · ` +
+    `${mounted.checked} gemountet (${mounted.verdient} verdient) · alle wohlgeformt + zertifiziert-vollständig.`,
 );

@@ -5,6 +5,8 @@ import type { PortCallContext } from "./capabilities.js";
 import {
   createChosAgentClientFromEnv,
   createChosAiAssistPort,
+  createComposableEngineClient,
+  createComposableEngineClientFromEnv,
   HttpChosAgentClient,
   InMemoryChosAgentClient,
   type ChosAgentClient,
@@ -137,5 +139,79 @@ describe("createChosAgentClientFromEnv", () => {
       }),
     ).toBeInstanceOf(HttpChosAgentClient);
     expect(createChosAgentClientFromEnv({})).toBeUndefined();
+  });
+});
+
+describe("Container-Consume-Naht (Ziel-1 S6/S7)", () => {
+  it("createComposableEngineClient: der Container-Descriptor (baseUrl + password) wird ein ChosAgentClient", () => {
+    const client = createComposableEngineClient({
+      baseUrl: "https://composable.example",
+      password: "engine-pw",
+      composableId: "sachbearbeitung",
+    });
+    expect(client).toBeInstanceOf(HttpChosAgentClient);
+  });
+
+  it("fail-closed: ohne baseUrl bzw. password wirft der Client-Bau", () => {
+    expect(() =>
+      createComposableEngineClient({ baseUrl: "", password: "x" }),
+    ).toThrow(/baseUrl/);
+    expect(() =>
+      createComposableEngineClient({ baseUrl: "https://x", password: "" }),
+    ).toThrow(/password/);
+  });
+
+  it("das Container-Passwort reist als Bearer-Token an die exponierte Engine", async () => {
+    let authHeader: string | undefined;
+    const fetchImpl = (async (
+      _input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      authHeader = (init?.headers as Record<string, string>)["authorization"];
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          value: { ok: true },
+          confidence: 0.6,
+          rationale: "r",
+          sources: [],
+          modelId: "composable:sachbearbeitung",
+        }),
+      } as Response;
+    }) as typeof fetch;
+    const client = new HttpChosAgentClient({
+      baseUrl: "https://composable.example",
+      token: "engine-pw",
+      fetchImpl,
+    });
+    await client.advise({
+      task: "composable-chat:sachbearbeitung",
+      input: {},
+      maxClass: "limited-risk",
+      requestId: "r",
+      tenantId: "t1",
+      authorityId: "b1",
+      jurisdictionId: "de",
+    });
+    expect(authHeader).toBe("Bearer engine-pw");
+  });
+
+  it("createComposableEngineClientFromEnv: braucht URL + PASSWORD (sonst undefined, fail-closed)", () => {
+    expect(
+      createComposableEngineClientFromEnv({
+        COMPOSABLE_ENGINE_URL: "https://composable.example",
+        COMPOSABLE_ENGINE_PASSWORD: "pw",
+      }),
+    ).toBeInstanceOf(HttpChosAgentClient);
+    expect(
+      createComposableEngineClientFromEnv({
+        COMPOSABLE_ENGINE_URL: "https://composable.example",
+      }),
+    ).toBeUndefined();
+    expect(
+      createComposableEngineClientFromEnv({ COMPOSABLE_ENGINE_PASSWORD: "pw" }),
+    ).toBeUndefined();
+    expect(createComposableEngineClientFromEnv({})).toBeUndefined();
   });
 });

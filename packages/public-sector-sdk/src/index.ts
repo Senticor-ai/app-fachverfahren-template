@@ -16,3 +16,7 @@ export * from "./rechtsbehelf-frist.js";
 export * from "./kalender.js";
 export * from "./aufbewahrung.js";
 export * from "./composable.js";
+// composable-cert-verify — KIT-seitige, reine Struktur-Prüfung eines CHOS-Eval-Verdikts + die Mesh-Manifest-Typen.
+export * from "./composable-cert-verify.js";
+// composable-manifest — der Mount-Mapper Mesh-Manifest → AgenticComposable (Ziel-1 S7).
+export * from "./composable-manifest.js";
