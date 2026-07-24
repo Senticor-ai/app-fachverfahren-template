@@ -20,6 +20,38 @@ export const SpineAgentDtoSchema = Type.Object(
 );
 export type SpineAgentDto = Static<typeof SpineAgentDtoSchema>;
 
+/** Eine publizierende Quelle der Reuse-Herkunft (Provenienz) — Verbund/Tenant/Zeitpunkt. */
+export const ComposableHerkunftQuelleDtoSchema = Type.Object(
+  {
+    verbundId: Type.String(),
+    tenant: Type.String(),
+    publishedAt: Type.Optional(Type.String()),
+  },
+  { additionalProperties: false },
+);
+export type ComposableHerkunftQuelleDto = Static<
+  typeof ComposableHerkunftQuelleDtoSchema
+>;
+
+/** Reuse-Herkunft (Blueprint §18 „ERP-Reuse"): aus der geteilten Mesh-Registry GEMOUNTET (registry-mount, mit
+ *  Quell-Provenienz) vs. im Verfahren LOKAL abgeleitet (lokal-abgeleitet). Die EINE Wahrheit ist die neben dem
+ *  Manifest liegende Mount-Provenienz (`<id>.mount.json`) — absent ⇒ lokal (server-abgeleitet, nie geraten). */
+export const ComposableHerkunftDtoSchema = Type.Object(
+  {
+    art: Type.Union([
+      Type.Literal("registry-mount"),
+      Type.Literal("lokal-abgeleitet"),
+    ]),
+    /** Nur bei registry-mount: die publizierenden Quellen (kann leer sein). */
+    quelle: Type.Optional(Type.Array(ComposableHerkunftQuelleDtoSchema)),
+    version: Type.Optional(Type.String()),
+    recordHash: Type.Optional(Type.String()),
+    mountedAt: Type.Optional(Type.String()),
+  },
+  { additionalProperties: false },
+);
+export type ComposableHerkunftDto = Static<typeof ComposableHerkunftDtoSchema>;
+
 /** Kurzfassung eines Composables für die Liste (Discovery). */
 export const ComposableSummaryDtoSchema = Type.Object(
   {
@@ -32,6 +64,8 @@ export const ComposableSummaryDtoSchema = Type.Object(
     /** enabled = certified/active (produktiv nutzbar). */
     enabled: Type.Boolean(),
     hasSpine: Type.Boolean(),
+    /** Reuse-Herkunft (server-abgeleitet aus der Mount-Provenienz): registry-mount vs. lokal-abgeleitet. */
+    herkunft: ComposableHerkunftDtoSchema,
   },
   { additionalProperties: false },
 );
@@ -67,6 +101,8 @@ export const ComposableDetailDtoSchema = Type.Object(
     spine: Type.Optional(SpineAgentDtoSchema),
     evals: Type.Array(Type.String()),
     replaceableBy: Type.Array(Type.String()),
+    /** Reuse-Herkunft (server-abgeleitet aus der Mount-Provenienz): registry-mount vs. lokal-abgeleitet. */
+    herkunft: ComposableHerkunftDtoSchema,
     /** Zertifizierungsreife (Blueprint §19): certifiable + konkret fehlende Ebenen. */
     certification: Type.Object(
       {
@@ -220,7 +256,9 @@ export const ComposableChatReplyDtoSchema = Type.Object(
   },
   { additionalProperties: false },
 );
-export type ComposableChatReplyDto = Static<typeof ComposableChatReplyDtoSchema>;
+export type ComposableChatReplyDto = Static<
+  typeof ComposableChatReplyDtoSchema
+>;
 
 // EVIDENCE-LEDGER (Blueprint §15.3 / §27): der hash-verkettete, tamper-evidente Nachweis agentischer
 // Governance-Handlungen (Spine-Vorschläge). Nur Metadaten — nie der Vorschlagsinhalt (kein PII).

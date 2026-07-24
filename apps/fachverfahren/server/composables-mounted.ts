@@ -24,6 +24,8 @@ import {
   mapManifestToComposable,
   verifyMeshCertStructure,
   type AgenticComposable,
+  type ComposableHerkunft,
+  type ComposableHerkunftQuelle,
   type MeshComposableManifest,
 } from "@senticor/public-sector-sdk";
 
@@ -32,6 +34,59 @@ const sha256 = (buf: Buffer): string =>
 
 const msg = (e: unknown): string =>
   e instanceof Error ? e.message : String(e);
+
+const trimmedString = (v: unknown): string =>
+  typeof v === "string" ? v.trim() : "";
+
+/** Die Provenienz-Quellen aus der Mount-Provenienz normalisieren (fail-open: unbrauchbare Einträge fallen weg). */
+function normalisiereQuelle(raw: unknown): ComposableHerkunftQuelle[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ComposableHerkunftQuelle[] = [];
+  for (const q of raw) {
+    if (!q || typeof q !== "object" || Array.isArray(q)) continue;
+    const r = q as Record<string, unknown>;
+    const verbundId = trimmedString(r["verbundId"]);
+    const tenant = trimmedString(r["tenant"]);
+    if (!verbundId && !tenant) continue; // ohne jede Zuordnung keine „Quelle" vortäuschen
+    const publishedAt = trimmedString(r["publishedAt"]);
+    out.push({ verbundId, tenant, ...(publishedAt ? { publishedAt } : {}) });
+  }
+  return out;
+}
+
+/**
+ * ladeHerkunft — liest die neben dem Manifest liegende Mount-Provenienz (`<id>.mount.json`, von CHOS
+ * `mountComposableDefinition` geschrieben) und projiziert sie auf die typisierte `ComposableHerkunft`. Die
+ * Datei ist die EINE Wahrheit des ERP-Reuse: ist sie da (wohlgeformt, kongruent zu DIESER Stelle) ⇒ die Stelle
+ * ist aus der geteilten Registry GEMOUNTET; fehlt/malformt/inkongruent ⇒ LOKAL abgeleitet. REIN best-effort:
+ * absente/kaputte Provenienz wird NIE geraten und wirft NIE (evidence-driven fail-open, absent = lokal).
+ */
+function ladeHerkunft(dir: string, id: string): ComposableHerkunft {
+  const lokal: ComposableHerkunft = { art: "lokal-abgeleitet" };
+  const p = path.join(dir, `${id}.mount.json`);
+  if (!existsSync(p)) return lokal;
+  try {
+    const parsed = JSON.parse(readFileSync(p, "utf8")) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+      return lokal; // malformt (kein Objekt) ⇒ lokal
+    const m = parsed as Record<string, unknown>;
+    // Kongruenz: die Provenienz muss zu DIESER Stelle gehören — ein anderer Bezug ⇒ keine fremde Herkunft raten.
+    const belegteId = trimmedString(m["composableId"]);
+    if (belegteId && belegteId !== id) return lokal;
+    const version = trimmedString(m["version"]);
+    const recordHash = trimmedString(m["recordHash"]);
+    const mountedAt = trimmedString(m["mountedAt"]);
+    return {
+      art: "registry-mount",
+      quelle: normalisiereQuelle(m["quelle"]),
+      ...(version ? { version } : {}),
+      ...(recordHash ? { recordHash } : {}),
+      ...(mountedAt ? { mountedAt } : {}),
+    };
+  } catch {
+    return lokal; // unlesbar/kein JSON ⇒ lokal (nie werfen)
+  }
+}
 
 /** Das Verzeichnis der CHOS-emittierten Manifeste — relativ zur Projekt-Wurzel (Laufzeit-CWD der generierten App).
  *  `MOUNTED_COMPOSABLES_DIR` überschreibt (DIESELBE Env-Konvention wie das check:composables-Gate). */
@@ -53,7 +108,9 @@ export interface MountedLoad {
 /**
  * loadMountedComposables — scannt `dir` nach `<id>.json`-Manifesten, liest je Manifest das daneben liegende
  * `<id>.cert.json` (Attestation via verifyMeshCertStructure) und projiziert über `mapManifestToComposable`.
- * Nachbardateien (`.cert.json`/`.mount.json`/fremd) werden übersprungen. Fehlt `dir`, ist das Ergebnis leer
+ * Zusätzlich wird die neben dem Manifest liegende Mount-Provenienz (`<id>.mount.json`) gelesen und als typisierte
+ * `herkunft` angehängt (registry-mount = ERP-Reuse aus der geteilten Registry · sonst lokal-abgeleitet).
+ * Nachbardateien (`.cert.json`/`.mount.json`/fremd) zählen NICHT als Manifest. Fehlt `dir`, ist das Ergebnis leer
  * (der Aufrufer fällt auf die Muster zurück). REIN best-effort — wirft nie.
  */
 export function loadMountedComposables(
@@ -108,7 +165,10 @@ export function loadMountedComposables(
     }
 
     try {
-      composables.push(mapManifestToComposable(manifest, { attestation }));
+      // Reuse-Herkunft aus der neben dem Manifest liegenden Mount-Provenienz (`<id>.mount.json`) — die EINE
+      // Wahrheit des ERP-Reuse. Absent/malformt ⇒ „lokal abgeleitet" (best-effort, nie geraten, nie geworfen).
+      const mounted = mapManifestToComposable(manifest, { attestation });
+      composables.push({ ...mounted, herkunft: ladeHerkunft(dir, id) });
     } catch (e) {
       // fail-closed reject: ein über-autonomes/inkongruentes Manifest wird EHRLICH verworfen (kein stilles Kappen).
       uebersprungen.push({ file, grund: msg(e) });

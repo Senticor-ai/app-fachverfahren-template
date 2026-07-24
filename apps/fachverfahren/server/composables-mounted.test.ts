@@ -173,6 +173,68 @@ describe("loadMountedComposables — Auto-Mount der CHOS-Manifeste", () => {
     expect(load.uebersprungen[0]!.file).toBe("ueber-autonom.json");
   });
 
+  it("attachiert Herkunft registry-mount (inkl. Quelle) aus der Mount-Provenienz (`<id>.mount.json`)", () => {
+    writeManifest(dir, manifest(), { withEarnedCert: true });
+    writeFileSync(
+      path.join(dir, "sachbearbeitung.mount.json"),
+      serialize({
+        schemaVersion: 1,
+        composableId: "sachbearbeitung",
+        version: "2.1.0",
+        recordHash: "abc123",
+        quelle: [
+          {
+            verbundId: "verbund-nord",
+            tenant: "musterverfahren-amt",
+            publishedAt: "2026-07-20T10:00:00.000Z",
+          },
+        ],
+        mountedAt: "2026-07-24T08:00:00.000Z",
+      }),
+    );
+    const c = loadMountedComposables(dir).composables[0]!;
+    expect(c.herkunft).toEqual({
+      art: "registry-mount",
+      version: "2.1.0",
+      recordHash: "abc123",
+      mountedAt: "2026-07-24T08:00:00.000Z",
+      quelle: [
+        {
+          verbundId: "verbund-nord",
+          tenant: "musterverfahren-amt",
+          publishedAt: "2026-07-20T10:00:00.000Z",
+        },
+      ],
+    });
+  });
+
+  it("attachiert Herkunft lokal-abgeleitet, wenn keine Mount-Provenienz daneben liegt", () => {
+    writeManifest(dir, manifest());
+    const c = loadMountedComposables(dir).composables[0]!;
+    expect(c.herkunft).toEqual({ art: "lokal-abgeleitet" });
+  });
+
+  it("fällt bei malformter/inkongruenter Mount-Provenienz auf lokal-abgeleitet zurück (nie geraten, nie geworfen)", () => {
+    writeManifest(dir, manifest());
+    // kaputtes JSON
+    writeFileSync(
+      path.join(dir, "sachbearbeitung.mount.json"),
+      "{ das ist kein json",
+    );
+    expect(loadMountedComposables(dir).composables[0]!.herkunft).toEqual({
+      art: "lokal-abgeleitet",
+    });
+
+    // wohlgeformt, aber auf eine ANDERE Stelle bezogen (inkongruent) ⇒ keine fremde Herkunft raten
+    writeFileSync(
+      path.join(dir, "sachbearbeitung.mount.json"),
+      serialize({ composableId: "eine-andere-stelle", recordHash: "x" }),
+    );
+    expect(loadMountedComposables(dir).composables[0]!.herkunft).toEqual({
+      art: "lokal-abgeleitet",
+    });
+  });
+
   it("ignoriert Nachbardateien (Verdikt/Provenienz/fremd) — nur Manifeste zählen", () => {
     writeManifest(dir, manifest(), { withEarnedCert: true });
     writeFileSync(

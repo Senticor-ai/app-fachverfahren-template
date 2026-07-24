@@ -64,6 +64,53 @@ describe("BFF /api/composables (Discovery)", () => {
     await app.close();
   });
 
+  it("trägt die Reuse-Herkunft: lokal-abgeleitet ohne Provenienz, registry-mount (inkl. Quelle) mit", async () => {
+    const lokal = composable({ id: "lokal", displayName: "Lokal abgeleitet" });
+    const gemountet = composable({
+      id: "gemountet",
+      displayName: "Aus Registry",
+      herkunft: {
+        art: "registry-mount",
+        version: "3.0.0",
+        recordHash: "hash-xyz",
+        mountedAt: "2026-07-24T00:00:00.000Z",
+        quelle: [
+          {
+            verbundId: "verbund-nord",
+            tenant: "musterverfahren-amt",
+            publishedAt: "2026-07-20T00:00:00.000Z",
+          },
+        ],
+      },
+    });
+    const { app } = await appWith([lokal, gemountet]);
+    const res = await app.inject({ method: "GET", url: "/api/composables" });
+    const body = res.json();
+    const byId = Object.fromEntries(
+      body.composables.map((c: { id: string }) => [c.id, c]),
+    );
+    expect(byId["lokal"].herkunft).toEqual({ art: "lokal-abgeleitet" });
+    expect(byId["gemountet"].herkunft).toEqual({
+      art: "registry-mount",
+      version: "3.0.0",
+      recordHash: "hash-xyz",
+      mountedAt: "2026-07-24T00:00:00.000Z",
+      quelle: [
+        {
+          verbundId: "verbund-nord",
+          tenant: "musterverfahren-amt",
+          publishedAt: "2026-07-20T00:00:00.000Z",
+        },
+      ],
+    });
+    // Auch das Detail trägt die Herkunft.
+    const detail = (
+      await app.inject({ method: "GET", url: "/api/composables/gemountet" })
+    ).json();
+    expect(detail.herkunft.art).toBe("registry-mount");
+    await app.close();
+  });
+
   it("liefert Detail inkl. Spine (rechtsnah abgeleitet) + Zertifizierungsreife", async () => {
     const { app } = await appWith([composable()]);
     const res = await app.inject({

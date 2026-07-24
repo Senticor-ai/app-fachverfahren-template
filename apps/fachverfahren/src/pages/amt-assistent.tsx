@@ -5,14 +5,77 @@
 // composable-chat-client-Adapter — kein zweites Chat-UI. Das DATEN-Signal `LeistungConfig.ki.chat` schaltet
 // die Fläche frei (dieselbe 3-Schichten-Logik wie KiAssist: Config bietet an ∧ Port injiziert).
 import { useEffect, useMemo, useState } from "react";
-import type { ComposableSummaryDto } from "@senticor/app-bff-contracts";
-import { AssistentPanel, Callout } from "@senticor/fachverfahren-kit";
+import type {
+  ComposableHerkunftDto,
+  ComposableSummaryDto,
+} from "@senticor/app-bff-contracts";
+import { AssistentPanel, Badge, Callout } from "@senticor/fachverfahren-kit";
 import { Shell } from "../app/shell.js";
 import {
   erstelleComposableChatPort,
   ladeComposables,
 } from "../composable-chat-client.js";
 import { store } from "../store.js";
+
+/** Eine Quelle der Reuse-Herkunft lesbar zusammenfassen (Verbund · Tenant), leere Felder weglassen. */
+function quelleLabel(q: {
+  verbundId: string;
+  tenant: string;
+  publishedAt?: string;
+}): string {
+  return [q.verbundId, q.tenant].filter((s) => s.trim().length > 0).join(" · ");
+}
+
+/**
+ * HerkunftBadge — die fachliche REUSE-HERKUNFT einer Stelle als kleines, ehrliches Badge (progressive disclosure):
+ * „Aus Mesh-Registry wiederverwendet" (ERP-Reuse aus einem anderen Verbund) mit Quell-Verbund/Tenant + Version
+ * als Detailzeile, vs. „Im Verfahren abgeleitet". Das Signal spiegelt AUSSCHLIESSLICH die vom Server aus der
+ * Mount-Provenienz (`<id>.mount.json`) abgeleitete Herkunft — nichts wird erfunden.
+ */
+function HerkunftBadge({
+  herkunft,
+}: {
+  herkunft: ComposableHerkunftDto;
+}): React.JSX.Element {
+  if (herkunft.art !== "registry-mount") {
+    return (
+      <Badge
+        tone="neu"
+        title="Diese Fähigkeitseinheit wurde in diesem Verfahren abgeleitet (keine Mesh-Registry-Herkunft)."
+      >
+        Im Verfahren abgeleitet
+      </Badge>
+    );
+  }
+  const quellen = (herkunft.quelle ?? [])
+    .map(quelleLabel)
+    .filter((s) => s.length > 0);
+  const detail = [
+    ...(quellen.length > 0 ? [`Quelle: ${quellen.join(", ")}`] : []),
+    ...(herkunft.version ? [`Version ${herkunft.version}`] : []),
+    ...(herkunft.mountedAt ? [`gemountet ${herkunft.mountedAt}`] : []),
+  ];
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+      <Badge
+        tone="info"
+        title={
+          detail.length > 0
+            ? detail.join(" · ")
+            : "Aus der geteilten Mesh-Registry wiederverwendet (ERP-Reuse)."
+        }
+      >
+        Aus Mesh-Registry wiederverwendet
+      </Badge>
+      {quellen.length > 0 ? (
+        <span className="text-xs text-muted-foreground">
+          {quellen.join(", ")}
+          {herkunft.version ? ` · v${herkunft.version}` : ""}
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
 export function AmtAssistentPage(): React.JSX.Element {
   const chatConfig = store.config.ki?.chat;
@@ -65,7 +128,11 @@ export function AmtAssistentPage(): React.JSX.Element {
         </p>
 
         {status === "fehler" ? (
-          <Callout tone="warn" title="Composables nicht ladbar" className="mt-4">
+          <Callout
+            tone="warn"
+            title="Composables nicht ladbar"
+            className="mt-4"
+          >
             Die Composable-Liste konnte nicht geladen werden. Bitte erneut
             versuchen.
           </Callout>
@@ -97,6 +164,12 @@ export function AmtAssistentPage(): React.JSX.Element {
                 ) : null}
               </button>
             ))}
+          </div>
+        ) : null}
+
+        {aktiv ? (
+          <div className="mt-3 flex items-center gap-2">
+            <HerkunftBadge herkunft={aktiv.herkunft} />
           </div>
         ) : null}
 

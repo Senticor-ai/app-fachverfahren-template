@@ -17,6 +17,7 @@ import {
   CaseIdParamsSchema,
   type ComposableChatDateiRefDto,
   type ComposableDetailDto,
+  type ComposableHerkunftDto,
   type ComposableSummaryDto,
   type EvidenceEntryDto,
 } from "@senticor/app-bff-contracts";
@@ -45,6 +46,24 @@ import { bffRouteAuth, requestIdOf, sessionOf } from "../route-auth.js";
 import { storeUnavailable } from "../store-error.js";
 import { kuratierteWissensEintraege } from "./verfahren-wissen.js";
 
+/** Reuse-Herkunft → Wire-DTO. Fehlt sie am Composable, ist die Stelle lokal abgeleitet (absent ⇒ lokal —
+ *  evidence-driven, nie geraten; die EINE Wahrheit ist die Mount-Provenienz, die der Loader anhängt). */
+function toHerkunft(c: AgenticComposable): ComposableHerkunftDto {
+  const h = c.herkunft;
+  if (!h || h.art !== "registry-mount") return { art: "lokal-abgeleitet" };
+  return {
+    art: "registry-mount",
+    quelle: h.quelle.map((q) => ({
+      verbundId: q.verbundId,
+      tenant: q.tenant,
+      ...(q.publishedAt !== undefined ? { publishedAt: q.publishedAt } : {}),
+    })),
+    ...(h.version !== undefined ? { version: h.version } : {}),
+    ...(h.recordHash !== undefined ? { recordHash: h.recordHash } : {}),
+    ...(h.mountedAt !== undefined ? { mountedAt: h.mountedAt } : {}),
+  };
+}
+
 function toSummary(c: AgenticComposable): ComposableSummaryDto {
   return {
     id: c.id,
@@ -55,6 +74,7 @@ function toSummary(c: AgenticComposable): ComposableSummaryDto {
     assurance: c.assurance,
     enabled: istEnabled(c),
     hasSpine: c.spine !== undefined,
+    herkunft: toHerkunft(c),
   };
 }
 
@@ -89,6 +109,7 @@ function toDetail(c: AgenticComposable): ComposableDetailDto {
       : {}),
     evals: [...c.evals],
     replaceableBy: [...c.replaceableBy],
+    herkunft: toHerkunft(c),
     certification: certificationReadiness(c),
   };
 }
@@ -441,12 +462,10 @@ export function registerComposableRoutes(
 
       // ── Provider-Runde: converse (Chat-Naht) mit suggest-Fallback (Verlauf reist im input). ──────────
       const history: AiChatTurn[] = [
-        ...(request.body.verlauf ?? []).map(
-          (t): AiChatTurn => ({
-            role: t.rolle === "assistent" ? "assistant" : "user",
-            text: t.text,
-          }),
-        ),
+        ...(request.body.verlauf ?? []).map((t): AiChatTurn => ({
+          role: t.rolle === "assistent" ? "assistant" : "user",
+          text: t.text,
+        })),
         { role: "user", text: request.body.nachricht },
       ];
       const task = `composable-chat:${id}`;
@@ -494,9 +513,7 @@ export function registerComposableRoutes(
           : JSON.stringify(result.value.value);
 
       // ── Datei-OUT: die Antwort zusätzlich als Markdown-Datei ablegen + zurückgeben. ─────────────────
-      let dateiRaus:
-        | { ref: AttachmentRef; contentBase64: string }
-        | undefined;
+      let dateiRaus: { ref: AttachmentRef; contentBase64: string } | undefined;
       if (request.body.antwortAlsDatei === true) {
         const bytes = new Uint8Array(Buffer.from(antwortText, "utf8"));
         const put = await deps.blobStorage.put(
@@ -548,9 +565,7 @@ export function registerComposableRoutes(
             ...(request.body.caseId ? { caseId: request.body.caseId } : {}),
             ...(dateienRein.length > 0
               ? {
-                  dateienRein: dateienRein
-                    .map((r) => r.attachmentId)
-                    .join(","),
+                  dateienRein: dateienRein.map((r) => r.attachmentId).join(","),
                 }
               : {}),
             ...(dateiRaus ? { dateiRaus: dateiRaus.ref.attachmentId } : {}),

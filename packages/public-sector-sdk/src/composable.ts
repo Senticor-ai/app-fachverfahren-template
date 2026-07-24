@@ -114,6 +114,34 @@ export interface ComposableOwners {
  * Additiv zum DomainModuleManifest: `moduleId` bindet die deterministische Naht (Routes/Permissions/Events);
  * dieses Envelope ergänzt Outcome, Ownership, Spine-Agent, Assurance, Evals und Austauschbarkeit.
  */
+/** Eine publizierende Quelle der Mount-Provenienz — Verbund/Tenant/Zeitpunkt (ERP-Reuse-Herkunft). */
+export interface ComposableHerkunftQuelle {
+  verbundId: string;
+  tenant: string;
+  /** Zeitpunkt der Registry-Publikation (ISO-8601), sofern der Beleg ihn trägt. */
+  publishedAt?: string;
+}
+
+/**
+ * Reuse-Herkunft eines Composables (Blueprint §18 „ERP-Reuse"): wurde die Stelle aus der GETEILTEN Mesh-Registry
+ * GEMOUNTET (aus einem anderen Verbund/Tenant wiederverwendet) oder im eigenen Verfahren LOKAL abgeleitet?
+ * Die EINE Wahrheit ist die neben dem Manifest liegende Mount-Provenienz (`<id>.mount.json`, von CHOS geschrieben);
+ * fehlt sie, ist die Stelle lokal abgeleitet (evidence-driven: absente Provenienz = lokal, nie geraten).
+ */
+export type ComposableHerkunft =
+  | {
+      art: "registry-mount";
+      /** Die aggregierte Provenienz-Kette der Publisher (aus der Mount-Provenienz). Kann leer sein (Beleg ohne Quelle). */
+      quelle: ComposableHerkunftQuelle[];
+      /** Content-Version des gemounteten Records. */
+      version?: string;
+      /** Der Ketten-Hash des gewinnenden Registry-Records (Mount-Beleg). */
+      recordHash?: string;
+      /** Zeitpunkt des Mounts (ISO-8601). */
+      mountedAt?: string;
+    }
+  | { art: "lokal-abgeleitet" };
+
 export interface AgenticComposable {
   id: string;
   version: string;
@@ -131,6 +159,9 @@ export interface AgenticComposable {
   evals: string[];
   /** Austauschbarkeit (Blueprint §18): Composables, die dieses ersetzen könnten. */
   replaceableBy: string[];
+  /** Reuse-Herkunft (Blueprint §18): aus der geteilten Registry gemountet vs. lokal abgeleitet. Fehlt das Feld,
+   *  gilt „lokal abgeleitet" (evidence-driven: absente Mount-Provenienz = lokal). */
+  herkunft?: ComposableHerkunft;
 }
 
 const AAL_RANG: Record<AgenticAutonomyLevel, number> = {

@@ -207,6 +207,8 @@ export {
   type WissenViewListDto,
 } from "./verfahren-wissen.js";
 export {
+  ComposableHerkunftQuelleDtoSchema,
+  ComposableHerkunftDtoSchema,
   ComposableSummaryDtoSchema,
   ComposableListDtoSchema,
   ComposableDetailDtoSchema,
@@ -221,6 +223,8 @@ export {
   ComposableChatDateiRefDtoSchema,
   ComposableChatRequestSchema,
   ComposableChatReplyDtoSchema,
+  type ComposableHerkunftQuelleDto,
+  type ComposableHerkunftDto,
   type ComposableSummaryDto,
   type ComposableListDto,
   type ComposableDetailDto,
