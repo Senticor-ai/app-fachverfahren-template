@@ -15,8 +15,14 @@ const procedure: ProcedureVersion = {
   allowedTransitions: [],
 };
 
-const INHALT = "Nachweis-Inhalt (synthetisch)";
-const CONTENT_B64 = Buffer.from(INHALT).toString("base64");
+// Eine ECHTE, minimal gültige PDF-Datei: sie beginnt mit der Signatur %PDF, die der Server prüft.
+// Vorher lief dieser Test mit einer .txt-Datei durch — genau das ist jetzt nicht mehr möglich.
+const PDF_BYTES = Buffer.concat([
+  Buffer.from("%PDF-1.4\n"),
+  Buffer.from("Nachweis-Inhalt (synthetisch)\n"),
+  Buffer.from("%%EOF\n"),
+]);
+const CONTENT_B64 = PDF_BYTES.toString("base64");
 
 async function annaMitAntrag() {
   const caseStore = new InMemoryCaseStore();
@@ -47,15 +53,15 @@ describe("BFF Nachweis-Upload (/api/buerger/antraege/:id/nachweise)", () => {
       method: "POST",
       url: `/api/buerger/antraege/${antragId}/nachweise`,
       payload: {
-        fileName: "meldebescheinigung.txt",
-        mimeType: "text/plain",
+        fileName: "meldebescheinigung.pdf",
+        mimeType: "application/pdf",
         contentBase64: CONTENT_B64,
       },
     });
     expect(up.statusCode).toBe(201);
     const ref = up.json();
-    expect(ref.fileName).toBe("meldebescheinigung.txt");
-    expect(ref.sizeBytes).toBe(Buffer.byteLength(INHALT));
+    expect(ref.fileName).toBe("meldebescheinigung.pdf");
+    expect(ref.sizeBytes).toBe(PDF_BYTES.byteLength);
     expect(ref.checksumSha256).toMatch(/^[0-9a-f]{64}$/);
 
     // Liste enthält den Nachweis.
@@ -75,8 +81,8 @@ describe("BFF Nachweis-Upload (/api/buerger/antraege/:id/nachweise)", () => {
     });
     expect(dl.statusCode).toBe(200);
     const download = dl.json();
-    expect(Buffer.from(download.contentBase64, "base64").toString()).toBe(
-      INHALT,
+    expect(Buffer.from(download.contentBase64, "base64").equals(PDF_BYTES)).toBe(
+      true,
     );
     expect(download.checksumSha256).toBe(ref.checksumSha256);
     await app.close();

@@ -18,10 +18,18 @@ const procedure: ProcedureVersion = {
   version: "1",
   effectiveFrom: "2026-01-01T00:00:00.000Z",
   legalBasisIds: ["§ 1 Demo-Satzung"],
-  allowedStates: ["offen", "festgesetzt"],
+  allowedStates: ["offen", "in_pruefung", "festgesetzt"],
   allowedTransitions: [
+    // Der vorbereitende Schritt: nötig, weil ein von AUSSEN eingereichter Vorgang nicht in einem
+    // einzigen Zug festgesetzt werden kann (Taint-Wirkungssperre) — eine Person prüft, eine zweite gibt frei.
     {
       from: "offen",
+      to: "in_pruefung",
+      action: "pruefen",
+      requiredPermission: "case.decision.prepare",
+    },
+    {
+      from: "in_pruefung",
       to: "festgesetzt",
       action: "festsetzen",
       requiredPermission: "case.decision.prepare",
@@ -78,12 +86,24 @@ describe("Verwaltungsakt einfrieren am festsetzenden Übergang", () => {
     ).json();
     await appA.close();
 
-    // Akteur B (≠ A) setzt fest → Vier-Augen erfüllt, Bescheid wird eingefroren.
+    // INTERN eröffneter Fall (kein Bürger-Eingang) — hier greift die Taint-Sperre bewusst NICHT.
+    // Akteur A prüft vor, Akteur B (≠ A) setzt fest → Vier-Augen erfüllt, Bescheid wird eingefroren.
+    const { app: appAv } = await appFor(caseStore, "actor.a");
+    const vorgeprueft = await appAv.inject({
+      method: "POST",
+      url: `/api/cases/${created.caseId}/transitions`,
+      payload: { action: "pruefen", expectedVersion: created.version },
+    });
+    expect(vorgeprueft.statusCode).toBe(200);
+    await appAv.close();
     const { app: appB } = await appFor(caseStore, "actor.b");
     const res = await appB.inject({
       method: "POST",
       url: `/api/cases/${created.caseId}/transitions`,
-      payload: { action: "festsetzen", expectedVersion: created.version },
+      payload: {
+        action: "festsetzen",
+        expectedVersion: vorgeprueft.json().version,
+      },
     });
     expect(res.statusCode).toBe(200);
 
@@ -94,8 +114,10 @@ describe("Verwaltungsakt einfrieren am festsetzenden Übergang", () => {
         url: `/api/cases/${created.caseId}/audit`,
       })
     ).json();
+    // Es gibt jetzt ZWEI case.transitioned (pruefen, festsetzen) — gesucht ist das mit dem VA.
     const festsetzung = audit.events.find(
-      (e: { eventType: string }) => e.eventType === "case.transitioned",
+      (e: { eventType: string; payload: Record<string, unknown> }) =>
+        e.eventType === "case.transitioned" && e.payload["verwaltungsakt"],
     );
     const va = festsetzung?.payload?.verwaltungsakt as
       { content: Record<string, unknown>; checksumSha256: string } | undefined;
@@ -137,17 +159,45 @@ describe("Verwaltungsakt einfrieren am festsetzenden Übergang", () => {
       })
     ).json();
 
-    // Die Sachbearbeitung setzt fest → Bescheid wird eingefroren (kein vorheriger Bearbeitungsschritt,
-    // Vier-Augen greift nicht: die Einreichung ist case.submitted, nicht four-eyes-relevant).
-    const { app: amt } = await buildBffApp({
+    // ── DIE TAINT-WIRKUNGSSPERRE, direkt am Bürgerpfad belegt ──────────────────────────────────
+    // Der Vorgang kommt von AUSSEN (case.submitted). Eine einzelne Sachbearbeitung kann ihn deshalb
+    // NICHT in einem Zug festsetzen — auch dann nicht, wenn sie alle Rechte hat. Vor dieser Sperre war
+    // genau dieser Aufruf 200; der Kommentar an dieser Stelle lautete „Vier-Augen greift nicht".
+    const { app: allein } = await buildBffApp({
       session: caseworkerSession({ actorId: "actor.sb" }),
+      caseStore,
+      procedureRegistry: registry,
+    });
+    const imAlleingang = await allein.inject({
+      method: "POST",
+      url: `/api/cases/${antrag.antragId}/transitions`,
+      payload: { action: "pruefen", expectedVersion: antrag.version },
+    });
+    expect(imAlleingang.statusCode).toBe(200);
+    const selbstFestsetzen = await allein.inject({
+      method: "POST",
+      url: `/api/cases/${antrag.antragId}/transitions`,
+      payload: {
+        action: "festsetzen",
+        expectedVersion: imAlleingang.json().version,
+      },
+    });
+    expect(selbstFestsetzen.statusCode).toBe(403);
+    await allein.close();
+
+    // Erst eine ZWEITE Person setzt fest → Bescheid wird eingefroren.
+    const { app: amt } = await buildBffApp({
+      session: caseworkerSession({ actorId: "actor.sb2" }),
       caseStore,
       procedureRegistry: registry,
     });
     const festsetzung = await amt.inject({
       method: "POST",
       url: `/api/cases/${antrag.antragId}/transitions`,
-      payload: { action: "festsetzen", expectedVersion: antrag.version },
+      payload: {
+        action: "festsetzen",
+        expectedVersion: imAlleingang.json().version,
+      },
     });
     expect(festsetzung.statusCode).toBe(200);
     await amt.close();
@@ -246,11 +296,21 @@ describe("Verwaltungsakt einfrieren am festsetzenden Übergang", () => {
       })
     ).json();
     await appA.close();
+    const { app: appAv } = await appFor(caseStore, "actor.a");
+    const vorgeprueft = await appAv.inject({
+      method: "POST",
+      url: `/api/cases/${created.caseId}/transitions`,
+      payload: { action: "pruefen", expectedVersion: created.version },
+    });
+    await appAv.close();
     const { app: appB } = await appFor(caseStore, "actor.b");
     await appB.inject({
       method: "POST",
       url: `/api/cases/${created.caseId}/transitions`,
-      payload: { action: "festsetzen", expectedVersion: created.version },
+      payload: {
+        action: "festsetzen",
+        expectedVersion: vorgeprueft.json().version,
+      },
     });
     const audit = (
       await appB.inject({
@@ -259,7 +319,8 @@ describe("Verwaltungsakt einfrieren am festsetzenden Übergang", () => {
       })
     ).json();
     const va = audit.events.find(
-      (e: { eventType: string }) => e.eventType === "case.transitioned",
+      (e: { eventType: string; payload: Record<string, unknown> }) =>
+        e.eventType === "case.transitioned" && e.payload["verwaltungsakt"],
     ).payload.verwaltungsakt;
     // Ein Angreifer setzt den Betrag herab — der Hash passt nicht mehr.
     const manipuliert = {

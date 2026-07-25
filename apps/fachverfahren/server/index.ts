@@ -109,6 +109,41 @@ function parseZoneSurfaces(
     );
 }
 
+/**
+ * ZONEN-TRENNUNG FAIL-CLOSED IM BETRIEB (die Lehre aus dem Green-Wash-Befund).
+ *
+ * Der gesamte default-deny-Apparat (NetworkPolicy, Ingress nur für exponierte Zonen, Routen-Familien je
+ * Fläche) hängt an EINEM Signal: der Präsenz von `ZONE_SURFACES`. Fehlt es, registriert der BFF ALLE
+ * Familien — Bürger-Portal und Back-Office teilen sich dann Prozess, Port und Sitzungs-Cookie. Im
+ * Entwicklungsstand ist das bequem und gewollt; in einem PRODUKTIV-Betrieb ist es die offene Flanke.
+ *
+ * Deshalb: `NODE_ENV=production` ohne `ZONE_SURFACES` ⇒ der Prozess startet NICHT. Ein stiller
+ * fail-open in Produktion ist genau die Sorte Befund, die man erst nach dem Vorfall findet.
+ * Wer bewusst EINE Instanz ohne Trennung fahren will, sagt das ausdrücklich:
+ * `ZONE_SURFACES=buerger,sachbearbeitung,aufsicht`.
+ */
+export class ZonenTrennungFehltError extends Error {
+  constructor() {
+    super(
+      "ZONE_SURFACES ist nicht gesetzt, NODE_ENV=production. Ohne deklarierte Zonen-Flächen würden " +
+        "Bürger-Portal und Back-Office in EINEM Prozess laufen. Setzen Sie ZONE_SURFACES je Instanz " +
+        "(z. B. ZONE_SURFACES=buerger) — oder ausdrücklich alle Flächen, wenn das gewollt ist.",
+    );
+    this.name = "ZonenTrennungFehltError";
+  }
+}
+
+export function pruefeZonenTrennung(env: NodeJS.ProcessEnv): void {
+  if (env["NODE_ENV"] === "production" && env["ZONE_SURFACES"] === undefined)
+    throw new ZonenTrennungFehltError();
+}
+
+/** Wahr, wenn diese Instanz OHNE Zonen-Trennung läuft — die Oberfläche zeigt das sichtbar an, statt es
+ *  zu verschweigen. Ein unsichtbarer fail-open ist schlimmer als gar keine Trennung. */
+export function zonenTrennungAktiv(env: NodeJS.ProcessEnv): boolean {
+  return env["ZONE_SURFACES"] !== undefined;
+}
+
 /** Self-Signup-Politik aus der Env: default AUS; `open_unverified` heißt ehrlich so,
  *  bis E-Mail-Verifikation existiert. Unbekannte Werte fallen GESCHLOSSEN zurück. */
 function parseRegistrationMode(value: string | undefined): RegistrationMode {
@@ -302,7 +337,15 @@ export async function startRuntime(
     registrationMode: parseRegistrationMode(env["AUTH_REGISTRATION_MODE"]),
     ...(oidcConfig ? { oidcConfig } : {}),
   };
+  // FAIL-CLOSED VOR DEM ERSTEN LISTEN: lieber ein Prozess, der nicht startet, als eine Produktion,
+  // in der Aussen- und Innenzone still verschmelzen.
+  pruefeZonenTrennung(env);
   const allowedSurfaces = parseZoneSurfaces(env);
+  if (allowedSurfaces === undefined)
+    console.warn(
+      "[zone] ZONE_SURFACES ist nicht gesetzt: DIESE INSTANZ SERVIERT ALLE FLÄCHEN (Bürger + Back-Office) " +
+        "in EINEM Prozess. Für den Entwicklungsstand gewollt, für einen Betrieb nicht.",
+    );
   const bff: BffWiring = {
     appStore: createAppStoreFromEnv(env),
     caseStore: createCaseStoreFromEnv(env),

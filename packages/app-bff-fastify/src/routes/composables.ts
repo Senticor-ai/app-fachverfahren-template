@@ -156,8 +156,11 @@ export function registerComposableRoutes(
   deps: BffDeps,
 ): void {
   const typed = app.withTypeProvider<TypeBoxTypeProvider>();
+  // KATALOG-DISCOVERY verlangt `ai.assist`, nicht `session.read`: die Liste der handelnden Stellen
+  // (Fähigkeiten, Autonomiegrad, Wissensdomänen) ist eine Innenansicht der Behörde. Mit `session.read`
+  // konnte JEDE angemeldete Bürger:in sie abrufen — ein kostenloses Verzeichnis der Angriffsfläche.
   const auth = bffRouteAuth(
-    { kind: "rbac", permission: builtInPermissions.sessionRead.permission },
+    { kind: "rbac", permission: builtInPermissions.aiAssist.permission },
     deps,
   );
   // Den Spine AUSFÜHREN ist eine agentische (KI-)Handlung → ai.assist-Permission (nur Sachbearbeitung),

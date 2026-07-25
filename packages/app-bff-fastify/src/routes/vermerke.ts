@@ -27,6 +27,8 @@ import type { AppAuditEvent, AppCase } from "@senticor/app-store-postgres";
 import {
   builtInPermissions,
   createFachlicheAuditEvent,
+  externQuarantaene,
+  herkunftAusEreignissen,
   INJEKTION_PLATZHALTER,
   neutralisiereInjektion,
   scanInjection,
@@ -343,6 +345,19 @@ export function registerVermerkRoutes(
           text: neutralisiereInjektion(v.text),
         }));
 
+      // ── QUARANTÄNE-UMSCHLAG für die EXTERN eingereichten Antragsdaten ────────────────────────────
+      // Die Stelle soll den Sachverhalt kennen — sonst rät sie. Aber alles, was ein Bürger geschrieben
+      // hat, ist DATEN, nie Anweisung: es reist deshalb ausschliesslich als abgegrenzter, escapter Block
+      // mit Herkunfts-Banner, NIE im Anweisungsteil. Feldpfade mit anweisungsartigem Text werden als
+      // Auffälligkeit markiert und wandern in die Provenienz des Entwurfs — der prüfende Mensch sieht
+      // sofort, WO manipuliert wurde. (Der Umschlag ist Struktur, kein Urteil: die tragende Sperre gegen
+      // eine Festsetzung aus externen Daten liegt in cases.ts, nicht hier.)
+      const herkunft = herkunftAusEreignissen(bisher);
+      const quarantaene =
+        herkunft === "extern"
+          ? externQuarantaene(appCase.data)
+          : undefined;
+
       // Den (austauschbaren) AiAssistPort fragen — Kontext AUSSCHLIESSLICH aus der Sitzung + geteilter Akte.
       const result = await deps.aiAssist.suggest(
         {
@@ -360,7 +375,15 @@ export function registerVermerkRoutes(
             akte: {
               caseId: appCase.caseId,
               state: appCase.state,
+              herkunft,
               zellen: blackboard,
+              // Der EINZIGE Weg, auf dem Bürger-Antragsdaten in einen Modellkontext gelangen.
+              ...(quarantaene
+                ? {
+                    externeDaten: quarantaene.block,
+                    externeAuffaelligkeiten: quarantaene.auffaelligkeiten,
+                  }
+                : {}),
             },
           },
         },
@@ -404,6 +427,16 @@ export function registerVermerkRoutes(
               konfidenz: result.value.confidence,
               quellen: result.value.sources,
               rationale: result.value.rationale,
+              // PROVENIENZ DES ENTWURFS: unter welcher Herkunft er entstand und ob im externen Text
+              // etwas stand, das sich wie eine Anweisung liest. Das ist die Information, die der
+              // prüfende Mensch braucht — sie darf nicht im Serverlog verschwinden.
+              herkunft,
+              ...(quarantaene
+                ? {
+                    externAuffaellig: quarantaene.auffaellig,
+                    externAuffaelligeFelder: quarantaene.auffaelligkeiten,
+                  }
+                : {}),
             },
             ...(request.body.bezugVermerkId !== undefined
               ? { bezugVermerkId: request.body.bezugVermerkId }

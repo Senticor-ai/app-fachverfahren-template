@@ -24,6 +24,11 @@ export const AntragDtoSchema = Type.Object(
     abgeschlossenAm: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
     /** Die eigenen Antragsdaten + die Berechnung — für den Server opak, für den Bürger sein Antrag. */
     data: Type.Record(Type.String(), Type.Unknown()),
+    /** Die SERVER-vergebene Eingangs-/Vorgangsnummer (Format = Verfahrens-DATEN). Sie ist die lesbare
+     *  Projektion von Aktenzeichen + Server-Eingangszeit — der Browser vergibt sie NICHT mehr: ein
+     *  client-gestempelter Eingangsnachweis trägt die Uhr des Antragstellers und ist als Fristnachweis
+     *  wertlos. Ohne dieses Feld im Schema würfe Fastifys `removeAdditional` sie still weg. */
+    eingangsnummer: Type.String({ minLength: 1 }),
   },
   { additionalProperties: false },
 );

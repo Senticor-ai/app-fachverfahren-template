@@ -90,6 +90,25 @@ export interface ProcedureVersion {
    *  Solange sie läuft, blockiert sie die DSGVO-Löschung (Art. 17 Abs. 3 lit. b DSGVO). Fehlt sie, gibt es
    *  keine zusätzliche Sperre (Default unverändert). Enforcement: `aufbewahrungLaeuft` (aufbewahrung.ts). */
   aufbewahrungMonate?: number;
+  /** FORMAT der server-vergebenen Eingangs-/Vorgangsnummer (DATEN, generisch). Platzhalter `{jahr}`
+   *  `{monat}` `{tag}` `{verfahren}` `{kennung}` — siehe `formatiereEingangsnummer`. Fehlt es, gilt
+   *  `EINGANGSNUMMER_DEFAULT_FORMAT`. Die Nummer vergibt IMMER der Server, nie der Browser. */
+  eingangsnummerFormat?: string;
+  /** ANLAGEN-Regeln dieses Verfahrens (erlaubte Typen, Größe, Anzahl). Fehlen sie, gilt
+   *  `ANLAGEN_REGELN_DEFAULT` — fail-closed: ein nicht deklarierter Typ wird NICHT angenommen. */
+  anlagen?: {
+    erlaubteMimeTypen?: readonly string[];
+    maxBytes?: number;
+    maxAnzahl?: number;
+  };
+  /** MISSBRAUCHS-Drossel der öffentlichen Schreibwege dieses Verfahrens (DATEN, keine Code-Konstante).
+   *  Fehlt sie, gilt `DROSSEL_DEFAULT`. */
+  drossel?: {
+    /** Zulässige Schreibvorgänge je Fenster und Akteur. */
+    proAkteur?: number;
+    /** Fensterlänge in Sekunden. */
+    fensterSekunden?: number;
+  };
 }
 
 export interface Application {

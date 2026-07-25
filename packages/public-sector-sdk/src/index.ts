@@ -6,6 +6,15 @@ export * from "./procedure-from-status-machine.js";
 export * from "./rules.js";
 // injection-scan — reine Prompt-Injektions-Heuristik (Guardrail für den agentischen Aktenvermerk-Blackboard).
 export * from "./injection-scan.js";
+// extern-herkunft — die TAINT-Invariante: extern-getaintete Daten sind Sachverhalt, nie Anweisung
+// (Quarantäne-Umschlag + Werkzeug-Kappung + Vier-Augen-Pflicht bei hoheitlicher Wirkung).
+export * from "./extern-herkunft.js";
+// injektions-korpus — der geteilte Angriffs-Korpus (DATEN), gegen den mehrere Nähte geprüft werden.
+export * from "./injektions-korpus.js";
+// eingangsstempel — EINE Zeit-Wahrheit: der Server vergibt Eingangszeit + Eingangsnummer (Format = DATEN).
+export * from "./eingangsstempel.js";
+// anlagen-pruefung — der Türsteher für Anlagen (Allowlist + Magic Bytes + Deckel), vor jedem Leser.
+export * from "./anlagen-pruefung.js";
 export * from "./module-manifest.js";
 export * from "./authorization.js";
 export * from "./audit.js";

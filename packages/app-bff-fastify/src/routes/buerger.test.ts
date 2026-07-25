@@ -85,14 +85,20 @@ describe("POST /api/buerger/antraege — eigenen Antrag einreichen", () => {
     await b.close();
   });
 
-  it("400 bei unbekanntem Verfahren (Verfahren = DATEN; nichts wird erfunden)", async () => {
+  it("422 bei unbekanntem Verfahren — und der Fehlertext verrät NICHTS über die Innenwelt", async () => {
     const { app: a } = await app();
     const res = await a.inject({
       method: "POST",
       url: "/api/buerger/antraege",
       payload: { ...antrag, procedureId: "gibt-es-nicht" },
     });
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(422);
+    // SICHT-INVARIANTE: die frühere Meldung lautete „unknown procedure <id>@<version>" und bestätigte
+    // einem Fremden damit Existenz/Nicht-Existenz interner Verfahrenskennungen.
+    const body = res.json();
+    expect(body.error).not.toContain("gibt-es-nicht");
+    expect(body.error).not.toContain("unknown procedure");
+    expect(typeof body.requestId).toBe("string");
     await a.close();
   });
 

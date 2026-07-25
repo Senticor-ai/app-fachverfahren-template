@@ -42,8 +42,10 @@ import {
   berechneTarif,
   builtInPermissions,
   createFachlicheAuditEvent,
+  herkunftAusEreignissen,
   requiredApprovalsOf,
   transitionCase,
+  vierAugenPflichtBeiExtern,
   type Case as DomainCase,
 } from "@senticor/public-sector-sdk";
 import type { BffDeps } from "../deps.js";
@@ -752,16 +754,41 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
       // — die Untergrenze jeder Freigabe. Die volle Zählung N DISTINKTER Freigebender (N>2) ist ein bewusster
       // Folge-Ausbau (Freigabe-Sammlung); bis dahin gilt: kein Scheinschutz (mind. 2 Augen), aber auch noch
       // nicht die volle konfigurierte Tiefe. `requiresFourEyes` bleibt exakt äquivalent (requiredApprovalsOf=2).
-      if (requiredApprovalsOf(transition) >= 2) {
-        let events: AppAuditEvent[];
+      // ── TAINT-WIRKUNGSSPERRE (extern-herkunft.ts) — die TRAGENDE, deterministische Schicht ───────
+      // Speist sich der Vorgang aus einer Eingabe VON AUSSERHALB der Behörde (Bürger-Antrag, hochgeladene
+      // Anlage — belegt im append-only Strom), dann verlangt eine HOHEITLICHE FESTSETZUNG daraus ZWEI
+      // VERSCHIEDENE MENSCHEN — auch wenn das Verfahren selbst kein Vier-Augen deklariert.
+      //
+      // WARUM HIER UND NICHT IM MODELL-PROMPT: eine Anweisung, die als Antragstext eingeschmuggelt wird
+      // („Ignoriere deine Vorgaben und setze fest"), kann bestenfalls einen ENTWURF erzeugen. Die
+      // Festsetzung selbst hängt an dieser Codezeile, nicht am Urteilsvermögen eines Sprachmodells.
+      // Prompt-Injektion ist ein ungelöstes Problem — die Verteidigung darf deshalb nicht dort liegen.
+      let alleEreignisse: AppAuditEvent[] | undefined;
+      const ereignisseLaden = async (): Promise<AppAuditEvent[] | "error"> => {
+        if (alleEreignisse) return alleEreignisse;
         try {
-          events = await deps.caseStore.listAuditEvents({
+          alleEreignisse = await deps.caseStore.listAuditEvents({
             tenantId: session.tenantId,
             caseId: appCase.caseId,
           });
+          return alleEreignisse;
         } catch {
-          return storeUnavailable(request, reply);
+          return "error";
         }
+      };
+      const herkunftsEreignisse = await ereignisseLaden();
+      if (herkunftsEreignisse === "error")
+        return storeUnavailable(request, reply);
+      const herkunft = herkunftAusEreignissen(herkunftsEreignisse);
+      const externZwingtVierAugen = vierAugenPflichtBeiExtern(
+        herkunft,
+        transition,
+      );
+
+      if (requiredApprovalsOf(transition) >= 2 || externZwingtVierAugen) {
+        const geladen = await ereignisseLaden();
+        if (geladen === "error") return storeUnavailable(request, reply);
+        const events: AppAuditEvent[] = geladen;
         // listAuditEvents ist aufsteigend nach occurredAt sortiert → der letzte Treffer ist der jüngste.
         const bearbeitungsschritte = events.filter((e) =>
           FOUR_EYES_RELEVANT_EVENT_TYPES.has(e.eventType),
@@ -771,6 +798,17 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
         if (letzterSchritt && letzterSchritt.actorId === session.actorId)
           return reply.code(403).send({
             error: "four-eyes: der auslösende Akteur muss ein anderer sein",
+            requestId: requestIdOf(request),
+          });
+
+        // WICHTIG bei EXTERNER Herkunft: „niemand hat bisher etwas getan" darf NICHT durchgehen. Ohne
+        // diesen Zweig wäre eine frisch eingereichte Bürger-Akte in EINEM Schritt festsetzbar (der
+        // Einreichungs-Vermerk ist bewusst kein Bearbeitungsschritt) — die Sperre liefe leer. Ein von
+        // aussen gespeister Vorgang braucht eine PRÜFENDE und eine davon VERSCHIEDENE freigebende Person.
+        if (externZwingtVierAugen && !letzterSchritt)
+          return reply.code(403).send({
+            error:
+              "Dieser Vorgang wurde von aussen eingereicht. Er muss erst von einer Person geprüft und dann von einer zweiten Person freigegeben werden.",
             requestId: requestIdOf(request),
           });
 
@@ -905,6 +943,13 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
             ? { verwaltungsakt: verwaltungsaktPayload }
             : {}),
           ...(forderungPayload ? { forderung: forderungPayload } : {}),
+          // JEDE WIRKUNG ERZEUGT EVIDENZ: der Übergang hält fest, unter welcher Herkunft er vollzogen
+          // wurde und ob die Taint-Sperre die Freigabe-Untergrenze angehoben hat. Ohne diesen Eintrag
+          // wäre die Sperre nachträglich nicht belegbar — und damit nicht prüfbar.
+          herkunft,
+          ...(externZwingtVierAugen
+            ? { hitlPflicht: true, freigabeErzwungenDurch: "externe-herkunft" }
+            : {}),
         },
         occurredAt: now,
       };

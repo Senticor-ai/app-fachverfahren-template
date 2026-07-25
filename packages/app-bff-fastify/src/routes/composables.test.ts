@@ -169,8 +169,18 @@ describe("BFF /api/composables (Discovery)", () => {
     await app.close();
   });
 
-  it("auch die Bürger-Rolle darf Composables entdecken (session.read)", async () => {
+  it("SICHT-INVARIANTE: die Bürger-Rolle bekommt den Katalog NICHT (er beschreibt die Innenwelt)", async () => {
+    // Die Liste der handelnden Stellen nennt Fähigkeiten, Autonomiegrad und Wissensdomänen der
+    // Behörde. Sie lag hinter `session.read` und war damit für jede angemeldete Bürger:in abrufbar —
+    // ein kostenloses Verzeichnis der Angriffsfläche. Jetzt: `ai.assist` (nur Sachbearbeitung).
     const { app } = await appWith([composable()], citizenSession());
+    const res = await app.inject({ method: "GET", url: "/api/composables" });
+    expect(res.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it("GEGENPROBE: die Sachbearbeitung bekommt den Katalog weiterhin (kein Falschblocker)", async () => {
+    const { app } = await appWith([composable()]);
     const res = await app.inject({ method: "GET", url: "/api/composables" });
     expect(res.statusCode).toBe(200);
     await app.close();

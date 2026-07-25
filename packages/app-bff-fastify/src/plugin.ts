@@ -156,8 +156,14 @@ export async function appBff(
   }[] = [
     { surfaces: null, register: () => registerSessionRoute(app, deps) },
     { surfaces: null, register: () => registerCapabilitiesRoute(app, deps) },
-    // Agentic Composables (Blueprint v5.0): Discovery-Naht — quer, keine Fall-Daten, RBAC session.read.
-    { surfaces: null, register: () => registerComposableRoutes(app, deps) },
+    // Agentic Composables: NICHT mehr „Infra" (surfaces:null). Der Katalog beschreibt die HANDELNDEN
+    // Stellen der Behörde — welche Fähigkeiten sie hat, welche Autonomie, welches Wissen. Das ist eine
+    // Innenansicht und hat in der internet-exponierten Bürger-Zone nichts zu suchen. Als quer-liegende
+    // Familie lag sie bisher in JEDER Zone, inklusive der öffentlichen.
+    {
+      surfaces: ["sachbearbeitung", "aufsicht"],
+      register: () => registerComposableRoutes(app, deps),
+    },
     { surfaces: null, register: () => registerAiAssistRoutes(app, deps) },
     // Identität/Vertrauen (BundID/eID): das SITZUNGS-eigene Subjekt — Infra (quer, keine Fall-Daten), RBAC session.read.
     { surfaces: null, register: () => registerIdentityRoutes(app, deps) },

@@ -16,10 +16,19 @@ const procedure: ProcedureVersion = {
   version: "1",
   effectiveFrom: "2026-01-01T00:00:00.000Z",
   legalBasisIds: ["§ 1 Demo-Satzung"],
-  allowedStates: ["offen", "festgesetzt"],
+  // ZWEI SCHRITTE, weil ein von aussen eingereichter Vorgang genau so bearbeitet wird: eine Person
+  // prüft, eine ZWEITE setzt fest (Taint-Wirkungssperre, extern-herkunft.ts). Die frühere Ein-Schritt-
+  // Fassung war nur deshalb grün, weil die Sperre fehlte.
+  allowedStates: ["offen", "in_pruefung", "festgesetzt"],
   allowedTransitions: [
     {
       from: "offen",
+      to: "in_pruefung",
+      action: "pruefen",
+      requiredPermission: "case.decision.prepare",
+    },
+    {
+      from: "in_pruefung",
       to: "festgesetzt",
       action: "festsetzen",
       requiredPermission: "case.decision.prepare",
@@ -60,15 +69,32 @@ async function mitBescheid() {
       },
     })
   ).json();
+  // PRÜFERIN (erste Person) …
+  const { app: amt1 } = await buildBffApp({
+    session: caseworkerSession({ actorId: "actor.sb1" }),
+    caseStore,
+    procedureRegistry: registry,
+  });
+  const gepruft = await amt1.inject({
+    method: "POST",
+    url: `/api/cases/${antrag.antragId}/transitions`,
+    payload: { action: "pruefen", expectedVersion: antrag.version },
+  });
+  expect(gepruft.statusCode).toBe(200);
+  await amt1.close();
+  // … und eine ZWEITE Person setzt fest.
   const { app: amt } = await buildBffApp({
-    session: caseworkerSession({ actorId: "actor.sb" }),
+    session: caseworkerSession({ actorId: "actor.sb2" }),
     caseStore,
     procedureRegistry: registry,
   });
   const fest = await amt.inject({
     method: "POST",
     url: `/api/cases/${antrag.antragId}/transitions`,
-    payload: { action: "festsetzen", expectedVersion: antrag.version },
+    payload: {
+      action: "festsetzen",
+      expectedVersion: gepruft.json().version,
+    },
   });
   expect(fest.statusCode).toBe(200);
   await amt.close();

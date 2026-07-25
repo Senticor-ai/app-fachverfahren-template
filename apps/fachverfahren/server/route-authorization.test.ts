@@ -208,16 +208,18 @@ describe("Routen-Klassifizierung (config.auth)", () => {
           url: "/api/cases/:id/vermerke/:vermerkId/review",
           policy: "rbac:case.note.write",
         },
-        // Agentic-Composable-Discovery: read-only, jede Sitzung (session.read).
+        // Agentic-Composable-Discovery: die Liste der HANDELNDEN Stellen ist eine Innenansicht der
+        // Behörde (Fähigkeiten, Autonomiegrad, Wissensdomänen) — deshalb ai.assist, NICHT session.read.
+        // Mit session.read konnte jede angemeldete Bürger:in sie abrufen.
         {
           method: "GET",
           url: "/api/composables",
-          policy: "rbac:session.read",
+          policy: "rbac:ai.assist",
         },
         {
           method: "GET",
           url: "/api/composables/:id",
-          policy: "rbac:session.read",
+          policy: "rbac:ai.assist",
         },
         // Evidence-Ledger: behördliche Oversight-Sicht (case.read).
         {

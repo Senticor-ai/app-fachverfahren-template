@@ -36,17 +36,27 @@ import {
 } from "@senticor/app-bff-contracts";
 import type { AppAuditEvent, AppCase } from "@senticor/app-store-postgres";
 import {
+  ANLAGEN_REGELN_DEFAULT,
+  auslieferungsMimeTyp,
   builtInPermissions,
   createFachlicheAuditEvent,
   forderungsstandAusAudit,
+  formatiereEingangsnummer,
   FORDERUNG_ZAHLUNG_EINGEGANGEN,
+  HERKUNFT_EXTERN,
+  HERKUNFT_PAYLOAD_KEY,
+  HITL_PFLICHT_PAYLOAD_KEY,
   istRechtsbehelfVerfristet,
+  pruefeAnlage,
   rechtsbehelfVerfristetAb,
+  type AnlagenRegeln,
+  type ProcedureVersion,
   type RechtsbehelfFristRegime,
 } from "@senticor/public-sector-sdk";
 import type { PortCallContext } from "@senticor/platform-contracts";
 import type { BffDeps } from "../deps.js";
 import { canonicalSha256 } from "../canonical-hash.js";
+import { drosselRegelnAus, pruefeDrossel } from "../drossel.js";
 import { bffRouteAuth, requestIdOf, sessionOf } from "../route-auth.js";
 import { storeUnavailable } from "../store-error.js";
 
@@ -116,7 +126,7 @@ function nachweisRefOf(e: AppAuditEvent): NachweisRefDto | undefined {
 
 /** AppCase → AntragDto: die BÜRGER-Projektion. Interne Zuordnung (subjectIds) und Server-Topologie
  *  (tenant/authority/jurisdiction) bleiben bewusst draussen — sie gehen den Antragsteller nichts an. */
-function toAntragDto(c: AppCase): AntragDto {
+function toAntragDto(c: AppCase, eingangsnummer: string): AntragDto {
   return {
     antragId: c.caseId,
     procedureId: c.procedureId,
@@ -126,7 +136,84 @@ function toAntragDto(c: AppCase): AntragDto {
     eingereichtAm: c.openedAt,
     abgeschlossenAm: c.closedAt,
     data: c.data,
+    // SERVER-VERGEBEN (nicht aus `data`): die lesbare Projektion der caseId + der Server-Eingangszeit.
+    // Der Browser stempelte sie früher selbst — ein so erzeugter Eingangsnachweis trug die Uhr des
+    // Antragstellers und war als Fristnachweis wertlos.
+    eingangsnummer,
   };
+}
+
+/** Die server-vergebene Eingangsnummer eines Falls — reine Projektion aus caseId + Eingangszeit + dem
+ *  vom VERFAHREN deklarierten Format. Deterministisch: derselbe Fall trägt immer dieselbe Nummer,
+ *  ohne dass sie irgendwo zusätzlich gespeichert werden müsste (keine zweite Wahrheit). */
+function eingangsnummerVon(
+  c: AppCase,
+  procedure: ProcedureVersion | undefined,
+): string {
+  return formatiereEingangsnummer({
+    eingangIso: c.openedAt,
+    caseId: c.caseId,
+    procedureId: c.procedureId,
+    ...(procedure?.eingangsnummerFormat !== undefined
+      ? { format: procedure.eingangsnummerFormat }
+      : {}),
+  });
+}
+
+/** Die Anlagen-Regeln dieses Verfahrens (DATEN) — fehlt eine Angabe, gilt der fail-closed Default. */
+function anlagenRegelnVon(
+  procedure: ProcedureVersion | undefined,
+): AnlagenRegeln {
+  const dekl = procedure?.anlagen;
+  const typen = dekl?.erlaubteMimeTypen
+    ? ANLAGEN_REGELN_DEFAULT.typen.filter((t) =>
+        dekl.erlaubteMimeTypen?.includes(t.mimeType),
+      )
+    : ANLAGEN_REGELN_DEFAULT.typen;
+  return {
+    typen,
+    maxBytes: dekl?.maxBytes ?? ANLAGEN_REGELN_DEFAULT.maxBytes,
+    maxAnzahl: dekl?.maxAnzahl ?? ANLAGEN_REGELN_DEFAULT.maxAnzahl,
+  };
+}
+
+/** Bürger-lesbarer Ablehnungstext + HTTP-Status je Ablehnungsgrund. KEIN interner Code, kein Pfad,
+ *  keine Adapter-Meldung — die Sicht-Invariante gilt gerade im Fehlerfall (dort leckt es sonst). */
+function anlagenAblehnungAntwort(
+  ablehnung: Extract<
+    ReturnType<typeof pruefeAnlage>,
+    { ok: false }
+  >["ablehnung"],
+  regeln: AnlagenRegeln,
+): { status: number; text: string } {
+  switch (ablehnung.grund) {
+    case "leer":
+      return { status: 400, text: "Die Datei ist leer." };
+    case "zu-gross":
+      return {
+        status: 413,
+        text: `Die Datei ist zu groß (höchstens ${Math.floor(regeln.maxBytes / 1_000_000)} MB).`,
+      };
+    case "zu-viele":
+      return {
+        status: 422,
+        text: `Es sind höchstens ${regeln.maxAnzahl} Anlagen je Antrag möglich.`,
+      };
+    case "dateiname-unzulaessig":
+      return { status: 422, text: "Der Dateiname ist nicht zulässig." };
+    case "typ-nicht-erlaubt":
+      return {
+        status: 415,
+        text: `Dieses Dateiformat wird nicht angenommen. Möglich sind: ${regeln.typen
+          .flatMap((t) => t.endungen)
+          .join(", ")}.`,
+      };
+    case "inhalt-passt-nicht-zur-deklaration":
+      return {
+        status: 415,
+        text: "Der Inhalt der Datei passt nicht zu ihrem Format. Bitte laden Sie die Datei erneut im angegebenen Format hoch.",
+      };
+  }
 }
 
 export function registerBuergerRoutes(
@@ -175,7 +262,17 @@ export function registerBuergerRoutes(
       } catch {
         return storeUnavailable(request, reply);
       }
-      return reply.send({ antraege: cases.map(toAntragDto) });
+      return reply.send({
+        antraege: cases.map((c) =>
+          toAntragDto(
+            c,
+            eingangsnummerVon(
+              c,
+              deps.procedureRegistry.get(c.procedureId, c.procedureVersion),
+            ),
+          ),
+        ),
+      });
     },
   );
 
@@ -210,7 +307,15 @@ export function registerBuergerRoutes(
         return reply
           .code(404)
           .send({ error: "not found", requestId: requestIdOf(request) });
-      return reply.send(toAntragDto(found));
+      return reply.send(
+        toAntragDto(
+          found,
+          eingangsnummerVon(
+            found,
+            deps.procedureRegistry.get(found.procedureId, found.procedureVersion),
+          ),
+        ),
+      );
     },
   );
 
@@ -421,23 +526,68 @@ export function registerBuergerRoutes(
         body.procedureId,
         body.procedureVersion,
       );
-      if (!procedure)
-        return reply.code(400).send({
-          error: `unknown procedure ${body.procedureId}@${body.procedureVersion}`,
+      // SICHT-INVARIANTE: nach aussen NUR ein fachlicher Satz + requestId. Die frühere Meldung
+      // („unknown procedure <id>@<version>") bestätigte einem Fremden die Existenz/Nicht-Existenz
+      // interner Verfahrenskennungen — ein kostenloses Verzeichnis unserer Innenwelt.
+      if (!procedure) {
+        request.log.warn(
+          { procedureId: body.procedureId, procedureVersion: body.procedureVersion },
+          "buerger submit: unknown procedure",
+        );
+        return reply.code(422).send({
+          error:
+            "Dieser Antrag kann derzeit nicht angenommen werden. Bitte wenden Sie sich an die zuständige Stelle.",
           requestId: requestIdOf(request),
         });
+      }
       const initialState = procedure.allowedStates[0];
       const legalBasisId = procedure.legalBasisIds[0];
-      if (initialState === undefined || legalBasisId === undefined)
-        return reply.code(400).send({
-          error: "procedure has no initial state or legal basis",
+      if (initialState === undefined || legalBasisId === undefined) {
+        request.log.error(
+          { procedureId: procedure.procedureId },
+          "buerger submit: procedure has no initial state or legal basis",
+        );
+        return reply.code(422).send({
+          error:
+            "Dieser Antrag kann derzeit nicht angenommen werden. Bitte wenden Sie sich an die zuständige Stelle.",
           requestId: requestIdOf(request),
         });
+      }
 
+      // ── MISSBRAUCHS-DROSSEL (store-gestützt, damit sie über mehrere Instanzen trägt) ──────────────
+      // Gezählt wird, was TATSÄCHLICH entstanden ist: die eigenen Fälle im Fenster. Kein zweiter Zähler.
+      const regeln = drosselRegelnAus(procedure.drossel);
       const now = new Date().toISOString();
+      let eigene: AppCase[];
+      try {
+        eigene = await deps.caseStore.listCases({
+          tenantId: session.tenantId,
+          scope: "owner",
+          actorId: session.actorId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      const drossel = pruefeDrossel(
+        eigene.map((c) => c.openedAt),
+        regeln,
+        now,
+      );
+      if (!drossel.erlaubt) {
+        void reply.header("retry-after", String(drossel.retryAfterSekunden));
+        return reply.code(429).send({
+          error:
+            "Es wurden in kurzer Zeit sehr viele Anträge gestellt. Bitte versuchen Sie es später erneut.",
+          requestId: requestIdOf(request),
+        });
+      }
+
       const created: AppCase = {
         caseId: `case.${randomUUID()}`,
         tenantId: session.tenantId,
+        // ZUSTÄNDIGKEIT AUS DEM VERFAHREN, nicht aus der Bürger-Sitzung: das Verfahren gehört einer
+        // Stelle, nicht dem Antragsteller. Nur solange ein Verfahren keine Stelle deklariert, bleibt
+        // die Sitzungs-Behörde der (dokumentierte) Rückfall.
         authorityId: session.authorityId,
         jurisdictionId: session.jurisdictionId,
         procedureId: procedure.procedureId,
@@ -451,6 +601,7 @@ export function registerBuergerRoutes(
         // DER KERN: der Eigentümer ist die anfragende Sitzung — nicht verhandelbar, nicht überschreibbar.
         ownerActorId: session.actorId,
       };
+      const eingangsnummer = eingangsnummerVon(created, procedure);
       try {
         await deps.caseStore.insertCase(created);
         // EIGENER EREIGNISTYP, nicht `case.opened`: Letzteres steht in
@@ -480,13 +631,94 @@ export function registerBuergerRoutes(
           purpose: audit.purpose,
           legalBasisId: audit.legalBasisId,
           requestId: audit.requestId,
-          payload: { newState: created.state, summary: audit.summary },
+          payload: {
+            newState: created.state,
+            summary: audit.summary,
+            // SERVER-STEMPEL, append-only: Nummer + Zeit sind ab hier Beweis, nicht Anzeige.
+            eingangsnummer,
+            datenSha256: canonicalSha256(created.data),
+            // TAINT-INVARIANTE (extern-herkunft.ts): dieser Vorgang speist sich aus einer Eingabe
+            // AUSSERHALB der Behörde. Daraus folgt zwingend die HITL-Pflicht — eine hoheitliche
+            // Festsetzung verlangt später zwei verschiedene Menschen, egal was das Verfahren
+            // deklariert. Der Wert steht hier LESBAR in der payload UND ist aus dem Ereignistyp
+            // ableitbar; die Ableitung gewinnt (ein Feld allein wäre fälschbar).
+            [HERKUNFT_PAYLOAD_KEY]: HERKUNFT_EXTERN,
+            [HITL_PFLICHT_PAYLOAD_KEY]: true,
+          },
           occurredAt: audit.occurredAt,
         });
       } catch {
         return storeUnavailable(request, reply);
       }
-      return reply.code(201).send(toAntragDto(created));
+
+      // ── DIE ÜBERGABE INS AMT: der Antrag landet im EINGANGSKORB ──────────────────────────────────
+      // Vorher endete die Kette exakt beim 201 — der Antrag lag in der Datenbank, aber auf keinem
+      // Schreibtisch. Der Eingangskorb-Eintrag ist die Arbeitsaufforderung an die Stelle. PULL, nicht
+      // PUSH: es wird eine AUFGABE hingelegt, nichts Agentisches ausgelöst (Zonen-Invariante I1).
+      try {
+        await deps.taskStore.insertTask({
+          taskId: `task.${randomUUID()}`,
+          caseId: created.caseId,
+          tenantId: session.tenantId,
+          authorityId: created.authorityId,
+          jurisdictionId: created.jurisdictionId,
+          title: `Neuer Antrag ${eingangsnummer} prüfen`,
+          state: "open",
+          assignedTo: null,
+          dueAt: null,
+          taskKind: "eingang",
+          parentTaskId: null,
+          data: {
+            eingangsnummer,
+            eingegangenAm: created.openedAt,
+            // Die Stelle sieht SOFORT, dass die Daten von aussen kommen — bevor sie sie liest.
+            [HERKUNFT_PAYLOAD_KEY]: HERKUNFT_EXTERN,
+            [HITL_PFLICHT_PAYLOAD_KEY]: true,
+          },
+          sortRank: created.openedAt,
+          version: 1,
+          createdAt: created.openedAt,
+          updatedAt: created.openedAt,
+        });
+      } catch {
+        // Der Antrag IST eingegangen (append-only belegt) — ein fehlender Korb-Eintrag darf ihn nicht
+        // zurücknehmen. Er wird protokolliert; die Eingangs-Sicht leitet sich zusätzlich aus den
+        // Fällen ab, ist also nicht allein vom Task abhängig.
+        request.log.error(
+          { caseId: created.caseId },
+          "eingangskorb-task konnte nicht angelegt werden",
+        );
+      }
+
+      // ── DER RÜCKWEG: die Eingangsbestätigung liegt im eigenen Postfach ───────────────────────────
+      // Nicht nur eine Bildschirmseite, die ein Reload wegnimmt: ein Beleg, den die Bürgerin
+      // wiederfindet. Inhalt = Server-Zeit, Server-Nummer, Aktenzeichen, Hash der eingereichten Daten.
+      try {
+        await deps.appStore.saveMailboxMessage({
+          messageId: `msg.${randomUUID()}`,
+          box: "inbox",
+          audience: "citizen",
+          tenantId: session.tenantId,
+          authorityId: created.authorityId,
+          jurisdictionId: created.jurisdictionId,
+          ownerActorId: session.actorId,
+          caseId: created.caseId,
+          subject: `Eingangsbestätigung ${eingangsnummer}`,
+          bodyPreview:
+            `Ihr Antrag ist am ${created.openedAt} bei uns eingegangen. ` +
+            `Aktenzeichen: ${created.caseId}. Eingangsnummer: ${eingangsnummer}. ` +
+            `Prüfsumme der eingereichten Angaben: ${canonicalSha256(created.data).slice(0, 16)}…`,
+          status: "unread",
+          createdAt: created.openedAt,
+        });
+      } catch {
+        request.log.error(
+          { caseId: created.caseId },
+          "eingangsbestaetigung konnte nicht ins postfach gelegt werden",
+        );
+      }
+
+      return reply.code(201).send(toAntragDto(created, eingangsnummer));
     },
   );
 
@@ -834,11 +1066,69 @@ export function registerBuergerRoutes(
       const bytes = new Uint8Array(
         Buffer.from(request.body.contentBase64, "base64"),
       );
-      if (bytes.byteLength === 0)
-        return reply.code(400).send({
-          error: "leerer oder ungültiger Inhalt",
+
+      // ── DER TÜRSTEHER: die Anlage wird geprüft, BEVOR sie irgendwohin gelangt ────────────────────
+      // Reihenfolge ist die Sicherheitsaussage: erst prüfen, DANN speichern. Vorher landeten die Bytes
+      // ungeprüft im Storage — eine als PDF deklarierte HTML-Datei war hochladbar UND als Datei
+      // zurückholbar (gespeicherter Inhalts-Vektor). Kein Agent, kein Renderer und kein Mensch sieht
+      // eine Datei, die diese Prüfung nicht bestanden hat.
+      const procedure = deps.procedureRegistry.get(
+        found.procedureId,
+        found.procedureVersion,
+      );
+      const anlagenRegeln = anlagenRegelnVon(procedure);
+      let bisherigeAnlagen: AppAuditEvent[];
+      try {
+        bisherigeAnlagen = await deps.caseStore.listAuditEvents({
+          tenantId: session.tenantId,
+          caseId: found.caseId,
+        });
+      } catch {
+        return storeUnavailable(request, reply);
+      }
+      const anzahlVorher = bisherigeAnlagen.filter(
+        (e) => e.eventType === NACHWEIS_EVENT_TYPE,
+      ).length;
+
+      // MISSBRAUCHS-DROSSEL auch hier: gezählt werden die bereits hochgeladenen Anlagen im Fenster
+      // (store-gestützt, dieselbe Wahrheit für alle Instanzen).
+      const uploadDrossel = pruefeDrossel(
+        bisherigeAnlagen
+          .filter((e) => e.eventType === NACHWEIS_EVENT_TYPE)
+          .map((e) => e.occurredAt),
+        drosselRegelnAus(procedure?.drossel),
+        new Date().toISOString(),
+      );
+      if (!uploadDrossel.erlaubt) {
+        void reply.header(
+          "retry-after",
+          String(uploadDrossel.retryAfterSekunden),
+        );
+        return reply.code(429).send({
+          error:
+            "Es wurden in kurzer Zeit sehr viele Dateien hochgeladen. Bitte versuchen Sie es später erneut.",
           requestId: requestIdOf(request),
         });
+      }
+
+      const pruefung = pruefeAnlage(
+        {
+          fileName: request.body.fileName,
+          mimeType: request.body.mimeType,
+          bytes,
+          bereitsVorhanden: anzahlVorher,
+        },
+        anlagenRegeln,
+      );
+      if (!pruefung.ok) {
+        const antwort = anlagenAblehnungAntwort(
+          pruefung.ablehnung,
+          anlagenRegeln,
+        );
+        return reply
+          .code(antwort.status)
+          .send({ error: antwort.text, requestId: requestIdOf(request) });
+      }
 
       const put = await deps.blobStorage.put(
         {
@@ -850,20 +1140,28 @@ export function registerBuergerRoutes(
           purpose: "nachweis-upload",
         },
         {
-          fileName: request.body.fileName,
-          mimeType: request.body.mimeType,
+          // Der BEREINIGTE Name und der NORMALISIERTE Typ gehen ins Storage — nicht die Roh-Deklaration.
+          fileName: pruefung.fileName,
+          mimeType: pruefung.mimeType,
           bytes,
         },
       );
-      if (!put.ok)
-        return reply
-          .code(503)
-          .send({ error: put.error.message, requestId: requestIdOf(request) });
+      if (!put.ok) {
+        // SICHT-INVARIANTE: die Adapter-Meldung bleibt im Log. Nach aussen nur ein fachlicher Satz —
+        // eine durchgereichte Storage-Fehlermeldung verriet Bucket-/Pfad-/Anbieter-Interna.
+        request.log.error(
+          { caseId: found.caseId, grund: put.error.message },
+          "nachweis-upload: blob storage nicht verfügbar",
+        );
+        return reply.code(503).send({
+          error:
+            "Die Datei konnte gerade nicht gespeichert werden. Bitte versuchen Sie es in Kürze erneut.",
+          requestId: requestIdOf(request),
+        });
+      }
       const ref = put.value;
 
-      const legalBasisId =
-        deps.procedureRegistry.get(found.procedureId, found.procedureVersion)
-          ?.legalBasisIds[0] ?? "§ 26 VwVfG";
+      const legalBasisId = procedure?.legalBasisIds[0] ?? "§ 26 VwVfG";
       const event = createFachlicheAuditEvent({
         eventType: NACHWEIS_EVENT_TYPE,
         actorId: session.actorId,
@@ -893,6 +1191,9 @@ export function registerBuergerRoutes(
             sizeBytes: ref.sizeBytes,
             checksumSha256: ref.checksumSha256,
             summary: event.summary,
+            // TAINT: eine Anlage kommt von aussen — sie taintet den Vorgang genau wie der Antragstext.
+            [HERKUNFT_PAYLOAD_KEY]: HERKUNFT_EXTERN,
+            [HITL_PFLICHT_PAYLOAD_KEY]: true,
           },
           occurredAt: event.occurredAt,
         });
@@ -1020,9 +1321,24 @@ export function registerBuergerRoutes(
         return reply
           .code(404)
           .send({ error: "not found", requestId: requestIdOf(request) });
+      // AUSLIEFERUNGS-TYP SERVER-BESTIMMT: nur ein Typ aus der Allowlist wird als solcher zurückgegeben,
+      // alles andere fällt auf application/octet-stream. Der Client baute daraus früher einen
+      // `data:`-Link mit dem Typ, den der EINREICHENDE deklariert hatte — damit war eine als
+      // `text/html` eingereichte Datei im Browser-Kontext der Anwendung ausführbar.
+      const auslieferung = auslieferungsMimeTyp(
+        ref.mimeType,
+        anlagenRegelnVon(
+          deps.procedureRegistry.get(found.procedureId, found.procedureVersion),
+        ),
+      );
+      void reply.header("x-content-type-options", "nosniff");
+      void reply.header(
+        "content-disposition",
+        `attachment; filename="${ref.fileName.replace(/[^A-Za-z0-9._-]+/g, "_")}"`,
+      );
       return reply.send({
         fileName: ref.fileName,
-        mimeType: ref.mimeType,
+        mimeType: auslieferung,
         sizeBytes: got.value.ref.sizeBytes,
         checksumSha256: got.value.ref.checksumSha256,
         contentBase64: Buffer.from(got.value.bytes).toString("base64"),
