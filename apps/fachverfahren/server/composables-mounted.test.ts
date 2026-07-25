@@ -24,6 +24,8 @@ import {
 import {
   loadMountedComposables,
   resolveMountedComposablesDir,
+  resolveProjectRoot,
+  MOUNTED_COMPOSABLES_REL,
 } from "./composables-mounted.js";
 import {
   createComposableRegistry,
@@ -356,5 +358,42 @@ describe("createComposableRegistry — generierte Wahrheit ersetzt die Muster", 
     expect(
       resolveMountedComposablesDir({ MOUNTED_COMPOSABLES_DIR: "/tmp/x" }),
     ).toBe(path.resolve("/tmp/x"));
+  });
+
+  // ── E4: die Auflösung darf NICHT am Prozess-CWD haengen ────────────────────────────────────────────────
+  it("resolveProjectRoot findet die Wurzel AUFWAERTS (Start aus einem Unterverzeichnis)", () => {
+    const wurzel = path.join(dir, "e4-wurzel");
+    const tief = path.join(wurzel, "apps", "fachverfahren");
+    mkdirSync(path.join(wurzel, MOUNTED_COMPOSABLES_REL), { recursive: true });
+    mkdirSync(tief, { recursive: true });
+    expect(resolveProjectRoot(tief, {})).toBe(wurzel);
+    expect(resolveMountedComposablesDir({}, tief)).toBe(
+      path.join(wurzel, MOUNTED_COMPOSABLES_REL),
+    );
+  });
+
+  it("resolveProjectRoot: ohne .chos zaehlt die Workspace-Wurzel (pnpm-workspace.yaml)", () => {
+    const wurzel = path.join(dir, "e4-ws");
+    const tief = path.join(wurzel, "apps", "fachverfahren");
+    mkdirSync(tief, { recursive: true });
+    writeFileSync(path.join(wurzel, "pnpm-workspace.yaml"), "packages:\n  - apps/*\n");
+    expect(resolveProjectRoot(tief, {})).toBe(wurzel);
+  });
+
+  it("resolveProjectRoot: APP_PROJECT_ROOT gewinnt (explizit vor Heuristik)", () => {
+    expect(resolveProjectRoot(dir, { APP_PROJECT_ROOT: "/tmp/explizit" })).toBe(
+      path.resolve("/tmp/explizit"),
+    );
+  });
+
+  it("E3/E4: leerer Mount faellt EHRLICH zurueck (der Rueckfall wird benannt, nicht verschwiegen)", () => {
+    const meldungen: string[] = [];
+    const reg = createComposableRegistry(
+      { MOUNTED_COMPOSABLES_DIR: path.join(dir, "gibt-es-gar-nicht") },
+      (m) => meldungen.push(m),
+    );
+    expect(reg.get(musterverfahrenComposable.id)).toBeDefined();
+    expect(meldungen.some((m) => m.includes("Rückfall auf die"))).toBe(true);
+    expect(meldungen.some((m) => m.includes("gibt-es-gar-nicht"))).toBe(true);
   });
 });

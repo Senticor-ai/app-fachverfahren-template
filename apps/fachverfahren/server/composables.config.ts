@@ -37,10 +37,25 @@ export {
  */
 export function createComposableRegistry(
   env: NodeJS.ProcessEnv = process.env,
+  log: (msg: string) => void = (msg) => console.warn(msg),
 ): ComposableRegistry {
-  const { composables: mounted } = loadMountedComposables(
-    resolveMountedComposablesDir(env),
-  );
+  const dir = resolveMountedComposablesDir(env);
+  const { composables: mounted, uebersprungen } = loadMountedComposables(dir);
+  // EHRLICHER RÜCKFALL (E3/E4): der Rückfall auf die Muster war bisher STILL — ein Deploy ohne die generierten
+  // Stellen sah exakt aus wie ein Template-Start, und niemand konnte den Unterschied sehen. Er wird jetzt benannt,
+  // mitsamt dem geprüften Verzeichnis und den fail-closed übersprungenen Manifesten.
+  if (!mounted.length) {
+    log(
+      `[composables] Keine gemounteten Stellen unter ${dir} — Rückfall auf die ${composables.length} Muster-Composables.` +
+        (uebersprungen.length
+          ? ` ${uebersprungen.length} Manifest(e) fail-closed übersprungen: ${uebersprungen.map((u) => `${u.file} (${u.grund})`).join(" · ")}`
+          : " Kein Manifest gefunden (Template-Start oder Deploy ohne .chos/mesh/composables)."),
+    );
+  } else if (uebersprungen.length) {
+    log(
+      `[composables] ${mounted.length} Stelle(n) gemountet, ${uebersprungen.length} fail-closed übersprungen: ${uebersprungen.map((u) => `${u.file} (${u.grund})`).join(" · ")}`,
+    );
+  }
   return createInMemoryComposableRegistry(
     mounted.length ? mounted : composables,
   );

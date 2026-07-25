@@ -37,7 +37,11 @@ COPY . .
 RUN pnpm run build:packages \
  && pnpm run build:app \
  && pnpm run build:server \
- && pnpm prune --prod
+ && pnpm prune --prod \
+ # Die gemounteten Stellen (CHOS-emittierte Manifeste) liegen ausserhalb des App-Pakets. Das Verzeichnis wird hier
+ # IMMER angelegt, damit die Runtime-Stage es unbedingt kopieren kann — auch im Template-Repo, das (noch) keine
+ # gemounteten Stellen hat. Ohne diese Zeile scheitert der Runtime-COPY an einer fehlenden Quelle.
+ && mkdir -p /app/.chos/mesh/composables
 
 FROM registry.opencode.de/open-code/oci/nodejs:24@sha256:4f6d0ed8aeda0c7d83eee77975b9d335524378f577a81722ada78d2ba1d362b6
 ENV NODE_ENV=production
@@ -49,6 +53,15 @@ ENV APP_ENABLE_SERVICE_WORKER=false
 USER root
 WORKDIR /app
 COPY --from=build --chown=0:0 /app/node_modules ./node_modules
+# Die Workspace-Pakete MUESSEN mit: `node_modules/@senticor/*` sind pnpm-Symlinks auf `packages/*` — ohne diese
+# Zeile zeigen sie im Runtime-Image ins Leere, und alles, was zur Laufzeit (statt gebundlet) aufgeloest wird,
+# faellt aus. Sie tragen ausserdem die gebauten `dist/`-Artefakte aus `build:packages`.
+COPY --from=build --chown=0:0 /app/packages ./packages
+COPY --from=build --chown=0:0 /app/jurisdictions ./jurisdictions
+# Die GEMOUNTETEN STELLEN (CHOS-emittierte Composable-Manifeste + Zertifikate + Mount-Provenienz). Ohne sie findet
+# `loadMountedComposables` im Deploy nichts und die App faellt still auf ihre zwei Muster-Composables zurueck —
+# das Deploy verlor damit genau die Stellen, die das Verfahren ausmachen (E3).
+COPY --from=build --chown=0:0 /app/.chos ./.chos
 COPY --from=build --chown=0:0 /app/apps/fachverfahren/node_modules ./apps/fachverfahren/node_modules
 COPY --from=build --chown=0:0 /app/apps/fachverfahren/dist ./apps/fachverfahren/dist
 COPY --from=build --chown=0:0 /app/apps/fachverfahren/dist-server ./apps/fachverfahren/dist-server

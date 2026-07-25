@@ -122,14 +122,54 @@ function ladeHerkunft(dir: string, id: string): ComposableHerkunft {
   }
 }
 
-/** Das Verzeichnis der CHOS-emittierten Manifeste — relativ zur Projekt-Wurzel (Laufzeit-CWD der generierten App).
+/** Relativer Pfad des Manifest-Verzeichnisses unter der Projekt-Wurzel — EINE Schreibweise für Auflösung + Tests. */
+export const MOUNTED_COMPOSABLES_REL = path.join(".chos", "mesh", "composables");
+
+/**
+ * resolveProjectRoot — findet die Projekt-Wurzel AUFWÄRTS statt sie aus dem Prozess-CWD zu raten.
+ *
+ * WARUM (E4): die Manifeste liegen in der WURZEL des Workspace, der Server startet aber je nach Aufruf mit einem
+ * anderen CWD — `node apps/fachverfahren/dist-server/index.js` aus `/app` (Container) gegen
+ * `pnpm --filter … start` aus `apps/fachverfahren` (lokal). Im zweiten Fall zeigte `path.resolve(".chos/…")` auf
+ * ein Verzeichnis, das es dort nie gibt: der Mount lief STILL leer und die App fiel auf ihre Muster-Composables
+ * zurück — ohne einen einzigen Hinweis, dass die Stellen des Verfahrens fehlen.
+ *
+ * Reihenfolge: `APP_PROJECT_ROOT` (explizit) → erstes Verzeichnis aufwärts, das `.chos/mesh/composables` trägt →
+ * erstes Verzeichnis aufwärts mit `pnpm-workspace.yaml` → CWD (heutiges Verhalten als letzter Fallback).
+ */
+export function resolveProjectRoot(
+  startDir: string = process.cwd(),
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const explizit = env["APP_PROJECT_ROOT"]?.trim();
+  if (explizit) return path.resolve(explizit);
+  const kandidaten: string[] = [];
+  let cur = path.resolve(startDir);
+  for (let i = 0; i < 12; i += 1) {
+    kandidaten.push(cur);
+    const parent = path.dirname(cur);
+    if (parent === cur) break;
+    cur = parent;
+  }
+  const mitManifesten = kandidaten.find((d) =>
+    existsSync(path.join(d, MOUNTED_COMPOSABLES_REL)),
+  );
+  if (mitManifesten) return mitManifesten;
+  const mitWorkspace = kandidaten.find((d) =>
+    existsSync(path.join(d, "pnpm-workspace.yaml")),
+  );
+  return mitWorkspace ?? path.resolve(startDir);
+}
+
+/** Das Verzeichnis der CHOS-emittierten Manifeste — aufgelöst aus der PROJEKT-WURZEL, nicht aus dem Prozess-CWD.
  *  `MOUNTED_COMPOSABLES_DIR` überschreibt (DIESELBE Env-Konvention wie das check:composables-Gate). */
 export function resolveMountedComposablesDir(
   env: NodeJS.ProcessEnv = process.env,
+  startDir: string = process.cwd(),
 ): string {
-  return path.resolve(
-    env["MOUNTED_COMPOSABLES_DIR"] ?? path.join(".chos", "mesh", "composables"),
-  );
+  const override = env["MOUNTED_COMPOSABLES_DIR"];
+  if (override) return path.resolve(override);
+  return path.join(resolveProjectRoot(startDir, env), MOUNTED_COMPOSABLES_REL);
 }
 
 export interface MountedLoad {
