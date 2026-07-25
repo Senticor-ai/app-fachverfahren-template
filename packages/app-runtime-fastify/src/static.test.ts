@@ -227,3 +227,29 @@ describe("cachePolicy", () => {
     }
   });
 });
+
+describe("Schnittstellen-Pfade fallen nie auf die SPA zurück", () => {
+  // WARUM DAS EINE SICHERHEITSPRÜFUNG IST: ein nicht registrierter /api-Pfad antwortete mit 200 +
+  // dem gesamten Anwendungs-HTML. Eine Prüfung „erreicht die Aussenzone diesen Endpunkt?" las den
+  // 200 und schloss „ja" — obwohl der Endpunkt gar nicht existiert. Ein falsches Urteil in die
+  // gefährliche Richtung.
+  it.each([
+    "/api/gibt-es-nicht",
+    "/auth/gibt-es-nicht",
+    "/internal/gibt-es-nicht",
+  ])("%s ⇒ 404 JSON, nie 200 HTML", async (url) => {
+    const res = await app.inject({ method: "GET", url });
+    expect(res.statusCode).toBe(404);
+    expect(res.headers["content-type"]).toContain("application/json");
+    expect(res.body).not.toContain("<html");
+  });
+
+  it("GEGENPROBE: eine echte Client-Route bekommt weiterhin die Anwendung (kein Falschblocker)", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: "/amt/akte/case.abc-123",
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('id="root"');
+  });
+});

@@ -23,6 +23,10 @@ import type {
   WorkflowPort,
 } from "./ports.js";
 
+/** Die Kennung, unter der der lokale Fake auftritt. Sie SAGT, was sie ist — jede Oberfläche, die eine
+ *  Modell-Kennung zeigt, zeigt damit automatisch den ehrlichen Zustand an, ohne eigenes Sonder-Wissen. */
+export const ECHO_MODELL_KENNUNG = "echo-modus:kein-modell-konfiguriert";
+
 function descriptor(
   id: CapabilityDescriptor["id"],
   name: string,
@@ -104,8 +108,12 @@ export function createLocalAiAssistPort(
       "confidential",
     ),
     async suggest(_context, request) {
-      // OSS-first: Modell vom Provider/Runtime gesetzt (lokales Ollama als Default), KEIN Inline-Key.
-      const modelId = options.aiAssistModel ?? "ollama:qwen3";
+      // EHRLICHE KENNUNG (bewusst KEIN Modellname als Default): dieser Fake ruft KEIN Modell. Er gab
+      // sich bisher als „ollama:qwen3" aus — damit stand in jeder Akte und jeder Oberfläche eine
+      // Modell-Kennung, hinter der nie ein Modell stand. Ein Vermerk sah aus wie eine KI-Einschätzung
+      // und war eine Echo-Antwort. Wer ein echtes Modell will, konfiguriert es (AI_ASSIST_PROVIDER);
+      // wer keines konfiguriert hat, SIEHT das jetzt an genau der Stelle, wo es zählt.
+      const modelId = options.aiAssistModel ?? ECHO_MODELL_KENNUNG;
       // KI assistiert nie rechtsnah autonom: high-risk-Aufgaben werden abgelehnt.
       if (request.maxClass === "high-risk") {
         return capabilityFailure(
@@ -129,7 +137,7 @@ export function createLocalAiAssistPort(
     // KONVERSATION (deterministisch, ohne Modell/Netz): echoet die letzte Nutzer-Nachricht + die Anzahl
     // der mitgegebenen Erdungs-Einträge — dieselben HCAI-Invarianten wie suggest (reviewRequired, marking).
     async converse(_context, request) {
-      const modelId = options.aiAssistModel ?? "ollama:qwen3";
+      const modelId = options.aiAssistModel ?? ECHO_MODELL_KENNUNG;
       if (request.maxClass === "high-risk") {
         return capabilityFailure(
           "ai-assist/high-risk-refused",

@@ -50,8 +50,18 @@ describe("SessionDtoSchema / CapabilitiesDtoSchema", () => {
       Value.Check(CapabilitiesDtoSchema, {
         rbacRoles: ["citizen"],
         permissions: ["session.read", "mailbox.own.write"],
+        // PFLICHTFELD: welcher KI-Anbieter tatsächlich antwortet. Optional wäre es wertlos —
+        // ein fehlendes Feld läse sich in der Oberfläche wie „alles in Ordnung".
+        kiAnbieter: "local-fake",
       }),
     ).toBe(true);
+    // Ohne kiAnbieter ist das DTO ungültig.
+    expect(
+      Value.Check(CapabilitiesDtoSchema, {
+        rbacRoles: ["citizen"],
+        permissions: ["session.read"],
+      }),
+    ).toBe(false);
     expect(Value.Check(CapabilitiesDtoSchema, { rbacRoles: ["citizen"] })).toBe(
       false,
     );

@@ -450,9 +450,23 @@ describe("(2) Die Aussenzone erreicht KEINE handelnde Fähigkeit", () => {
   it("selbst in einer ungetrennten Instanz kommt eine Bürger-Sitzung nicht an die handelnden Fähigkeiten (RBAC als zweite Grenze)", async () => {
     const caseStore = new InMemoryCaseStore();
     const anna = await alsBuerger(caseStore);
-    for (const url of ["/api/composables", "/api/cases", "/api/tasks"]) {
+    for (const url of [
+      "/api/composables",
+      "/api/composables/irgendwas",
+      "/api/cases",
+      "/api/cases/case.fremd/tasks",
+      "/api/cases/case.fremd/vermerke",
+    ]) {
       const res = await anna.inject({ method: "GET", url });
-      expect([403, 404]).toContain(res.statusCode);
+      expect([403, 404], `${url} antwortete ${res.statusCode}`).toContain(
+        res.statusCode,
+      );
+      // WICHTIG: die Antwort muss auch WIRKLICH eine Absage sein. Ein LIVE-Befund am laufenden
+      // Server war, dass ein nicht registrierter /api-Pfad mit 200 + der kompletten Anwendung als
+      // HTML antwortete (SPA-Fallback) — eine Prüfung, die nur den Statuscode liest, hätte daraus
+      // „erreichbar" geschlossen, obwohl es den Endpunkt gar nicht gibt. Deshalb wird hier
+      // zusätzlich geprüft, dass keine Nutzlast zurückkommt.
+      expect(res.body).not.toContain("<html");
     }
   });
 

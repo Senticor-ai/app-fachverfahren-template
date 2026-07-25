@@ -42,6 +42,7 @@ import {
   berechneTarif,
   builtInPermissions,
   createFachlicheAuditEvent,
+  formatiereEingangsnummer,
   herkunftAusEreignissen,
   requiredApprovalsOf,
   transitionCase,
@@ -77,7 +78,7 @@ const FOUR_EYES_RELEVANT_EVENT_TYPES: ReadonlySet<string> = new Set([
 const CASE_APPROVAL_EVENT_TYPE = "case.approval.recorded";
 
 /** AppCase → CaseDto (Server-Topologie tenant/authority/jurisdiction bleibt verborgen). */
-function toCaseDto(c: AppCase): CaseDto {
+function toCaseDto(c: AppCase, eingangsnummerFormat?: string): CaseDto {
   return {
     caseId: c.caseId,
     procedureId: c.procedureId,
@@ -88,6 +89,17 @@ function toCaseDto(c: AppCase): CaseDto {
     openedAt: c.openedAt,
     closedAt: c.closedAt,
     data: c.data,
+    // EINE NUMMER: exakt dieselbe Projektion wie in der Bürger-Sicht (Fall-Kennung + Server-
+    // Eingangszeit + Verfahrens-Format). Sie wird NICHT gespeichert — sie wird gerechnet, damit sie
+    // gar nicht erst von einer zweiten Quelle abweichen kann.
+    eingangsnummer: formatiereEingangsnummer({
+      eingangIso: c.openedAt,
+      caseId: c.caseId,
+      procedureId: c.procedureId,
+      ...(eingangsnummerFormat !== undefined
+        ? { format: eingangsnummerFormat }
+        : {}),
+    }),
   };
 }
 
@@ -262,7 +274,15 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
       } catch {
         return storeUnavailable(request, reply);
       }
-      return reply.send({ cases: cases.map(toCaseDto) });
+      return reply.send({
+        cases: cases.map((c) =>
+          toCaseDto(
+            c,
+            deps.procedureRegistry.get(c.procedureId, c.procedureVersion)
+              ?.eingangsnummerFormat,
+          ),
+        ),
+      });
     },
   );
 
@@ -298,7 +318,11 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
         return reply
           .code(404)
           .send({ error: "not found", requestId: requestIdOf(request) });
-      return reply.send(toCaseDto(found));
+      return reply.send(toCaseDto(
+        found,
+        deps.procedureRegistry.get(found.procedureId, found.procedureVersion)
+          ?.eingangsnummerFormat,
+      ));
     },
   );
 
@@ -523,7 +547,11 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
       } catch {
         return storeUnavailable(request, reply);
       }
-      return reply.code(201).send(toCaseDto(created));
+      return reply.code(201).send(toCaseDto(
+        created,
+        deps.procedureRegistry.get(created.procedureId, created.procedureVersion)
+          ?.eingangsnummerFormat,
+      ));
     },
   );
 
@@ -979,7 +1007,11 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
             .send({ error: "not found", requestId: requestIdOf(request) });
         return storeUnavailable(request, reply);
       }
-      return reply.send(toCaseDto(updated));
+      return reply.send(toCaseDto(
+        updated,
+        deps.procedureRegistry.get(updated.procedureId, updated.procedureVersion)
+          ?.eingangsnummerFormat,
+      ));
     },
   );
 
@@ -1127,7 +1159,11 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
             .send({ error: "not found", requestId: requestIdOf(request) });
         return storeUnavailable(request, reply);
       }
-      return reply.send({ case: toCaseDto(updated), redactedPaths: redacted });
+      return reply.send({ case: toCaseDto(
+        updated,
+        deps.procedureRegistry.get(updated.procedureId, updated.procedureVersion)
+          ?.eingangsnummerFormat,
+      ), redactedPaths: redacted });
     },
   );
 

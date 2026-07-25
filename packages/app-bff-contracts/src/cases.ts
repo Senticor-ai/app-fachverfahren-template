@@ -18,6 +18,11 @@ export const CaseDtoSchema = Type.Object(
     // Für den Server OPAK: er interpretiert sie nicht und kann es nicht (die fachliche Config liegt
     // ausserhalb seines rootDir). Der Client rechnet, der Server bewahrt auf und auditiert.
     data: Type.Record(Type.String(), Type.Unknown()),
+    /** Die SERVER-vergebene Eingangs-/Vorgangsnummer (Format = Verfahrens-DATEN) — DIESELBE, die die
+     *  Antragstellerin auf ihrer Eingangsbestätigung sieht. Ohne dieses Feld läse die Amts-Sicht die
+     *  Nummer aus der opaken `data`-Nutzlast, wo noch die alte, im BROWSER erzeugte Nummer steht:
+     *  Amt und Bürger nennten denselben Vorgang unterschiedlich. Eine Nummer, EINE Wahrheit. */
+    eingangsnummer: Type.String({ minLength: 1 }),
   },
   { additionalProperties: false },
 );

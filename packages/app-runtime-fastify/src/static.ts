@@ -43,6 +43,10 @@ const STATIC_ASSET_EXTENSIONS = new Set([
   ".pdf",
 ]);
 
+/** Präfixe, unter denen SCHNITTSTELLEN liegen — nie Client-Routen. Ein unbekannter Pfad darunter ist
+ *  ein Fehler, keine Seite. Bewusst hier (Delivery-Politik) und nicht je Anwendung wiederholt. */
+const SCHNITTSTELLEN_PRAEFIXE = ["/api/", "/auth/", "/internal/"] as const;
+
 export function registerStaticDelivery(
   app: FastifyInstance,
   config: RuntimeConfig,
@@ -81,6 +85,21 @@ export function registerStaticDelivery(
         .send({ status: "method-not-allowed" });
     }
     const pathname = safePathname(request.url);
+    // ── SCHNITTSTELLEN-PFADE FALLEN NIE AUF DIE SPA ZURÜCK ──────────────────────────────────────
+    // Ein nicht registrierter `/api/…`-Pfad bekam bisher den History-Fallback: 200 + die komplette
+    // Anwendung als HTML. Drei Folgen, alle schlecht:
+    //   • eine Prüfung „erreicht die Aussenzone diesen Endpunkt?" liest 200 und schliesst „ja" —
+    //     der Endpunkt existiert gar nicht. Genau so entsteht ein falsches Sicherheitsurteil.
+    //   • ein Client, der JSON erwartet, bekommt HTML und scheitert an einer Stelle, die nichts mit
+    //     der Ursache zu tun hat (die Clients tragen deshalb bereits Notbehelfs-Prüfungen).
+    //   • jede Endpunkt-Sondierung bekommt kostenlos das gesamte Anwendungs-Bundle ausgeliefert.
+    // Deshalb: Schnittstellen-Präfixe antworten sauber mit 404-JSON. Die SPA-Routen sind alles Übrige.
+    if (SCHNITTSTELLEN_PRAEFIXE.some((p) => pathname.startsWith(p))) {
+      return reply
+        .code(404)
+        .header("Cache-Control", NO_STORE)
+        .send({ status: "not-found" });
+    }
     // NUR fehlende Dateien mit BEKANNTER Asset-Extension → 404-JSON; punkthaltige Client-Routen
     // (z. B. /amt/akte/case.<uuid>) sind KEINE Asset-Anfragen und bekommen den History-Fallback.
     const ext = path.extname(pathname).toLowerCase();

@@ -54,10 +54,10 @@ export function caseZuVorgang<T>(dto: CaseDto): Vorgang<T> {
     // SERVER-WAHRHEIT vor Client-Nutzlast: der Eingangszeitpunkt ist der des Servers, nicht der,
     // den der Browser des Antragstellers in die `data` geschrieben hatte.
     eingangIso: dto.openedAt,
-    vorgangsnummer:
-      typeof rumpf.vorgangsnummer === "string" && rumpf.vorgangsnummer
-        ? rumpf.vorgangsnummer
-        : dto.caseId,
+    // DIE SERVER-NUMMER GEWINNT. In der opaken `data` steht bei Alt-Vorgängen noch die im BROWSER
+    // erzeugte Nummer — läse die Amts-Sicht sie, nennten Amt und Bürgerin denselben Vorgang
+    // unterschiedlich. Genau die Sorte stiller Doppel-Wahrheit, die am Schalter eskaliert.
+    vorgangsnummer: dto.eingangsnummer,
     history: Array.isArray(rumpf.history) ? rumpf.history : [],
     nachweise: Array.isArray(rumpf.nachweise) ? rumpf.nachweise : [],
   } as Vorgang<T>;

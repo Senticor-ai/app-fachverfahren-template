@@ -15,6 +15,7 @@ import {
   erstelleComposableChatPort,
   ladeComposables,
 } from "../composable-chat-client.js";
+import { apiPath } from "../case-client.js";
 import { store } from "../store.js";
 
 /** Eine Quelle der Reuse-Herkunft lesbar zusammenfassen (Verbund · Tenant), leere Felder weglassen. */
@@ -83,6 +84,21 @@ export function AmtAssistentPage(): React.JSX.Element {
   const [ausgewaehlt, setAusgewaehlt] = useState<string | undefined>();
   const [status, setStatus] = useState<"laedt" | "idle" | "fehler">("laedt");
 
+  // WELCHER KI-ANBIETER TATSÄCHLICH ANTWORTET. `local-fake` heißt: kein Modell, ein Echo.
+  const [kiAnbieter, setKiAnbieter] = useState<string | undefined>();
+  useEffect(() => {
+    let ab = false;
+    void fetch(apiPath("/api/capabilities"), { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : undefined))
+      .then((d?: { kiAnbieter?: string }) => {
+        if (!ab && d?.kiAnbieter) setKiAnbieter(d.kiAnbieter);
+      })
+      .catch(() => undefined);
+    return () => {
+      ab = true;
+    };
+  }, []);
+
   useEffect(() => {
     let ab = false;
     ladeComposables()
@@ -126,6 +142,21 @@ export function AmtAssistentPage(): React.JSX.Element {
           je Runde nachvollziehbar protokolliert — die Entscheidung bleibt bei
           Ihnen.
         </p>
+
+        {/* EHRLICHKEIT AM TOR statt hinterher: wer hier chattet, soll VORHER wissen, ob ein Modell
+            antwortet. Ohne diesen Hinweis liest sich eine Echo-Antwort wie eine Einschätzung. */}
+        {kiAnbieter === "local-fake" ? (
+          <Callout
+            tone="warn"
+            title="Kein Sprachmodell angebunden — Sie sehen Echo-Antworten"
+            className="mt-4"
+          >
+            Für diese Installation ist kein Modell konfiguriert. Die Stelle
+            antwortet deshalb mit einer festen, synthetischen Antwort — sie
+            denkt nicht mit. Sobald ein Modell hinterlegt ist, verschwindet
+            dieser Hinweis von selbst.
+          </Callout>
+        ) : null}
 
         {status === "fehler" ? (
           <Callout

@@ -43,6 +43,9 @@ export function registerCapabilitiesRoute(
       return reply.send({
         rbacRoles: [...session.rbacRoles],
         permissions: resolvePermissionsForRoles(roles, deps.rbacRegistry),
+        // Aus dem DESKRIPTOR des verdrahteten Ports — nicht aus einer Env, die der Server nur
+        // GELESEN hätte: was hier steht, ist der Adapter, der tatsächlich antworten wird.
+        kiAnbieter: deps.aiAssist.descriptor.provider,
       });
     },
   );
