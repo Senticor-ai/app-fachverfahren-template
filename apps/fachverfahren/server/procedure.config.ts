@@ -15,11 +15,18 @@
 //
 // Ein vollständiges reales Beispiel (Integrationsmanagement mit §§ AufenthG/FlüAG) liegt als AGENT-VORLAGE in der
 // dossier-fallmanagement-Skill + docs/examples/integrationsberatung/ — es gehört NICHT in diese neutrale Vorlage.
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   builtInPermissions,
   statusMachineToProcedureVersion,
 } from "@senticor/public-sector-sdk";
-import type { ProcedureVersion } from "@senticor/public-sector-sdk";
+import type {
+  ProcedureVersion,
+  StatusMachineSource,
+  StatusMachineTransitionSource,
+} from "@senticor/public-sector-sdk";
 
 /** Feinere RBAC lebt in der Governance-/BFF-Schicht; die Übergänge tragen die Schreib-Permission
  *  case.decision.prepare (wie die aus BPMN abgeleiteten Übergänge). */
@@ -87,8 +94,7 @@ export const dossierProcedure: ProcedureVersion = {
  *
  * `procedureId` MUSS `leistung.config.id` entsprechen — der Client sendet ihn beim Einreichen.
  */
-export const antragProcedure: ProcedureVersion =
-  statusMachineToProcedureVersion({
+const MUSTER_ANTRAG: StatusMachineSource = {
     procedureId: "musterantrag",
     version: "1",
     effectiveFrom: "2026-01-01T00:00:00.000Z",
@@ -209,7 +215,117 @@ export const antragProcedure: ProcedureVersion =
         vierAugen: true,
       },
     ],
-  });
+};
+
+// ── DIE EINE ANTRAGS-WAHRHEIT: DER EMITTIERTE LEISTUNGS-VERTRAG ──────────────────────────────────────────
+// Der Server kann `src/leistung.config.ts` nicht importieren (rootDir-Mauer). Er kann aber ihren
+// EMITTIERTEN Vertrag lesen: `apps/<app>/leistung.contract.json` liegt IM App-Verzeichnis und trägt `id`
+// + die vollständige `statusMachine` (inkl. terminal/vierAugen/erlaesstBescheid/closesCase).
+//
+// WARUM DAS ZWINGEND IST (live gemessen): eine GENERIERTE App bekommt eine eigene `leistung.config.id`
+// (z. B. "grundsteuer"), während diese Server-Datei die Muster-Kopie behielt ("musterantrag"). Der Client
+// sendet `leistungConfig.id` — der Server kannte sie nicht und antwortete auf JEDEN Antrag mit 422
+// „Dieser Antrag kann derzeit nicht angenommen werden". Der Bürgerpfad endete damit vor dem Amt.
+// Mit dieser Ableitung ist der Drift STRUKTURELL unmöglich, nicht nur durch ein Gate bemerkt.
+//
+// FAIL-SAFE, nicht fail-open: fehlt/bricht der Vertrag, gilt unverändert die committete Muster-Maschine.
+// Server-seitige Metadaten (version/effectiveFrom/Permission/Verwaltungsakt-Regime) bleiben Server-Sache —
+// sie stehen nicht im Client-Vertrag und werden aus MUSTER_ANTRAG übernommen.
+const APP_DIR = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+
+interface VertragsStatusMaschine {
+  states?: { key?: unknown; terminal?: unknown }[];
+  transitions?: {
+    from?: unknown;
+    to?: unknown;
+    label?: unknown;
+    vierAugen?: unknown;
+    erlaesstBescheid?: unknown;
+    closesCase?: unknown;
+    /** Eigenes VA-Regime bzw. Sollstellung NUR für diesen Übergang — reist 1:1 mit (sonst ginge
+     *  die Rechtsbehelfs-Belehrung des Widerspruchsbescheids bzw. die Forderung still verloren). */
+    verwaltungsakt?: unknown;
+    stelltForderung?: unknown;
+    guard?: unknown;
+  }[];
+}
+
+function antragQuelleAusVertrag(): StatusMachineSource | null {
+  try {
+    const roh = JSON.parse(
+      fs.readFileSync(path.join(APP_DIR, "leistung.contract.json"), "utf8"),
+    ) as {
+      id?: unknown;
+      rechtsgrundlagen?: { norm?: unknown }[];
+      statusMachine?: VertragsStatusMaschine;
+    };
+    const id = typeof roh.id === "string" ? roh.id.trim() : "";
+    const sm = roh.statusMachine;
+    if (!id || !Array.isArray(sm?.states) || !Array.isArray(sm.transitions)) {
+      return null;
+    }
+    const states = sm.states
+      .filter((z) => typeof z.key === "string" && z.key.length > 0)
+      .map((z) => ({
+        key: String(z.key),
+        ...(z.terminal === true ? { terminal: true as const } : {}),
+      }));
+    const transitions = sm.transitions
+      .filter(
+        (u) =>
+          typeof u.from === "string" &&
+          typeof u.to === "string" &&
+          typeof u.label === "string",
+      )
+      .map((u) => ({
+        from: String(u.from),
+        to: String(u.to),
+        label: String(u.label),
+        ...(u.vierAugen === true ? { vierAugen: true as const } : {}),
+        ...(u.erlaesstBescheid === true
+          ? { erlaesstBescheid: true as const }
+          : {}),
+        ...(u.closesCase === true ? { closesCase: true as const } : {}),
+        ...(u.verwaltungsakt
+          ? {
+              verwaltungsakt: u.verwaltungsakt as NonNullable<
+                StatusMachineTransitionSource["verwaltungsakt"]
+              >,
+            }
+          : {}),
+        ...(u.stelltForderung
+          ? {
+              stelltForderung: u.stelltForderung as NonNullable<
+                StatusMachineTransitionSource["stelltForderung"]
+              >,
+            }
+          : {}),
+        ...(u.guard
+          ? {
+              guard: u.guard as NonNullable<
+                StatusMachineTransitionSource["guard"]
+              >,
+            }
+          : {}),
+      }));
+    if (states.length === 0 || transitions.length === 0) return null;
+    const legalBasisIds = (roh.rechtsgrundlagen ?? [])
+      .map((r) => (typeof r.norm === "string" ? r.norm : ""))
+      .filter((n) => n.length > 0);
+    return {
+      ...MUSTER_ANTRAG,
+      procedureId: id,
+      ...(legalBasisIds.length > 0 ? { legalBasisIds } : {}),
+      states,
+      transitions,
+    };
+  } catch {
+    return null; // kein Vertrag lesbar → committete Muster-Maschine (unverändertes Verhalten)
+  }
+}
+
+export const antragProcedure: ProcedureVersion =
+  statusMachineToProcedureVersion(antragQuelleAusVertrag() ?? MUSTER_ANTRAG);
 
 /** Ein Ziel des Demo-Dossiers: Titel, optionale Frist/Kategorie/Status + Checklisten-Schritte. */
 export interface DossierDemoZiel {
