@@ -53,7 +53,13 @@ export function TestzugangPanel(): React.JSX.Element | null {
         Testzugang zu diesem Entwicklungsstand
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">{ausweis.hinweis}</p>
-      <div className="mt-3 overflow-x-auto">
+      {/* Der Tabellen-Rahmen scrollt waagerecht — also ist er fokussierbar (WCAG 2.1.1, wie die Codebloecke). */}
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label="Testkonten"
+        className="mt-3 overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
         <table className="w-full min-w-[36rem] border-collapse text-left text-sm">
           <caption className="sr-only">
             Vorprovisionierte Testkonten mit Anmeldedaten, Zweck und Einstieg

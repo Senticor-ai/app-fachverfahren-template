@@ -196,7 +196,15 @@ function CodeBlock({ lang, children }: { lang: string; children: string }) {
           {copied ? "kopiert" : "kopieren"}
         </button>
       </div>
-      <pre className="overflow-x-auto px-3 py-2 text-sm leading-relaxed font-mono">
+      {/* WAAGERECHT SCROLLBAR ⇒ MIT TASTATUR ERREICHBAR (WCAG 2.1.1): ein Codeblock, den man nur mit der
+          Maus zur Seite schieben kann, ist für Tastatur-Nutzung nicht lesbar. `tabIndex` macht ihn
+          fokussierbar, `role="region"` + Label geben ihm im Screenreader einen Namen. */}
+      <pre
+        tabIndex={0}
+        role="region"
+        aria-label={`Codeblock${lang ? ` (${lang})` : ""}`}
+        className="overflow-x-auto px-3 py-2 text-sm leading-relaxed font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
         <code className={`language-${lang || "plaintext"}`}>{children}</code>
       </pre>
     </div>
