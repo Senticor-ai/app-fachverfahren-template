@@ -10,6 +10,7 @@ import {
   type FachverfahrenStore,
 } from "@senticor/fachverfahren-kit";
 import { createHttpVorgangPersistence } from "./antrag-client.js";
+import { createHttpAmtVorgangPersistence } from "./amt-client.js";
 // Die Config kommt aus DER EINEN Austausch-Naht (./leistung.config) — Default = ein NEUTRALES Demo-Verfahren,
 // von einem generierenden Build überschrieben mit der aus dem Fachkonzept generierten Config. Die Composition-App bleibt
 // VERFAHRENS-AGNOSTISCH: sie reicht eine beliebige LeistungConfig an dieselben Kit-Bausteine.
@@ -26,4 +27,20 @@ export const store: FachverfahrenStore<Record<string, unknown>> =
       procedureId: leistungConfig.id,
       procedureVersion: "1",
     }),
+  });
+
+// ── DIE AMTS-SICHT: EIGENE Store-Instanz gegen /api/cases ────────────────────────────────────────────
+// WARUM ZWEI INSTANZEN UND NICHT EINE: Bürger- und Amts-Sicht sehen NICHT dasselbe. Der Bürger sieht
+// seine eigenen Anträge (owner-scoped), das Amt die Fälle seiner Stelle (behörden-scoped). Eine
+// gemeinsame Instanz hätte genau eine Wahrheit haben können — und die andere Sicht hätte sie
+// weggezogen. Der Schnitt liegt deshalb an der ROUTE (zwei Nähte), nicht an einer `scope`-Fahne.
+//
+// KEIN DEMO-SEED: die Amts-Sicht zeigt, was der Server hat — auch wenn das NICHTS ist. Ein Demo-
+// Bestand, der aussieht wie echte Arbeit, ist die schlimmere Lüge als ein ehrlich leerer Eingangskorb.
+const { seed: _demoSeed, ...ohneSeed } = leistungConfig;
+const amtConfig = ohneSeed as typeof leistungConfig;
+
+export const amtStore: FachverfahrenStore<Record<string, unknown>> =
+  createFachverfahrenStore(amtConfig, {
+    persistence: createHttpAmtVorgangPersistence(leistungConfig),
   });

@@ -813,6 +813,21 @@ export interface VorgangPersistence<TAntragsdaten = Record<string, unknown>> {
    *  Fassung zurück — der Server vergibt id/vorgangsnummer/Eingangszeitpunkt verbindlich. Der Store
    *  übernimmt die Rückgabe in den Snapshot, damit ein Reload später denselben Vorgang findet. */
   einreichen(vorgang: Vorgang<TAntragsdaten>): Promise<Vorgang<TAntragsdaten>>;
+  /**
+   * Persistiert einen ZUSTANDSÜBERGANG server-autoritativ (PROD: POST /api/cases/:id/transitions) und
+   * gibt den kanonischen Vorgang zurück. OPTIONAL/additiv: eine Persistenz ohne diesen Haken lässt den
+   * Übergang wie bisher rein lokal laufen (DEV-Demo).
+   *
+   * WARUM ÜBERHAUPT: ohne diesen Haken schrieb eine Sachbearbeitungs-Entscheidung nur in den Browser-
+   * Snapshot — sie war nach einem Reload weg, das Vier-Augen-Prinzip lief clientseitig, und der Bürger
+   * sah nie ein Ergebnis. Der Server ist die Wahrheit über den Zustand eines Vorgangs; der Store zeigt
+   * an, was der Server entschieden hat.
+   */
+  uebergang?(
+    vorgang: Vorgang<TAntragsdaten>,
+    to: string,
+    detail?: string,
+  ): Promise<Vorgang<TAntragsdaten>>;
 }
 
 /**

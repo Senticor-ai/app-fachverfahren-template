@@ -147,6 +147,13 @@ function toVorgang<T>(dto: AntragDto): Vorgang<T> {
     ...rumpf,
     id: dto.antragId,
     status: dto.state,
+    // ── DIE SERVER-WAHRHEIT GEWINNT (der geschlossene Bruch) ────────────────────────────────────
+    // Vorher fielen `eingereichtAm` und die Nummer hier weg: der Browser hatte beide selbst erzeugt
+    // und die Bestätigungsseite zeigte die Uhr des Antragstellers. Ein so gestempelter Eingang ist
+    // als Fristnachweis wertlos und nach einem Neustart des Browsers neu vergeben. Ab hier steht in
+    // der Oberfläche exakt das, was der Server vergeben und append-only festgehalten hat.
+    eingangIso: dto.eingereichtAm,
+    vorgangsnummer: dto.eingangsnummer,
     history: Array.isArray(rumpf.history) ? rumpf.history : [],
     nachweise: Array.isArray(rumpf.nachweise) ? rumpf.nachweise : [],
   };

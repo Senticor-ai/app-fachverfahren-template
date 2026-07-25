@@ -169,6 +169,15 @@ export function createFachverfahrenStore<T = Record<string, unknown>>(
             `Vier-Augen verletzt: „${t.label}" erfordert eine ANDERE Person als ${akteur} (letzter Akteur der History)`,
           );
       }
+      // MIT PERSISTENZ ist der SERVER die Wahrheit über den Zustand: erst dort vollziehen (inkl.
+      // server-autoritativem Vier-Augen und, bei extern eingereichten Vorgängen, der Taint-Sperre),
+      // dann den kanonischen Vorgang in den Snapshot übernehmen. Wirft der Server (403/409/422),
+      // propagiert der Fehler an die Oberfläche — es wird NICHTS lokal vorgetäuscht.
+      if (persistence?.uebergang) {
+        const kanonisch = await persistence.uebergang(v, to, detail);
+        setState((vs) => vs.map((x) => (x.id === id ? kanonisch : x)));
+        return;
+      }
       setState((vs) =>
         vs.map((x) =>
           x.id === id

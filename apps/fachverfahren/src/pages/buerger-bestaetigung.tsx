@@ -38,14 +38,39 @@ export function BuergerBestaetigungPage(): React.JSX.Element {
         {v ? (
           <div className="rounded-lg border border-status-ok/30 bg-status-ok-soft p-6">
             <h1 className="text-lg font-semibold text-foreground">
-              Antrag eingegangen
+              Ihr Antrag ist eingegangen
             </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Ihr Vorgang wurde unter der Nummer{" "}
-              <span className="font-mono font-medium text-foreground">
-                {v.vorgangsnummer}
-              </span>{" "}
-              aufgenommen und wird geprüft.
+            {/* DIE ZAHLEN KOMMEN VOM SERVER (nicht mehr aus dem Browser) — sie sind der
+                Eingangsnachweis und stehen so auch in Ihrem Postfach. */}
+            <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div>
+                <dt className="text-xs text-muted-foreground">Eingangsnummer</dt>
+                <dd className="font-mono text-sm font-medium text-foreground">
+                  {v.vorgangsnummer}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">
+                  Bei uns eingegangen am
+                </dt>
+                <dd className="text-sm font-medium text-foreground">
+                  {new Date(v.eingangIso).toLocaleString("de-DE", {
+                    dateStyle: "long",
+                    timeStyle: "short",
+                  })}
+                </dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-xs text-muted-foreground">Aktenzeichen</dt>
+                <dd className="break-all font-mono text-sm text-foreground">
+                  {v.id}
+                </dd>
+              </div>
+            </dl>
+            <p className="mt-4 text-sm text-muted-foreground">
+              Wir haben Ihnen eine Eingangsbestätigung in Ihr Postfach gelegt.
+              Bitte bewahren Sie die Eingangsnummer auf — mit ihr können Sie
+              jederzeit nach dem Stand fragen.
             </p>
             {v.berechnung ? (
               <>
@@ -60,13 +85,23 @@ export function BuergerBestaetigungPage(): React.JSX.Element {
                 ) : null}
               </>
             ) : null}
-            <button
-              type="button"
-              onClick={() => navigate("/buerger/anmelden")}
-              className="mt-5 inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
-            >
-              Neuen Antrag stellen
-            </button>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {/* DER SICHTBARE NÄCHSTE SCHRITT — nicht „was kann ich sonst noch". */}
+              <button
+                type="button"
+                onClick={() => navigate("/buerger/postfach")}
+                className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+              >
+                Eingangsbestätigung im Postfach ansehen
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate("/buerger/antraege")}
+                className="inline-flex h-9 items-center rounded-md border border-border px-4 text-sm font-medium text-foreground"
+              >
+                Meine Anträge
+              </button>
+            </div>
           </div>
         ) : laedt ? (
           <p className="text-sm text-muted-foreground" aria-busy="true">

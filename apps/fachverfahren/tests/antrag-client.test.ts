@@ -68,6 +68,7 @@ describe("createHttpVorgangPersistence", () => {
       state: "eingegangen",
       version: 1,
       eingereichtAm: "2026-07-17T09:00:00.000Z",
+      eingangsnummer: "FV-2026-0006",
       abgeschlossenAm: null,
       data: {
         vorgangsnummer: "FV-2026-0006",
@@ -107,6 +108,7 @@ describe("createHttpVorgangPersistence", () => {
           state: "in_pruefung",
           version: 2,
           eingereichtAm: "2026-07-17T09:00:00.000Z",
+          eingangsnummer: "FV-2026-0006",
           abgeschlossenAm: null,
           data: {
             vorgangsnummer: "FV-2026-0006",
@@ -126,7 +128,9 @@ describe("createHttpVorgangPersistence", () => {
     // id + status kommen vom DTO-Kopf, der Rest aus data — der volle Vorgang ist wieder da.
     expect(v.id).toBe("case.server-9");
     expect(v.status).toBe("in_pruefung");
+    // SERVER-STEMPEL: Nummer und Eingangszeit kommen aus dem DTO-KOPF, nicht aus `data`.
     expect(v.vorgangsnummer).toBe("FV-2026-0006");
+    expect(v.eingangIso).toBe("2026-07-17T09:00:00.000Z");
     expect(v.antragsdaten).toEqual(vorgang.antragsdaten);
     expect(v.berechnung).toEqual(vorgang.berechnung);
     expect(v.nachweise).toEqual(vorgang.nachweise);
@@ -144,6 +148,7 @@ describe("createHttpVorgangPersistence", () => {
           state: vorgang.status,
           version: 1,
           eingereichtAm: vorgang.eingangIso,
+          eingangsnummer: vorgang.vorgangsnummer,
           abgeschlossenAm: null,
           data: rumpf,
         },
