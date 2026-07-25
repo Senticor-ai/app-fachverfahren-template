@@ -126,7 +126,7 @@ describe("Anlage folgt derselben Sperre wie der Ausweis", () => {
   });
 });
 
-describe("GET /dev/testzugang am gebauten Server", () => {
+describe("GET /api/dev/testzugang am gebauten Server", () => {
   it("antwortet im Entwicklungsstand mit dem Ausweis — in Produktion existiert die Route nicht", async () => {
     const { buildPublicServer } = await import("../index.js");
     const dev = buildPublicServer({ env: DEV_ENV });
@@ -135,9 +135,8 @@ describe("GET /dev/testzugang am gebauten Server", () => {
     expect(antwort.json()).toMatchObject({ aktiv: true });
     await dev.close();
 
-    // In Produktion ist die Route GAR NICHT REGISTRIERT. Der Pfad läuft dann in den SPA-Fallback
-    // (HTML, 200) — die entscheidende Zusicherung ist deshalb nicht der Status, sondern: es gibt
-    // keine Route und es verlässt kein einziges Zugangsdatum den Prozess.
+    // In Produktion ist die Route GAR NICHT REGISTRIERT: der Pfad landet im API-404 und es
+    // verlässt kein einziges Zugangsdatum den Prozess.
     const prod = buildPublicServer({
       env: { ...DEV_ENV, NODE_ENV: "production" },
     });
@@ -147,7 +146,7 @@ describe("GET /dev/testzugang am gebauten Server", () => {
       method: "GET",
       url: TESTZUGANG_ROUTE,
     });
-    expect(gesperrt.headers["content-type"]).not.toContain("application/json");
+    expect(gesperrt.statusCode).toBe(404);
     expect(gesperrt.body).not.toContain(PASSWORT);
     expect(gesperrt.body).not.toContain(TESTKONTEN[0]?.email ?? "buerger@");
     await prod.close();

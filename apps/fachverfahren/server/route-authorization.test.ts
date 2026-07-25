@@ -29,6 +29,7 @@ import {
 } from "./auth/authorization.js";
 import { registerAuthRoutes } from "./auth/routes.js";
 import { registerAuditRoutes } from "./audit/routes.js";
+import { registerTestzugangRoute } from "./dev/testzugang-route.js";
 import { registerBoardRoutes } from "./kanban/routes.js";
 import { registerUserRoutes } from "./users/routes.js";
 
@@ -81,6 +82,7 @@ async function buildAppAndCollect(): Promise<CollectedRoute[]> {
     auditStore,
     bootstrapToken: "test-token",
   });
+  registerTestzugangRoute(app, { authStore });
   registerBoardRoutes(app, { authStore, kanbanStore, auditStore });
   registerUserRoutes(app, { authStore, kanbanStore, auditStore });
   registerAuditRoutes(app, { authStore, auditStore });
@@ -119,6 +121,9 @@ describe("Routen-Klassifizierung (config.auth)", () => {
         // Nur-authentifiziert (bewusst OHNE Permission): eigenes Konto.
         { method: "GET", url: "/auth/session", policy: "authenticated" },
         { method: "POST", url: "/auth/password", policy: "authenticated" },
+        // Selbstauskunft des Entwicklungsstands über seine TESTKONTEN: bewusst `public` —
+        // sie entsteht nur ausserhalb der Produktion und nur mit ephemerem Store (testzugang.ts).
+        { method: "GET", url: "/api/dev/testzugang", policy: "public" },
         // BFF-Routen (Paket @senticor/app-bff-fastify): SDK-RBAC-Permissions,
         // deny-by-default; Mailbox mit scope-getrennten Lese-/Schreibrechten.
         {

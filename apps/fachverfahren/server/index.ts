@@ -210,7 +210,7 @@ function registerAppRoutes(
   registerAuthPolicyGuard(app);
   // Selbstauskunft über die vorprovisionierten TESTKONTEN — im Produktivbetrieb wird sie
   // gar nicht erst registriert (testzugang-route.ts).
-  registerTestzugangRoute(app, env);
+  registerTestzugangRoute(app, { authStore: stores.authStore }, env);
   app.register(fastifyCookie);
   // Collector VOR den BFF-Routen — der onRoute-Kollektor von @fastify/swagger sieht
   // nur später registrierte Routen (Reihenfolge-Vertrag, openapi.test.ts im Paket).

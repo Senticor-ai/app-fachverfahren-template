@@ -45,7 +45,7 @@ export async function ladeTestzugang(
   fetchImpl: typeof fetch = fetch,
 ): Promise<TestzugangAusweis | null> {
   try {
-    const antwort = await fetchImpl(apiPath("/dev/testzugang"), {
+    const antwort = await fetchImpl(apiPath("/api/dev/testzugang"), {
       credentials: "include",
     });
     if (!antwort.ok) return null;

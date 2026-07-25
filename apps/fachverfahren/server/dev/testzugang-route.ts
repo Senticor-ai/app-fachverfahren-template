@@ -7,12 +7,15 @@
 //  2. Ist sie registriert, antwortet sie nur dann mit Zugangsdaten, wenn der Ausweis (testzugang.ts)
 //     aktiv ist — sonst EHRLICH mit dem Grund der Sperre, damit die Oberfläche nicht rät.
 //
-// Bewusst NICHT unter /auth oder /api: es ist kein Authentisierungs- und kein Fach-Endpunkt, sondern
-// die Selbstauskunft eines Entwicklungsstands über sich selbst.
+// Unter /api, weil JEDE Auslieferungsform diesen Präfix ans Backend weiterreicht (Vite-Dev-Proxy,
+// Vorschau-Weiche, Ein-Deploy). Ein Sonderpfad wäre in der Vorschau im SPA-Fallback gelandet und die
+// Seite hätte stumm nichts angezeigt — gemessen. Die Policy ist ausdrücklich `public`: es gibt hier
+// nichts zu autorisieren, was der Prozess nicht ohnehin schon entschieden hat (Registrierung ja/nein).
 import type { FastifyInstance } from "fastify";
+import { routeAuth, type RouteAuthDeps } from "../auth/authorization.js";
 import { testzugangAusweis, type TestzugangAusweis } from "./testzugang.js";
 
-export const TESTZUGANG_ROUTE = "/dev/testzugang";
+export const TESTZUGANG_ROUTE = "/api/dev/testzugang";
 
 /** Wahr, wenn dieser Prozess die Selbstauskunft überhaupt anbieten darf. */
 export function testzugangRouteErlaubt(env: NodeJS.ProcessEnv): boolean {
@@ -22,10 +25,13 @@ export function testzugangRouteErlaubt(env: NodeJS.ProcessEnv): boolean {
 /** Registriert die Selbstauskunft — im Produktivbetrieb ein No-op (die Route entsteht nicht). */
 export function registerTestzugangRoute(
   app: FastifyInstance,
+  deps: RouteAuthDeps,
   env: NodeJS.ProcessEnv = process.env,
 ): void {
   if (!testzugangRouteErlaubt(env)) return;
-  app.get(TESTZUGANG_ROUTE, async (): Promise<TestzugangAusweis> => {
-    return testzugangAusweis(env);
-  });
+  app.get(
+    TESTZUGANG_ROUTE,
+    routeAuth({ kind: "public" }, deps),
+    async (): Promise<TestzugangAusweis> => testzugangAusweis(env),
+  );
 }
