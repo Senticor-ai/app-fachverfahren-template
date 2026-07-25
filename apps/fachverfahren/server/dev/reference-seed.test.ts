@@ -31,7 +31,7 @@ describe("seedReferenceDemo (DEV/memory, aus der procedure.config-Naht)", () => 
     const stores = freshStores();
     await seedReferenceDemo({
       ...stores,
-      env: { APP_DEV_SEED_PASSWORD: TEST_PASSWORD },
+      env: { APP_STORE_MODE: "memory", APP_DEV_SEED_PASSWORD: TEST_PASSWORD },
     });
 
     // DREI Konten: die Sachbearbeitung (admin→caseworker), ein Bürger (citizen, für den Antrag-Flow —
@@ -102,7 +102,7 @@ describe("seedReferenceDemo (DEV/memory, aus der procedure.config-Naht)", () => 
 
   it("ohne APP_DEV_SEED_PASSWORD: KEIN Login (kein committetes Secret), aber das Demo-Dossier wird geseedet", async () => {
     const stores = freshStores();
-    await seedReferenceDemo({ ...stores, env: {} });
+    await seedReferenceDemo({ ...stores, env: { APP_STORE_MODE: "memory" } });
 
     expect(await stores.authStore.countUsers({ tenantId: TENANT })).toBe(0);
     const found = await stores.caseStore.getCase({
@@ -121,7 +121,10 @@ describe("seedReferenceDemo (DEV/memory, aus der procedure.config-Naht)", () => 
 
   it("ist idempotent (zweiter Lauf wirft nicht und dupliziert nicht)", async () => {
     const stores = freshStores();
-    const deps = { ...stores, env: { APP_DEV_SEED_PASSWORD: TEST_PASSWORD } };
+    const deps = {
+      ...stores,
+      env: { APP_STORE_MODE: "memory", APP_DEV_SEED_PASSWORD: TEST_PASSWORD },
+    };
     await seedReferenceDemo(deps);
     await seedReferenceDemo(deps);
 

@@ -25,25 +25,19 @@ import {
 } from "../auth/bootstrap.js";
 import { hashPassword } from "@senticor/provider-local-auth";
 import { dossierDemo, dossierProcedure } from "../procedure.config.js";
+import {
+  seedPasswort,
+  testzugangAnlageErlaubt,
+  TESTKONTEN,
+  TESTKONTO_ADMIN,
+  type TestkontoDeklaration,
+} from "./testzugang.js";
 
-// DEV-Login (nur In-Memory): der Account wird NUR angelegt, wenn ein Passwort über die Umgebung
-// (APP_DEV_SEED_PASSWORD) bereitgestellt wird — es gibt bewusst KEIN im Quelltext festgeschriebenes Passwort
-// (der memory-Modus wird auch für erreichbare Previews genutzt; ein committetes Login-Secret wäre eine
-// öffentlich bekannte Zugangsdaten-Naht). Ohne die Variable existiert kein Demo-Login.
-const DEV_PASSWORD_ENV = "APP_DEV_SEED_PASSWORD";
-const DEV_EMAIL = "sachbearbeitung@example.org";
-const DEV_NAME = "Demo-Sachbearbeitung";
-// Ein ZWEITES Demo-Konto in der Bürgerrolle — damit der Bürger-Antrag-Flow (server-persistent seit
-// die Bürger-Seite stateful ist) demonstrierbar ist: die Sachbearbeitung (admin→caseworker) hat
-// bewusst KEIN case.own.submit; ein Bürger reicht ein, die Sachbearbeitung bearbeitet. Zwei-Konten-
-// Flow, wie im echten Verfahren. Nutzt dasselbe env-gegatete Passwort (kein committetes Secret).
-const DEV_CITIZEN_EMAIL = "buerger@example.org";
-const DEV_CITIZEN_NAME = "Demo-Bürger:in";
-// Ein ZWEITER Sachbearbeitungs-Account — damit der volle VIER-AUGEN-Flow demonstrierbar ist: die
-// Festsetzung (requiresFourEyes) verlangt eine ANDERE Person als den letzten Bearbeitungsschritt.
-// Rolle „member" → caseworker (wie admin), localPersonas [sachbearbeitung].
-const DEV_CASEWORKER2_EMAIL = "sachbearbeitung2@example.org";
-const DEV_CASEWORKER2_NAME = "Demo-Sachbearbeitung II";
+// DIE KONTEN SELBST STEHEN NICHT HIER: sie sind in testzugang.ts deklariert — DIESELBE Wahrheit, die
+// der Ausweis auf /hilfe anzeigt. Anlage und Anzeige können damit nicht auseinanderlaufen.
+// Die Sperre (kein Produktivbetrieb · nur ephemerer Store · Passwort nur aus der Umgebung) liegt
+// ebenfalls dort — ein committetes Login-Secret wäre eine öffentlich bekannte Zugangsdaten-Naht.
+const DEV_CITIZEN = TESTKONTEN.find((k) => k.kind === "citizen");
 
 // Eröffnungs-Akteur des Demo-Falls: ein FESTER synthetischer Akteur, bewusst VERSCHIEDEN vom Login-Konto,
 // damit der Vier-Augen-Abschluss (jüngster-Audit-Akteur ≠ auslösender Akteur) vom Demo-Login ausübbar ist.
@@ -75,41 +69,32 @@ export async function seedReferenceDemo(
 ): Promise<void> {
   const log: SeedLog = deps.log ?? (() => undefined);
   await seedDevCaseworker(deps, log);
-  // Bürger-Konto (Rolle citizen) — für den server-persistenten Antrag-Flow.
-  await seedZusatzKonto(deps, log, {
-    email: DEV_CITIZEN_EMAIL,
-    name: DEV_CITIZEN_NAME,
-    actorId: "actor.dev-citizen",
-    role: "citizen",
-    personas: ["buerger"],
-    kind: "citizen",
-  });
-  // Zweites Sachbearbeitungs-Konto — für den vollen VIER-AUGEN-Flow (Festsetzung ≠ Vorbereiter).
-  await seedZusatzKonto(deps, log, {
-    email: DEV_CASEWORKER2_EMAIL,
-    name: DEV_CASEWORKER2_NAME,
-    actorId: "actor.dev-caseworker2",
-    role: "member",
-    personas: ["sachbearbeitung"],
-    kind: "caseworker2",
-  });
+  // Die weiteren Testkonten AUS DER DEKLARATION (testzugang.ts): Bürger:in für den Antrag-Flow
+  // (die Sachbearbeitung hat bewusst kein case.own.submit) und eine zweite Sachbearbeitung für
+  // das Vier-Augen-Prinzip. Kein Konto-Literal mehr hier.
+  for (const konto of TESTKONTEN) await seedZusatzKonto(deps, log, konto);
   // Das Demo-Dossier ist unabhängig vom Login und wird IMMER einem festen synthetischen Eröffnungs-Akteur
   // zugeschrieben (≠ Login-Konto) — so bleibt der Vier-Augen-Abschluss vom Demo-Login ausübbar.
   await seedDemoDossier(deps, SEED_AUDIT_ACTOR, log);
   // Eine synthetische Postfach-Nachricht für die Demo-Bürger:in — damit die gemountete Postfach-Seite
   // im Preview Inhalt zeigt (statt nur des Leerzustands). Nur, wenn appStore verdrahtet ist.
-  if (deps.appStore) await seedDemoPostfach(deps.appStore, log);
+  if (deps.appStore && DEV_CITIZEN)
+    await seedDemoPostfach(deps.appStore, DEV_CITIZEN.actorId, log);
 }
 
 /** Idempotent: legt der Demo-Bürger:in eine synthetische Willkommens-Nachricht ins Postfach (nur wenn leer). */
-async function seedDemoPostfach(appStore: AppStore, log: SeedLog): Promise<void> {
+async function seedDemoPostfach(
+  appStore: AppStore,
+  buergerActorId: string,
+  log: SeedLog,
+): Promise<void> {
   try {
     const vorhanden = await appStore.listMailboxMessages({
       box: "inbox",
       audience: "citizen",
       tenantId: DEFAULT_TENANT_ID,
       authorityId: DEFAULT_AUTHORITY_ID,
-      actorId: "actor.dev-citizen",
+      actorId: buergerActorId,
       scope: "owner",
     });
     if (vorhanden.length > 0) return;
@@ -120,7 +105,7 @@ async function seedDemoPostfach(appStore: AppStore, log: SeedLog): Promise<void>
       tenantId: DEFAULT_TENANT_ID,
       authorityId: DEFAULT_AUTHORITY_ID,
       jurisdictionId: DEFAULT_JURISDICTION_ID,
-      ownerActorId: "actor.dev-citizen",
+      ownerActorId: buergerActorId,
       caseId: null,
       subject: "Willkommen in Ihrem Postfach",
       bodyPreview:
@@ -128,7 +113,7 @@ async function seedDemoPostfach(appStore: AppStore, log: SeedLog): Promise<void>
       status: "unread",
       createdAt: new Date().toISOString(),
     });
-    log("info", "dev.seed.postfach", { ownerActorId: "actor.dev-citizen" });
+    log("info", "dev.seed.postfach", { ownerActorId: buergerActorId });
   } catch (error) {
     log("error", "dev.seed.postfach.failed", { error: String(error) });
   }
@@ -140,17 +125,14 @@ async function seedDemoPostfach(appStore: AppStore, log: SeedLog): Promise<void>
 async function seedZusatzKonto(
   deps: ReferenceSeedDeps,
   log: SeedLog,
-  konto: {
-    email: string;
-    name: string;
-    actorId: string;
-    role: "citizen" | "member" | "admin";
-    personas: ("buerger" | "sachbearbeitung" | "aufsicht")[];
-    kind: string;
-  },
+  konto: TestkontoDeklaration,
 ): Promise<void> {
-  const password = deps.env?.[DEV_PASSWORD_ENV];
-  if (password === undefined || password === "") return; // kein Login ohne bereitgestelltes Passwort
+  const env = deps.env ?? {};
+  // FAIL-CLOSED an EINER Stelle: kein Produktivbetrieb, nur ephemerer Store, Passwort nur aus der
+  // Umgebung. Fehlt eine Bedingung, entsteht kein Konto — und /hilfe weist auch keins aus.
+  if (!testzugangAnlageErlaubt(env)) return;
+  const password = seedPasswort(env);
+  if (password === undefined) return;
   try {
     const vorhanden = await deps.authStore.getUserByEmail({
       tenantId: DEFAULT_TENANT_ID,
@@ -173,8 +155,8 @@ async function seedZusatzKonto(
         email: konto.email,
         displayName: konto.name,
         status: "active",
-        role: konto.role,
-        localPersonas: konto.personas,
+        role: konto.rolle,
+        localPersonas: [...konto.personas],
         oidcPersonas: [],
         personaManagementMode: "local",
         principalVersion: 1,
@@ -207,11 +189,14 @@ async function seedDevCaseworker(
   deps: ReferenceSeedDeps,
   log: SeedLog,
 ): Promise<void> {
-  const password = deps.env?.[DEV_PASSWORD_ENV];
-  if (password === undefined || password === "") {
-    // Kein committetes Login-Secret: ohne bereitgestelltes Passwort wird KEIN anmeldbares Konto angelegt.
+  const env = deps.env ?? {};
+  const password = seedPasswort(env);
+  if (!testzugangAnlageErlaubt(env) || password === undefined) {
+    // Kein committetes Login-Secret und kein Testkonto ausserhalb des Entwicklungsstands: ohne
+    // erfüllte Sperre (testzugang.ts) wird KEIN anmeldbares Konto angelegt.
     log("info", "runtime.dev-seed.user.skipped", {
-      reason: `${DEV_PASSWORD_ENV} not set — kein Demo-Login angelegt`,
+      reason:
+        "Testzugang gesperrt (Produktivbetrieb, kein ephemerer Store oder kein APP_DEV_SEED_PASSWORD) — kein Testkonto angelegt",
     });
     return;
   }
@@ -229,11 +214,15 @@ async function seedDevCaseworker(
       }
       const result = await bootstrapWorkspace(
         { authStore: deps.authStore, kanbanStore: deps.kanbanStore },
-        { email: DEV_EMAIL, password, displayName: DEV_NAME },
+        {
+          email: TESTKONTO_ADMIN.email,
+          password,
+          displayName: TESTKONTO_ADMIN.name,
+        },
       );
       log("info", "runtime.dev-seed.user.created", {
         actorId: result.user.actorId,
-        email: DEV_EMAIL,
+        email: TESTKONTO_ADMIN.email,
       });
     });
   } catch (error) {

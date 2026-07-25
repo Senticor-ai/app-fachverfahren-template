@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { MarkdownView } from "@senticor/fachverfahren-kit";
 import { DOCS, type DocEntry } from "../docs/docs-manifest.generated.js";
+import { TestzugangPanel } from "./testzugang-panel.js";
 
 export function HilfePage(): React.JSX.Element {
   const [aktiv, setAktiv] = useState<string>(DOCS[0]?.id ?? "");
@@ -44,6 +45,9 @@ export function HilfePage(): React.JSX.Element {
           {DOCS.length} Dokumente aus dem Repository (README · AGENTS · docs/ · Skills)
         </span>
       </header>
+      <div className="mx-auto w-full max-w-6xl px-6 pt-6">
+        <TestzugangPanel />
+      </div>
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-6 md:flex-row">
         <nav aria-label="Dokumente" className="w-full shrink-0 md:w-72">
           <label htmlFor="doku-suche" className="sr-only">

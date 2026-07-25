@@ -62,6 +62,7 @@ import { registerAuthRoutes, type RegistrationMode } from "./auth/routes.js";
 import { oidcConfigFromEnv, type OidcConfig } from "./auth/oidc-routes.js";
 import { createCookieSessionResolver } from "./auth/session-resolver.js";
 import { seedReferenceDemo } from "./dev/reference-seed.js";
+import { registerTestzugangRoute } from "./dev/testzugang-route.js";
 import { seedGoldenMesh } from "./dev/golden-fixture.js";
 import { registerBoardRoutes } from "./kanban/routes.js";
 import { antragProcedure, dossierProcedure } from "./procedure.config.js";
@@ -203,9 +204,13 @@ function registerAppRoutes(
     oidcConfig?: OidcConfig;
   },
   bff: BffWiring,
+  env: NodeJS.ProcessEnv = process.env,
 ): void {
   // K2: /auth-/api-Route ohne Autorisierungs-Policy = Boot-Fehler, nicht erst Test-Rot.
   registerAuthPolicyGuard(app);
+  // Selbstauskunft über die vorprovisionierten TESTKONTEN — im Produktivbetrieb wird sie
+  // gar nicht erst registriert (testzugang-route.ts).
+  registerTestzugangRoute(app, env);
   app.register(fastifyCookie);
   // Collector VOR den BFF-Routen — der onRoute-Kollektor von @fastify/swagger sieht
   // nur später registrierte Routen (Reihenfolge-Vertrag, openapi.test.ts im Paket).
@@ -250,6 +255,7 @@ export function buildPublicServer({
   ),
   oidcConfig = oidcConfigFromEnv(),
   allowedSurfaces = parseZoneSurfaces(process.env),
+  env = process.env,
 }: {
   config?: RuntimeConfig;
   state?: RuntimeState;
@@ -269,6 +275,8 @@ export function buildPublicServer({
   registrationMode?: RegistrationMode;
   oidcConfig?: OidcConfig;
   allowedSurfaces?: readonly BffSurface[] | undefined;
+  /** Prozess-Umgebung — steuert u. a., ob die Testzugang-Selbstauskunft entsteht (nie in Produktion). */
+  env?: NodeJS.ProcessEnv;
 } = {}): FastifyInstance {
   return buildRuntimePublicServer({
     config,
@@ -297,6 +305,7 @@ export function buildPublicServer({
           aiAssist,
           ...(allowedSurfaces ? { allowedSurfaces } : {}),
         },
+        env,
       ),
   });
 }
@@ -376,7 +385,8 @@ export async function startRuntime(
   return startRuntimeBase({
     env,
     configOverrides: APP_IDENTITY,
-    registerPublicRoutes: (app) => registerAppRoutes(app, stores, policy, bff),
+    registerPublicRoutes: (app) =>
+      registerAppRoutes(app, stores, policy, bff, env),
     registerInternalRoutes: (app, context) =>
       registerOpenApiRoute(app, context.publicServer),
     // Fresh-Deployment-Akzeptanz: mit AUTH_BOOTSTRAP_ADMIN_* entsteht der Admin samt
