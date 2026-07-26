@@ -19,11 +19,17 @@
 import { createHash, createPublicKey, verify as ed25519Verify } from "node:crypto";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import path from "node:path";
+import { parse as parseYaml } from "yaml";
 import {
   istMeshManifest,
   verifyMeshCertStructure,
+  verifyMeshGovernanceProjektion,
   type MeshComposableManifest,
 } from "../../packages/public-sector-sdk/src/composable-cert-verify.ts";
+
+/** Der Erzeuger-Marker in der mitgereisten Stellen-Verfassung — byte-gleich zur CHOS-Seite
+ *  (`COMPOSABLE_GOVERNANCE_YAML_GENERATOR`). Eine hand-geschriebene yaml trägt ihn nicht. */
+const GOVERNANCE_YAML_GENERATOR = "chos:packages/fachverfahren/composable-governance-yaml.ts";
 
 const ENABLED_STATUS = new Set(["certified", "active"]);
 
@@ -73,6 +79,82 @@ export interface MountedComposableReport {
   verdient: number;
   fehler: string[];
   hinweise: string[];
+}
+
+/**
+ * pruefeMitgereisteVerfassung — die yaml wird GEPARST und ihr Siegel NACHGERECHNET, nicht ihr Text durchsucht.
+ *
+ * WARUM NICHT TEXT: ein Text-Wächter, der nur die `digest:`-Zeile und den Erzeuger-Marker sucht, fängt genau den
+ * gefährlichsten Fall NICHT — jemand schreibt im Body `entwurf-only` statt `erlaesst-va` und lässt Siegel-Zeile und
+ * Marker stehen. Dann liest das aufnehmende Haus eine WEICHERE Verfassung, als die App tatsächlich betreibt: die
+ * menschliche Freigabe beträfe etwas anderes als der Betrieb. Genau dafür ist das Siegel da — also wird es benutzt.
+ *
+ * Geprüft wird (fail-closed):
+ *   1. die yaml parst überhaupt;
+ *   2. der `_meta`-Block trägt den ERZEUGER-Marker (eine hand-geschriebene Verfassung ist kein gültiger Anspruch);
+ *   3. `_meta.sourceSha256` benennt DIESELBE Quell-Verfassung wie die Projektion selbst (keine zwei Herkünfte);
+ *   4. das SIEGEL der geparsten Projektion rechnet nach (jede Handänderung im Body bricht es);
+ *   5. es ist DASSELBE Siegel wie im Manifest (die zwei Darstellungen sagen dasselbe).
+ *
+ * GRENZE, ehrlich: der BYTE-Vergleich gegen die kanonische Neu-Erzeugung (der auch reine Kosmetik im Kopf fängt)
+ * bleibt beim Erzeuger — ihn hier zu wiederholen hieße, den Renderer ein zweites Mal zu bauen, und ein zweiter
+ * Renderer wäre genau die zweite Wahrheit, die dieses Artefakt vermeiden soll. Semantisch ist hier nichts offen:
+ * alles, was die AUSSAGE der Verfassung verändert, bricht das Siegel.
+ */
+function pruefeMitgereisteVerfassung(
+  id: string,
+  yamlPath: string,
+  manifestDigest: string,
+): string[] {
+  let doc: unknown;
+  try {
+    doc = parseYaml(readFileSync(yamlPath, "utf8"));
+  } catch (e) {
+    return [
+      `${id}: die mitgereiste Stellen-Verfassung (${id}.governance.yaml) ist nicht lesbar/kein gültiges YAML (${e instanceof Error ? e.message : String(e)}) — fail-closed.`,
+    ];
+  }
+  if (!doc || typeof doc !== "object" || Array.isArray(doc)) {
+    return [`${id}: die mitgereiste Stellen-Verfassung enthält kein Governance-Dokument (fail-closed).`];
+  }
+  const { _meta, ...projektion } = doc as Record<string, unknown>;
+  const meta = (_meta && typeof _meta === "object" && !Array.isArray(_meta)
+    ? (_meta as Record<string, unknown>)
+    : {});
+  const fehler: string[] = [];
+  if (meta["generatedBy"] !== GOVERNANCE_YAML_GENERATOR) {
+    fehler.push(
+      `${id}: die mitgereiste Stellen-Verfassung trägt keinen gültigen Erzeuger-Marker (_meta.generatedBy) — sie ist nicht erzeugt, sondern geschrieben worden. Eine Verfassung wird nicht von Hand in ein Composable gelegt.`,
+    );
+  }
+  const v = verifyMeshGovernanceProjektion(projektion, { composableId: id, sha256Hex });
+  if (!v.vorhanden || !v.intakt) {
+    fehler.push(
+      `${id}: die mitgereiste Stellen-Verfassung (${id}.governance.yaml) ist nicht (mehr) die erzeugte — ${v.gruende.join("; ")}`,
+    );
+    return fehler;
+  }
+  const herkunft = (projektion["herkunft"] ?? {}) as Record<string, unknown>;
+  if (meta["sourceSha256"] !== herkunft["verfassungDigest"]) {
+    fehler.push(
+      `${id}: der Herkunfts-Marker (_meta.sourceSha256) benennt eine ANDERE Quell-Verfassung als die Projektion selbst — die Datei behauptet zwei Herkünfte (fail-closed).`,
+    );
+  }
+  if (v.digest !== manifestDigest) {
+    fehler.push(
+      `${id}: die mitgereiste Stellen-Verfassung und das Manifest daneben tragen VERSCHIEDENE Siegel — es ist nicht bestimmbar, unter welcher Governance die Stelle betrieben wird (Zweitdatenstand, fail-closed).`,
+    );
+  }
+  return fehler;
+}
+
+/** „Governance-Beleg fehlt": eine Stelle FÜHRT eine Projektion, das Verdikt bezeugt sie aber nicht. Führt sie gar
+ *  keine (Alt-Bestand), gibt es nichts zu bezeugen — dann ist auch kein Hinweis fällig (kein Rauschen). */
+function belegtGovernanceFehlt(
+  governanceAttested: boolean,
+  projektionVorhanden: boolean,
+): boolean {
+  return projektionVorhanden && !governanceAttested;
 }
 
 /** Der deklarierte Status eines Manifests (lower-cased, ungetrimmt-tolerant); fehlt er → "draft". */
@@ -140,13 +222,51 @@ export function verifyMountedComposables(dir: string): MountedComposableReport {
       }
     }
 
+    // ── DIE MITGEREISTE VERFASSUNG (`<id>.governance.yaml`) — zur BAUZEIT geprüft. ────────────────────────────
+    // Die Stelle reist mit ZWEI Darstellungen derselben versiegelten Ableitung: JSON im Manifest (was die App
+    // liest) und yaml daneben (was ein Mensch im aufnehmenden Haus liest und freigibt). Laufen sie auseinander,
+    // ist nicht bestimmbar, unter welcher Governance die Stelle betrieben wird — und die menschliche Freigabe
+    // beträfe etwas anderes als der Betrieb. Das ist ein BAU-Fehler, kein Laufzeit-Zustand.
+    // GRENZE, ehrlich benannt: dieses Gate rechnet das SIEGEL der JSON-Projektion voll nach und prüft an der yaml
+    // die zwei Zeilen, die der Renderer deterministisch erzeugt (Erzeuger-Marker + genau dieser digest). Der
+    // vollständige BYTE-Vergleich gegen die kanonische Neu-Erzeugung liegt beim Erzeuger (CHOS
+    // verifyComposableGovernanceYaml) — ihn hier zu wiederholen hieße, den Renderer ein zweites Mal zu bauen,
+    // und ein zweiter Renderer wäre genau die zweite Wahrheit, die dieses Artefakt vermeidet.
+    const gov = verifyMeshGovernanceProjektion(manifest.governanceProjektion, {
+      composableId: id,
+      sha256Hex,
+    });
+    if (gov.vorhanden && !gov.intakt) {
+      fehler.push(`${id}: ${gov.gruende.join("; ")}`);
+    }
+    if (gov.intakt && gov.digest) {
+      const yamlPath = path.join(dir, `${id}.governance.yaml`);
+      if (!existsSync(yamlPath)) {
+        hinweise.push(
+          `${id}: die Stelle führt eine versiegelte Governance-Projektion, aber keine lesbare Stellen-Verfassung (${id}.governance.yaml) daneben — im aufnehmenden Haus kann niemand prüfen, was er betreibt.`,
+        );
+      } else {
+        fehler.push(...pruefeMitgereisteVerfassung(id, yamlPath, gov.digest));
+      }
+    }
+
     const v = verifyMeshCertStructure(certParsed, {
       composableId: id,
       manifestSha256: sha256(raw),
       certSigningPublicKey: trusted,
       sha256Hex,
       verifyEd25519,
+      // Das ZWEITE in-toto-Subjekt `<id>#governance`: das Verdikt gilt nur für exakt die Governance, unter der es
+      // verdient wurde. `null` = keine (gültige) Projektion vorhanden ⇒ ein Verdikt, das eine bezeugt, wird ungültig.
+      governanceSha256: gov.intakt && gov.digest ? gov.digest : null,
     });
+    // Ein enabled Composable OHNE bezeugte Governance ist kein Fehler, aber eine ehrliche Lücke: sein Verdikt sagt
+    // über die Verfassung, unter der es verdient wurde, nichts. Sichtbar machen statt still hinnehmen.
+    if (ENABLED_STATUS.has(status) && belegtGovernanceFehlt(v.governanceAttested, gov.vorhanden)) {
+      hinweise.push(
+        `${id}: deklariert „${status}", aber das Verdikt bezeugt KEINE Governance (kein Subjekt „${id}#governance") — es ist nicht belegt, unter welcher Verfassung die Stelle zertifiziert wurde.`,
+      );
+    }
     // BELEGT = strukturell verdient UND kryptografisch signatur-verifiziert (Ed25519 gegen den vertrauten PUBLIC Key).
     const belegt = v.earned && v.signatureChecked;
     if (belegt) verdient++;

@@ -19,7 +19,7 @@
 // bleibt ein deklariertes certified/active bestehen; ohne Beleg wird es EHRLICH auf `candidate` gekappt (Spiegel der
 // CHOS-Wire-Wahrheit effectiveCertification). Ohne übergebene attestation gilt: nicht belegt ⇒ gekappt (fail-closed).
 
-import { assertComposable } from "./composable.js";
+import { assertComposable, MAX_AUTONOMY_HOCHSICHER } from "./composable.js";
 import type {
   AgenticComposable,
   AgenticAutonomyLevel,
@@ -115,6 +115,41 @@ function manifestAutonomy(
   return (m ? `AAL-${m[1]}` : "AAL-2") as AgenticAutonomyLevel;
 }
 
+/** Die AAL-Ordinalität als Zahl (`AAL-3` → 3); nicht-AAL → 0. */
+function aalRang(level: string): number {
+  const m = AAL_RE.exec(level);
+  return m ? Number(m[1]) : 0;
+}
+
+/**
+ * DIE RECHTSNAH-DECKE (der Handlungs-Wächter). Fasst der Spine eine HITL-pflichtige Aufgabe an
+ * (Prüfung/Subsumtion/Review), darf er dort NUR beraten → höchstens AAL-2 „Advise" (composable.ts
+ * `assertSpineAgent`). Diese Funktion WENDET die Decke an, statt das Manifest zu verwerfen — und das ist
+ * bewusst der Unterschied zu einem über-autonomen Manifest:
+ *
+ *   · Ein Manifest, das die GLOBALE Obergrenze reißt (AAL-4/AAL-5), ist ein Widerspruch zur Plattform und wird
+ *     weiterhin EHRLICH VERWORFEN (assertSpineAgent wirft).
+ *   · Ein Manifest mit AAL-3 „Act with Approval" UND HITL-Pflicht ist KEIN Widerspruch — es sagt genau das, was
+ *     es sagt. Nur ist die AAL-Semantik dieses Trägers strenger: wo ein Mensch entscheidet, berät die KI. Die
+ *     Stelle deshalb GANZ zu verwerfen, wäre ein Falsch-Blocker der teuersten Sorte (das Bescheid-Composable
+ *     verschwände aus der App). Also: Decke anwenden, Kappung SICHTBAR machen (mapManifestWithProvenance).
+ */
+function gedeckelteAutonomie(
+  manifest: MeshComposableManifest,
+  aufgaben: readonly SpineAufgabe[],
+): AgenticAutonomyLevel {
+  const deklariert = manifestAutonomy(manifest);
+  // ZUERST die globale Obergrenze: ein Manifest ÜBER AAL-3 wird NICHT gedeckelt, sondern unangetastet an
+  // assertSpineAgent gereicht — dort wirft es. Würde die Rechtsnah-Decke auch hier greifen, verwandelte sie
+  // einen harten Widerspruch in ein stilles Kappen und der fail-closed-Reject verschwände lautlos.
+  if (aalRang(deklariert) > aalRang(MAX_AUTONOMY_HOCHSICHER)) return deklariert;
+  const rechtsnah = aufgaben.some(
+    (a) => a === "pruefung" || a === "subsumtion" || a === "review",
+  );
+  if (!rechtsnah) return deklariert;
+  return aalRang(deklariert) > 2 ? ("AAL-2" as AgenticAutonomyLevel) : deklariert;
+}
+
 /**
  * Die Aufgaben-Achse des Spine aus dem Manifest ableiten. Basis ist „assistenz" (ein chatbarer, governter Assistent
  * ist mindestens assistiv — nicht-rechtsnah). Trägt die Stelle eine HITL-Governance-Regel („mit-freigabe" = die
@@ -126,10 +161,17 @@ export function manifestSpineAufgaben(
   manifest: MeshComposableManifest,
 ): SpineAufgabe[] {
   const aufgaben: SpineAufgabe[] = ["assistenz"];
-  const hitl = (manifest.governance?.regeln ?? []).some(
+  // DIE BISHERIGE, ZU ENGE ACHSE: nur eine „mit-freigabe"-Regel machte die Stelle rechtsnah. Ein
+  // Bescheid-Composable, dessen Regeln allesamt `verbindlich` sind, sah damit nicht rechtsnah aus — obwohl sein
+  // Manifest `befugnis: {entscheidung:"erlaesst-va", hitlPflicht:true}` trägt. Ergebnis: der Chat lief AAL-3
+  // gegen eine HITL-pflichtige Verwaltungsakt-Stelle. Die BEFUGNIS ist die eigentliche Achse; die Regel-Klasse
+  // ist nur einer von mehreren Wegen, auf denen sie sichtbar wird.
+  const hitlRegel = (manifest.governance?.regeln ?? []).some(
     (r) => r?.art === "mit-freigabe",
   );
-  if (hitl) aufgaben.push("pruefung");
+  const hitlBefugnis = manifest.befugnis?.hitlPflicht === true;
+  const erlaesstVa = manifest.befugnis?.entscheidung === "erlaesst-va";
+  if (hitlRegel || hitlBefugnis || erlaesstVa) aufgaben.push("pruefung");
   return aufgaben;
 }
 
@@ -198,7 +240,7 @@ export function mapManifestToComposable(
         : manifestSpineAufgaben(manifest);
     spine = {
       role: `${id}-spine`,
-      autonomy: manifestAutonomy(manifest),
+      autonomy: gedeckelteAutonomie(manifest, aufgaben),
       aufgaben,
       skills: ki,
       knowledgeDomains: dedup([manifest.domain, ...(manifest.wissen ?? [])]),
@@ -261,6 +303,12 @@ export function mapManifestWithProvenance(
     effektiverStatus: ComposableStatus;
     beleg: "verdient" | "deklariert";
     ueberclaim: boolean;
+    /** Die im Manifest DEKLARIERTE Autonomie (fehlt ohne Spine). */
+    deklarierteAutonomie?: AgenticAutonomyLevel;
+    /** Die EFFEKTIVE Autonomie nach der Rechtsnah-Decke. Weicht sie ab, wurde gekappt — SICHTBAR, nie still. */
+    effektiveAutonomie?: AgenticAutonomyLevel;
+    /** Die Stelle ist HITL-pflichtig/VA-erlassend und wurde deshalb auf „Advise" gedeckelt. */
+    autonomieGekappt: boolean;
   };
 } {
   const composable = mapManifestToComposable(manifest, opts);
@@ -270,6 +318,10 @@ export function mapManifestWithProvenance(
     opts.attestation?.valid === true && opts.attestation?.earned === true
       ? "verdient"
       : "deklariert";
+  const deklarierteAutonomie = manifest.faehigkeiten?.ki?.length
+    ? manifestAutonomy(manifest)
+    : undefined;
+  const effektiveAutonomie = composable.spine?.autonomy;
   return {
     composable,
     provenance: {
@@ -277,6 +329,12 @@ export function mapManifestWithProvenance(
       effektiverStatus,
       beleg,
       ueberclaim: deklarierterStatus !== effektiverStatus,
+      ...(deklarierteAutonomie ? { deklarierteAutonomie } : {}),
+      ...(effektiveAutonomie ? { effektiveAutonomie } : {}),
+      autonomieGekappt:
+        !!deklarierteAutonomie &&
+        !!effektiveAutonomie &&
+        deklarierteAutonomie !== effektiveAutonomie,
     },
   };
 }

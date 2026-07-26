@@ -47,6 +47,103 @@ export interface MeshRechtsgrundlage {
   [k: string]: unknown;
 }
 
+/** Die mitgereiste, VERSIEGELTE Governance-Projektion einer Stelle — die Felder, die der KIT zum BEURTEILEN
+ *  braucht. Weitere Felder bleiben erhalten (Index-Signatur) und gehen in die Siegel-Nachrechnung ein: das Siegel
+ *  geht über ALLES außer `digest`, ein ignoriertes Feld wäre also eine Lücke. */
+export interface MeshGovernanceProjektion {
+  schemaVersion?: number;
+  art?: string;
+  composableId?: string;
+  domain?: string;
+  regime?: { normativ?: boolean };
+  stellen?: { id: string; art?: string; zone?: string; akteur?: string; titel?: string }[];
+  regeln?: { id: string; label: string; art: string; class?: string; verify?: string; role?: string; requirement?: string }[];
+  capabilities?: { id: string; ergebnis: string; wissen?: string[]; evalSuite?: string }[];
+  befugnis?: { entscheidung?: string; hitlPflicht?: boolean; aal?: number };
+  faehigkeiten?: { ki?: string[]; entitlements?: string[]; autonomie?: string; aal?: number };
+  herkunft?: { verfassungDigest?: string; revision?: number };
+  digest?: string;
+  [k: string]: unknown;
+}
+
+/** Die SCHEMA-VERSION der Projektion, die dieser KIT versteht. FAIL-CLOSED statt Schema-Raten: eine ältere/neuere
+ *  Projektion wird nicht „irgendwie“ gelesen, sondern abgelehnt — byte-gleich zur CHOS-Konstante
+ *  GOVERNANCE_PROJEKTION_SCHEMA_VERSION. */
+export const MESH_GOVERNANCE_PROJEKTION_SCHEMA_VERSION = 2;
+
+/** Der Subjekt-NAME der Governance-Projektion im in-toto-Statement — byte-gleich zur CHOS-Seite
+ *  (`composableCertGovernanceSubject`). Das ZWEITE Subjekt neben dem Manifest. */
+export function meshCertGovernanceSubject(composableId: string): string {
+  return `${composableId.trim()}#governance`;
+}
+
+/** Das Verdikt einer nachgerechneten Governance-Projektion (Spiegel CHOS `ProjektionVerdict`). */
+export interface MeshGovernanceVerdict {
+  /** Überhaupt eine Projektion vorhanden (Absenz ist etwas ANDERES als Manipulation). */
+  vorhanden: boolean;
+  /** Siegel intakt: der nachgerechnete Digest stimmt mit dem mitgeführten überein. */
+  intakt: boolean;
+  digest?: string;
+  projektion?: MeshGovernanceProjektion;
+  gruende: string[];
+}
+
+/**
+ * verifyMeshGovernanceProjektion — LESER GLAUBEN NIE, SIE RECHNEN NACH. Rechnet das Siegel der mitgereisten
+ * Verfassung im aufnehmenden Träger nach: `sha256(stableStringify(projektion ohne digest))` ≡ `digest`.
+ * Dieselbe kanonische Serialisierung wie die Cert-Signatur (stableStringify) — kein zweiter Dialekt.
+ *
+ * REIN: die sha256-Funktion wird INJIZIERT (dieses Paket bleibt plattform-agnostisch). Ohne sie kann nicht
+ * nachgerechnet werden ⇒ fail-closed `intakt:false` (nie „ist schon in Ordnung“).
+ */
+export function verifyMeshGovernanceProjektion(
+  value: unknown,
+  opts: { composableId: string; sha256Hex?: (input: string) => string },
+): MeshGovernanceVerdict {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {
+      vorhanden: false,
+      intakt: false,
+      gruende: [
+        "Diese Stelle führt keine versiegelte Governance-Projektion mit — sie behauptet nichts darüber, unter welcher Governance sie zertifiziert wurde.",
+      ],
+    };
+  }
+  const p = value as MeshGovernanceProjektion;
+  const gruende: string[] = [];
+  const id = opts.composableId.trim();
+  if (p.schemaVersion !== MESH_GOVERNANCE_PROJEKTION_SCHEMA_VERSION) {
+    gruende.push(
+      `Die mitgereiste Verfassung trägt schemaVersion ${String(p.schemaVersion)} — dieser Träger versteht ${MESH_GOVERNANCE_PROJEKTION_SCHEMA_VERSION} (fail-closed statt Schema-Raten).`,
+    );
+  }
+  if (p.art !== "projektion") gruende.push("Die mitgereiste Verfassung gibt sich nicht als abgeleitete Projektion aus (art ≠ \"projektion\") — kein Vertrauen.");
+  if (typeof p.digest !== "string" || !p.digest) gruende.push("Die mitgereiste Verfassung trägt kein Siegel (digest) — nicht prüfbar, also nicht belastbar.");
+  if (p.composableId !== id) gruende.push(`Die mitgereiste Verfassung gehört zur Stelle „${String(p.composableId)}“, gemountet wird „${id}“ — inkongruent (fail-closed).`);
+  if (gruende.length) return { vorhanden: true, intakt: false, gruende };
+  if (!opts.sha256Hex) {
+    return {
+      vorhanden: true,
+      intakt: false,
+      gruende: [
+        "Das Siegel der mitgereisten Verfassung konnte nicht nachgerechnet werden (keine sha256-Funktion injiziert) — fail-closed: ungeprüft ist nicht in Ordnung.",
+      ],
+    };
+  }
+  const { digest, ...ohneSiegel } = p as Record<string, unknown> & { digest: string };
+  const nachgerechnet = opts.sha256Hex(stableStringify(ohneSiegel));
+  if (nachgerechnet !== digest) {
+    return {
+      vorhanden: true,
+      intakt: false,
+      gruende: [
+        "Die mitgereiste Verfassung wurde nach ihrer Erzeugung verändert (Siegel stimmt nicht) — sie ist ein ABGELEITETES Artefakt und darf nicht von Hand editiert werden. Das erzeugende Verfahren muss sie neu erzeugen und die Stelle neu zertifizieren.",
+      ],
+    };
+  }
+  return { vorhanden: true, intakt: true, digest, projektion: p, gruende: [] };
+}
+
 /** Das adressierbare Composable-Manifest `.chos/mesh/composables/<id>.json` (schemaVersion 1). Nur die Felder, die der
  *  KIT-Mount projiziert; unbekannte Felder bleiben erhalten (index signature). */
 export interface MeshComposableManifest {
@@ -70,6 +167,18 @@ export interface MeshComposableManifest {
   faehigkeiten?: { ki?: string[]; autonomie?: string };
   wissen?: string[];
   evalSuiten?: string[];
+  /** Die VERANTWORTUNG/BEFUGNIS der Stelle — „darf sie entscheiden“. Bisher fiel dieses Feld in die
+   *  Index-Signatur und war dem KIT damit UNBEKANNT: `hitlPflicht` erreichte weder den Mount-Mapper noch die
+   *  Chat-Route. Genau daran lief ein HITL-pflichtiges Bescheid-Composable als nicht-rechtsnaher AAL-3-Agent. */
+  befugnis?: {
+    entscheidung?: "erlaesst-va" | "entwurf-only" | "keine";
+    hitlPflicht?: boolean;
+    aal?: number;
+  };
+  /** Die VERSIEGELTE Governance-Projektion (CHOS `composable-governance-projektion`) — die mitgereiste
+   *  Verfassung dieser Stelle. Ebenfalls bisher nur Index-Signatur; ohne Typ konnte der KIT das Siegel weder
+   *  nachrechnen noch das zweite in-toto-Subjekt darauf beziehen. */
+  governanceProjektion?: MeshGovernanceProjektion;
   certification?: {
     status?: string;
     cal?: number;
@@ -176,6 +285,13 @@ export interface MeshCertVerification {
    *  Ed25519-Attestation dagegen gültig verifizierte; bzw. der ältere injizierte HMAC-Verifier bestand). */
   signatureChecked: boolean;
   countersigned: boolean;
+  /** Bezeugt das Verdikt die konkrete GOVERNANCE, unter der zertifiziert wurde (zweites in-toto-Subjekt
+   *  `<id>#governance`)? Bisher prüfte der KIT nur `subject[0]` — ein Verdikt konnte also „zertifiziert“ sagen,
+   *  ohne dass irgendwer wusste, unter welcher Verfassung. false = das Verdikt sagt über Governance NICHTS
+   *  (ehrliche Absenz), nicht „Governance ist in Ordnung“. */
+  governanceAttested: boolean;
+  /** Der vom Verdikt bezeugte Projektions-Digest (nur bei governanceAttested). */
+  governanceSha256?: string;
   axes?: Record<CertAxis, CertAxisVerdict>;
   finishedAt?: string;
   reasons: string[];
@@ -200,6 +316,10 @@ export interface MeshCertVerifyOptions {
   verifySignature?: (payload: string, sig: string | undefined) => boolean;
   /** Kanonische Serialisierung des Statements für den HMAC-Payload (muss byte-gleich zur CHOS-Signier-Seite sein). */
   statementPayload?: (statement: MeshCertStatement) => string;
+  /** Der NACHGERECHNETE Digest der mitgereisten Governance-Projektion (verifyMeshGovernanceProjektion). Das Verdikt
+   *  gilt nur für EXAKT die Governance, unter der es verdient wurde. `null` = die Stelle führt keine (mehr) mit;
+   *  `undefined` = der Aufrufer hat nicht geprüft (dann bleibt die Achse ehrlich ungeprüft, kein stiller Freispruch). */
+  governanceSha256?: string | null;
 }
 
 /**
@@ -220,6 +340,7 @@ export function verifyMeshCertStructure(
       earned: false,
       signatureChecked: false,
       countersigned: false,
+      governanceAttested: false,
       reasons: [
         "Eval-Verdikt fehlt/unlesbar (kein Objekt) — Zertifizierung ist nicht belegt (deklariert ≠ verdient).",
       ],
@@ -248,6 +369,25 @@ export function verifyMeshCertStructure(
     reasons.push(
       "Manifest-Digest weicht ab — die Stelle wurde seit der Zertifizierung neu emittiert/verändert (Verdikt veraltet, Re-Zertifizierung nötig).",
     );
+  }
+  // GOVERNANCE-SUBJEKT (das ZWEITE in-toto-Subjekt `<id>#governance`): bezeugt das Verdikt eine konkrete
+  // Governance-Projektion — und ist es DIESE? Ein ausgetauschtes/verändertes Governance-Artefakt macht das Verdikt
+  // UNGÜLTIG: das Zertifikat gilt nur für exakt die Verfassung, unter der es verdient wurde. Kein Subjekt ⇒
+  // governanceAttested:false (ehrliche Absenz, kein stiller Über-Claim). Spiegel der CHOS-Seite.
+  const govSubject = st?.subject?.find(
+    (subject) => subject?.name === meshCertGovernanceSubject(id),
+  );
+  const bezeugterGovDigest = govSubject?.digest?.sha256;
+  if (bezeugterGovDigest && opts.governanceSha256 !== undefined) {
+    if (opts.governanceSha256 === null) {
+      reasons.push(
+        "Das Verdikt bezeugt eine Governance-Projektion, die Stelle führt aber keine (gültige) mehr mit — die Governance, unter der zertifiziert wurde, ist nicht mehr nachweisbar.",
+      );
+    } else if (opts.governanceSha256 !== bezeugterGovDigest) {
+      reasons.push(
+        "Governance-Projektion weicht ab — die Stelle steht nicht mehr unter der Governance, unter der sie zertifiziert wurde (Verdikt veraltet, Re-Zertifizierung nötig).",
+      );
+    }
   }
   // claim ∧ evidence IM Artefakt: earned aus den Szenario-Records nachrechnen; Abweichung ⇒ manipuliert/inkonsistent.
   const recomputedAxes = st?.predicate?.scenarios
@@ -302,6 +442,8 @@ export function verifyMeshCertStructure(
     earned: valid && recomputedEarned,
     signatureChecked,
     countersigned,
+    governanceAttested: valid && !!bezeugterGovDigest,
+    ...(valid && bezeugterGovDigest ? { governanceSha256: bezeugterGovDigest } : {}),
     ...(valid && recomputedAxes ? { axes: recomputedAxes } : {}),
     ...(valid && st?.predicate?.finishedAt
       ? { finishedAt: st.predicate.finishedAt }

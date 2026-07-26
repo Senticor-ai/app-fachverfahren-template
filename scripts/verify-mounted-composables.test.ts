@@ -6,7 +6,7 @@ import {
   sign as edSign,
   type KeyObject,
 } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -223,5 +223,134 @@ describe("verifyMountedComposables — Anspruch ∧ Beleg (fail-closed)", () => 
     expect(r.ok).toBe(true);
     expect(r.checked).toBe(1);
     expect(r.verdient).toBe(0);
+  });
+});
+
+// ── DIE MITGEREISTE STELLEN-VERFASSUNG (`<id>.governance.yaml`) ─────────────────────────────────────────────────────
+// Eine Stelle reist mit ZWEI Darstellungen derselben versiegelten Ableitung: JSON im Manifest (was die App betreibt)
+// und yaml daneben (was ein Mensch im aufnehmenden Haus liest und freigibt). Laufen sie auseinander, beträfe die
+// menschliche Freigabe etwas anderes als der Betrieb — das ist der Fall, den diese Proben schließen. Die yaml wird
+// GEPARST und ihr Siegel NACHGERECHNET; ein Text-Wächter (nur `digest:`-Zeile suchen) hätte die gefährlichste Probe
+// (Body handgelockert, Siegel-Zeile stehen gelassen) durchgelassen — genau daran ist die erste Fassung gefallen.
+describe("verifyMountedComposables — mitgereiste Stellen-Verfassung", () => {
+  const GENERATOR = "chos:packages/fachverfahren/composable-governance-yaml.ts";
+  const QUELL_DIGEST = "a".repeat(64);
+
+  /** Baut Manifest + passende, versiegelte yaml — beide aus DERSELBEN Projektion (wie der CHOS-Emitter). */
+  function writeMitVerfassung(id: string, opts: { entscheidung?: string } = {}): {
+    projektion: Record<string, unknown>;
+    yamlText: string;
+  } {
+    const ohneSiegel: Record<string, unknown> = {
+      schemaVersion: 2,
+      art: "projektion",
+      composableId: id,
+      domain: "hundesteuer",
+      regime: { normativ: true },
+      stellen: [{ id, art: "flaeche", akteur: "mensch" }],
+      regeln: [{ id: "vier-augen", label: "Vier-Augen vor Bescheid", art: "verbindlich", class: "blocking", verify: "code" }],
+      befugnis: { entscheidung: opts.entscheidung ?? "erlaesst-va", hitlPflicht: true },
+      herkunft: { verfassungDigest: QUELL_DIGEST, revision: 4711 },
+    };
+    const digest = createHash("sha256").update(stableStringify(ohneSiegel)).digest("hex");
+    const projektion = { ...ohneSiegel, digest };
+    const manifest = {
+      schemaVersion: 1,
+      domain: "hundesteuer",
+      id,
+      titel: `Stelle ${id}`,
+      art: "flaeche",
+      akteur: "mensch",
+      faehigkeiten: { ki: ["pruefung"], autonomie: "AAL-2" },
+      certification: { status: "candidate", cal: 2 },
+      governanceProjektion: projektion,
+    };
+    writeFileSync(path.join(dir, `${id}.json`), JSON.stringify(manifest, null, 2) + "\n");
+    const yamlText = [
+      "# erzeugt, nicht geschrieben",
+      `_meta:`,
+      `  doNotEdit: erzeugt`,
+      `  generatedBy: ${GENERATOR}`,
+      `  sourceSha256: ${QUELL_DIGEST}`,
+      yamlVon(projektion),
+    ].join("\n");
+    writeFileSync(path.join(dir, `${id}.governance.yaml`), yamlText);
+    return { projektion, yamlText };
+  }
+
+  /** Minimaler, deterministischer yaml-Dump der Projektion (die Gate-Prüfung parst ihn mit `yaml`). */
+  function yamlVon(o: unknown, einzug = ""): string {
+    if (Array.isArray(o)) {
+      return o.map((v) => `${einzug}- ${yamlVon(v, einzug + "  ").replace(/^\s+/, "")}`).join("\n");
+    }
+    if (o && typeof o === "object") {
+      return Object.entries(o as Record<string, unknown>)
+        .map(([k, v]) =>
+          v && typeof v === "object"
+            ? `${einzug}${k}:\n${yamlVon(v, einzug + "  ")}`
+            : `${einzug}${k}: ${JSON.stringify(v)}`,
+        )
+        .join("\n");
+    }
+    return `${einzug}${JSON.stringify(o)}`;
+  }
+
+  const govFehler = (r: { fehler: string[] }): string[] =>
+    r.fehler.filter((f) => /Verfassung|Herkunfts-Marker|Erzeuger/.test(f));
+
+  it("ÜBERBLOCKUNG: eine unveränderte, passende Verfassung kommt durch", () => {
+    writeMitVerfassung("sachbearbeitung");
+    expect(govFehler(verifyMountedComposables(dir))).toEqual([]);
+  });
+
+  it("ÜBERBLOCKUNG: FEHLT die yaml (Alt-Bestand), blockt das Gate nicht — es weist nur hin", () => {
+    writeManifest("ohne-verfassung", "candidate");
+    const r = verifyMountedComposables(dir);
+    expect(govFehler(r)).toEqual([]);
+    expect(r.ok).toBe(true);
+  });
+
+  it("eine im Body HANDGELOCKERTE Verfassung wird verworfen (ein Text-Wächter hätte sie durchgelassen)", () => {
+    const { yamlText } = writeMitVerfassung("sachbearbeitung");
+    writeFileSync(
+      path.join(dir, "sachbearbeitung.governance.yaml"),
+      yamlText.replace('"erlaesst-va"', '"keine"'),
+    );
+    expect(govFehler(verifyMountedComposables(dir)).join(" ")).toMatch(/nicht \(mehr\) die erzeugte/);
+  });
+
+  it("eine Verfassung mit FREMDEM Siegel wird verworfen", () => {
+    const { yamlText } = writeMitVerfassung("sachbearbeitung");
+    writeFileSync(
+      path.join(dir, "sachbearbeitung.governance.yaml"),
+      yamlText.replace(/digest: ".*"/, `digest: "${"0".repeat(64)}"`),
+    );
+    expect(govFehler(verifyMountedComposables(dir)).length).toBeGreaterThan(0);
+  });
+
+  it("eine HAND-GESCHRIEBENE Verfassung (ohne Erzeuger-Marker) ist kein gültiger Anspruch", () => {
+    const { yamlText } = writeMitVerfassung("sachbearbeitung");
+    writeFileSync(
+      path.join(dir, "sachbearbeitung.governance.yaml"),
+      yamlText.replace(GENERATOR, "mensch:von-hand"),
+    );
+    expect(govFehler(verifyMountedComposables(dir)).join(" ")).toMatch(/Erzeuger-Marker/);
+  });
+
+  it("ein _meta, das eine ANDERE Quell-Verfassung benennt, ist ein Widerspruch in sich", () => {
+    const { yamlText } = writeMitVerfassung("sachbearbeitung");
+    writeFileSync(
+      path.join(dir, "sachbearbeitung.governance.yaml"),
+      yamlText.replace(`sourceSha256: ${QUELL_DIGEST}`, `sourceSha256: ${"f".repeat(64)}`),
+    );
+    expect(govFehler(verifyMountedComposables(dir)).join(" ")).toMatch(/zwei Herkünfte/);
+  });
+
+  it("eine handgelockerte Projektion IM MANIFEST bricht ihr Siegel (der Betriebs-Pfad ist ebenso geschützt)", () => {
+    writeMitVerfassung("sachbearbeitung");
+    const p = path.join(dir, "sachbearbeitung.json");
+    const roh = readFileSync(p, "utf8");
+    writeFileSync(p, roh.replace('"hitlPflicht": true', '"hitlPflicht": false'));
+    expect(verifyMountedComposables(dir).fehler.join(" ")).toMatch(/verändert/);
   });
 });

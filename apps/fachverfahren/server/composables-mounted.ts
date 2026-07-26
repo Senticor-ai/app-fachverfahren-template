@@ -23,6 +23,7 @@ import {
   istMeshManifest,
   mapManifestToComposable,
   verifyMeshCertStructure,
+  verifyMeshGovernanceProjektion,
   type AgenticComposable,
   type ComposableHerkunft,
   type ComposableHerkunftQuelle,
@@ -223,6 +224,22 @@ export function loadMountedComposables(
     const manifest = parsed as MeshComposableManifest;
     const id = manifest.id.trim();
 
+    // ── DIE MITGEREISTE VERFASSUNG (Verteilzeit): das Siegel wird NACHGERECHNET, nicht geglaubt. ──────────────
+    // Verlässt eine Stelle ihren Arbeitsbereich, ist die eigene Verfassung dieses Trägers über sie stumm — die
+    // mitgereiste, versiegelte Projektion IST hier ihre Verfassung. Genau deshalb darf sie nicht unterwegs
+    // veränderbar sein: ein gebrochenes Siegel bedeutet, dass jemand die Governance einer fremden Stelle
+    // umgeschrieben hat. Das ist kein Kappungs-Fall, sondern ein Übersprung-Fall (fail-closed, sichtbar).
+    // ABSENZ blockt NICHT: eine Stelle ohne Projektion behauptet über Governance ehrlich nichts (Alt-Bestand) —
+    // sie darauf zu blocken wäre ein Falsch-Blocker, der jeden Mount ohne CHOS-Governance unmöglich machte.
+    const gov = verifyMeshGovernanceProjektion(manifest.governanceProjektion, {
+      composableId: id,
+      sha256Hex,
+    });
+    if (gov.vorhanden && !gov.intakt) {
+      uebersprungen.push({ file, grund: gov.gruende.join(" · ") });
+      continue;
+    }
+
     // Attestation aus dem daneben liegenden Verdikt (Frische gegen die EXAKTEN Manifest-Bytes + Ed25519-Signatur gegen
     // den vertrauten PUBLIC Key). Fehlt/unlesbar/ungültig/unsigniert ⇒ earned:false ⇒ der Mapper kappt deklariertes
     // certified/active fail-closed auf candidate (kein Über-Claim ohne verdienten UND authentischen Beleg).
@@ -237,6 +254,10 @@ export function loadMountedComposables(
           certSigningPublicKey: trusted,
           sha256Hex,
           verifyEd25519,
+          // Das Verdikt bezeugt ein ZWEITES Subjekt `<id>#governance`. Bisher prüfte der KIT nur subject[0] — ein
+          // Verdikt konnte also „zertifiziert" sagen, während die Governance darunter ausgetauscht war. Jetzt wird
+          // der nachgerechnete Projektions-Digest dagegen gehalten: `null` = keine (gültige) Projektion vorhanden.
+          governanceSha256: gov.intakt && gov.digest ? gov.digest : null,
         });
         // earned NUR mit verifizierter Signatur (fehlt der vertraute Key ⇒ signatureChecked=false ⇒ gekappt).
         attestation = { valid: v.valid, earned: v.earned && v.signatureChecked };
