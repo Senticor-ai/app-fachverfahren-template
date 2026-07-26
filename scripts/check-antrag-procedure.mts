@@ -69,6 +69,13 @@ const quelle: StatusMachineSource = {
   legalBasisIds: leistungConfig.rechtsgrundlagen.map((r) => r.norm),
   requiredPermission: permission,
   ...(verwaltungsakt ? { verwaltungsakt } : {}),
+  // Die DATEN-Bindung der VA-Pflichtangaben (`verwaltungsaktInhalt`) ist SERVER-seitige Metadatenangabe wie
+  // version/effectiveFrom/Permission: sie besteht aus Punkt-PFADEN in die server-gehaltene Fallakte und steht
+  // deshalb nicht in leistung.config. Sie wird — wie die übrigen Server-Metadaten — aus der committeten
+  // antragProcedure übernommen, damit dieses Gate NUR echte Struktur-Drift meldet.
+  ...(antragProcedure.verwaltungsaktInhalt
+    ? { verwaltungsaktInhalt: antragProcedure.verwaltungsaktInhalt }
+    : {}),
   states: sm.states.map((s) => ({
     key: s.key,
     ...(s.terminal ? { terminal: true } : {}),

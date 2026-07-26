@@ -955,12 +955,23 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
         // liest sie hier EINMAL beim Erlass und friert sie ein. Fehlt eine Deklaration, wird nichts
         // erfunden — die Lücke bleibt sichtbar und das Pflichtangaben-Gate meldet sie.
         const inhalt = procedure.verwaltungsaktInhalt;
-        const alsText = (pfad: string | undefined): string | undefined => {
+        const alsText = (
+          pfad: string | readonly string[] | undefined,
+        ): string | undefined => {
           if (!pfad) return undefined;
-          const v = leseDatenPfad(appCase.data, pfad);
-          const t =
-            typeof v === "string" ? v.trim() : v == null ? "" : String(v);
-          return t.length > 0 ? t : undefined;
+          // Mehrere Pfade (z. B. Vor- und Nachname) werden in DEKLARIERTER Reihenfolge verbunden — der
+          // Inhaltsadressat ist selten ein einzelnes Feld.
+          const teile = (Array.isArray(pfad) ? pfad : [pfad as string])
+            .map((p) => {
+              const v = leseDatenPfad(appCase.data, p);
+              return typeof v === "string"
+                ? v.trim()
+                : v == null
+                  ? ""
+                  : String(v);
+            })
+            .filter((t) => t.length > 0);
+          return teile.length ? teile.join(" ") : undefined;
         };
         const adressatName = alsText(inhalt?.adressatNamePfad);
         const adressat = adressatName

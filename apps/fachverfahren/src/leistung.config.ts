@@ -354,7 +354,7 @@ export const leistungConfig: LeistungConfig = {
       quelle: "apps/fachverfahren/src/leistung.config.ts — DEMO_TARIF",
     },
     {
-      name: "Gebuehrenfrei (Vollnachlass--Fallgruppe)",
+      name: "Gebuehrenfrei (Voll-Nachlass-Fallgruppe)",
       antragsdaten: { anliegen: { kategorie: "gebuehrenfrei" } },
       erwartet: { betrag: 0 },
       herleitung:

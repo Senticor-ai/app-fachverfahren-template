@@ -96,9 +96,10 @@ export interface VerwaltungsaktConfig {
  * entscheidet das Gate über die Verfassungs-Liste, nicht dieser Typ.
  */
 export interface VerwaltungsaktInhaltConfig {
-  /** Punkt-Pfade auf Name/Anschrift/Vertreter des INHALTSADRESSATEN in `case.data`. */
-  adressatNamePfad?: string;
-  adressatAnschriftPfad?: string;
+  /** Punkt-Pfad(e) auf den NAMEN des Inhaltsadressaten in `case.data`. Mehrere Pfade werden in der
+   *  angegebenen Reihenfolge mit Leerzeichen verbunden (Vor-/Nachname sind in der Regel zwei Felder). */
+  adressatNamePfad?: string | readonly string[];
+  adressatAnschriftPfad?: string | readonly string[];
   adressatVertreterPfad?: string;
   /** Regelungs-/Erhebungszeitraum: entweder aus der Akte (Pfad) oder als fester Text des Verfahrens. */
   zeitraumPfad?: string;

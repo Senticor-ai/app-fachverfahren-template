@@ -115,6 +115,29 @@ const MUSTER_ANTRAG: StatusMachineSource = {
     fiktionTage: 4,
     fiktionNorm: "§ 41 Abs. 2 VwVfG",
   },
+  // PFLICHTANGABEN DES VERWALTUNGSAKTS als DATEN-Bindung (Phase 5, W5). Der Renderer kann nur zeigen, was
+  // der eingefrorene VA TRÄGT; hier steht, WOHER er es beim Erlass nimmt. Ohne diese Bindung nennt der
+  // Bescheid keinen Inhaltsadressaten (§ 119 Abs. 1 AO — Nichtigkeitsrisiko) und kein Leistungsgebot
+  // (§ 254 Abs. 1 AO — nicht vollstreckbar). Ein reales Verfahren ersetzt die Pfade durch seine Felder.
+  verwaltungsaktInhalt: {
+    adressatNamePfad: ["antragsteller.vorname", "antragsteller.nachname"],
+    adressatAnschriftPfad: ["antragsteller.plz", "antragsteller.ort"],
+    // Der Zahlbetrag ist der festgesetzte Tenor-Betrag; Fälligkeiten trägt dieses Demo-Verfahren nicht
+    // (Sofortfälligkeit). Ein Verfahren mit Raten deklariert `faelligkeitenPfad` auf eine Liste
+    // { datum, betrag } — MIT Jahreszahl, sonst ist die Fälligkeit unbestimmt.
+    leistungsgebot: {
+      betragPfad: "berechnung.betrag",
+      waehrung: "EUR",
+      zahlungsempfaenger: "Stadtkasse Musterstadt",
+    },
+    // § 119 Abs. 3 Satz 2 AO: Namenswiedergabe ODER ausdrücklicher Automations-Vermerk. Die Vorlage erlässt
+    // maschinell — also der Vermerk, nicht ein erfundener Name.
+    unterschrift: {
+      maschinell: true,
+      vermerk:
+        "Dieser Bescheid wurde maschinell erstellt und ist ohne Unterschrift gültig.",
+    },
+  },
   states: [
     { key: "eingegangen" },
     { key: "in_pruefung" },

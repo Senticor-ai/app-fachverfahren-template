@@ -16,6 +16,7 @@ import type {
   ProcedureVersion,
   StelltForderungConfig,
   VerwaltungsaktConfig,
+  VerwaltungsaktInhaltConfig,
 } from "./domain-kernel.js";
 import type { Bedingung } from "./rules.js";
 
@@ -59,6 +60,10 @@ export interface StatusMachineSource {
   /** Verwaltungsakt-Fachlichkeit (Rechtsbehelf + Bekanntgabe) — vorhanden, wenn das Verfahren einen
    *  Bescheid erlässt. Wird 1:1 an ProcedureVersion.verwaltungsakt durchgereicht. */
   verwaltungsakt?: VerwaltungsaktConfig;
+  /** DATEN-Bindung der VA-Pflichtangaben (Inhaltsadressat, Zeitraum, Leistungsgebot, Unterschrift) an die
+   *  Fallakte — Phase 5, W5. Wird 1:1 an ProcedureVersion.verwaltungsaktInhalt durchgereicht: der Renderer
+   *  kann nur zeigen, was der eingefrorene VA trägt, und der Erlass friert nur ein, was hier deklariert ist. */
+  verwaltungsaktInhalt?: VerwaltungsaktInhaltConfig;
 }
 
 /** Deterministischer, ASCII-sicherer Slug eines Labels → stabile `action`. Umlaute werden transliteriert,
@@ -124,5 +129,8 @@ export function statusMachineToProcedureVersion(
     allowedTransitions,
     // Verwaltungsakt-Fachlichkeit durchreichen, wenn deklariert.
     ...(src.verwaltungsakt ? { verwaltungsakt: src.verwaltungsakt } : {}),
+    ...(src.verwaltungsaktInhalt
+      ? { verwaltungsaktInhalt: src.verwaltungsaktInhalt }
+      : {}),
   };
 }
