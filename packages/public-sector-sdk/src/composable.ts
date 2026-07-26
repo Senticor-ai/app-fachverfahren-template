@@ -162,6 +162,39 @@ export interface AgenticComposable {
   /** Reuse-Herkunft (Blueprint §18): aus der geteilten Registry gemountet vs. lokal abgeleitet. Fehlt das Feld,
    *  gilt „lokal abgeleitet" (evidence-driven: absente Mount-Provenienz = lokal). */
   herkunft?: ComposableHerkunft;
+  /** WAS die Stelle im laufenden Verfahren ENTSCHEIDET — die Verfahrensschritte, fuer die sie berechtigt ist.
+   *
+   *  GEMESSEN (32 reale Mesh-Manifeste): ein Composable deklarierte bisher Faehigkeiten, Befugnis und
+   *  Wissensbindung — und nirgends, was bei ihm herauskommt. Fuer einen Fachbereich ist das die erste Frage.
+   *
+   *  ABGELEITET, NICHT GEPFLEGT: die Zuordnung entsteht im Emitter aus der Zustandsmaschine der Leistung
+   *  (Uebergaenge x `rollen`). Ein handgepflegtes Feld waere eine zweite Wahrheit und beim ersten
+   *  Verfassungs-Update falsch. Fehlt es, entscheidet die Stelle nichts — das ist eine Aussage, keine Luecke. */
+  leistungen?: ComposableLeistung[];
+  /** WAS in welcher BAU-Phase entsteht (aus RACI x produces). Ergaenzt `leistungen` um die Herstellungs-Sicht. */
+  artefakte?: ComposableArtefakt[];
+}
+
+/** Ein Verfahrensschritt, den diese Stelle verantwortet — die fachliche Leistung des Composables. */
+export interface ComposableLeistung {
+  /** Der Schritt in der Sprache des Verfahrens („Grundsteuerwert feststellen"). */
+  schritt: string;
+  /** Der Zustand, den er herbeifuehrt — das eigentliche Ergebnis. */
+  ergebnis: string;
+  /** Verlangt der Schritt eine zweite Person? Eine Rechtsfolge, keine Nuance. */
+  vierAugen: boolean;
+  /** Muss die Entscheidung begruendet werden? */
+  begruendungsPflicht: boolean;
+  /** Erlaesst dieser Schritt einen Verwaltungsakt? Der schwerste Marker, den ein Schritt tragen kann. */
+  erlaesstBescheid: boolean;
+}
+
+/** Ein Artefakt, das diese Stelle in einer Bau-Phase verantwortet. */
+export interface ComposableArtefakt {
+  ziel: string;
+  phase: string;
+  /** DATEI-Zusage oder abstraktes ERGEBNIS-Ziel — beides legitim, aber nicht dasselbe. */
+  art: "datei" | "ergebnis";
 }
 
 const AAL_RANG: Record<AgenticAutonomyLevel, number> = {

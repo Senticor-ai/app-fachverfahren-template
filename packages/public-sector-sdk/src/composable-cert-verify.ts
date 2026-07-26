@@ -167,6 +167,18 @@ export interface MeshComposableManifest {
   faehigkeiten?: { ki?: string[]; autonomie?: string };
   wissen?: string[];
   evalSuiten?: string[];
+  /** WAS die Stelle im laufenden Verfahren ENTSCHEIDET — abgeleitet aus der Zustandsmaschine (Uebergaenge x
+   *  `rollen`), nie handgepflegt. Bis hierher deklariert, damit es nicht — wie `befugnis` vor ihm — in die
+   *  Index-Signatur faellt und dem KIT unbekannt bleibt. */
+  leistungen?: {
+    schritt: string;
+    ergebnis: string;
+    vierAugen: boolean;
+    begruendungsPflicht: boolean;
+    erlaesstBescheid: boolean;
+  }[];
+  /** WAS in welcher BAU-Phase entsteht (aus RACI x produces) — die Herstellungs-Sicht neben `leistungen`. */
+  artefakte?: { ziel: string; phase: string; art: "datei" | "ergebnis" }[];
   /** Die VERANTWORTUNG/BEFUGNIS der Stelle — „darf sie entscheiden“. Bisher fiel dieses Feld in die
    *  Index-Signatur und war dem KIT damit UNBEKANNT: `hitlPflicht` erreichte weder den Mount-Mapper noch die
    *  Chat-Route. Genau daran lief ein HITL-pflichtiges Bescheid-Composable als nicht-rechtsnaher AAL-3-Agent. */

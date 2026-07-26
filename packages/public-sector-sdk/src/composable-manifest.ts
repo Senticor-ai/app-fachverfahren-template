@@ -283,6 +283,11 @@ export function mapManifestToComposable(
     ...(spine ? { spine } : {}),
     evals,
     replaceableBy: [],
+    // WAS LIEFERT DIESE STELLE — vom Emitter ABGELEITET (Zustandsmaschine x rollen bzw. RACI x produces),
+    // nie hier nachgebaut: eine zweite Ableitung waere ein zweiter Datenstand. Der Adapter REICHT DURCH.
+    // Fehlen die Felder, entscheidet/liefert die Stelle nichts — das ist eine Aussage, keine Luecke.
+    ...(manifest.leistungen?.length ? { leistungen: manifest.leistungen } : {}),
+    ...(manifest.artefakte?.length ? { artefakte: manifest.artefakte } : {}),
   };
 
   return assertComposable(composable);
