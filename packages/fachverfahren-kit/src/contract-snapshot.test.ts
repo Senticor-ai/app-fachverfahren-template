@@ -262,3 +262,59 @@ describe("diffNurEinfacheSprache — self-diagnosing FRISCHE-Fehlermeldung", () 
     expect(diffNurEinfacheSprache(committed, frisch)).toBeNull();
   });
 });
+
+// ── PHASE 5 / W1: DAS RECHTSBEHELFS-REGIME REIST IM VERTRAG MIT ──────────────────────────────────────────────
+// Rechtsfolgen-Test: der Server liest AUSSCHLIESSLICH `leistung.contract.json`. Fehlt dort das Regime, erbt er
+// still das Regime der Vorlage und der Bescheid belehrt nach der falschen Verfahrensschiene — eine unrichtige
+// Belehrung verlängert die Rechtsbehelfsfrist auf EIN JAHR (§ 356 Abs. 2 AO / § 58 Abs. 2 VwGO).
+describe("toContractSnapshot — Rechtsbehelfs-/Bekanntgabe-Regime (W1)", () => {
+  const aoRegime: LeistungConfig["zustellung"] = {
+    fiktionTage: 4,
+    fiktionNorm: "§ 122 Abs. 2 AO",
+    rechtsbehelf: {
+      art: "einspruch",
+      fristWert: 1,
+      fristEinheit: "monat",
+      stelle: "der Stadt Musterstadt — Steueramt",
+      sitz: "Rathausplatz 1, 12345 Musterstadt",
+      form: "schriftlich, elektronisch oder zur Niederschrift",
+      norm: "§ 355 Abs. 1 AO",
+    },
+  };
+
+  it("transportiert das VOLLSTÄNDIGE Regime inkl. Sitz und Form (sonst belehrt der Server falsch)", () => {
+    const snap = toContractSnapshot({ ...basis, zustellung: aoRegime });
+    expect(snap.zustellung?.fiktionNorm).toBe("§ 122 Abs. 2 AO");
+    expect(snap.zustellung?.rechtsbehelf?.art).toBe("einspruch");
+    expect(snap.zustellung?.rechtsbehelf?.sitz).toBe(
+      "Rathausplatz 1, 12345 Musterstadt",
+    );
+    expect(snap.zustellung?.rechtsbehelf?.form).toBe(
+      "schriftlich, elektronisch oder zur Niederschrift",
+    );
+    // GEGENPROBE zum Vorher-Zustand: der Snapshot vor Phase 5 kannte das Feld gar nicht — hier als das
+    // reproduzierte Symptom, das der Server sah (kein Regime ⇒ Muster-Regime der Vorlage).
+    const ohneTransport = JSON.parse(JSON.stringify(snap)) as Record<
+      string,
+      unknown
+    >;
+    delete ohneTransport["zustellung"];
+    expect(ohneTransport["zustellung"]).toBeUndefined();
+  });
+
+  it("bleibt deterministisch: die Laufzeit-URL `bescheidUrl` wandert NICHT in den Vertrag", () => {
+    const snap = toContractSnapshot({
+      ...basis,
+      zustellung: { ...aoRegime, bescheidUrl: "https://host/x.pdf" },
+    });
+    expect(snap.zustellung).toBeDefined();
+    expect(
+      (snap.zustellung as Record<string, unknown>)["bescheidUrl"],
+    ).toBeUndefined();
+  });
+
+  it("ÜBERBLOCKUNG: eine Config OHNE zustellung erzeugt kein leeres Feld (Bestandsverträge bleiben gültig)", () => {
+    const snap = toContractSnapshot(basis);
+    expect("zustellung" in snap).toBe(false);
+  });
+});

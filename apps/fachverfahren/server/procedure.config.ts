@@ -95,126 +95,130 @@ export const dossierProcedure: ProcedureVersion = {
  * `procedureId` MUSS `leistung.config.id` entsprechen — der Client sendet ihn beim Einreichen.
  */
 const MUSTER_ANTRAG: StatusMachineSource = {
-    procedureId: "musterantrag",
-    version: "1",
-    effectiveFrom: "2026-01-01T00:00:00.000Z",
-    legalBasisIds: ["§ 1 Demo-Satzung"],
-    requiredPermission: PREPARE,
-    // Verwaltungsakt-Fachlichkeit — SPIEGEL von leistung.config.zustellung (der Server kann leistung.config
-    // nicht importieren, rootDir-Mauer). Das Drift-Gate check:antrag-procedure sichert die Deckung.
-    verwaltungsakt: {
-      rechtsbehelf: {
-        art: "widerspruch",
-        fristWert: 1,
-        fristEinheit: "monat",
-        stelle: "der erlassenden Behörde",
-        norm: "§ 68 ff. VwGO",
-      },
-      fiktionTage: 4,
-      fiktionNorm: "§ 41 Abs. 2 VwVfG",
+  procedureId: "musterantrag",
+  version: "1",
+  effectiveFrom: "2026-01-01T00:00:00.000Z",
+  legalBasisIds: ["§ 1 Demo-Satzung"],
+  requiredPermission: PREPARE,
+  // Verwaltungsakt-Fachlichkeit — SPIEGEL von leistung.config.zustellung (der Server kann leistung.config
+  // nicht importieren, rootDir-Mauer). Das Drift-Gate check:antrag-procedure sichert die Deckung.
+  verwaltungsakt: {
+    rechtsbehelf: {
+      art: "widerspruch",
+      fristWert: 1,
+      fristEinheit: "monat",
+      stelle: "der erlassenden Behörde",
+      norm: "§ 70 Abs. 1 VwGO",
+      sitz: "Rathausplatz 1, 12345 Musterstadt",
+      form: "schriftlich, elektronisch oder zur Niederschrift",
     },
-    states: [
-      { key: "eingegangen" },
-      { key: "in_pruefung" },
-      { key: "review_noetig" },
-      // Wiederaufnehmbar-geschlossen (nicht terminal) — der Widerspruch öffnet den Fall wieder (ADR-0006).
-      { key: "festgesetzt" },
-      { key: "abgelehnt", terminal: true },
-      { key: "widerspruch_in_pruefung" },
-      { key: "abgeholfen", terminal: true },
-      { key: "widerspruch_zurueckgewiesen", terminal: true },
-      { key: "rueckforderung_festgesetzt" },
-      { key: "erstattet", terminal: true },
-      { key: "niedergeschlagen", terminal: true },
-    ],
-    transitions: [
-      { from: "eingegangen", to: "in_pruefung", label: "In Prüfung nehmen" },
-      { from: "in_pruefung", to: "review_noetig", label: "Zur Zweitprüfung" },
-      {
-        from: "in_pruefung",
-        to: "festgesetzt",
-        label: "Festsetzen",
-        vierAugen: true,
-        erlaesstBescheid: true,
-        closesCase: true,
-      },
-      {
-        from: "review_noetig",
-        to: "festgesetzt",
-        label: "Festsetzen (Zweitfreigabe)",
-        vierAugen: true,
-        erlaesstBescheid: true,
-        closesCase: true,
-      },
-      { from: "in_pruefung", to: "abgelehnt", label: "Ablehnen" },
-      // Widerspruchs-Verfahren (ADR-0006) — Spiegel von leistung.config, Drift-Gate check:antrag-procedure.
-      {
-        from: "festgesetzt",
-        to: "widerspruch_in_pruefung",
-        label: "Widerspruch bearbeiten",
-      },
-      {
-        from: "widerspruch_in_pruefung",
-        to: "abgeholfen",
-        label: "Abhilfe",
-        vierAugen: true,
-      },
-      {
-        from: "widerspruch_in_pruefung",
-        to: "widerspruch_zurueckgewiesen",
-        label: "Widerspruch zurückweisen",
-        vierAugen: true,
-        // Widerspruchsbescheid = Verwaltungsakt mit EIGENEM Klage-Regime (ADR-0006 §3), Spiegel von leistung.config.
-        erlaesstBescheid: true,
-        verwaltungsakt: {
-          rechtsbehelf: {
-            art: "klage",
-            fristWert: 1,
-            fristEinheit: "monat",
-            stelle: "das zuständige Verwaltungsgericht",
-            norm: "§ 74 VwGO",
-          },
-          fiktionTage: 4,
-          fiktionNorm: "§ 41 Abs. 2 VwVfG",
+    fiktionTage: 4,
+    fiktionNorm: "§ 41 Abs. 2 VwVfG",
+  },
+  states: [
+    { key: "eingegangen" },
+    { key: "in_pruefung" },
+    { key: "review_noetig" },
+    // Wiederaufnehmbar-geschlossen (nicht terminal) — der Widerspruch öffnet den Fall wieder (ADR-0006).
+    { key: "festgesetzt" },
+    { key: "abgelehnt", terminal: true },
+    { key: "widerspruch_in_pruefung" },
+    { key: "abgeholfen", terminal: true },
+    { key: "widerspruch_zurueckgewiesen", terminal: true },
+    { key: "rueckforderung_festgesetzt" },
+    { key: "erstattet", terminal: true },
+    { key: "niedergeschlagen", terminal: true },
+  ],
+  transitions: [
+    { from: "eingegangen", to: "in_pruefung", label: "In Prüfung nehmen" },
+    { from: "in_pruefung", to: "review_noetig", label: "Zur Zweitprüfung" },
+    {
+      from: "in_pruefung",
+      to: "festgesetzt",
+      label: "Festsetzen",
+      vierAugen: true,
+      erlaesstBescheid: true,
+      closesCase: true,
+    },
+    {
+      from: "review_noetig",
+      to: "festgesetzt",
+      label: "Festsetzen (Zweitfreigabe)",
+      vierAugen: true,
+      erlaesstBescheid: true,
+      closesCase: true,
+    },
+    { from: "in_pruefung", to: "abgelehnt", label: "Ablehnen" },
+    // Widerspruchs-Verfahren (ADR-0006) — Spiegel von leistung.config, Drift-Gate check:antrag-procedure.
+    {
+      from: "festgesetzt",
+      to: "widerspruch_in_pruefung",
+      label: "Widerspruch bearbeiten",
+    },
+    {
+      from: "widerspruch_in_pruefung",
+      to: "abgeholfen",
+      label: "Abhilfe",
+      vierAugen: true,
+    },
+    {
+      from: "widerspruch_in_pruefung",
+      to: "widerspruch_zurueckgewiesen",
+      label: "Widerspruch zurückweisen",
+      vierAugen: true,
+      // Widerspruchsbescheid = Verwaltungsakt mit EIGENEM Klage-Regime (ADR-0006 §3), Spiegel von leistung.config.
+      erlaesstBescheid: true,
+      verwaltungsakt: {
+        rechtsbehelf: {
+          art: "klage",
+          fristWert: 1,
+          fristEinheit: "monat",
+          stelle: "dem zuständigen Verwaltungsgericht",
+          norm: "§ 74 Abs. 1 VwGO",
+          sitz: "Gerichtsstraße 1, 12345 Musterstadt",
+          form: "schriftlich, in elektronischer Form oder zur Niederschrift des Urkundsbeamten der Geschäftsstelle",
         },
+        fiktionTage: 4,
+        fiktionNorm: "§ 41 Abs. 2 VwVfG",
       },
-      // Rückforderungs-Verfahren (ADR-0007) — Spiegel von leistung.config; stelltForderung MUSS deckungsgleich sein.
-      {
-        from: "festgesetzt",
-        to: "rueckforderung_festgesetzt",
-        label: "Rückforderung festsetzen",
-        vierAugen: true,
-        erlaesstBescheid: true,
-        stelltForderung: {
-          tarif: {
-            positionen: [
-              { kategorie: "standard", betragCent: 5000, label: "Standard" },
-              { kategorie: "express", betragCent: 9000, label: "Express" },
-              {
-                kategorie: "gebuehrenfrei",
-                betragCent: 0,
-                label: "Gebührenfrei",
-              },
-            ],
-            defaultCent: 0,
-          },
-          diskriminator: "anliegen.kategorie",
-          zahlungsfristTage: 30,
+    },
+    // Rückforderungs-Verfahren (ADR-0007) — Spiegel von leistung.config; stelltForderung MUSS deckungsgleich sein.
+    {
+      from: "festgesetzt",
+      to: "rueckforderung_festgesetzt",
+      label: "Rückforderung festsetzen",
+      vierAugen: true,
+      erlaesstBescheid: true,
+      stelltForderung: {
+        tarif: {
+          positionen: [
+            { kategorie: "standard", betragCent: 5000, label: "Standard" },
+            { kategorie: "express", betragCent: 9000, label: "Express" },
+            {
+              kategorie: "gebuehrenfrei",
+              betragCent: 0,
+              label: "Gebührenfrei",
+            },
+          ],
+          defaultCent: 0,
         },
+        diskriminator: "anliegen.kategorie",
+        zahlungsfristTage: 30,
       },
-      {
-        from: "rueckforderung_festgesetzt",
-        to: "erstattet",
-        label: "Erstattung bestätigen",
-        vierAugen: true,
-      },
-      {
-        from: "rueckforderung_festgesetzt",
-        to: "niedergeschlagen",
-        label: "Forderung niederschlagen",
-        vierAugen: true,
-      },
-    ],
+    },
+    {
+      from: "rueckforderung_festgesetzt",
+      to: "erstattet",
+      label: "Erstattung bestätigen",
+      vierAugen: true,
+    },
+    {
+      from: "rueckforderung_festgesetzt",
+      to: "niedergeschlagen",
+      label: "Forderung niederschlagen",
+      vierAugen: true,
+    },
+  ],
 };
 
 // ── DIE EINE ANTRAGS-WAHRHEIT: DER EMITTIERTE LEISTUNGS-VERTRAG ──────────────────────────────────────────
@@ -229,9 +233,88 @@ const MUSTER_ANTRAG: StatusMachineSource = {
 // Mit dieser Ableitung ist der Drift STRUKTURELL unmöglich, nicht nur durch ein Gate bemerkt.
 //
 // FAIL-SAFE, nicht fail-open: fehlt/bricht der Vertrag, gilt unverändert die committete Muster-Maschine.
-// Server-seitige Metadaten (version/effectiveFrom/Permission/Verwaltungsakt-Regime) bleiben Server-Sache —
-// sie stehen nicht im Client-Vertrag und werden aus MUSTER_ANTRAG übernommen.
+// Server-seitige Metadaten (version/effectiveFrom/Permission) bleiben Server-Sache — sie stehen nicht im
+// Client-Vertrag und werden aus MUSTER_ANTRAG übernommen.
+//
+// DAS VA-REGIME IST SEIT W1 KEINE SERVER-SACHE MEHR (adversariales Fachaudit, Befund S1): welcher Rechtsbehelf
+// gegen den Bescheid statthaft ist, ist eine FACHLICHE Aussage des Verfahrens, keine Server-Konfiguration. Sie
+// stand in `leistung.config.zustellung`, reiste aber nicht im Vertrag mit — also erbte JEDES generierte
+// Verfahren still das Muster-Regime der Vorlage (Widerspruch/§ 68 ff. VwGO/§ 41 Abs. 2 VwVfG). Für ein
+// AO-Steuerverfahren ist das die falsche Verfahrensschiene; eine unrichtige Belehrung verlängert die
+// Rechtsbehelfsfrist auf EIN JAHR (§ 356 Abs. 2 AO). Der Vertrag trägt `zustellung` jetzt (contract-snapshot),
+// und diese Ableitung KONSUMIERT sie — EINE Wahrheit, transportiert.
 const APP_DIR = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+
+/** Nur die vom Server gelesene Teilform des Vertrags-`zustellung`-Blocks (strukturell, ohne Kit-Import). */
+interface VertragsZustellung {
+  fiktionTage?: unknown;
+  fiktionNorm?: unknown;
+  rechtsbehelf?: {
+    art?: unknown;
+    fristWert?: unknown;
+    fristEinheit?: unknown;
+    stelle?: unknown;
+    norm?: unknown;
+    sitz?: unknown;
+    form?: unknown;
+  };
+}
+
+/**
+ * Leitet das VA-Regime aus dem VERTRAG ab (nicht aus der Server-Kopie). Gibt `undefined` zurück, wenn der
+ * Vertrag kein — oder ein strukturell unbrauchbares — Regime trägt: dann erlässt dieses Verfahren nach
+ * Server-Sicht keinen förmlichen Bescheid, und der Erlass-Übergang wird fail-closed verweigert (cases.ts)
+ * statt still mit dem Muster-Regime der Vorlage eingefroren.
+ *
+ * `sitz`/`form` reisen mit, WENN der Vertrag sie trägt — sie sind Pflicht-Slots der Belehrung
+ * (§ 356 Abs. 1, § 357 Abs. 1 AO), aber im Typ optional, damit Bestands-Verfahren nicht bei der Ableitung
+ * brechen. Die Vollständigkeit erzwingt der ERLASS (fail-closed), nicht diese reine Projektion.
+ */
+function verwaltungsaktAusVertrag(
+  z: VertragsZustellung | undefined,
+): NonNullable<StatusMachineSource["verwaltungsakt"]> | undefined {
+  const rb = z?.rechtsbehelf;
+  if (!rb) return undefined;
+  const s = (v: unknown): string | undefined =>
+    typeof v === "string" && v.trim() ? v : undefined;
+  const art = s(rb.art);
+  const fristEinheit = s(rb.fristEinheit);
+  const stelle = s(rb.stelle);
+  const norm = s(rb.norm);
+  const fristWert =
+    typeof rb.fristWert === "number" && Number.isFinite(rb.fristWert)
+      ? rb.fristWert
+      : undefined;
+  if (art !== "widerspruch" && art !== "einspruch" && art !== "klage")
+    return undefined;
+  if (
+    fristEinheit !== "monat" &&
+    fristEinheit !== "woche" &&
+    fristEinheit !== "tag"
+  )
+    return undefined;
+  if (fristWert === undefined || !stelle || !norm) return undefined;
+  const sitz = s(rb.sitz);
+  const form = s(rb.form);
+  return {
+    rechtsbehelf: {
+      art,
+      fristWert,
+      fristEinheit,
+      stelle,
+      norm,
+      ...(sitz ? { sitz } : {}),
+      ...(form ? { form } : {}),
+    },
+    fiktionTage:
+      typeof z?.fiktionTage === "number" && Number.isFinite(z.fiktionTage)
+        ? z.fiktionTage
+        : 4,
+    // KEIN VwVfG-Default mehr im AO-Fall: fehlt die Fiktionsnorm im Vertrag, bleibt sie LEER — der Erlass
+    // scheitert dann fail-closed, statt eine Norm der FREMDEN Schiene in den Bescheid zu schreiben.
+    fiktionNorm: s(z?.fiktionNorm) ?? "",
+  };
+}
 
 interface VertragsStatusMaschine {
   states?: { key?: unknown; terminal?: unknown }[];
@@ -258,6 +341,7 @@ function antragQuelleAusVertrag(): StatusMachineSource | null {
       id?: unknown;
       rechtsgrundlagen?: { norm?: unknown }[];
       statusMachine?: VertragsStatusMaschine;
+      zustellung?: VertragsZustellung;
     };
     const id = typeof roh.id === "string" ? roh.id.trim() : "";
     const sm = roh.statusMachine;
@@ -312,10 +396,16 @@ function antragQuelleAusVertrag(): StatusMachineSource | null {
     const legalBasisIds = (roh.rechtsgrundlagen ?? [])
       .map((r) => (typeof r.norm === "string" ? r.norm : ""))
       .filter((n) => n.length > 0);
+    // W1 — DAS REGIME KOMMT AUS DEM VERTRAG, nicht aus MUSTER_ANTRAG. Trägt der Vertrag KEIN (brauchbares)
+    // Regime, wird `verwaltungsakt` bewusst ENTFERNT statt geerbt: lieber gar kein Bescheid (fail-closed am
+    // Erlass) als ein Bescheid mit der Belehrung eines fremden Verfahrens.
+    const verwaltungsakt = verwaltungsaktAusVertrag(roh.zustellung);
+    const { verwaltungsakt: _musterRegime, ...basisOhneRegime } = MUSTER_ANTRAG;
     return {
-      ...MUSTER_ANTRAG,
+      ...basisOhneRegime,
       procedureId: id,
       ...(legalBasisIds.length > 0 ? { legalBasisIds } : {}),
+      ...(verwaltungsakt ? { verwaltungsakt } : {}),
       states,
       transitions,
     };

@@ -17,7 +17,8 @@
     { "path": "../../packages/app-store-postgres" },
     { "path": "../../packages/platform-contracts" },
     { "path": "../../packages/provider-ai-ollama" },
-    { "path": "../../packages/provider-local-auth" }
+    { "path": "../../packages/provider-local-auth" },
+    { "path": "../../packages/public-sector-sdk" }
   ],
   "include": ["server/**/*.ts"]
 }

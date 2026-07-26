@@ -5,7 +5,7 @@
 // ein Verfahren sie statt der Daten nutzt) bleiben JSON-untragbar und werden als Präsenz-Marker geführt. So kann ein
 // externes Build-Gate den Vertrag — inklusive der subsumierbaren Business-Logik — deterministisch prüfen, ohne die
 // .ts-Config zu importieren.
-import type { LeistungConfig } from "./types.js";
+import type { LeistungConfig, Rechenprobe } from "./types.js";
 
 export interface LeistungContractSnapshot {
   id: string;
@@ -28,6 +28,20 @@ export interface LeistungContractSnapshot {
   fristenTypen?: LeistungConfig["fristenTypen"];
   /** GENERISCHE DATENANBINDUNG als echte Zeilen (Register/intern/extern, zweckgebunden + BSI-klassifiziert). */
   datenanbindung?: LeistungConfig["datenanbindung"];
+  /**
+   * DAS RECHTSBEHELFS-/BEKANNTGABE-REGIME als echte Zeilen — reine, JSON-sichere DATEN.
+   *
+   * WARUM (adversariales Fachaudit, Befund S1 · Wurzel W1): der Vertrag transportierte das VA-Regime NICHT.
+   * Der Server kann `src/leistung.config.ts` nicht importieren (rootDir-Mauer) und liest allein diesen
+   * Snapshot; fehlte `zustellung`, erbte er still das Muster-Regime der Vorlage (Widerspruch/§ 68 ff. VwGO/
+   * § 41 Abs. 2 VwVfG). Ein GENERIERTES AO-Steuerverfahren bekam damit eine Belehrung aus der falschen
+   * Verfahrensschiene — unrichtige Belehrung ⇒ Rechtsbehelfsfrist EIN JAHR (§ 356 Abs. 2 AO). Es gab ZWEI
+   * Wahrheiten; das Drift-Gate sah sie, aber niemand transportierte die eine. Mit dieser Projektion ist der
+   * Regime-Drift STRUKTURELL unmöglich statt nur bemerkbar.
+   *
+   * Rein additiv: eine Config ohne `zustellung` lässt das Feld weg (bestehende Snapshots bleiben gültig).
+   */
+  zustellung?: LeistungConfig["zustellung"];
   statusMachine: LeistungConfig["statusMachine"];
   register: LeistungConfig["register"];
   detailSektionen: LeistungConfig["detailSektionen"];
@@ -37,6 +51,10 @@ export interface LeistungContractSnapshot {
   personas?: LeistungConfig["personas"];
   /** ESCAPE-HATCH-Präsenz: nur gesetzt, wenn eine `berechne`-Funktion statt eines `tarif` genutzt wird. */
   berechne?: "[function]";
+  /** RECHENPROBEN (Sollwert-Tabelle) als echte Zeilen — der maschinelle Beleg, dass der Tenor rechnerisch stimmt.
+   *  Sie reisen bewusst MIT: der Server kann daraus nachrechnen (tenorHerkunft „server-nachgerechnet"), und ein
+   *  externes Gate sieht ohne .ts-Import, ob jede Fallgruppe eine Probe hat. */
+  rechenproben?: Rechenprobe[];
   /** ESCAPE-HATCH-Präsenz: nur gesetzt, wenn eine `nachweise`-Funktion statt der Codelisten-Ableitung genutzt wird. */
   nachweise?: "[function]";
   seedCount: number;
@@ -74,6 +92,17 @@ export function toContractSnapshot<T = Record<string, unknown>>(
     ...(config.fimRefs ? { fimRefs: config.fimRefs } : {}),
     ...(config.fristenTypen ? { fristenTypen: config.fristenTypen } : {}),
     ...(config.datenanbindung ? { datenanbindung: config.datenanbindung } : {}),
+    // W1 — DAS REGIME REIST MIT: ohne diese Zeile erbt der Server das Muster-VA-Regime der Vorlage und die
+    // Belehrung des generierten Verfahrens stammt aus der falschen Verfahrensschiene (Audit-Befund S1).
+    // `bescheidUrl` ist eine LAUFZEIT-URL (kein Vertragsinhalt) und wird abgestreift — der Snapshot bleibt
+    // deterministisch, sonst driftete der Vertrag mit jedem Deployment.
+    ...(config.zustellung
+      ? {
+          zustellung: (({ bescheidUrl: _bescheidUrl, ...rest }) => rest)(
+            config.zustellung,
+          ),
+        }
+      : {}),
     statusMachine: config.statusMachine,
     register: config.register,
     detailSektionen: config.detailSektionen,
@@ -86,6 +115,9 @@ export function toContractSnapshot<T = Record<string, unknown>>(
       : {}),
     // Escape-Hatches nur als Präsenz-Marker (nicht JSON-serialisierbar) — und nur, wenn tatsächlich genutzt.
     ...(config.berechne ? { berechne: "[function]" as const } : {}),
+    ...(config.rechenproben?.length
+      ? { rechenproben: config.rechenproben as unknown as Rechenprobe[] }
+      : {}),
     ...(config.nachweise ? { nachweise: "[function]" as const } : {}),
     seedCount,
     _snapshot: true,

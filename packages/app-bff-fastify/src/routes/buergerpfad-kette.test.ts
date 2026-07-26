@@ -51,6 +51,11 @@ const verfahren: ProcedureVersion = {
       fristEinheit: "monat",
       stelle: "der erlassenden Behörde",
       norm: "§ 68 ff. VwGO",
+      // PFLICHT-SLOTS der Belehrung (§ 356 Abs. 1, § 357 Abs. 1 AO / § 58 Abs. 1, § 70 Abs. 1 VwGO):
+      // ohne Sitz UND Form verweigert der Server den Erlass fail-closed (unvollständige Belehrung
+      // ⇒ Rechtsbehelfsfrist ein Jahr). Auch eine Demo-Fixture muss ein erlassfähiges Regime tragen.
+      sitz: "Rathausplatz 1, 12345 Musterstadt",
+      form: "schriftlich, elektronisch oder zur Niederschrift",
     },
     fiktionTage: 4,
     fiktionNorm: "§ 41 Abs. 2 VwVfG",
@@ -278,7 +283,8 @@ describe("Die Kette Bürger → Amt", () => {
         payload: { ...ANTRAG, procedureId: "engpass" },
       });
     // GEGENPROBE: die ersten drei gehen durch — die Drossel blockiert nicht pauschal.
-    for (let i = 0; i < 3; i++) expect((await einreichen()).statusCode).toBe(201);
+    for (let i = 0; i < 3; i++)
+      expect((await einreichen()).statusCode).toBe(201);
     const vierter = await einreichen();
     expect(vierter.statusCode).toBe(429);
     expect(Number(vierter.headers["retry-after"])).toBeGreaterThan(0);

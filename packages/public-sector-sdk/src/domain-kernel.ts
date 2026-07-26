@@ -58,6 +58,21 @@ export interface RechtsbehelfConfig {
   stelle: string;
   /** Die Rechtsgrundlage des Rechtsbehelfs (z. B. „§ 68 ff. VwGO", „§ 347 AO"). */
   norm: string;
+  /**
+   * Der SITZ (Anschrift) der Stelle, bei der der Rechtsbehelf anzubringen ist. Eine Belehrung, die den Sitz
+   * verschweigt, ist UNRICHTIG — § 356 Abs. 1 AO verlangt Belehrung „über … die Behörde, bei der er
+   * anzubringen ist, deren Sitz und die einzuhaltende Frist"; § 58 Abs. 1 VwGO verlangt dasselbe für den
+   * Verwaltungsrechtsweg. Rechtsfolge des Fehlens: die Rechtsbehelfsfrist beträgt EIN JAHR statt der
+   * Regelfrist (§ 356 Abs. 2 AO / § 58 Abs. 2 VwGO). Optional im TYP (Bestandsschutz für vorhandene
+   * Verfahren), PFLICHT am ERLASS (der Server verweigert den Bescheid fail-closed, siehe cases.ts).
+   */
+  sitz?: string;
+  /**
+   * Die zulässige FORM des Rechtsbehelfs, als fertiger Teilsatz („schriftlich, elektronisch oder zur
+   * Niederschrift"). § 357 Abs. 1 AO / § 70 Abs. 1 VwGO. Fehlt sie, ist die Belehrung unvollständig —
+   * gleiche Rechtsfolge wie beim Sitz. Optional im TYP, PFLICHT am ERLASS.
+   */
+  form?: string;
 }
 
 /**
@@ -74,6 +89,35 @@ export interface VerwaltungsaktConfig {
   fiktionNorm: string;
 }
 
+/**
+ * DATEN-Bindung der VA-Pflichtangaben an die Fallakte. Jeder `*Pfad` ist ein Punkt-Pfad in `case.data`
+ * (z. B. „antragsteller.name"); `*Wert`/`*Vorlage` sind feste bzw. schablonierte Angaben des Verfahrens.
+ * Alles optional — was fehlt, wird nicht eingefroren und nicht gerendert; ob eine PFLICHT verletzt ist,
+ * entscheidet das Gate über die Verfassungs-Liste, nicht dieser Typ.
+ */
+export interface VerwaltungsaktInhaltConfig {
+  /** Punkt-Pfade auf Name/Anschrift/Vertreter des INHALTSADRESSATEN in `case.data`. */
+  adressatNamePfad?: string;
+  adressatAnschriftPfad?: string;
+  adressatVertreterPfad?: string;
+  /** Regelungs-/Erhebungszeitraum: entweder aus der Akte (Pfad) oder als fester Text des Verfahrens. */
+  zeitraumPfad?: string;
+  zeitraumWert?: string;
+  /** LEISTUNGSGEBOT (§ 254 Abs. 1 AO) — nur beim Zahlungs-VA. `betragPfad` zeigt auf den Zahlbetrag
+   *  (Default: der Tenor-Betrag); `faelligkeitenPfad` auf eine Liste `{datum, betrag}` MIT Jahreszahl. */
+  leistungsgebot?: {
+    betragPfad?: string;
+    waehrung?: string;
+    faelligkeitenPfad?: string;
+    zahlungsempfaenger?: string;
+    iban?: string;
+    kassenzeichenPfad?: string;
+    verwendungszweckPfad?: string;
+  };
+  /** Namenswiedergabe (§ 119 Abs. 3 S. 2 AO) ODER — wenn `maschinell` — der ausdrückliche Automations-Vermerk. */
+  unterschrift?: { name?: string; maschinell?: boolean; vermerk?: string };
+}
+
 export interface ProcedureVersion {
   procedureId: string;
   version: string;
@@ -85,6 +129,21 @@ export interface ProcedureVersion {
   /** Verwaltungsakt-Fachlichkeit — vorhanden, wenn das Verfahren einen förmlichen Bescheid erlässt
    *  (mindestens ein Übergang trägt `issuesVerwaltungsakt`). Regime-neutral, data-driven. */
   verwaltungsakt?: VerwaltungsaktConfig;
+  /**
+   * WOHER DIE PFLICHTANGABEN DES BESCHEIDS KOMMEN (Phase 5, Wurzel W5) — als DATEN, nie als Code.
+   *
+   * Der Bescheid-Renderer ist bewusst domänenfrei: er kann nur zeigen, was der eingefrorene Verwaltungsakt
+   * TRÄGT. Diese Deklaration sagt dem Server, aus welchen Feldern der Fallakte (Punkt-Pfade in `case.data`)
+   * bzw. aus welchen festen Werten er Inhaltsadressat, Regelungszeitraum, Leistungsgebot und
+   * Unterschrift/Automations-Vermerk beim ERLASS einfriert.
+   *
+   * Rechtsfolge der Lücke (adversariales Fachaudit M1-M4): fehlender Inhaltsadressat und eine nicht erkennbare
+   * Behörde ⇒ NICHTIGKEIT (§ 125 Abs. 1, Abs. 2 Nr. 1 AO); fehlendes Leistungsgebot ⇒ nicht vollstreckbar
+   * (§ 254 Abs. 1 AO); fehlender Zeitraum ⇒ Bestimmtheitsmangel (§ 119 Abs. 1 AO).
+   *
+   * GENERISCH: ein Vergabe-, HR- oder Justiz-Bescheid nutzt dieselben Slots mit anderen Pfaden.
+   */
+  verwaltungsaktInhalt?: VerwaltungsaktInhaltConfig;
   /** Gesetzliche AUFBEWAHRUNGSFRIST in Monaten, gemessen ab Fallabschluss (`closedAt`) — data-driven am
    *  Verfahren DEKLARIERT (welche §-Frist gilt, ist eine Fach-/Rechtsentscheidung; z. B. § 84 SGB X = 120).
    *  Solange sie läuft, blockiert sie die DSGVO-Löschung (Art. 17 Abs. 3 lit. b DSGVO). Fehlt sie, gibt es

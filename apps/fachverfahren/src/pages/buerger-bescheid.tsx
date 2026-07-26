@@ -186,6 +186,19 @@ export function BuergerBescheidPage(): React.JSX.Element {
                 fiktionTage: va.fiktionTage,
                 fiktionNorm: va.fiktionNorm,
               }}
+              // PFLICHTANGABEN DES VA (Phase 5, W5) — dieselben Slots wie im PDF, aus DEMSELBEN eingefrorenen
+              // Verwaltungsakt. Beide Flächen zeigen damit denselben Bescheid; vorher fehlten Inhaltsadressat,
+              // Erhebungszeitraum, Leistungsgebot und Unterschrift/Automations-Vermerk auf BEIDEN.
+              pflichtangaben={{
+                ...(va.adressat ? { adressat: va.adressat } : {}),
+                ...(va.behoerde ? { behoerde: va.behoerde } : {}),
+                ...(va.zeitraum ? { zeitraum: va.zeitraum } : {}),
+                ...(va.leistungsgebot
+                  ? { leistungsgebot: va.leistungsgebot }
+                  : {}),
+                ...(va.unterschrift ? { unterschrift: va.unterschrift } : {}),
+                ...(va.entwurf ? { entwurf: true } : {}),
+              }}
               // Echter, server-generierter Bescheid als Datei-Download (owner-scoped, hash-beweisbar).
               pdfDownloadUrl={bescheidPdfUrl(id)}
             />

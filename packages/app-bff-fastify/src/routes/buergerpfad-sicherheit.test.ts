@@ -78,6 +78,11 @@ const verfahren: ProcedureVersion = {
       fristEinheit: "monat",
       stelle: "der erlassenden Behörde",
       norm: "§ 68 ff. VwGO",
+      // PFLICHT-SLOTS der Belehrung (§ 356 Abs. 1, § 357 Abs. 1 AO / § 58 Abs. 1, § 70 Abs. 1 VwGO):
+      // ohne Sitz UND Form verweigert der Server den Erlass fail-closed (unvollständige Belehrung
+      // ⇒ Rechtsbehelfsfrist ein Jahr). Auch eine Demo-Fixture muss ein erlassfähiges Regime tragen.
+      sitz: "Rathausplatz 1, 12345 Musterstadt",
+      form: "schriftlich, elektronisch oder zur Niederschrift",
     },
     fiktionTage: 4,
     fiktionNorm: "§ 41 Abs. 2 VwVfG",
@@ -195,7 +200,10 @@ describe("(1) Ein Bürgertext, der wie eine Anweisung aussieht, ändert NICHTS a
     expect(alleingang.statusCode).toBe(403);
 
     // Der Zustand hat sich NICHT bewegt — der Angriffstext hat nichts bewirkt.
-    const stand = await sb1.inject({ method: "GET", url: `/api/cases/${antragId}` });
+    const stand = await sb1.inject({
+      method: "GET",
+      url: `/api/cases/${antragId}`,
+    });
     expect(stand.json().state).toBe("in_pruefung");
 
     // GEGENPROBE: eine ZWEITE Person setzt fest → 200. Die Sperre blockiert nicht pauschal,
@@ -329,7 +337,9 @@ describe("(1) Ein Bürgertext, der wie eine Anweisung aussieht, ändert NICHTS a
       // (a) Der Text steht im Umschlag …
       expect(block).toContain(QUARANTAENE_BANNER);
       // (b) … und der Banner steht VOR ihm (der Angriff kann ihn nicht überschreiben).
-      expect(block.indexOf(QUARANTAENE_BANNER)).toBe(0 + block.indexOf(QUARANTAENE_BANNER));
+      expect(block.indexOf(QUARANTAENE_BANNER)).toBe(
+        0 + block.indexOf(QUARANTAENE_BANNER),
+      );
       expect(block.startsWith("<<<EXTERNE-DATEN")).toBe(true);
       // (c) Der Umschlag ist nicht aufgebrochen: genau EIN Blockende.
       expect(block.split("EXTERNE-DATEN>>>").length - 1).toBe(1);
@@ -392,10 +402,9 @@ describe("(1) Ein Bürgertext, der wie eine Anweisung aussieht, ändert NICHTS a
       url: `/api/cases/${angelegt.caseId}/vermerke/ki`,
       payload: { task: "zusammenfassen" },
     });
-    const akte = (gesehen[0]?.input as Record<string, unknown>)["akte"] as Record<
-      string,
-      unknown
-    >;
+    const akte = (gesehen[0]?.input as Record<string, unknown>)[
+      "akte"
+    ] as Record<string, unknown>;
     expect(akte["herkunft"]).toBe("intern");
     expect(akte["externeDaten"]).toBeUndefined();
   });
@@ -697,7 +706,7 @@ describe("(4) Nach aussen dringen KEINE internen Pfade, Kennungen, Fehlercodes o
 
   it("GEGENPROBE: der Wächter WÜRDE anschlagen — an einem Text, der genau so ein Leck enthält", () => {
     const leck =
-      'unknown procedure musterantrag@1 at handler (/Users/x/node_modules/app/routes/buerger.ts:431)';
+      "unknown procedure musterantrag@1 at handler (/Users/x/node_modules/app/routes/buerger.ts:431)";
     let getroffen = 0;
     for (const muster of VERBOTEN) if (muster.test(leck)) getroffen += 1;
     expect(getroffen).toBeGreaterThanOrEqual(4);

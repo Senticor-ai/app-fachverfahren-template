@@ -42,6 +42,7 @@ import {
   berechneTarif,
   builtInPermissions,
   createFachlicheAuditEvent,
+  fehlendeBelehrungsSlots,
   formatiereEingangsnummer,
   herkunftAusEreignissen,
   requiredApprovalsOf,
@@ -51,6 +52,7 @@ import {
 } from "@senticor/public-sector-sdk";
 import type { BffDeps } from "../deps.js";
 import { canonicalSha256 } from "../canonical-hash.js";
+import { anzeigeIdentitaet } from "../behoerden-identitaet.js";
 import { bffRouteAuth, requestIdOf, sessionOf } from "../route-auth.js";
 import { storeUnavailable } from "../store-error.js";
 
@@ -318,11 +320,13 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
         return reply
           .code(404)
           .send({ error: "not found", requestId: requestIdOf(request) });
-      return reply.send(toCaseDto(
-        found,
-        deps.procedureRegistry.get(found.procedureId, found.procedureVersion)
-          ?.eingangsnummerFormat,
-      ));
+      return reply.send(
+        toCaseDto(
+          found,
+          deps.procedureRegistry.get(found.procedureId, found.procedureVersion)
+            ?.eingangsnummerFormat,
+        ),
+      );
     },
   );
 
@@ -547,11 +551,17 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
       } catch {
         return storeUnavailable(request, reply);
       }
-      return reply.code(201).send(toCaseDto(
-        created,
-        deps.procedureRegistry.get(created.procedureId, created.procedureVersion)
-          ?.eingangsnummerFormat,
-      ));
+      return reply
+        .code(201)
+        .send(
+          toCaseDto(
+            created,
+            deps.procedureRegistry.get(
+              created.procedureId,
+              created.procedureVersion,
+            )?.eingangsnummerFormat,
+          ),
+        );
     },
   );
 
@@ -907,7 +917,135 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
       // Per-Übergang-Regime (z. B. Widerspruchsbescheid = Klage, ADR-0006 §3) hat Vorrang vor dem
       // Verfahrens-Regime; fehlt es, gilt weiter ProcedureVersion.verwaltungsakt (rückwärtskompatibel).
       const vaConfig = transition.verwaltungsakt ?? procedure.verwaltungsakt;
+      // W1 FAIL-CLOSED AM ERLASS (adversariales Fachaudit, Befund S1): erlässt dieser Übergang einen förmlichen
+      // Bescheid, MUSS das Rechtsbehelfs-/Bekanntgabe-Regime vollständig deklariert sein. Vorher erbte ein
+      // generiertes Verfahren, dessen Vertrag kein Regime transportierte, still das Muster-Regime der Vorlage —
+      // ein AO-Steuerbescheid bekam damit eine VwGO-Widerspruchsbelehrung. Eine unrichtige oder unvollständige
+      // Belehrung verlängert die Rechtsbehelfsfrist auf EIN JAHR (§ 356 Abs. 2 AO / § 58 Abs. 2 VwGO) und trifft
+      // JEDEN erlassenen Bescheid. Deshalb: lieber KEIN Verwaltungsakt als einer mit erfundener Belehrung.
+      // Code setzt durch, nicht ein Modell — deterministisch, vor jedem Schreiben.
+      if (transition.issuesVerwaltungsakt) {
+        const fehlendeSlots = vaConfig
+          ? [
+              ...fehlendeBelehrungsSlots(vaConfig.rechtsbehelf),
+              ...(typeof vaConfig.fiktionNorm === "string" &&
+              vaConfig.fiktionNorm.trim()
+                ? []
+                : ["bekanntgabe-fiktionsnorm"]),
+              ...(typeof vaConfig.fiktionTage === "number" &&
+              Number.isFinite(vaConfig.fiktionTage)
+                ? []
+                : ["bekanntgabe-fiktionstage"]),
+            ]
+          : ["verwaltungsakt-regime"];
+        if (fehlendeSlots.length > 0)
+          return reply.code(422).send({
+            error:
+              "Rechtsbehelfs-Regime nicht (vollständig) deklariert — dieser Bescheid darf nicht erlassen werden. " +
+              `Fehlend: ${fehlendeSlots.join(", ")}. Eine unvollständige Rechtsbehelfsbelehrung verlängert die ` +
+              "Rechtsbehelfsfrist auf ein Jahr; das Verfahren muss Art, Stelle, Sitz, Frist, Form und Norm des " +
+              "Rechtsbehelfs sowie die Bekanntgabe-Fiktion der eigenen Verfahrensschiene deklarieren.",
+            requestId: requestIdOf(request),
+          });
+      }
       if (transition.issuesVerwaltungsakt && vaConfig) {
+        // ── PFLICHTANGABEN DES VA EINFRIEREN (Phase 5, W5) ───────────────────────────────────────────
+        // Der Renderer kann nur zeigen, was der VA TRÄGT. Woher die Angaben kommen, steht als DATEN am
+        // Verfahren (`verwaltungsaktInhalt` — Punkt-Pfade in die Fallakte bzw. feste Werte); der Server
+        // liest sie hier EINMAL beim Erlass und friert sie ein. Fehlt eine Deklaration, wird nichts
+        // erfunden — die Lücke bleibt sichtbar und das Pflichtangaben-Gate meldet sie.
+        const inhalt = procedure.verwaltungsaktInhalt;
+        const alsText = (pfad: string | undefined): string | undefined => {
+          if (!pfad) return undefined;
+          const v = leseDatenPfad(appCase.data, pfad);
+          const t =
+            typeof v === "string" ? v.trim() : v == null ? "" : String(v);
+          return t.length > 0 ? t : undefined;
+        };
+        const adressatName = alsText(inhalt?.adressatNamePfad);
+        const adressat = adressatName
+          ? {
+              name: adressatName,
+              ...(alsText(inhalt?.adressatAnschriftPfad)
+                ? { anschrift: alsText(inhalt?.adressatAnschriftPfad)! }
+                : {}),
+              ...(alsText(inhalt?.adressatVertreterPfad)
+                ? { vertreter: alsText(inhalt?.adressatVertreterPfad)! }
+                : {}),
+            }
+          : undefined;
+        const zeitraum = alsText(inhalt?.zeitraumPfad) ?? inhalt?.zeitraumWert;
+        const tenorBetrag = (() => {
+          const b = (
+            appCase.data["berechnung"] as { betrag?: unknown } | undefined
+          )?.betrag;
+          return typeof b === "number" && Number.isFinite(b) ? b : undefined;
+        })();
+        const lgCfg = inhalt?.leistungsgebot;
+        const lgBetrag = lgCfg
+          ? (() => {
+              const v = lgCfg.betragPfad
+                ? leseDatenPfad(appCase.data, lgCfg.betragPfad)
+                : tenorBetrag;
+              return typeof v === "number" && Number.isFinite(v)
+                ? v
+                : undefined;
+            })()
+          : undefined;
+        const lgFaelligkeiten = lgCfg?.faelligkeitenPfad
+          ? (leseDatenPfad(appCase.data, lgCfg.faelligkeitenPfad) as
+              { datum?: unknown; betrag?: unknown }[] | undefined)
+          : undefined;
+        const leistungsgebot =
+          lgCfg && lgBetrag !== undefined
+            ? {
+                betrag: lgBetrag,
+                ...(lgCfg.waehrung ? { waehrung: lgCfg.waehrung } : {}),
+                ...(Array.isArray(lgFaelligkeiten) && lgFaelligkeiten.length
+                  ? {
+                      faelligkeiten: lgFaelligkeiten
+                        .filter(
+                          (f) =>
+                            typeof f?.datum === "string" &&
+                            typeof f?.betrag === "number",
+                        )
+                        .map((f) => ({
+                          datum: String(f.datum),
+                          betrag: Number(f.betrag),
+                        })),
+                    }
+                  : {}),
+                ...(lgCfg.zahlungsempfaenger
+                  ? { zahlungsempfaenger: lgCfg.zahlungsempfaenger }
+                  : {}),
+                ...(lgCfg.iban ? { iban: lgCfg.iban } : {}),
+                ...(alsText(lgCfg.kassenzeichenPfad)
+                  ? { kassenzeichen: alsText(lgCfg.kassenzeichenPfad)! }
+                  : {}),
+                ...(alsText(lgCfg.verwendungszweckPfad)
+                  ? { verwendungszweck: alsText(lgCfg.verwendungszweckPfad)! }
+                  : {}),
+              }
+            : undefined;
+        const unterschrift = inhalt?.unterschrift
+          ? {
+              ...(inhalt.unterschrift.name
+                ? { name: inhalt.unterschrift.name }
+                : {}),
+              maschinell: inhalt.unterschrift.maschinell === true,
+              ...(inhalt.unterschrift.vermerk
+                ? { vermerk: inhalt.unterschrift.vermerk }
+                : {}),
+            }
+          : undefined;
+        // ERLASSENDE BEHÖRDE (§ 119 Abs. 3 S. 1 AO) — sie gehört IN den Verwaltungsakt, nicht in seine
+        // Darstellung: nur eingefroren deckt der SHA-256 sie mit ab. Liefert die Komposition keine (oder nur
+        // eine technische) Identität, wird NICHTS erfunden — der VA trägt den ENTWURFS-Marker und sagt damit
+        // sichtbar, dass er kein wirksamer Verwaltungsakt ist.
+        const behoerde = anzeigeIdentitaet(
+          deps.behoerdenIdentitaet,
+          session.authorityId,
+        );
         const content = {
           aktenzeichen: appCase.caseId,
           issuedAt: now,
@@ -916,6 +1054,11 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
           rechtsbehelf: vaConfig.rechtsbehelf,
           fiktionTage: vaConfig.fiktionTage,
           fiktionNorm: vaConfig.fiktionNorm,
+          ...(adressat ? { adressat } : {}),
+          ...(zeitraum ? { zeitraum } : {}),
+          ...(leistungsgebot ? { leistungsgebot } : {}),
+          ...(unterschrift ? { unterschrift } : {}),
+          ...(behoerde ? { behoerde } : { entwurf: true }),
           // HERKUNFT DES TENORS — ehrlich statt falscher Sicherheit: der Betrag wurde CLIENT-seitig
           // gerechnet (der `berechne`-Escape-Hatch ist Client-TS, server-seitig nicht ausführbar) und vom
           // Server NICHT nachgerechnet. Er wird gefroren + gehasht (unveränderlich + beweisbar-unverändert),
@@ -1007,11 +1150,15 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
             .send({ error: "not found", requestId: requestIdOf(request) });
         return storeUnavailable(request, reply);
       }
-      return reply.send(toCaseDto(
-        updated,
-        deps.procedureRegistry.get(updated.procedureId, updated.procedureVersion)
-          ?.eingangsnummerFormat,
-      ));
+      return reply.send(
+        toCaseDto(
+          updated,
+          deps.procedureRegistry.get(
+            updated.procedureId,
+            updated.procedureVersion,
+          )?.eingangsnummerFormat,
+        ),
+      );
     },
   );
 
@@ -1159,11 +1306,16 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
             .send({ error: "not found", requestId: requestIdOf(request) });
         return storeUnavailable(request, reply);
       }
-      return reply.send({ case: toCaseDto(
-        updated,
-        deps.procedureRegistry.get(updated.procedureId, updated.procedureVersion)
-          ?.eingangsnummerFormat,
-      ), redactedPaths: redacted });
+      return reply.send({
+        case: toCaseDto(
+          updated,
+          deps.procedureRegistry.get(
+            updated.procedureId,
+            updated.procedureVersion,
+          )?.eingangsnummerFormat,
+        ),
+        redactedPaths: redacted,
+      });
     },
   );
 

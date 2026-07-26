@@ -59,6 +59,26 @@ export interface Berechnung {
   herkunft?: "deterministisch" | "ki";
 }
 
+/**
+ * EINE Rechenprobe: Eingabe → erwarteter Sollwert, mit Herleitung und Fundstelle. Reine DATEN (JSON-sicher),
+ * damit sie im Vertrags-Snapshot mitreist und ein externes Gate sie lesen kann.
+ */
+export interface Rechenprobe<TAntragsdaten = Record<string, unknown>> {
+  /** Sprechender Name der Fallgruppe („Grundfall", „mit 10 %-Minderung", „Erlass"). */
+  name: string;
+  /** Die Eingabe, mit der `berechne` aufgerufen wird. */
+  antragsdaten: TAntragsdaten;
+  /** Der erwartete Sollwert. `betrag` ist Pflicht; `positionen` optional (dann werden sie mitgeprüft). */
+  erwartet: {
+    betrag: number;
+    positionen?: { label?: string; betrag: number; norm?: string }[];
+  };
+  /** Der NACHVOLLZIEHBARE Rechenweg mit §-Belegen — aus dem Fachkonzept, nicht aus dem Gedächtnis. */
+  herleitung: string;
+  /** Fundstelle der Herleitung (Datei/Kapitel/§) — damit der Sollwert belegt und nicht behauptet ist. */
+  quelle: string;
+}
+
 /** M4 — der BEZUGSWEG eines Nachweises: klassischer Datei-`upload` (Default), `register-once-only` (der Nachweis
  *  liegt bereits in einem Register — der/die Bürger:in autorisiert nur den Abruf, lädt NICHTS hoch, Once-Only-Prinzip)
  *  oder `gefordert` (nachzureichen; wird später verlangt, jetzt kein Upload). Fehlt der Wert ⇒ `upload`. */
@@ -336,6 +356,12 @@ export interface RechtsbehelfConfig {
   stelle: string;
   /** Die Rechtsgrundlage des Rechtsbehelfs (z. B. „§ 68 ff. VwGO", „§ 347 AO"). */
   norm: string;
+  /** SITZ (Anschrift) der Stelle — § 356 Abs. 1 AO / § 58 Abs. 1 VwGO verlangen ihn ausdrücklich. Fehlt er,
+   *  ist die Belehrung unrichtig ⇒ Frist EIN JAHR (§ 356 Abs. 2 AO / § 58 Abs. 2 VwGO). */
+  sitz?: string;
+  /** FORM des Rechtsbehelfs als fertiger Teilsatz („schriftlich, elektronisch oder zur Niederschrift") —
+   *  § 357 Abs. 1 AO / § 70 Abs. 1 VwGO. Fehlt sie, gilt dieselbe Rechtsfolge wie beim Sitz. */
+  form?: string;
 }
 
 /** Zustellungs-/Bekanntgabe-Signal: schaltet Bescheid-Tab (PdfViewer) + Bürger-Postfach frei. */
@@ -753,6 +779,23 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
    *  Berechnung (kein Datum/Random). OPTIONAL — fehlt sie, ist die Daten-Auswertung von `tarif` durch den reinen
    *  Interpreter der Default. Ist sie gesetzt, hat sie Vorrang vor `tarif`. */
   berechne?: (antragsdaten: TAntragsdaten) => Berechnung;
+  /**
+   * RECHENPROBEN — die SOLLWERT-TABELLE der Berechnung als DATEN der Naht (Phase 5, Wurzel W4).
+   *
+   * WARUM (adversariales Fachaudit): der mitgelieferte Berechnungs-Test prüfte nur „aufrufbar / deterministisch /
+   * nicht-negativ" — es wurde NIE ein Betrag assertiert. Deshalb blieb unbemerkt, dass eine gewährte Minderung
+   * den festgesetzten Betrag GAR NICHT senkte (Bescheid und Begründung wiesen sie aus, der Tenor setzte den vollen
+   * Betrag fest) und dass die Positionstabelle nicht auf die Festsetzung summierte. Ein Bescheid mit falschem
+   * Betrag ist ein materiell rechtswidriger, aber WIRKSAMER Verwaltungsakt — er nimmt echtes Geld.
+   *
+   * DIE DIREKTIVE „Agenten rechnen NIE selbst" bleibt gewahrt: hier steht der SOLLWERT samt `herleitung` (der
+   * nachvollziehbare Rechenweg mit §-Belegen AUS dem Fachkonzept) und `quelle` (wo er dort steht). Das AUSFÜHRENDE
+   * Programm ist der Test — er ruft `berechne(antragsdaten)` auf und vergleicht. Niemand rechnet im Kopf.
+   *
+   * JE FALLGRUPPE EINE PROBE: Grundfall, JEDE Minderung/Begünstigung, JEDER Erlass, mindestens eine Kombination.
+   * OPTIONAL im TYP (Bestandsschutz); ab Bau-Tiefe `mvp` fordert die Verfassung sie.
+   */
+  rechenproben?: Rechenprobe<TAntragsdaten>[];
   /** ESCAPE-HATCH für Nachweise. OPTIONAL — fehlt sie, leitet der Interpreter die Nachweise aus den `codelisten`
    *  (`belege` der gewählten Einträge) ab. Ist sie gesetzt, hat sie Vorrang. */
   nachweise?: (antragsdaten: TAntragsdaten) => Nachweis[];

@@ -31,6 +31,10 @@ export type BescheidPdfRenderer = (input: {
   behoerde: string;
 }) => Promise<Uint8Array>;
 
+// Die Anzeige-Identität der erlassenden Behörde lebt als eigenes Modul (Prädikat + Port-Typ).
+export type { BehoerdenIdentitaet } from "./behoerden-identitaet.js";
+import type { BehoerdenIdentitaet } from "./behoerden-identitaet.js";
+
 export interface BffDeps {
   appStore: AppStore;
   /** Fall/Dossier-Datenschicht (ADR-0001). Template-Stub (Standalone); in PROD sitzt chos hinter der Naht. */
@@ -64,6 +68,9 @@ export interface BffDeps {
   /** Bescheid-PDF-Renderer als PORT (optional; die App-Komposition liefert die pdf-lib-Impl). Ohne ihn liefert
    *  die `.pdf`-Download-Route 501 — der JSON-/BescheidView-Pfad bleibt unberührt. */
   bescheidPdf?: BescheidPdfRenderer;
+  /** Anzeige-Identität der erlassenden Behörde (Name + Anschrift) — ersetzt die technische `authorityId` im
+   *  Briefkopf. Fehlt sie, gilt der Bescheid als ENTWURF (kein Vortäuschen einer Behörde). */
+  behoerdenIdentitaet?: BehoerdenIdentitaet;
   /** Registry der AGENTIC COMPOSABLES (Blueprint v5.0) — die deklarierten Fähigkeitseinheiten mit Spine-Agent.
    *  Optional: ohne sie liefert `/api/composables` eine leere Liste (die deterministische Naht existiert
    *  trotzdem). Die App-Komposition registriert die domänen-spezifischen Composables. */

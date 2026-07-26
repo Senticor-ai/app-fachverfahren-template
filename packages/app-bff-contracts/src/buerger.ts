@@ -109,6 +109,14 @@ export const RechtsbehelfDtoSchema = Type.Object(
     ]),
     stelle: Type.String({ minLength: 1 }),
     norm: Type.String({ minLength: 1 }),
+    /** SITZ (Anschrift) der Stelle — § 356 Abs. 1 AO / § 58 Abs. 1 VwGO verlangen ihn AUSDRÜCKLICH.
+     *  MUSS im Schema stehen: `additionalProperties:false` + Fastifys `removeAdditional` würfen ihn sonst
+     *  STILL weg, und der Bescheid belehrte wieder unvollständig (Frist ein Jahr, § 356 Abs. 2 AO).
+     *  Optional deklariert, damit VOR W1 eingefrorene Verwaltungsakte lesbar bleiben (Bestandsschutz);
+     *  am ERLASS ist er Pflicht (cases.ts fail-closed). */
+    sitz: Type.Optional(Type.String({ minLength: 1 })),
+    /** FORM des Rechtsbehelfs (§ 357 Abs. 1 AO / § 70 Abs. 1 VwGO) — gleiche Begründung wie beim Sitz. */
+    form: Type.Optional(Type.String({ minLength: 1 })),
   },
   { additionalProperties: false },
 );
@@ -141,6 +149,81 @@ export const VerwaltungsaktDtoSchema = Type.Object(
       Type.Literal("client-berechnet"),
       Type.Literal("server-nachgerechnet"),
     ]),
+    // ── PFLICHTANGABEN DES VERWALTUNGSAKTS (Phase 5, Wurzel W5) ────────────────────────────────────────────
+    // WARUM ADDITIV IM DTO: der Bescheid-Renderer kann nur zeigen, was der eingefrorene VA TRÄGT. Vor Phase 5
+    // kannte weder der DTO noch das Renderer-Template einen Inhaltsadressaten, einen Erhebungszeitraum, ein
+    // Leistungsgebot oder eine erlassende Behörde mit Namen — deshalb konnte KEINE Generierung sie füllen.
+    // Rechtsfolge dieser Lücke: fehlender Inhaltsadressat und eine nicht erkennbare Behörde führen zur
+    // NICHTIGKEIT (§ 125 Abs. 1, Abs. 2 Nr. 1 AO), ein fehlendes Leistungsgebot macht den Zahlungsanspruch
+    // nicht vollstreckbar (§ 254 Abs. 1 AO), ein fehlender Zeitraum ist ein Bestimmtheitsmangel (§ 119 Abs. 1 AO).
+    // Alle Felder OPTIONAL im Schema (VOR Phase 5 eingefrorene Akte bleiben lesbar); die PFLICHT erzwingt die
+    // Verfassung (`verwaltungsakt.pflichtangaben`) über das Gate — nicht der Typ.
+    /** INHALTSADRESSAT: an wen sich die Regelung richtet (§ 119 Abs. 1, § 157 Abs. 1 S. 2 AO / § 37 Abs. 1 VwVfG). */
+    adressat: Type.Optional(
+      Type.Object(
+        {
+          name: Type.String({ minLength: 1 }),
+          anschrift: Type.Optional(Type.String()),
+          /** Gesetzlicher Vertreter/Bevollmächtigter, falls die Bekanntgabe an ihn erfolgt. */
+          vertreter: Type.Optional(Type.String()),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    /** ERLASSENDE BEHÖRDE mit ANZEIGE-Identität — NIE die technische authorityId (§ 119 Abs. 3 S. 1 AO). */
+    behoerde: Type.Optional(
+      Type.Object(
+        {
+          name: Type.String({ minLength: 1 }),
+          anschrift: Type.Optional(Type.String()),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    /** REGELUNGS-/ERHEBUNGSZEITRAUM („für das Kalenderjahr 2026") — bei zeitraumbezogenen Regelungen Pflicht. */
+    zeitraum: Type.Optional(Type.String({ minLength: 1 })),
+    /** LEISTUNGSGEBOT bei einem Zahlungs-VA (§ 254 Abs. 1 AO): Betrag, Fälligkeiten MIT Jahr, Zahlweg. */
+    leistungsgebot: Type.Optional(
+      Type.Object(
+        {
+          betrag: Type.Number(),
+          waehrung: Type.Optional(Type.String()),
+          faelligkeiten: Type.Optional(
+            Type.Array(
+              Type.Object(
+                {
+                  /** Vollständiges Datum INKLUSIVE Jahr — „15.02." allein ist keine Fälligkeit. */
+                  datum: Type.String({ minLength: 1 }),
+                  betrag: Type.Number(),
+                },
+                { additionalProperties: false },
+              ),
+            ),
+          ),
+          zahlungsempfaenger: Type.Optional(Type.String()),
+          iban: Type.Optional(Type.String()),
+          kassenzeichen: Type.Optional(Type.String()),
+          verwendungszweck: Type.Optional(Type.String()),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    /** UNTERSCHRIFT oder AUTOMATIONS-VERMERK (§ 119 Abs. 3 S. 2 AO / § 37 Abs. 5 VwVfG). */
+    unterschrift: Type.Optional(
+      Type.Object(
+        {
+          /** Namenswiedergabe des/der Verantwortlichen — leer, wenn maschinell erlassen. */
+          name: Type.Optional(Type.String()),
+          /** true ⇒ maschinell erlassen; dann MUSS der Vermerk im Bescheid stehen. */
+          maschinell: Type.Boolean(),
+          vermerk: Type.Optional(Type.String()),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+    /** ENTWURFS-KENNZEICHNUNG: true ⇒ das Dokument ist NICHT erlassen (Demo/Vorschau) und sagt das sichtbar.
+     *  Der SHA-256-Nachweis belegt Unverändertheit — NICHT den Erlass; die Trennung wird jetzt gerendert. */
+    entwurf: Type.Optional(Type.Boolean()),
     /** SHA-256 über die kanonisch serialisierten Bytes — das portable Beweis-Token. */
     checksumSha256: Type.String({ minLength: 64, maxLength: 64 }),
   },

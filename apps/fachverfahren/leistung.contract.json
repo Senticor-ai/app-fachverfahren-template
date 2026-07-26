@@ -83,6 +83,19 @@
     ],
     "einleitung": "Neutrales Demo-Verfahren — es zeigt die drei Sichten (Bürger:in · Sachbearbeitung · Aufsicht), enthält aber keine echten Fachdaten."
   },
+  "zustellung": {
+    "fiktionTage": 4,
+    "fiktionNorm": "§ 41 Abs. 2 VwVfG",
+    "rechtsbehelf": {
+      "art": "widerspruch",
+      "fristWert": 1,
+      "fristEinheit": "monat",
+      "stelle": "der erlassenden Behörde",
+      "norm": "§ 70 Abs. 1 VwGO",
+      "sitz": "Rathausplatz 1, 12345 Musterstadt",
+      "form": "schriftlich, elektronisch oder zur Niederschrift"
+    }
+  },
   "statusMachine": {
     "initial": "eingegangen",
     "states": [
@@ -228,8 +241,10 @@
             "art": "klage",
             "fristWert": 1,
             "fristEinheit": "monat",
-            "stelle": "das zuständige Verwaltungsgericht",
-            "norm": "§ 74 VwGO"
+            "stelle": "dem zuständigen Verwaltungsgericht",
+            "norm": "§ 74 Abs. 1 VwGO",
+            "sitz": "Gerichtsstraße 1, 12345 Musterstadt",
+            "form": "schriftlich, in elektronischer Form oder zur Niederschrift des Urkundsbeamten der Geschäftsstelle"
           },
           "fiktionTage": 4,
           "fiktionNorm": "§ 41 Abs. 2 VwVfG"
@@ -355,6 +370,47 @@
     }
   },
   "berechne": "[function]",
+  "rechenproben": [
+    {
+      "name": "Grundfall Standard",
+      "antragsdaten": {
+        "anliegen": {
+          "kategorie": "standard"
+        }
+      },
+      "erwartet": {
+        "betrag": 50
+      },
+      "herleitung": "Pauschale Bearbeitungsgebuehr der Kategorie standard = 50 EUR (Demo-Tarif; ein reales Verfahren belegt den Satz aus seiner Gebuehrensatzung).",
+      "quelle": "apps/fachverfahren/src/leistung.config.ts — DEMO_TARIF"
+    },
+    {
+      "name": "Express (hoeherer Satz)",
+      "antragsdaten": {
+        "anliegen": {
+          "kategorie": "express"
+        }
+      },
+      "erwartet": {
+        "betrag": 90
+      },
+      "herleitung": "Pauschale Bearbeitungsgebuehr der Kategorie express = 90 EUR (Demo-Tarif).",
+      "quelle": "apps/fachverfahren/src/leistung.config.ts — DEMO_TARIF"
+    },
+    {
+      "name": "Gebuehrenfrei (Vollnachlass--Fallgruppe)",
+      "antragsdaten": {
+        "anliegen": {
+          "kategorie": "gebuehrenfrei"
+        }
+      },
+      "erwartet": {
+        "betrag": 0
+      },
+      "herleitung": "Die Kategorie gebuehrenfrei traegt den Satz 0 EUR — die Vollnachlass wirkt bis in den festgesetzten Betrag (Demo-Tarif).",
+      "quelle": "apps/fachverfahren/src/leistung.config.ts — DEMO_TARIF"
+    }
+  ],
   "seedCount": 4,
   "_snapshot": true
 }

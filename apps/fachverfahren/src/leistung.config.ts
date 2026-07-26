@@ -242,8 +242,10 @@ export const leistungConfig: LeistungConfig = {
             art: "klage",
             fristWert: 1,
             fristEinheit: "monat",
-            stelle: "das zuständige Verwaltungsgericht",
-            norm: "§ 74 VwGO",
+            stelle: "dem zuständigen Verwaltungsgericht",
+            norm: "§ 74 Abs. 1 VwGO",
+            sitz: "Gerichtsstraße 1, 12345 Musterstadt",
+            form: "schriftlich, in elektronischer Form oder zur Niederschrift des Urkundsbeamten der Geschäftsstelle",
           },
           fiktionTage: 4,
           fiktionNorm: "§ 41 Abs. 2 VwVfG",
@@ -330,6 +332,36 @@ export const leistungConfig: LeistungConfig = {
   // setzt hier stattdessen Einspruch/§ 347 AO/§ 122 Abs. 2 AO — der Bescheid trägt dann die RICHTIGE
   // Belehrung, statt der früher hart kodierten Widerspruchs-Belehrung. Diese Werte werden beim Erlass in
   // den Bescheid EINGEFROREN (bestandskraft-fest), nicht beim Abruf live gelesen.
+  // RECHENPROBEN — die SOLLWERT-TABELLE der Berechnung als DATEN (Phase 5, W4). Je Fallgruppe EINE Probe mit
+  // erwartetem Betrag, nachvollziehbarer Herleitung und Fundstelle. Der mitgelieferte `berechnung.test.ts`
+  // FUEHRT sie aus — dadurch wird ein Betrag maschinell belegt, statt nur behauptet. Ein reales Verfahren
+  // ersetzt diese Demo-Proben durch seine Fallgruppen (Grundfall, JEDE Minderung, JEDER Erlass, Kombination).
+  rechenproben: [
+    {
+      name: "Grundfall Standard",
+      antragsdaten: { anliegen: { kategorie: "standard" } },
+      erwartet: { betrag: 50 },
+      herleitung:
+        "Pauschale Bearbeitungsgebuehr der Kategorie standard = 50 EUR (Demo-Tarif; ein reales Verfahren belegt den Satz aus seiner Gebuehrensatzung).",
+      quelle: "apps/fachverfahren/src/leistung.config.ts — DEMO_TARIF",
+    },
+    {
+      name: "Express (hoeherer Satz)",
+      antragsdaten: { anliegen: { kategorie: "express" } },
+      erwartet: { betrag: 90 },
+      herleitung:
+        "Pauschale Bearbeitungsgebuehr der Kategorie express = 90 EUR (Demo-Tarif).",
+      quelle: "apps/fachverfahren/src/leistung.config.ts — DEMO_TARIF",
+    },
+    {
+      name: "Gebuehrenfrei (Vollnachlass--Fallgruppe)",
+      antragsdaten: { anliegen: { kategorie: "gebuehrenfrei" } },
+      erwartet: { betrag: 0 },
+      herleitung:
+        "Die Kategorie gebuehrenfrei traegt den Satz 0 EUR — die Vollnachlass wirkt bis in den festgesetzten Betrag (Demo-Tarif).",
+      quelle: "apps/fachverfahren/src/leistung.config.ts — DEMO_TARIF",
+    },
+  ],
   zustellung: {
     fiktionTage: 4,
     fiktionNorm: "§ 41 Abs. 2 VwVfG",
@@ -338,7 +370,13 @@ export const leistungConfig: LeistungConfig = {
       fristWert: 1,
       fristEinheit: "monat",
       stelle: "der erlassenden Behörde",
-      norm: "§ 68 ff. VwGO",
+      // § 70 Abs. 1 VwGO ist die FRISTNORM des Widerspruchs; „§ 68 ff. VwGO" benennt nur den Rechtsweg und
+      // taugt nicht als Fristangabe (Audit-Befund S1.6). Die Belehrung nennt die Norm, aus der die FRIST folgt.
+      norm: "§ 70 Abs. 1 VwGO",
+      // PFLICHT-SLOTS der Belehrung: Sitz (§ 58 Abs. 1 VwGO / § 356 Abs. 1 AO) und Form (§ 70 Abs. 1 VwGO /
+      // § 357 Abs. 1 AO). Ohne sie ist die Belehrung unrichtig ⇒ Frist EIN JAHR statt einem Monat.
+      sitz: "Rathausplatz 1, 12345 Musterstadt",
+      form: "schriftlich, elektronisch oder zur Niederschrift",
     },
   },
   ki: {

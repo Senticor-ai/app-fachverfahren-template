@@ -5,6 +5,9 @@ export * from "./store.js";
 export * from "./board-types.js";
 export * from "./board-store.js";
 export * from "./contract-snapshot.js";
+// Die GENERISCHEN Berechnungs-Invarianten (Phase 5, W4) — ein standardisiertes Modul, das jeder generierte
+// `berechnung.test.ts` mountet, statt die Prädikate je App neu zu erfinden.
+export * from "./berechnung-invarianten.js";
 export * from "./format.js";
 // Business-Logik als DATEN: Feldwert-/Options-Auflösung + der generische reine Interpreter (Tarif/Regeln/Codelisten).
 export * from "./lib/antrag-felder.js";

@@ -45,6 +45,11 @@ const procedure: ProcedureVersion = {
       fristEinheit: "monat",
       stelle: "der erlassenden Behörde",
       norm: "§ 68 ff. VwGO",
+      // PFLICHT-SLOTS der Belehrung (§ 356 Abs. 1, § 357 Abs. 1 AO / § 58 Abs. 1, § 70 Abs. 1 VwGO):
+      // ohne Sitz UND Form verweigert der Server den Erlass fail-closed (unvollständige Belehrung
+      // ⇒ Rechtsbehelfsfrist ein Jahr). Auch eine Demo-Fixture muss ein erlassfähiges Regime tragen.
+      sitz: "Rathausplatz 1, 12345 Musterstadt",
+      form: "schriftlich, elektronisch oder zur Niederschrift",
     },
     fiktionTage: 4,
     fiktionNorm: "§ 41 Abs. 2 VwVfG",

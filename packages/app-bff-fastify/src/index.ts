@@ -3,7 +3,11 @@
 // config.auth (bffRouteAuth) — der Startup-Guard der App verlangt das auf /api/*.
 export { registerOpenApiCollector, registerOpenApiRoute } from "./openapi.js";
 export { appBff, type AppBffOptions, type BffSurface } from "./plugin.js";
-export type { BescheidPdfRenderer, BffDeps } from "./deps.js";
+export type {
+  BehoerdenIdentitaet,
+  BescheidPdfRenderer,
+  BffDeps,
+} from "./deps.js";
 export {
   bffRouteAuthLabel,
   requestIdOf,

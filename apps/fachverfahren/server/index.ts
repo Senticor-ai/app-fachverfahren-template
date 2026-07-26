@@ -10,6 +10,7 @@ import {
   appBff,
   registerOpenApiCollector,
   registerOpenApiRoute,
+  type BehoerdenIdentitaet,
   type BescheidPdfRenderer,
   type BffSurface,
 } from "@senticor/app-bff-fastify";
@@ -191,6 +192,8 @@ interface BffWiring {
   aiAssist: AiAssistPort;
   /** Bescheid-PDF-Renderer (pdf-lib, template-getrieben) — App-seitige Impl hinter dem BFF-Port (#60). */
   bescheidPdf?: BescheidPdfRenderer;
+  /** Anzeige-Identität der erlassenden Behörde (§ 119 Abs. 3 S. 1 AO) — ersetzt die technische authorityId. */
+  behoerdenIdentitaet?: BehoerdenIdentitaet;
   /** Erlaubte Flächen dieser Zone (aus ZONE_SURFACES) — undefined ⇒ keine Zonen-Trennung (fail-open). */
   allowedSurfaces?: readonly BffSurface[];
 }
@@ -379,6 +382,18 @@ export async function startRuntime(
     aiAssist: createAiAssistPortFromEnv(env),
     // Bescheid-PDF-Renderer (pdf-lib, template-getrieben) — App-seitige Impl hinter dem BFF-Port (#60).
     bescheidPdf: renderBescheidPdf,
+    // ANZEIGE-IDENTITÄT der erlassenden Behörde (Phase 5, W5 / Audit-Befund M3): Name + Anschrift aus dem
+    // Deploy-Env. § 119 Abs. 3 S. 1 AO verlangt, dass der VA die erlassende Behörde ERKENNEN LÄSST; § 125 Abs. 2
+    // Nr. 1 AO macht ihn andernfalls NICHTIG. Vorher stand hier die technische authorityId — im Default-Deployment
+    // wörtlich „default". FAIL-CLOSED statt Erfindung: ist APP_AUTHORITY_NAME nicht gesetzt, liefert der Port
+    // `undefined`, und der Bescheid wird sichtbar als ENTWURF gekennzeichnet. Wer die Kommune ist, bleibt eine
+    // Betreiber-/Release-Entscheidung — die Fabrik rät sie nicht.
+    behoerdenIdentitaet: (_authorityId: string) => {
+      const name = (env["APP_AUTHORITY_NAME"] ?? "").trim();
+      if (!name) return undefined;
+      const anschrift = (env["APP_AUTHORITY_ADDRESS"] ?? "").trim();
+      return { name, ...(anschrift ? { anschrift } : {}) };
+    },
     // Zonen-Route-Enforcement: nur die Flächen dieser Zone (ZONE_SURFACES) — undefined ⇒ alle (fail-open).
     ...(allowedSurfaces ? { allowedSurfaces } : {}),
   };

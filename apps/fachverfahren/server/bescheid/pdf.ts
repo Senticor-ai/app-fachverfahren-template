@@ -17,6 +17,14 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import type { VerwaltungsaktDto } from "@senticor/app-bff-contracts";
+// W1 — DER EINE BELEHRUNGSSATZ-BAUER (SDK), identisch mit der Web-Fläche. Vorher baute diese Datei ihren
+// EIGENEN Satz: `${rb.art}` roh (kleingeschriebenes „widerspruch"), Verb hart „erhoben" (für den Einspruch
+// falsch), ohne Sitz (§ 356 Abs. 1 AO) und ohne Form (§ 357 Abs. 1 AO). Jeder Mangel für sich macht die
+// Belehrung unrichtig ⇒ Rechtsbehelfsfrist EIN JAHR (§ 356 Abs. 2 AO). Jetzt: EIN Modul, zwei Flächen.
+import {
+  fehlendeBelehrungsSlots,
+  formatRechtsbehelfsbelehrung,
+} from "@senticor/public-sector-sdk";
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 
@@ -52,12 +60,29 @@ function ladeDejaVu(): { regular: Uint8Array; bold: Uint8Array } {
  *  geprüft). So füllt die Generierung (CHOS) nur `berechne` → `Berechnung{begruendungRecht, positionen[].norm}`,
  *  und die Herleitung erscheint OHNE Renderer-Änderung im rechtsgültigen Bescheid. Trägt der Tenor keine
  *  solche Herleitung (nicht Berechnungs-förmig / keine Begründung), wird die Sektion sauber ausgelassen. */
+// ── PHASE 5 / W5: DER RENDERER KANN DIE PFLICHTANGABEN JETZT TRAGEN ────────────────────────────────────────
+// WURZEL (adversariales Fachaudit, Befunde M1-M4): dieser Typ kannte nur kopf|tenor|begruendung|bekanntgabe|
+// rechtsbehelf|freitext|integritaet. Inhaltsadressat, Erhebungszeitraum, Leistungsgebot und Unterschrift waren
+// STRUKTURELL nicht vorgesehen — keine Generierung kann füllen, was das Format nicht kennt. Rechtsfolgen:
+// fehlender Inhaltsadressat und eine nicht erkennbare Behörde ⇒ NICHTIGKEIT (§ 125 Abs. 1, Abs. 2 Nr. 1 AO);
+// fehlendes Leistungsgebot ⇒ nicht vollstreckbar (§ 254 Abs. 1 AO); fehlender Zeitraum ⇒ Bestimmtheitsmangel
+// (§ 119 Abs. 1 AO); fehlende Unterschrift/kein Automations-Vermerk ⇒ Formmangel (§ 119 Abs. 3 S. 2 AO).
+// Die neuen Kinds sind GENERISCHE SLOTS: ein Vergabe-, HR- oder Justiz-Bescheid braucht dieselben Rubriken mit
+// anderem Inhalt. Kein Domänen-Literal — die Inhalte kommen aus dem eingefrorenen VA.
 export type BescheidSektion =
   | { kind: "kopf" }
+  /** INHALTSADRESSAT (§ 119 Abs. 1, § 157 Abs. 1 S. 2 AO / § 37 Abs. 1 VwVfG). */
+  | { kind: "adressat"; ueberschrift?: string }
+  /** REGELUNGS-/ERHEBUNGSZEITRAUM — bedingte Pflicht (nur bei zeitraumbezogener Regelung). */
+  | { kind: "zeitraum"; ueberschrift?: string }
   | { kind: "tenor"; ueberschrift?: string }
   | { kind: "begruendung"; ueberschrift?: string }
+  /** LEISTUNGSGEBOT (§ 254 Abs. 1 AO) — bedingte Pflicht (nur bei Zahlungs-VA). */
+  | { kind: "leistungsgebot"; ueberschrift?: string }
   | { kind: "bekanntgabe"; ueberschrift?: string }
   | { kind: "rechtsbehelf"; ueberschrift?: string }
+  /** UNTERSCHRIFT ODER AUTOMATIONS-VERMERK (§ 119 Abs. 3 S. 2 AO / § 37 Abs. 5 VwVfG). */
+  | { kind: "unterschrift"; ueberschrift?: string }
   | { kind: "freitext"; ueberschrift?: string; absaetze: readonly string[] }
   | { kind: "integritaet"; ueberschrift?: string };
 
@@ -74,10 +99,16 @@ export const defaultBescheidTemplate: BescheidTemplate = {
   titel: "Bescheid (Verwaltungsakt)",
   sektionen: [
     { kind: "kopf" },
+    // Die bedingten Sektionen (adressat/zeitraum/leistungsgebot) rendern NICHTS, wenn der VA den Inhalt nicht
+    // trägt — ein Feststellungs-VA ohne Zahlungsanspruch bleibt damit ohne Leistungsgebot, ohne Sonderfall.
+    { kind: "adressat", ueberschrift: "Inhaltsadressat" },
+    { kind: "zeitraum", ueberschrift: "Regelungszeitraum" },
     { kind: "tenor", ueberschrift: "Verfügungssatz (Tenor)" },
     { kind: "begruendung", ueberschrift: "Begründung" },
+    { kind: "leistungsgebot", ueberschrift: "Leistungsgebot" },
     { kind: "bekanntgabe", ueberschrift: "Bekanntgabe" },
     { kind: "rechtsbehelf", ueberschrift: "Rechtsbehelfsbelehrung" },
+    { kind: "unterschrift" },
     {
       kind: "integritaet",
       ueberschrift: "Integritätsnachweis (fälschungssicher)",
@@ -97,12 +128,6 @@ export interface BescheidPdfInput {
 const A4: readonly [number, number] = [595.28, 841.89];
 const MARGIN = 56; // ~2 cm
 const PRODUCER = "Fachverfahren-Template Bescheid-Renderer";
-
-const FRIST_EINHEIT: Record<string, string> = {
-  monat: "Monat(en)",
-  woche: "Woche(n)",
-  tag: "Tag(en)",
-};
 
 /** ISO → deutsches Datum (TT.MM.JJJJ); ungültiger Wert → Rohwert. */
 function formatDatum(iso: string): string {
@@ -160,13 +185,25 @@ function berechnungAusTenor(
   };
 }
 
+/** Geldbetrag amtlich formatieren: auf Cent gerundet, deutsche Schreibweise. Ein Bescheid, der
+ *  „-9.999999999999998" ausweist, ist kein amtliches Dokument (Audit-Befund: genau dieser Wert stand im
+ *  Tenor, weil hier `String(betrag)` geschrieben wurde). Rein. */
+function formatGeld(n: number): string {
+  return (Math.round(n * 100) / 100).toLocaleString("de-DE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 /** Eine Rechenposition als lesbare Zeile: „Label: Betrag (Norm)" — die Norm nur, wenn belegt. */
 function positionZeile(p: TenorPosition): string | undefined {
   const label = typeof p.label === "string" ? p.label : undefined;
   const betrag =
-    typeof p.betrag === "number" || typeof p.betrag === "string"
-      ? String(p.betrag)
-      : undefined;
+    typeof p.betrag === "number"
+      ? formatGeld(p.betrag)
+      : typeof p.betrag === "string"
+        ? p.betrag
+        : undefined;
   if (!label && betrag === undefined) return undefined;
   const norm = typeof p.norm === "string" && p.norm ? ` (${p.norm})` : "";
   return `${label ?? "Position"}: ${betrag ?? "—"}${norm}`;
@@ -179,7 +216,7 @@ function tenorZeilen(tenor: VerwaltungsaktDto["tenor"]): string[] {
   if (!tenor) return ["(kein Tenor eingefroren)"];
   const berechnung = berechnungAusTenor(tenor);
   if (berechnung) {
-    const kopf = `${berechnung.label ?? "Festgesetzter Betrag"}: ${berechnung.betrag} ${berechnung.einheit}`;
+    const kopf = `${berechnung.label ?? "Festgesetzter Betrag"}: ${formatGeld(berechnung.betrag)} ${berechnung.einheit}`;
     // Mehrposten-Aufschlüsselung nur zeigen, wenn sie über den Gesamtbetrag hinausgeht (≥ 2 Positionen).
     const posten =
       berechnung.positionen.length >= 2
@@ -246,7 +283,7 @@ export async function renderBescheidPdf(
   const erlassDatum = new Date(va.issuedAt);
   const issued = Number.isNaN(erlassDatum.getTime()) ? undefined : erlassDatum;
   doc.setTitle(`Bescheid ${va.aktenzeichen}`);
-  doc.setAuthor(behoerde);
+  doc.setAuthor(va.behoerde?.name ?? behoerde);
   doc.setSubject(`Verwaltungsakt ${va.aktenzeichen} — Bekanntgabe`);
   doc.setKeywords([
     `aktenzeichen:${va.aktenzeichen}`,
@@ -254,7 +291,7 @@ export async function renderBescheidPdf(
     `tenorHerkunft:${va.tenorHerkunft}`,
   ]);
   doc.setProducer(PRODUCER);
-  doc.setCreator(behoerde);
+  doc.setCreator(va.behoerde?.name ?? behoerde);
   if (issued) {
     doc.setCreationDate(issued);
     doc.setModificationDate(issued);
@@ -296,13 +333,89 @@ export async function renderBescheidPdf(
 
   for (const sektion of template.sektionen) {
     switch (sektion.kind) {
-      case "kopf":
-        write(behoerde, { size: 13, font: bold, gap: 2 });
+      case "kopf": {
+        // ENTWURFS-KENNZEICHNUNG (§-frei, aber täuschungs-kritisch): solange der VA nicht erlassen ist bzw. die
+        // Behörden-Identität nur eine Demo-Identität ist, sagt das Dokument das SICHTBAR. Vorher sah ein
+        // synthetischer Bescheid für eine erfundene Kommune wie ein echter aus — inklusive
+        // „Integritätsnachweis (fälschungssicher)".
+        if (va.entwurf)
+          write(
+            "ENTWURF — NICHT ERLASSEN. Dieses Dokument ist kein wirksamer Verwaltungsakt.",
+            { size: 12, font: bold, gap: 6 },
+          );
+        // ERLASSENDE BEHÖRDE mit ANZEIGE-Identität (§ 119 Abs. 3 S. 1 AO: die Behörde muss ERKENNBAR sein).
+        // `behoerde` ist der Anzeigename aus der App-Identität — NIE die technische authorityId.
+        write(va.behoerde?.name ?? behoerde, { size: 13, font: bold, gap: 2 });
+        if (va.behoerde?.anschrift)
+          write(va.behoerde.anschrift, { size: 10, color: grau, gap: 4 });
         write(template.titel, { size: 18, font: bold, gap: 6 });
         write(`Aktenzeichen: ${va.aktenzeichen}`);
         write(`Erlassen am: ${formatDatum(va.issuedAt)}`);
         write(`Festgesetzt durch: ${va.issuedBy}`, { gap: 10 });
         break;
+      }
+      case "adressat": {
+        if (!va.adressat?.name) break; // kein Adressat im VA → Sektion entfällt (das Gate blockt die Lücke)
+        write(sektion.ueberschrift ?? "Inhaltsadressat", {
+          size: 13,
+          font: bold,
+          gap: 2,
+        });
+        write(va.adressat.name);
+        if (va.adressat.vertreter)
+          write(`vertreten durch: ${va.adressat.vertreter}`);
+        if (va.adressat.anschrift) write(va.adressat.anschrift, { gap: 10 });
+        else y -= 10;
+        break;
+      }
+      case "zeitraum": {
+        if (!va.zeitraum) break; // nicht-zeitraumbezogene Regelung → Sektion entfällt (bedingte Pflicht)
+        write(sektion.ueberschrift ?? "Regelungszeitraum", {
+          size: 13,
+          font: bold,
+          gap: 2,
+        });
+        write(va.zeitraum, { gap: 10 });
+        break;
+      }
+      case "leistungsgebot": {
+        const lg = va.leistungsgebot;
+        if (!lg) break; // Feststellungs-VA ohne Zahlungsanspruch → kein Leistungsgebot (bedingte Pflicht)
+        write(sektion.ueberschrift ?? "Leistungsgebot", {
+          size: 13,
+          font: bold,
+          gap: 2,
+        });
+        write(`Zu zahlen: ${formatGeld(lg.betrag)} ${lg.waehrung ?? "EUR"}.`);
+        for (const f of lg.faelligkeiten ?? [])
+          write(
+            `fällig am ${f.datum}: ${formatGeld(f.betrag)} ${lg.waehrung ?? "EUR"}`,
+          );
+        if (lg.zahlungsempfaenger)
+          write(`Zahlungsempfänger: ${lg.zahlungsempfaenger}`);
+        if (lg.iban) write(`IBAN: ${lg.iban}`);
+        if (lg.kassenzeichen) write(`Kassenzeichen: ${lg.kassenzeichen}`);
+        if (lg.verwendungszweck)
+          write(`Verwendungszweck: ${lg.verwendungszweck}`);
+        y -= 10;
+        break;
+      }
+      case "unterschrift": {
+        const u = va.unterschrift;
+        if (!u) break;
+        if (sektion.ueberschrift)
+          write(sektion.ueberschrift, { size: 13, font: bold, gap: 2 });
+        // Namenswiedergabe ODER ausdrücklicher Automations-Vermerk — § 119 Abs. 3 S. 2 AO verlangt eines von beidem.
+        if (u.name) write(u.name, { gap: 4 });
+        if (u.maschinell)
+          write(
+            u.vermerk ??
+              "Dieser Bescheid wurde maschinell erstellt und ist ohne Unterschrift gültig.",
+            { size: 9, color: grau, gap: 10 },
+          );
+        else y -= 10;
+        break;
+      }
       case "tenor": {
         write(sektion.ueberschrift ?? "Verfügungssatz (Tenor)", {
           size: 13,
@@ -368,10 +481,24 @@ export async function renderBescheidPdf(
           gap: 2,
         });
         const rb = va.rechtsbehelf;
-        const einheit = FRIST_EINHEIT[rb.fristEinheit] ?? rb.fristEinheit;
+        const fehlt = fehlendeBelehrungsSlots(rb);
+        if (fehlt.length > 0 || !va.fiktionNorm) {
+          // EHRLICH statt erfunden: ein eingefrorener VA OHNE vollständiges Regime bekommt keine
+          // zusammengeratene Standard-Belehrung, sondern den sichtbaren Mangel. Erlassen werden darf ein
+          // solcher Bescheid ohnehin nicht (cases.ts verweigert den Übergang fail-closed).
+          write(
+            "Rechtsbehelfsbelehrung nicht verfügbar — das Verfahren hat kein vollständiges " +
+              `Rechtsbehelfs-Regime deklariert (fehlend: ${[...fehlt, ...(va.fiktionNorm ? [] : ["bekanntgabe-fiktionsnorm"])].join(", ")}). ` +
+              "Eine unvollständige Belehrung verlängert die Rechtsbehelfsfrist auf ein Jahr.",
+            { gap: 16 },
+          );
+          break;
+        }
         write(
-          `Gegen diesen Bescheid kann innerhalb von ${rb.fristWert} ${einheit} nach Bekanntgabe ${rb.art} ` +
-            `bei ${rb.stelle} erhoben werden (${rb.norm}).`,
+          formatRechtsbehelfsbelehrung(rb, {
+            fiktionTage: va.fiktionTage,
+            fiktionNorm: va.fiktionNorm,
+          }),
           { gap: 16 },
         );
         break;
@@ -387,7 +514,9 @@ export async function renderBescheidPdf(
         );
         write(
           "Dieser Bescheid ist über die kanonischen Bytes des eingefrorenen Verwaltungsakts durch einen " +
-            "SHA-256-Hash gesichert. Jede nachträgliche Änderung verändert den Hash.",
+            "SHA-256-Hash gesichert. Jede nachträgliche Änderung verändert den Hash. Der Nachweis belegt die " +
+            "UNVERÄNDERTHEIT des Dokuments — nicht seinen wirksamen Erlass und nicht die behördliche " +
+            "Nachrechnung des festgesetzten Betrags (siehe Herkunft des Tenor).",
           { size: 8, color: grau },
         );
         write(`SHA-256: ${va.checksumSha256}`, {

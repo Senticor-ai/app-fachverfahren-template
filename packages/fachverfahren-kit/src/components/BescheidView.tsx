@@ -19,6 +19,15 @@ import type {
   RechtsbehelfConfig,
   Vorgang,
 } from "../types.js";
+// W1 — DER EINE BELEHRUNGSSATZ-BAUER (SDK): Web UND PDF mounten dasselbe Modul, statt je einen eigenen Satz
+// zu bauen. Vorher wichen die beiden Fassungen ab (PDF schrieb `${rb.art}` roh und verdrahtete das Verb hart auf
+// „erhoben"), und BEIDE nannten weder Sitz noch Form — jeder Mangel für sich macht die Belehrung unrichtig
+// (Frist ein Jahr statt Regelfrist, § 356 Abs. 2 AO / § 58 Abs. 2 VwGO). Reuse = Modul mounten, nicht nachbauen.
+import {
+  fehlendeBelehrungsSlots,
+  formatRechtsbehelfsbelehrung,
+} from "@senticor/public-sector-sdk";
+
 import { cn } from "../lib/utils.js";
 import { Button } from "../ui/button.js";
 import { Separator } from "../ui/separator.js";
@@ -48,61 +57,43 @@ export interface BescheidViewProps<T = Record<string, unknown>> {
    * Server bleibt die Wahrheit über die Bytes. Fehlt sie, bleibt allein die Druck-Aktion (SB-Vorschau/DEV).
    */
   pdfDownloadUrl?: string;
-}
-
-/** Name des Rechtsbehelfs für den Belehrungstext. */
-function rechtsbehelfName(art: RechtsbehelfConfig["art"]): string {
-  return art === "einspruch"
-    ? "Einspruch"
-    : art === "klage"
-      ? "Klage"
-      : "Widerspruch";
-}
-
-/** Verb: „erhoben" (Widerspruch/Klage) bzw. „eingelegt" (Einspruch) — grammatisch korrekt je Regime. */
-function rechtsbehelfVerb(art: RechtsbehelfConfig["art"]): string {
-  return art === "einspruch" ? "eingelegt" : "erhoben";
-}
-
-/** Fristdauer als Text: „einem Monat", „zwei Wochen", „14 Tagen" (Dativ, für „innerhalb …"). */
-function fristText(
-  wert: number,
-  einheit: RechtsbehelfConfig["fristEinheit"],
-): string {
-  const eins = wert === 1;
-  const wortEins: Record<RechtsbehelfConfig["fristEinheit"], string> = {
-    monat: "einem Monat",
-    woche: "einer Woche",
-    tag: "einem Tag",
+  /**
+   * DIE PFLICHTANGABEN DES VERWALTUNGSAKTS (Phase 5, W5) — dieselben generischen Slots wie im PDF-Renderer.
+   *
+   * WARUM (adversariales Fachaudit M1-M4): der Web-Bescheid rendert bislang Briefkopf → Tenor → Begründung →
+   * Belehrung. Inhaltsadressat, Regelungszeitraum, Leistungsgebot und Unterschrift/Automations-Vermerk waren
+   * strukturell nicht vorgesehen. Rechtsfolgen: fehlender Inhaltsadressat und eine nicht erkennbare Behörde ⇒
+   * NICHTIGKEIT (§ 125 Abs. 1, Abs. 2 Nr. 1 AO); fehlendes Leistungsgebot ⇒ nicht vollstreckbar (§ 254 Abs. 1 AO);
+   * fehlender Zeitraum ⇒ Bestimmtheitsmangel (§ 119 Abs. 1 AO); fehlende Unterschrift ⇒ Formmangel
+   * (§ 119 Abs. 3 S. 2 AO).
+   *
+   * Alle Slots OPTIONAL: fehlt einer, rendert die Fläche ihn nicht (bedingte Pflichten wie das Leistungsgebot
+   * gelten ohnehin nur beim Zahlungs-VA). Ob eine Pflicht VERLETZT ist, entscheidet das Gate über die
+   * Verfassungs-Liste — nicht dieser Renderer.
+   */
+  pflichtangaben?: {
+    adressat?: { name: string; anschrift?: string; vertreter?: string };
+    behoerde?: { name: string; anschrift?: string };
+    zeitraum?: string;
+    leistungsgebot?: {
+      betrag: number;
+      waehrung?: string;
+      faelligkeiten?: { datum: string; betrag: number }[];
+      zahlungsempfaenger?: string;
+      iban?: string;
+      kassenzeichen?: string;
+      verwendungszweck?: string;
+    };
+    unterschrift?: { name?: string; maschinell: boolean; vermerk?: string };
+    /** true ⇒ ENTWURF, nicht erlassen: das Dokument sagt das sichtbar, statt wie ein echter Bescheid auszusehen. */
+    entwurf?: boolean;
   };
-  const wortPlural: Record<RechtsbehelfConfig["fristEinheit"], string> = {
-    monat: "Monaten",
-    woche: "Wochen",
-    tag: "Tagen",
-  };
-  return eins ? wortEins[einheit] : `${wert} ${wortPlural[einheit]}`;
 }
 
 // ── Anzeige-Helfer (generisch, leistungs-agnostisch) ─────────────────────────────────────────
 /** Betrag inkl. Einheit formatieren: Euro-Einheiten als Währung, sonst Zahl + Einheit. */
 function formatBetrag(betrag: number, einheit: string): string {
   return formatBetragKit(betrag, einheit);
-}
-
-/** Ordinalzahl-Wort für die Bekanntgabefiktion („gilt am {n}. Tag als bekannt gegeben"): 1–7 ausgeschrieben,
- *  sonst „N." als Fallback. Speist sich aus config.zustellung.fiktionTage (Default 4 seit PostModG) — EINE Wahrheit,
- *  statt eine Frist im Prosatext zu backen. */
-function ordinalTag(n: number): string {
-  const w: Record<number, string> = {
-    1: "ersten",
-    2: "zweiten",
-    3: "dritten",
-    4: "vierten",
-    5: "fünften",
-    6: "sechsten",
-    7: "siebten",
-  };
-  return w[n] ?? `${n}.`;
 }
 
 /** ISO-Zeitstempel stabil-absolut als Datum rendern (kein Date.now() → keine Hydration-Diskrepanz). */
@@ -121,6 +112,7 @@ export function BescheidView<T = Record<string, unknown>>({
   config,
   belehrung,
   pdfDownloadUrl,
+  pflichtangaben,
 }: BescheidViewProps<T>): ReactElement {
   const berechnung: Berechnung | undefined = vorgang.berechnung;
   const datum = useMemo(
@@ -133,6 +125,28 @@ export function BescheidView<T = Record<string, unknown>>({
   const rb = belehrung?.rechtsbehelf ?? config.zustellung?.rechtsbehelf;
   const fiktionTage =
     belehrung?.fiktionTage ?? config.zustellung?.fiktionTage ?? 4;
+  // Die Fiktions-NORM gehört zur EIGENEN Verfahrensschiene (AO: § 122 Abs. 2 AO · VwVfG: § 41 Abs. 2 VwVfG).
+  // Sie wird NICHT mehr defaultet: ein AO-Verfahren, dessen Bescheid die VwVfG-Norm nennt, belehrt falsch.
+  const fiktionNorm = belehrung?.fiktionNorm ?? config.zustellung?.fiktionNorm;
+  // DER EINE SATZ. Fehlt ein Pflicht-Slot (Art/Stelle/Sitz/Frist/Form/Norm) oder die Fiktionsnorm, wird KEIN
+  // Text erfunden — die Fläche zeigt einen sichtbaren Fehlzustand. Der frühere hart kodierte Widerspruchs-
+  // Fallback erzeugte für ein AO-Verfahren eine juristisch falsche Belehrung (Audit-Befund S1).
+  const belehrungsSatz = useMemo(() => {
+    if (!rb || !fiktionNorm) return null;
+    if (fehlendeBelehrungsSlots(rb).length > 0) return null;
+    try {
+      return formatRechtsbehelfsbelehrung(rb, { fiktionTage, fiktionNorm });
+    } catch {
+      return null;
+    }
+  }, [rb, fiktionTage, fiktionNorm]);
+  const belehrungFehlt =
+    belehrungsSatz === null
+      ? [
+          ...fehlendeBelehrungsSlots(rb),
+          ...(fiktionNorm ? [] : ["bekanntgabe-fiktionsnorm"]),
+        ]
+      : [];
 
   return (
     <section className="mx-auto w-full max-w-3xl px-6 py-8 print:max-w-none print:px-0 print:py-0">
@@ -179,6 +193,17 @@ export function BescheidView<T = Record<string, unknown>>({
           "print:rounded-none print:border-0 print:bg-white print:p-0 print:text-black print:shadow-none",
         )}
       >
+        {/* ── ENTWURFS-KENNZEICHNUNG: solange nicht erlassen, sagt das Dokument es SICHTBAR ─────────── */}
+        {pflichtangaben?.entwurf && (
+          <p
+            role="status"
+            className="mb-6 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-sm font-semibold uppercase tracking-wide text-amber-900 print:border-black print:bg-transparent print:text-black"
+          >
+            Entwurf — nicht erlassen. Dieses Dokument ist kein wirksamer
+            Verwaltungsakt.
+          </p>
+        )}
+
         {/* ── Briefkopf: absendende Stelle + Leistung ───────────────────────────────── */}
         <header className="flex items-start justify-between gap-6">
           <div className="flex items-start gap-3">
@@ -188,8 +213,13 @@ export function BescheidView<T = Record<string, unknown>>({
             />
             <div>
               <p className="text-lg font-semibold leading-tight text-foreground print:text-black">
-                {config.kommune}
+                {pflichtangaben?.behoerde?.name ?? config.kommune}
               </p>
+              {pflichtangaben?.behoerde?.anschrift && (
+                <p className="text-xs text-muted-foreground print:text-black">
+                  {pflichtangaben.behoerde.anschrift}
+                </p>
+              )}
               <p className="text-sm text-muted-foreground print:text-black">
                 {config.label}
               </p>
@@ -220,6 +250,48 @@ export function BescheidView<T = Record<string, unknown>>({
         <p className="mt-1 text-sm text-muted-foreground print:text-black">
           zur Leistung {config.label}
         </p>
+
+        {/* ── Inhaltsadressat (§ 119 Abs. 1, § 157 Abs. 1 S. 2 AO) ──────────────────── */}
+        {pflichtangaben?.adressat?.name && (
+          <section aria-labelledby="bescheid-adressat" className="mt-8">
+            <h2
+              id="bescheid-adressat"
+              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-black"
+            >
+              Inhaltsadressat
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-foreground print:text-black">
+              {pflichtangaben.adressat.name}
+              {pflichtangaben.adressat.vertreter && (
+                <>
+                  <br />
+                  vertreten durch: {pflichtangaben.adressat.vertreter}
+                </>
+              )}
+              {pflichtangaben.adressat.anschrift && (
+                <>
+                  <br />
+                  {pflichtangaben.adressat.anschrift}
+                </>
+              )}
+            </p>
+          </section>
+        )}
+
+        {/* ── Regelungs-/Erhebungszeitraum (bedingte Pflicht) ────────────────────────── */}
+        {pflichtangaben?.zeitraum && (
+          <section aria-labelledby="bescheid-zeitraum" className="mt-6">
+            <h2
+              id="bescheid-zeitraum"
+              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-black"
+            >
+              Regelungszeitraum
+            </h2>
+            <p className="mt-2 text-sm text-foreground print:text-black">
+              {pflichtangaben.zeitraum}
+            </p>
+          </section>
+        )}
 
         {/* ── Tenor / Festsetzung aus vorgang.berechnung ────────────────────────────── */}
         <section aria-labelledby="bescheid-tenor" className="mt-8">
@@ -357,6 +429,73 @@ export function BescheidView<T = Record<string, unknown>>({
 
         <Separator className="my-8 print:bg-black/20" />
 
+        {/* ── Leistungsgebot (§ 254 Abs. 1 AO — ohne es ist der Anspruch nicht vollstreckbar) ─────── */}
+        {pflichtangaben?.leistungsgebot && (
+          <section aria-labelledby="bescheid-leistungsgebot" className="mt-6">
+            <h2
+              id="bescheid-leistungsgebot"
+              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-black"
+            >
+              Leistungsgebot
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-foreground print:text-black">
+              Zu zahlen:{" "}
+              {formatBetrag(
+                pflichtangaben.leistungsgebot.betrag,
+                pflichtangaben.leistungsgebot.waehrung ?? "EUR",
+              )}
+              .
+            </p>
+            {(pflichtangaben.leistungsgebot.faelligkeiten ?? []).length > 0 && (
+              <ul className="mt-2 space-y-1 text-sm text-muted-foreground print:text-black">
+                {pflichtangaben.leistungsgebot.faelligkeiten!.map((f) => (
+                  <li key={`${f.datum}-${f.betrag}`}>
+                    fällig am {f.datum}:{" "}
+                    {formatBetrag(
+                      f.betrag,
+                      pflichtangaben.leistungsgebot!.waehrung ?? "EUR",
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <dl className="mt-2 space-y-1 text-sm text-muted-foreground print:text-black">
+              {pflichtangaben.leistungsgebot.zahlungsempfaenger && (
+                <div>
+                  <dt className="inline">Zahlungsempfänger: </dt>
+                  <dd className="inline">
+                    {pflichtangaben.leistungsgebot.zahlungsempfaenger}
+                  </dd>
+                </div>
+              )}
+              {pflichtangaben.leistungsgebot.iban && (
+                <div>
+                  <dt className="inline">IBAN: </dt>
+                  <dd className="inline font-mono">
+                    {pflichtangaben.leistungsgebot.iban}
+                  </dd>
+                </div>
+              )}
+              {pflichtangaben.leistungsgebot.kassenzeichen && (
+                <div>
+                  <dt className="inline">Kassenzeichen: </dt>
+                  <dd className="inline font-mono">
+                    {pflichtangaben.leistungsgebot.kassenzeichen}
+                  </dd>
+                </div>
+              )}
+              {pflichtangaben.leistungsgebot.verwendungszweck && (
+                <div>
+                  <dt className="inline">Verwendungszweck: </dt>
+                  <dd className="inline">
+                    {pflichtangaben.leistungsgebot.verwendungszweck}
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </section>
+        )}
+
         {/* ── Rechtsbehelfsbelehrung (generisch) ────────────────────────────────────── */}
         <section aria-labelledby="bescheid-rechtsbehelf" className="mt-2">
           <h2
@@ -365,31 +504,24 @@ export function BescheidView<T = Record<string, unknown>>({
           >
             Rechtsbehelfsbelehrung
           </h2>
-          {rb ? (
-            // REGIME-NEUTRALER, data-driven Text — für ein AO-Verfahren „Einspruch" statt „Widerspruch".
+          {belehrungsSatz ? (
+            // DER EINE, geteilte Satz — identisch mit dem PDF (SDK-Bauer). Er nennt Art · Stelle · SITZ ·
+            // Frist · FORM · Norm und die Bekanntgabe-Fiktion der EIGENEN Schiene.
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground print:text-black">
-              Gegen diesen Bescheid kann innerhalb von{" "}
-              {fristText(rb.fristWert, rb.fristEinheit)} nach Bekanntgabe{" "}
-              {rechtsbehelfName(rb.art)} bei {rb.stelle}{" "}
-              {rechtsbehelfVerb(rb.art)} werden ({rb.norm}). Die Frist beginnt
-              mit dem Tag der Bekanntgabe dieses Bescheides. Erfolgt die
-              Bekanntgabe durch die Post im Inland, gilt der Bescheid am{" "}
-              {ordinalTag(fiktionTage)} Tag nach Aufgabe zur Post als bekannt
-              gegeben. Wird der {rechtsbehelfName(rb.art)} nicht oder nicht
-              fristgerecht {rechtsbehelfVerb(rb.art)}, wird der Bescheid
-              bestandskräftig.
+              {belehrungsSatz}
             </p>
           ) : (
-            // Fallback (keine Rechtsbehelf-Config): generische Widerspruchs-Belehrung wie bisher.
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground print:text-black">
-              Gegen diesen Bescheid kann innerhalb eines Monats nach Bekanntgabe
-              Widerspruch erhoben werden. Der Widerspruch ist schriftlich oder
-              zur Niederschrift bei der erlassenden Stelle ({config.kommune})
-              einzulegen. Die Frist beginnt mit dem Tag der Bekanntgabe dieses
-              Bescheides. Erfolgt die Bekanntgabe durch die Post im Inland, gilt
-              der Bescheid am {ordinalTag(fiktionTage)} Tag nach Aufgabe zur
-              Post als bekannt gegeben. Wird der Widerspruch nicht oder nicht
-              fristgerecht erhoben, wird der Bescheid bestandskräftig.
+            // KEIN erfundener Ersatztext: fehlt das Regime, ist der Mangel SICHTBAR statt stillschweigend
+            // durch eine (für dieses Verfahren womöglich falsche) Standard-Belehrung überdeckt.
+            <p
+              role="alert"
+              className="mt-3 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm leading-relaxed text-destructive print:border-black print:bg-transparent print:text-black"
+            >
+              Rechtsbehelfsbelehrung nicht verfügbar — das Verfahren hat kein
+              vollständiges Rechtsbehelfs-Regime deklariert (fehlend:{" "}
+              {belehrungFehlt.join(", ")}). Ohne vollständige Belehrung darf
+              dieser Bescheid nicht erlassen werden; eine unvollständige
+              Belehrung verlängert die Rechtsbehelfsfrist auf ein Jahr.
             </p>
           )}
         </section>
@@ -397,11 +529,24 @@ export function BescheidView<T = Record<string, unknown>>({
         {/* ── Unterschrift / Fußzeile ───────────────────────────────────────────────── */}
         <footer className="mt-10 flex items-end justify-between gap-6 text-sm text-muted-foreground print:text-black">
           <p>
-            {config.kommune}
+            {pflichtangaben?.behoerde?.name ?? config.kommune}
             <br />
-            <span className="text-muted-foreground print:text-black">
-              Im Auftrag
-            </span>
+            {/* § 119 Abs. 3 S. 2 AO: Namenswiedergabe ODER ausdrücklicher Automations-Vermerk — eines von beidem
+                MUSS dastehen. Vorher stand hier nur „Im Auftrag" ohne Namen und ohne Vermerk. */}
+            {pflichtangaben?.unterschrift?.name ? (
+              <span className="text-foreground print:text-black">
+                {pflichtangaben.unterschrift.name}
+              </span>
+            ) : pflichtangaben?.unterschrift?.maschinell ? (
+              <span className="text-muted-foreground print:text-black">
+                {pflichtangaben.unterschrift.vermerk ??
+                  "Dieser Bescheid wurde maschinell erstellt und ist ohne Unterschrift gültig."}
+              </span>
+            ) : (
+              <span className="text-muted-foreground print:text-black">
+                Im Auftrag
+              </span>
+            )}
           </p>
           <p className="text-right">
             Aktenzeichen{" "}

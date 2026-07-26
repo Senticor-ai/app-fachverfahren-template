@@ -87,6 +87,11 @@ function findVerwaltungsakt(events: AppAuditEvent[]): GefrorenerVa | undefined {
 }
 
 /** Die gefrorene VA-payload → das vollständige DTO (content-Felder + der separate Hash). */
+/**
+ * Projiziert den eingefrorenen VA in sein DTO. BEWUSST OHNE jede Anreicherung: der `checksumSha256` deckt
+ * exakt diese Felder, und der Bürger re-hasht sie. Jede beim Lesen ergänzte Anzeige-Angabe zerstörte den
+ * Beweiswert. Behörde und Entwurfs-Marker werden deshalb beim ERLASS eingefroren (cases.ts), nicht hier.
+ */
 function toVerwaltungsaktDto(va: GefrorenerVa): VerwaltungsaktDto {
   return {
     ...(va.content as Omit<VerwaltungsaktDto, "checksumSha256">),
@@ -312,7 +317,10 @@ export function registerBuergerRoutes(
           found,
           eingangsnummerVon(
             found,
-            deps.procedureRegistry.get(found.procedureId, found.procedureVersion),
+            deps.procedureRegistry.get(
+              found.procedureId,
+              found.procedureVersion,
+            ),
           ),
         ),
       );
@@ -485,10 +493,16 @@ export function registerBuergerRoutes(
           requestId: requestIdOf(request),
         });
 
+      // M3: der Briefkopf nennt die beim ERLASS eingefrorene Anzeige-Identität, NIE die technische authorityId
+      // („default" im Default-Deployment). Fehlt sie, sagt das Dokument ehrlich, dass es ein Entwurf ist.
       const dto = toVerwaltungsaktDto(va);
       let pdf: Uint8Array;
       try {
-        pdf = await deps.bescheidPdf({ va: dto, behoerde: found.authorityId });
+        pdf = await deps.bescheidPdf({
+          va: dto,
+          behoerde:
+            dto.behoerde?.name ?? "(Behörde nicht deklariert — ENTWURF)",
+        });
       } catch {
         return reply.code(500).send({
           error: "bescheid pdf render failed",
@@ -531,7 +545,10 @@ export function registerBuergerRoutes(
       // interner Verfahrenskennungen — ein kostenloses Verzeichnis unserer Innenwelt.
       if (!procedure) {
         request.log.warn(
-          { procedureId: body.procedureId, procedureVersion: body.procedureVersion },
+          {
+            procedureId: body.procedureId,
+            procedureVersion: body.procedureVersion,
+          },
           "buerger submit: unknown procedure",
         );
         return reply.code(422).send({

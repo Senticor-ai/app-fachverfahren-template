@@ -50,6 +50,11 @@ const verwaltungsakt = rb
         fristEinheit: rb.fristEinheit,
         stelle: rb.stelle,
         norm: rb.norm,
+        // PFLICHT-SLOTS der Belehrung (§ 356 Abs. 1, § 357 Abs. 1 AO / § 58 Abs. 1, § 70 Abs. 1 VwGO).
+        // Ohne diese Zeilen driftete die Ableitung STUMM: die Server-Kopie trüge Sitz/Form, die Ableitung
+        // nicht — genau die Klasse „mitgemappt vergessen", die das Gate sonst erst als Rauschen meldet.
+        ...(rb.sitz ? { sitz: rb.sitz } : {}),
+        ...(rb.form ? { form: rb.form } : {}),
       },
       fiktionTage: leistungConfig.zustellung?.fiktionTage ?? 4,
       fiktionNorm:
