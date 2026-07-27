@@ -308,7 +308,11 @@ export function loadMountedComposables(
     try {
       // Reuse-Herkunft aus der neben dem Manifest liegenden Mount-Provenienz (`<id>.mount.json`) — die EINE
       // Wahrheit des ERP-Reuse. Absent/malformt ⇒ „lokal abgeleitet" (best-effort, nie geraten, nie geworfen).
-      const mounted = mapManifestToComposable(manifest, { attestation });
+      // DIE VERSIEGELTE VERFASSUNG WIRD DURCHGEREICHT, nicht bloss geprueft: aus IHR nimmt der Mapper die
+      // strukturierte Faehigkeits-Seite. Ohne diese Zeile waere das Feld vorgesehen, typisiert und nie gefuellt —
+      // die Defektklasse, die diese Woche siebenmal aufgefallen ist. `gov` ist an dieser Stelle bereits
+      // nachgerechnet: ein gebrochenes Siegel hat den Mount weiter oben uebersprungen.
+      const mounted = mapManifestToComposable(manifest, { attestation, governance: gov });
       composables.push({ ...mounted, herkunft: ladeHerkunft(dir, id) });
       // ARCHETYP-BRUCH sichtbar machen (nicht werfen): traegt die Stelle eine Befugnis, die ihr Archetyp
       // ausschliesst? Der haeufigste Schnitt-Fehler — ein Initiator, der Bescheide erlaesst, ist kein

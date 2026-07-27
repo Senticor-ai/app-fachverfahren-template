@@ -60,7 +60,32 @@ export interface MeshGovernanceProjektion {
   regeln?: { id: string; label: string; art: string; class?: string; verify?: string; role?: string; requirement?: string }[];
   capabilities?: { id: string; ergebnis: string; wissen?: string[]; evalSuite?: string }[];
   befugnis?: { entscheidung?: string; hitlPflicht?: boolean; aal?: number };
-  faehigkeiten?: { ki?: string[]; entitlements?: string[]; autonomie?: string; aal?: number };
+  faehigkeiten?: {
+    ki?: string[];
+    entitlements?: string[];
+    autonomie?: string;
+    aal?: number;
+    /** DIE ZWEITE, GLEICHRANGIGE SEITE. Es reist der ANSPRUCH — `programm` ist eine KENNUNG (`tarif:…`,
+     *  `regel:…`, `dmn:…`), nie der Koerper: der ist nachbaubare Substanz und bleibt beim Herausgeber (§7).
+     *  Ohne diese Zeilen faellt die Seite in die Index-Signatur unten und ist dem KIT unbekannt — genau der
+     *  Weg, auf dem `befugnis` schon einmal verloren ging (s. Kommentar am Manifest-Typ). */
+    strukturiert?: {
+      id: string;
+      ergebnis: string;
+      klasse?: string;
+      programm?: string;
+      grundlagen?: string[];
+      evalSuite?: string;
+      /** Erzeugt von einer Wissens-Faehigkeit — und von wem freigegeben. OHNE Freigabe ist das ein Befund,
+       *  der im fremden Traeger sichtbar bleiben MUSS: der Betreiber entscheidet damit, ob er eine
+       *  ungelesene Regel betreibt. */
+      erzeugtVon?: string;
+      freigegebenVon?: string;
+    }[];
+    /** WERKZEUG-KANTEN: welche Wissens-Faehigkeit welches Programm aufruft. Eine Governance-Aussage
+     *  (WER WEN benutzen darf), kein Bauplan (WIE das Programm rechnet). */
+    benutzt?: { wissen: string; werkzeug: string }[];
+  };
   herkunft?: { verfassungDigest?: string; revision?: number };
   digest?: string;
   [k: string]: unknown;
@@ -164,7 +189,24 @@ export interface MeshComposableManifest {
       art: "verbindlich" | "mit-freigabe" | "optional";
     }[];
   };
-  faehigkeiten?: { ki?: string[]; autonomie?: string };
+  /** `strukturiert`/`benutzt` stehen hier fuer den Alt-Bestand OHNE mitgereiste Projektion. Wo eine
+   *  Projektion vorliegt, ist SIE der Traeger (versiegelt) — dieser Block ist dann nicht die Wahrheit,
+   *  sondern nur ihre unversiegelte Kopie. Die Rangfolge setzt `mapManifestToComposable` durch. */
+  faehigkeiten?: {
+    ki?: string[];
+    autonomie?: string;
+    strukturiert?: {
+      id: string;
+      ergebnis: string;
+      klasse?: string;
+      programm?: string;
+      grundlagen?: string[];
+      evalSuite?: string;
+      erzeugtVon?: string;
+      freigegebenVon?: string;
+    }[];
+    benutzt?: { wissen: string; werkzeug: string }[];
+  };
   wissen?: string[];
   evalSuiten?: string[];
   /** WAS die Stelle im laufenden Verfahren ENTSCHEIDET — abgeleitet aus der Zustandsmaschine (Uebergaenge x
