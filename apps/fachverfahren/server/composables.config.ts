@@ -40,7 +40,11 @@ export function createComposableRegistry(
   log: (msg: string) => void = (msg) => console.warn(msg),
 ): ComposableRegistry {
   const dir = resolveMountedComposablesDir(env);
-  const { composables: mounted, uebersprungen } = loadMountedComposables(dir);
+  const {
+    composables: mounted,
+    uebersprungen,
+    archetypBrueche,
+  } = loadMountedComposables(dir);
   // EHRLICHER RÜCKFALL (E3/E4): der Rückfall auf die Muster war bisher STILL — ein Deploy ohne die generierten
   // Stellen sah exakt aus wie ein Template-Start, und niemand konnte den Unterschied sehen. Er wird jetzt benannt,
   // mitsamt dem geprüften Verzeichnis und den fail-closed übersprungenen Manifesten.
@@ -54,6 +58,20 @@ export function createComposableRegistry(
   } else if (uebersprungen.length) {
     log(
       `[composables] ${mounted.length} Stelle(n) gemountet, ${uebersprungen.length} fail-closed übersprungen: ${uebersprungen.map((u) => `${u.file} (${u.grund})`).join(" · ")}`,
+    );
+  }
+  // ARCHETYP-BRUCH benennen — unabhängig davon, ob gemountet oder zurückgefallen wurde.
+  //
+  // WARUM EIGENER ZWEIG: ein Bruch ist kein Mount-Fehler. Die Stelle ist wohlgeformt, sie lädt, sie arbeitet — nur
+  // widerspricht ihre BEFUGNIS dem Archetyp, aus dem sie abgeleitet wurde (ein Initiator, der Bescheide erlässt).
+  // Er wäre in den beiden Zweigen oben nie aufgetaucht: dort ist nichts übersprungen und nichts leer.
+  //
+  // NICHT BLOCKEND, UND DAS IST DIE ENTSCHEIDUNG: ob ein Bruch den Start verhindert, gehört in die Verfassung —
+  // dieses Kit BENENNT ihn. Ein stiller Bruch dagegen wäre genau die Klasse, gegen die die Vorlagen gebaut wurden.
+  if (archetypBrueche.length) {
+    log(
+      `[composables] ${archetypBrueche.length} ARCHETYP-BRUCH: ` +
+        archetypBrueche.map((b) => `${b.id} — ${b.bruch}`).join(" · "),
     );
   }
   return createInMemoryComposableRegistry(

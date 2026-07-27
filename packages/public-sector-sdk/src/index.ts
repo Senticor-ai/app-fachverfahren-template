@@ -31,3 +31,5 @@ export * from "./composable.js";
 export * from "./composable-cert-verify.js";
 // composable-manifest — der Mount-Mapper Mesh-Manifest → AgenticComposable (Ziel-1 S7).
 export * from "./composable-manifest.js";
+
+export * from "./composable-vorlagen.js"; // die drei Archetypen — aus ihnen wird eine zustaendige Stelle abgeleitet

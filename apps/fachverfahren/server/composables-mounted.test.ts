@@ -87,7 +87,9 @@ function attestFor(
   priv: KeyObject = signerPriv,
   pub: string = signerPub,
 ): { alg: string; publicKey: string; sig: string } {
-  const digest = createHash("sha256").update(stableStringify(statement)).digest("hex");
+  const digest = createHash("sha256")
+    .update(stableStringify(statement))
+    .digest("hex");
   const sig = edSign(
     null,
     Buffer.from(`${COMPOSABLE_CERT_SIGNATURE_DOMAIN}\0${digest}`, "utf8"),
@@ -138,10 +140,7 @@ function writeManifest(
     const cert = opts.certOverride
       ? opts.certOverride(earnedCert(m.id, digest))
       : earnedCert(m.id, digest);
-    writeFileSync(
-      path.join(dir, `${m.id}.cert.json`),
-      serialize(cert),
-    );
+    writeFileSync(path.join(dir, `${m.id}.cert.json`), serialize(cert));
   }
   return digest;
 }
@@ -153,7 +152,9 @@ describe("loadMountedComposables — Auto-Mount der CHOS-Manifeste", () => {
     dir = mkdtempSync(path.join(tmpdir(), "chos-mesh-"));
     const kp = generateKeyPairSync("ed25519");
     signerPriv = kp.privateKey;
-    signerPub = kp.publicKey.export({ format: "der", type: "spki" }).toString("base64url");
+    signerPub = kp.publicKey
+      .export({ format: "der", type: "spki" })
+      .toString("base64url");
   });
   afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
@@ -376,7 +377,10 @@ describe("createComposableRegistry — generierte Wahrheit ersetzt die Muster", 
     const wurzel = path.join(dir, "e4-ws");
     const tief = path.join(wurzel, "apps", "fachverfahren");
     mkdirSync(tief, { recursive: true });
-    writeFileSync(path.join(wurzel, "pnpm-workspace.yaml"), "packages:\n  - apps/*\n");
+    writeFileSync(
+      path.join(wurzel, "pnpm-workspace.yaml"),
+      "packages:\n  - apps/*\n",
+    );
     expect(resolveProjectRoot(tief, {})).toBe(wurzel);
   });
 
@@ -384,6 +388,57 @@ describe("createComposableRegistry — generierte Wahrheit ersetzt die Muster", 
     expect(resolveProjectRoot(dir, { APP_PROJECT_ROOT: "/tmp/explizit" })).toBe(
       path.resolve("/tmp/explizit"),
     );
+  });
+
+  it("ARCHETYP-BRUCH: eine Stelle, die entgegen ihrem Archetyp entscheidet, wird BENANNT — und mountet trotzdem", () => {
+    // `buerger` ist der Initiator: er entscheidet nichts. Hier erlaesst er einen Verwaltungsakt.
+    writeManifest(
+      dir,
+      manifest({
+        id: "buerger",
+        flaeche: "buerger",
+        befugnis: { entscheidung: "erlaesst-va", hitlPflicht: false },
+      } as never),
+    );
+    const load = loadMountedComposables(dir);
+    // KEIN Wurf, KEIN Ueberspringen: ein Bruch darf eine laufende Anwendung nicht abschalten.
+    expect(load.composables.map((c) => c.id)).toEqual(["buerger"]);
+    expect(load.uebersprungen).toEqual([]);
+    expect(load.archetypBrueche).toHaveLength(1);
+    expect(load.archetypBrueche[0]!.id).toBe("buerger");
+    expect(load.archetypBrueche[0]!.bruch).toMatch(/ist kein initiator mehr/);
+  });
+
+  it("ARCHETYP-BRUCH: eine zum Archetyp passende Stelle erzeugt KEINEN Befund (kein Falsch-Blocker)", () => {
+    writeManifest(
+      dir,
+      manifest({
+        befugnis: { entscheidung: "erlaesst-va", hitlPflicht: true },
+      } as never),
+    );
+    expect(loadMountedComposables(dir).archetypBrueche).toEqual([]);
+  });
+
+  it("ARCHETYP-BRUCH erreicht die NAHT: createComposableRegistry meldet ihn (sonst waere der Waechter selbst verwaist)", () => {
+    writeManifest(
+      dir,
+      manifest({
+        id: "buerger",
+        flaeche: "buerger",
+        befugnis: { entscheidung: "erlaesst-va", hitlPflicht: false },
+      } as never),
+    );
+    const meldungen: string[] = [];
+    const reg = createComposableRegistry(
+      { MOUNTED_COMPOSABLES_DIR: dir },
+      (m) => meldungen.push(m),
+    );
+    expect(reg.get("buerger")).toBeDefined(); // gemountet, nicht abgeschaltet
+    expect(
+      meldungen.some(
+        (m) => m.includes("ARCHETYP-BRUCH") && m.includes("buerger"),
+      ),
+    ).toBe(true);
   });
 
   it("E3/E4: leerer Mount faellt EHRLICH zurueck (der Rueckfall wird benannt, nicht verschwiegen)", () => {

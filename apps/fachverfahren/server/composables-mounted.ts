@@ -16,7 +16,16 @@
 //
 // FALLBACK: fehlt `.chos/mesh/composables/` (Template ohne Build), lädt nichts — der Aufrufer fällt sauber auf die
 // hand-deklarierten Muster-Composables zurück. Best-effort/fail-open: ein Lese-/Scan-Fehler wirft NIE nach oben.
-import { createHash, createPublicKey, verify as ed25519Verify } from "node:crypto";
+import {
+  createHash,
+  createPublicKey,
+  verify as ed25519Verify,
+} from "node:crypto";
+import {
+  ARCHETYPEN,
+  archetypBruch,
+  type Archetyp,
+} from "@senticor/public-sector-sdk";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import {
@@ -34,7 +43,8 @@ const sha256 = (buf: Buffer): string =>
   createHash("sha256").update(buf).digest("hex");
 
 /** node:crypto-Primitive für den PURE-Package-Injektions-Seam (die Sicherheits-Logik lebt in verifyMeshCertStructure). */
-const sha256Hex = (s: string): string => createHash("sha256").update(s).digest("hex");
+const sha256Hex = (s: string): string =>
+  createHash("sha256").update(s).digest("hex");
 const verifyEd25519 = (
   publicKey: string,
   domain: string,
@@ -43,9 +53,18 @@ const verifyEd25519 = (
 ): boolean => {
   if (!signature || typeof publicKey !== "string") return false;
   try {
-    const pub = createPublicKey({ key: Buffer.from(publicKey, "base64url"), format: "der", type: "spki" });
+    const pub = createPublicKey({
+      key: Buffer.from(publicKey, "base64url"),
+      format: "der",
+      type: "spki",
+    });
     if (pub.asymmetricKeyType !== "ed25519") return false;
-    return ed25519Verify(null, Buffer.from(`${domain}\0${digestHex}`, "utf8"), pub, Buffer.from(signature, "base64url"));
+    return ed25519Verify(
+      null,
+      Buffer.from(`${domain}\0${digestHex}`, "utf8"),
+      pub,
+      Buffer.from(signature, "base64url"),
+    );
   } catch {
     return false;
   }
@@ -124,7 +143,11 @@ function ladeHerkunft(dir: string, id: string): ComposableHerkunft {
 }
 
 /** Relativer Pfad des Manifest-Verzeichnisses unter der Projekt-Wurzel — EINE Schreibweise für Auflösung + Tests. */
-export const MOUNTED_COMPOSABLES_REL = path.join(".chos", "mesh", "composables");
+export const MOUNTED_COMPOSABLES_REL = path.join(
+  ".chos",
+  "mesh",
+  "composables",
+);
 
 /**
  * resolveProjectRoot — findet die Projekt-Wurzel AUFWÄRTS statt sie aus dem Prozess-CWD zu raten.
@@ -178,6 +201,12 @@ export interface MountedLoad {
   composables: AgenticComposable[];
   /** Übersprungene Dateien mit Grund (fail-closed verworfen: über-autonom/inkongruent/unlesbar) — ehrlich, nie geraten. */
   uebersprungen: { file: string; grund: string }[];
+  /** Stellen, deren Befugnis ihrem ARCHETYP widerspricht — der häufigste Schnitt-Fehler.
+   *
+   *  Ein Initiator, der Bescheide erlässt, ist kein Initiator mehr; eine rechtsnahe Stelle ohne HITL-Pflicht
+   *  ist ein Governance-Loch. BEWUSST kein Wurf: ein Bruch darf eine laufende Anwendung nicht abschalten —
+   *  er wird BENANNT, und ob er blockt, entscheidet die Verfassung. Leer, solange alles zum Archetyp passt. */
+  archetypBrueche: { id: string; bruch: string }[];
 }
 
 /**
@@ -193,7 +222,10 @@ export function loadMountedComposables(
 ): MountedLoad {
   const composables: AgenticComposable[] = [];
   const uebersprungen: { file: string; grund: string }[] = [];
-  if (!existsSync(dir)) return { composables, uebersprungen };
+  /** Stellen, deren Befugnis ihrem Archetyp widerspricht — sichtbar, nicht blockend. */
+  const archetypBrueche: { id: string; bruch: string }[] = [];
+  if (!existsSync(dir))
+    return { composables, uebersprungen, archetypBrueche: [] };
 
   const trusted = trustedCertKey(dir);
 
@@ -207,7 +239,11 @@ export function loadMountedComposables(
     );
   } catch (e) {
     // Verzeichnis nicht lesbar → Fallback auf Muster (kein Wurf).
-    return { composables, uebersprungen: [{ file: dir, grund: msg(e) }] };
+    return {
+      composables,
+      uebersprungen: [{ file: dir, grund: msg(e) }],
+      archetypBrueche: [],
+    };
   }
 
   for (const file of entries.sort()) {
@@ -260,7 +296,10 @@ export function loadMountedComposables(
           governanceSha256: gov.intakt && gov.digest ? gov.digest : null,
         });
         // earned NUR mit verifizierter Signatur (fehlt der vertraute Key ⇒ signatureChecked=false ⇒ gekappt).
-        attestation = { valid: v.valid, earned: v.earned && v.signatureChecked };
+        attestation = {
+          valid: v.valid,
+          earned: v.earned && v.signatureChecked,
+        };
       } catch {
         /* unlesbares Verdikt → attestation bleibt {false,false} (fail-closed: gekappt) */
       }
@@ -271,11 +310,29 @@ export function loadMountedComposables(
       // Wahrheit des ERP-Reuse. Absent/malformt ⇒ „lokal abgeleitet" (best-effort, nie geraten, nie geworfen).
       const mounted = mapManifestToComposable(manifest, { attestation });
       composables.push({ ...mounted, herkunft: ladeHerkunft(dir, id) });
+      // ARCHETYP-BRUCH sichtbar machen (nicht werfen): traegt die Stelle eine Befugnis, die ihr Archetyp
+      // ausschliesst? Der haeufigste Schnitt-Fehler — ein Initiator, der Bescheide erlaesst, ist kein
+      // Initiator mehr; eine rechtsnahe Stelle ohne HITL-Pflicht ist ein Governance-Loch.
+      // BEWUSST KEIN WURF: ein Bruch darf eine laufende Anwendung nicht abschalten. Er wird BENANNT; ob er
+      // blockt, entscheidet die Verfassung — dieselbe Trennung wie bei jedem anderen Befund dieses Kits.
+      const archetyp = archetypVonId(id);
+      if (archetyp) {
+        for (const bruch of archetypBruch(manifest, archetyp))
+          archetypBrueche.push({ id, bruch });
+      }
     } catch (e) {
       // fail-closed reject: ein über-autonomes/inkongruentes Manifest wird EHRLICH verworfen (kein stilles Kappen).
       uebersprungen.push({ file, grund: msg(e) });
     }
   }
 
-  return { composables, uebersprungen };
+  return { composables, uebersprungen, archetypBrueche };
+}
+
+/** Der Archetyp hinter einer Stellen-Kennung — `null`, wenn die Stelle keinem der drei entspricht (voellig
+ *  legitim: ein Verfahren darf eigene Struktur-Stellen fuehren, fuer die kein Archetyp gilt). */
+function archetypVonId(id: string): Archetyp | null {
+  for (const [name, profil] of Object.entries(ARCHETYPEN))
+    if (profil.id === id) return name as Archetyp;
+  return null;
 }

@@ -54,45 +54,46 @@ export interface ArchetypProfil {
  * ein Initiator, der Bescheide erlässt, ist kein Initiator mehr; eine Aufsicht, die in den Einzelfall
  * eingreift, ist keine Aufsicht.
  */
-export const ARCHETYPEN: Readonly<Record<Archetyp, ArchetypProfil>> = Object.freeze({
-  initiator: Object.freeze({
-    id: "buerger",
-    art: "flaeche",
-    akteur: "mensch",
-    zone: "buerger",
-    entscheidung: "keine",
-    hitlPflicht: false,
-    autonomieDecke: "AAL-1",
-    warum:
-      "Der Initiator bringt sein Anliegen ein und ENTSCHEIDET NICHTS. Gemessen an grundsteuer: er trägt keinen " +
-      "einzigen Zustandsübergang. Eine leere Entscheidungs-Liste ist bei ihm die richtige Antwort, kein Mangel.",
-  }),
-  bearbeitung: Object.freeze({
-    id: "sachbearbeitung",
-    art: "flaeche",
-    akteur: "beide",
-    zone: "verwaltung",
-    entscheidung: "erlaesst-va",
-    hitlPflicht: true,
-    autonomieDecke: "AAL-2",
-    warum:
-      "Die einzige Stelle mit Außenwirkung: sie prüft, subsumiert und verantwortet die Festsetzung. `beide` heißt " +
-      "Mensch UND KI im Vier-Augen-Prinzip — die KI berät, der Mensch entscheidet. Die Autonomie-Decke steht auf " +
-      "AAL-2 („Advise“), weil eine rechtsnahe Entscheidung nie autonom fallen darf.",
-  }),
-  aufsicht: Object.freeze({
-    id: "aufsicht",
-    art: "flaeche",
-    akteur: "mensch",
-    zone: "aufsicht",
-    entscheidung: "keine",
-    hitlPflicht: false,
-    autonomieDecke: "AAL-2",
-    warum:
-      "Die Aufsicht sieht über VIELE Vorgänge — Muster, Auffälligkeiten, Kennzahlen, die prüfbare Akte. Sie greift " +
-      "NICHT in den Einzelfall ein; täte sie es, wäre sie eine zweite Bearbeitung ohne deren Bindungen.",
-  }),
-});
+export const ARCHETYPEN: Readonly<Record<Archetyp, ArchetypProfil>> =
+  Object.freeze({
+    initiator: Object.freeze({
+      id: "buerger",
+      art: "flaeche",
+      akteur: "mensch",
+      zone: "buerger",
+      entscheidung: "keine",
+      hitlPflicht: false,
+      autonomieDecke: "AAL-1",
+      warum:
+        "Der Initiator bringt sein Anliegen ein und ENTSCHEIDET NICHTS. Gemessen an grundsteuer: er trägt keinen " +
+        "einzigen Zustandsübergang. Eine leere Entscheidungs-Liste ist bei ihm die richtige Antwort, kein Mangel.",
+    }),
+    bearbeitung: Object.freeze({
+      id: "sachbearbeitung",
+      art: "flaeche",
+      akteur: "beide",
+      zone: "verwaltung",
+      entscheidung: "erlaesst-va",
+      hitlPflicht: true,
+      autonomieDecke: "AAL-2",
+      warum:
+        "Die einzige Stelle mit Außenwirkung: sie prüft, subsumiert und verantwortet die Festsetzung. `beide` heißt " +
+        "Mensch UND KI im Vier-Augen-Prinzip — die KI berät, der Mensch entscheidet. Die Autonomie-Decke steht auf " +
+        "AAL-2 („Advise“), weil eine rechtsnahe Entscheidung nie autonom fallen darf.",
+    }),
+    aufsicht: Object.freeze({
+      id: "aufsicht",
+      art: "flaeche",
+      akteur: "mensch",
+      zone: "aufsicht",
+      entscheidung: "keine",
+      hitlPflicht: false,
+      autonomieDecke: "AAL-2",
+      warum:
+        "Die Aufsicht sieht über VIELE Vorgänge — Muster, Auffälligkeiten, Kennzahlen, die prüfbare Akte. Sie greift " +
+        "NICHT in den Einzelfall ein; täte sie es, wäre sie eine zweite Bearbeitung ohne deren Bindungen.",
+    }),
+  });
 
 /** Was das VERFAHREN beisteuern muss — die Vorlage kann es nicht wissen. */
 export interface FachlicheFuellung {
@@ -128,15 +129,26 @@ const leer = (v: unknown): boolean => typeof v !== "string" || !v.trim();
  * Verfahren, die als „grün“ galten, weil sie die Demo-Vorlage trugen: eine Vorlage, die Platzhalter ausliefert,
  * produziert Erzeugnisse, die jedes Gate bestehen und nichts leisten.
  */
-export function ausVorlage(archetyp: Archetyp, fachlich: FachlicheFuellung): VorlagenErgebnis {
+export function ausVorlage(
+  archetyp: Archetyp,
+  fachlich: FachlicheFuellung,
+): VorlagenErgebnis {
   const profil = ARCHETYPEN[archetyp];
   if (!profil) {
-    return { fehlend: ["archetyp"], meldung: `Unbekannter Archetyp „${String(archetyp)}“ — erlaubt sind: ${Object.keys(ARCHETYPEN).join(", ")}.` };
+    return {
+      fehlend: ["archetyp"],
+      meldung: `Unbekannter Archetyp „${String(archetyp)}“ — erlaubt sind: ${Object.keys(ARCHETYPEN).join(", ")}.`,
+    };
   }
   const fehlend: string[] = [];
-  if (leer(fachlich?.titel)) fehlend.push("titel (der Anzeigename dieser Stelle im Verfahren)");
-  if (leer(fachlich?.domain)) fehlend.push("domain (der kanonische Slug des Verfahrens)");
-  if (leer(fachlich?.aufgabenbereich)) fehlend.push("aufgabenbereich (was die Stelle TUT, in der Sprache des Fachbereichs)");
+  if (leer(fachlich?.titel))
+    fehlend.push("titel (der Anzeigename dieser Stelle im Verfahren)");
+  if (leer(fachlich?.domain))
+    fehlend.push("domain (der kanonische Slug des Verfahrens)");
+  if (leer(fachlich?.aufgabenbereich))
+    fehlend.push(
+      "aufgabenbereich (was die Stelle TUT, in der Sprache des Fachbereichs)",
+    );
   if (fehlend.length) {
     return {
       fehlend,
@@ -147,7 +159,11 @@ export function ausVorlage(archetyp: Archetyp, fachlich: FachlicheFuellung): Vor
     };
   }
 
-  const ki = [...new Set((fachlich.faehigkeiten ?? []).map((s) => s.trim()).filter(Boolean))];
+  const ki = [
+    ...new Set(
+      (fachlich.faehigkeiten ?? []).map((s) => s.trim()).filter(Boolean),
+    ),
+  ];
   const manifest: MeshComposableManifest = {
     schemaVersion: 1,
     id: profil.id,
@@ -157,11 +173,22 @@ export function ausVorlage(archetyp: Archetyp, fachlich: FachlicheFuellung): Vor
     akteur: profil.akteur,
     ...(fachlich.amt?.trim() ? { amt: fachlich.amt.trim() } : {}),
     aufgabenbereich: fachlich.aufgabenbereich.trim(),
-    befugnis: { entscheidung: profil.entscheidung, hitlPflicht: profil.hitlPflicht },
+    befugnis: {
+      entscheidung: profil.entscheidung,
+      hitlPflicht: profil.hitlPflicht,
+    },
     // Autonomie NUR bei deklarierten KI-Fähigkeiten — ohne sie ist es eine rein deterministische Stelle,
     // und eine Autonomie-Angabe wäre eine Behauptung über etwas, das gar nicht existiert.
-    ...(ki.length ? { faehigkeiten: { ki, autonomie: profil.autonomieDecke } } : {}),
-    ...(fachlich.wissen?.length ? { wissen: [...new Set(fachlich.wissen.map((s) => s.trim()).filter(Boolean))] } : {}),
+    ...(ki.length
+      ? { faehigkeiten: { ki, autonomie: profil.autonomieDecke } }
+      : {}),
+    ...(fachlich.wissen?.length
+      ? {
+          wissen: [
+            ...new Set(fachlich.wissen.map((s) => s.trim()).filter(Boolean)),
+          ],
+        }
+      : {}),
   } as MeshComposableManifest;
 
   return {
@@ -181,22 +208,42 @@ export function ausVorlage(archetyp: Archetyp, fachlich: FachlicheFuellung): Vor
  *
  * Reine Prüfung, kein Wurf: sie MELDET Abweichungen. Ob eine davon blockt, entscheidet die Verfassung.
  */
-export function archetypBruch(manifest: MeshComposableManifest, archetyp: Archetyp): string[] {
+export function archetypBruch(
+  manifest: MeshComposableManifest,
+  archetyp: Archetyp,
+): string[] {
   const p = ARCHETYPEN[archetyp];
   if (!p) return [`Unbekannter Archetyp „${String(archetyp)}“`];
   const brueche: string[] = [];
-  const befugnis = (manifest as { befugnis?: { entscheidung?: unknown; hitlPflicht?: unknown } }).befugnis;
-  const ist = typeof befugnis?.entscheidung === "string" ? befugnis.entscheidung : "keine";
-  if (ist !== p.entscheidung) {
+  const befugnis = (
+    manifest as { befugnis?: { entscheidung?: unknown; hitlPflicht?: unknown } }
+  ).befugnis;
+
+  // ZWEI VERSCHIEDENE BEFUNDE, und sie durcheinanderzubringen wäre selbst eine Fabrikation: eine Stelle, die
+  // „keine Entscheidung“ ERKLÄRT, sagt etwas — eine Stelle ohne `befugnis`-Block sagt gar nichts. Ihr die
+  // Aussage „keine“ zu unterstellen und sie dann dafür zu rügen, wäre ein erfundenes Zitat. Beides bleibt ein
+  // Bruch (das VERSCHÄRFT nichts weg), nur wird jeder bei seinem Namen genannt — und nur der erklärte Fall
+  // erlaubt die Aussage, WAS dort stattdessen steht.
+  const erklaert = typeof befugnis?.entscheidung === "string";
+  const ist = erklaert ? (befugnis!.entscheidung as string) : "";
+  if (!erklaert) {
+    brueche.push(
+      `Entscheidungs-Befugnis nicht erklärt — der Archetyp „${archetyp}“ verlangt „${p.entscheidung}“. ` +
+        "[Ein fehlender `befugnis`-Block ist keine Aussage „keine“: er ist die fehlende Aussage selbst. " +
+        "Wer entscheiden darf, muss im Manifest stehen — sonst entscheidet es die Laufzeit stillschweigend.]",
+    );
+  } else if (ist !== p.entscheidung) {
     brueche.push(
       `Entscheidungs-Befugnis „${ist}“ widerspricht dem Archetyp „${archetyp}“ (dort: „${p.entscheidung}“). ` +
-      (p.entscheidung === "keine"
-        ? "Eine Stelle, die hier entscheidet, ist kein " + archetyp + " mehr."
-        : "Ohne diese Befugnis kann die Stelle ihre Rolle im Verfahren nicht ausfüllen."),
+        (p.entscheidung === "keine"
+          ? "Eine Stelle, die hier entscheidet, ist kein " + archetyp + " mehr."
+          : "Ohne diese Befugnis kann die Stelle ihre Rolle im Verfahren nicht ausfüllen."),
     );
   }
   if (p.hitlPflicht && befugnis?.hitlPflicht !== true) {
-    brueche.push("HITL-Pflicht fehlt, obwohl der Archetyp eine rechtsnahe Entscheidung trägt — sie darf nie autonom fallen.");
+    brueche.push(
+      "HITL-Pflicht fehlt, obwohl der Archetyp eine rechtsnahe Entscheidung trägt — sie darf nie autonom fallen.",
+    );
   }
   return brueche;
 }
