@@ -137,6 +137,15 @@ const MUSTER_ANTRAG: StatusMachineSource = {
       vermerk:
         "Dieser Bescheid wurde maschinell erstellt und ist ohne Unterschrift gültig.",
     },
+    // RECHEN-HOHEIT: der Betrag im Bescheid wird gegen den Tarif des Verfahrens NACHGERECHNET, bevor er
+    // eingefroren wird. Vorher trug der Tenor die im Browser des Antragstellers gerechnete Zahl, und
+    // `tenorHerkunft` sagte das auch ehrlich — nur änderte die Ehrlichkeit nichts daran, dass die Behörde
+    // einen Betrag festsetzte, den sie nicht selbst ermittelt hatte. Kein eigener Tarif hier: der
+    // autoritative Satz steht bereits an `stelltForderung` und wird von dort gelesen (EINE Quelle).
+    tenorNachrechnung: {
+      diskriminator: "anliegen.kategorie",
+      betragPfad: "berechnung.betrag",
+    },
   },
   states: [
     { key: "eingegangen" },

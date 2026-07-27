@@ -40,6 +40,8 @@ import {
   aufbewahrungLaeuft,
   aufbewahrungsende,
   berechneTarif,
+  pruefeTenor,
+  tarifDesVerfahrens,
   builtInPermissions,
   createFachlicheAuditEvent,
   fehlendeBelehrungsSlots,
@@ -948,6 +950,38 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
             requestId: requestIdOf(request),
           });
       }
+      // ── RECHEN-HOHEIT: DIE BEHOERDE RECHNET IHREN BETRAG SELBST NACH ─────────────────────────────
+      // Der Tenor wurde bisher aus `case.data.berechnung` eingefroren — einer Zahl, die der BROWSER des
+      // Antragstellers gerechnet hat. Fuer die Behoerde ist ein fremdes Geraet dasselbe wie ein Sprachmodell:
+      // eine Quelle, die sie nicht wiederholen und nicht verantworten kann. Der SHA-256 ueber den VA aendert
+      // daran nichts — er belegt Unveraenderlichkeit, nie Richtigkeit, und konserviert den Fehler.
+      // Deklariert das Verfahren `verwaltungsaktInhalt.tenorNachrechnung`, wird der Betrag hier gegen den
+      // EINEN im Verfahren hinterlegten Tarif geprueft; weicht er ab, wird der Bescheid NICHT erlassen.
+      // Ohne die Deklaration bleibt alles wie heute (Muster A) — bestehende Verfahren merken nichts.
+      const tenorUrteil = pruefeTenor(
+        procedure.verwaltungsaktInhalt?.tenorNachrechnung,
+        tarifDesVerfahrens(procedure),
+        transition.issuesVerwaltungsakt &&
+          procedure.verwaltungsaktInhalt?.tenorNachrechnung
+          ? {
+              kategorie: leseDatenPfad(
+                appCase.data,
+                procedure.verwaltungsaktInhalt.tenorNachrechnung.diskriminator,
+              ),
+              clientBetrag: leseDatenPfad(
+                appCase.data,
+                procedure.verwaltungsaktInhalt.tenorNachrechnung.betragPfad,
+              ),
+            }
+          : { kategorie: undefined, clientBetrag: undefined },
+      );
+      if (transition.issuesVerwaltungsakt && !tenorUrteil.ok)
+        return reply.code(422).send({
+          error:
+            "Der Betrag des Bescheids haelt der Nachrechnung nicht stand — er wird nicht erlassen. " +
+            tenorUrteil.grund,
+          requestId: requestIdOf(request),
+        });
       if (transition.issuesVerwaltungsakt && vaConfig) {
         // ── PFLICHTANGABEN DES VA EINFRIEREN (Phase 5, W5) ───────────────────────────────────────────
         // Der Renderer kann nur zeigen, was der VA TRÄGT. Woher die Angaben kommen, steht als DATEN am
@@ -1075,7 +1109,11 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
           // Server NICHT nachgerechnet. Er wird gefroren + gehasht (unveränderlich + beweisbar-unverändert),
           // aber NICHT server-verifiziert. Ein data-driven `tarif` wäre server-nachrechenbar → dann
           // „server-nachgerechnet" (deeperer Root Cause: Berechnung/Tarif-Move ins SDK, separate Scheibe).
-          tenorHerkunft: "client-berechnet" as const,
+          // EHRLICHE HERKUNFT, jetzt datengetrieben: nachgerechnet ⇒ der Satz stammt aus dem Programm der
+          // Stelle; ohne Nachrechnung bleibt es bei der client-gerechneten Zahl (und sagt das auch so).
+          tenorHerkunft: tenorUrteil.nachgerechnet
+            ? ("server-nachgerechnet" as const)
+            : ("client-berechnet" as const),
         };
         verwaltungsaktPayload = {
           content,

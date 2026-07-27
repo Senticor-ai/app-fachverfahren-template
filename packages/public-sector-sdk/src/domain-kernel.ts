@@ -1,5 +1,6 @@
 import { evalBedingung, type Bedingung } from "./rules.js";
 import type { TarifTabelle } from "./tarif.js";
+import type { TenorNachrechnungConfig } from "./tenor-nachrechnung.js";
 
 /** Konfiguration einer Sollstellung an einem Übergang (Rückforderung, ADR-0007): server-autoritative Höhe aus
  *  `tarif` + der client-gewählten Kategorie unter dem Datenpfad `diskriminator`; Zahlungsfrist in Tagen. */
@@ -117,6 +118,16 @@ export interface VerwaltungsaktInhaltConfig {
   };
   /** Namenswiedergabe (§ 119 Abs. 3 S. 2 AO) ODER — wenn `maschinell` — der ausdrückliche Automations-Vermerk. */
   unterschrift?: { name?: string; maschinell?: boolean; vermerk?: string };
+  /**
+   * NACHRECHNUNG DES TENOR-BETRAGS (Rechen-Hoheit): der Server prueft den client-gelieferten Betrag gegen den
+   * im Verfahren deklarierten Tarif, BEVOR er den Bescheid einfriert. Ohne diesen Block bleibt es beim
+   * heutigen Verhalten (`tenorHerkunft: "client-berechnet"`) — Muster A, byte-identisch.
+   *
+   * Er bringt bewusst KEINEN eigenen Tarif mit: der autoritative Satz ist bereits als `stelltForderung.tarif`
+   * an einem Uebergang deklariert, und eine Nachrechnung gegen eine zweite Abschrift desselben Tarifs pruefte
+   * nur, ob zwei Kopien noch gleich sind — genau der Defekt, den sie beheben soll.
+   */
+  tenorNachrechnung?: TenorNachrechnungConfig;
 }
 
 export interface ProcedureVersion {
