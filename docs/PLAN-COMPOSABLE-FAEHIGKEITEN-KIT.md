@@ -57,6 +57,35 @@ Mount-Test: Manifest mit `strukturiert` ⇒ das Detail-DTO trägt es.
 
 ---
 
+## STAND: S6 ist umgesetzt (Commit `a8e8420`)
+
+Alle vier Nähte sind gezogen — und die entscheidende Frage war nicht, OB die Seite ankommt, sondern **WOHER**.
+
+**Rangfolge der Quellen** (`mapManifestToComposable`, neuer Parameter `opts.governance`):
+- Projektion da **und** Siegel nachgerechnet intakt ⇒ **sie** ist die Quelle.
+- Projektion da, Siegel gebrochen **oder ungeprüft** ⇒ die Seite bleibt **leer**. Ein Rückfall auf den
+  unversiegelten Manifest-Block wäre der Umweg, der das Siegel wertlos machte.
+- **Gar keine** Projektion (Alt-Bestand) ⇒ der Manifest-Block trägt — dieselbe Quelle, aus der derselbe Mapper
+  auch `ki`/`befugnis`/`leistungen` liest.
+
+Der Mount-Pfad (`composables-mounted.ts`) reicht sein bereits nachgerechnetes `gov`-Verdikt jetzt durch. Ohne
+diese eine Zeile wäre das Feld vorgesehen, typisiert und nie gefüllt.
+
+**Die offene Fachfrage ist gemessen beantwortet, nicht entschieden:** `.chos/business-logic` existiert in diesem
+Kit nicht. Es gibt hier keinen Programm-Körper zu projizieren, also zeigt die Betreiber-Sicht den **Anspruch**
+(Kennung, Klasse, Grundlagen, Erzeugungs-Provenienz). Eine lokale Darstellungs-Route hätte den Zweitspeicher
+gebaut, den der Plan verbietet — die Fläche im Kit bleibt damit ein reiner Konsument.
+
+**Beweis, 13 Zusicherungen:** `composable-faehigkeiten-quelle.test.ts` (8/8, u.a. Parität zuerst · gebrochenes
+Siegel ⇒ leer trotz untergeschobenem Manifest-Block · ein Composable ohne `ki` trägt trotzdem seine strukturierte
+Seite) · `composables-faehigkeiten-naht.test.ts` (5/5, u.a. **Gegenprobe zur Strip-Naht**: ein nicht deklariertes
+Feld verschwindet im selben Aufruf).
+
+Offen bleibt bewusst die **Fläche** (`amt-assistent.tsx` / `amt-verfahren-wiki.tsx`): die Daten liegen jetzt am
+Detail-DTO an. Kein UI-Neubau — das Wiki dockt an die bestehende Mechanik an, wenn es gebraucht wird.
+
+---
+
 ## Was in diesem Repo dazu schon fertig ist
 
 - **Rechen-Hoheit am Bescheid** (`eec0e85`): der Server rechnet den Tenor gegen den Tarif des Verfahrens nach,
