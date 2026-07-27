@@ -1,5 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { extname, join, relative } from "node:path";
+import { istDokumentationsNutzlast } from "./lib/doku-nutzlast.mjs";
 
 const root = process.cwd();
 const sourceRoots = ["apps", "packages", "modules"];
@@ -99,7 +100,7 @@ for (const sourceRoot of sourceRoots) {
     const lines = (await readFile(file, "utf8")).split(/\r?\n/);
 
     lines.forEach((line, index) => {
-      if (isCustomPropertyDefinition(line)) {
+      if (isCustomPropertyDefinition(line) || istDokumentationsNutzlast(line)) {
         return;
       }
 

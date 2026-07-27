@@ -116,6 +116,9 @@ const updateUnmanagedPaths: string[] = [
   // Mesh-Mount-Prüfung — Repo-Maintainer-Skripte wie check-composables.mts selbst, kein
   // Konsumenten-verwaltetes Vorlagen-Fundament.
   "scripts/lib/verify-mounted-composables.mts",
+  // Geteilter Nutzlast-Filter der Quell-Gates (CSS-Token + Motion): Dokumentation ist kein Code. Gehoert zu
+  // denselben Repo-Maintainer-Skripten wie die Gates, die ihn benutzen — kein Konsumenten-Fundament.
+  "scripts/lib/doku-nutzlast.mjs",
   "scripts/verify-mounted-composables.test.ts",
   "scripts/check-css-token-aliases.mjs",
   "scripts/check-dev-dependencies.mjs",

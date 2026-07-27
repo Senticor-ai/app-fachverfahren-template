@@ -12,6 +12,7 @@
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { extname, join, relative } from "node:path";
+import { ohneDokumentationsNutzlast } from "./lib/doku-nutzlast.mjs";
 
 const root = process.cwd();
 const sourceRoots = ["apps", "packages", "modules"];
@@ -69,7 +70,9 @@ for (const sourceRoot of sourceRoots) {
   const files = await collectFiles(join(root, sourceRoot));
   for (const file of files) {
     const rel = display(file);
-    const text = await readFile(file, "utf8");
+    // Dokumentations-Nutzlast ausblenden, BEVOR gezaehlt wird: der Doku-Korpus zitiert `animate-bounce` und
+    // Dauer-Klassen, weil er die Motion-Regel ERKLAERT. Zeilennummern bleiben erhalten (Nutzlast wird leer).
+    const text = ohneDokumentationsNutzlast(await readFile(file, "utf8"));
     const durMatches = text.match(LITERAL_DURATION);
     if (durMatches && durMatches.length > 0)
       durationCounts[rel] = durMatches.length;
