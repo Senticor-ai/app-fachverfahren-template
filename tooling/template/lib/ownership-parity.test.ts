@@ -91,6 +91,11 @@ const updateUnmanagedPaths: string[] = [
   "tests/pg/**",
   // Doku außerhalb der verwalteten docs/agents|assets|reference|capabilities-Bäume.
   "docs/UX-UPGRADE-PLAN.md",
+  // Arbeitsplaene der VORLAGE selbst (docs/PLAN-*.md): Projekt-Steuerung dieses Repos, kein
+  // Konsumenten-Fundament — dieselbe Gruppe wie UX-UPGRADE-PLAN.md. Als Muster statt Einzelpfad,
+  // damit der naechste Plan die Ratsche nicht erneut rot faerbt (der Dead-Entry-Test unten haelt
+  // das Muster ehrlich: verschwindet der letzte Plan, meldet er den toten Eintrag).
+  "docs/PLAN-*.md",
   "docs/adr/**",
   "docs/architecture/**",
   "docs/compliance/**",

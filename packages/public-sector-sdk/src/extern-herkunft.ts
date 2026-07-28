@@ -126,6 +126,9 @@ function escapeGrenzen(text: string): string {
 
 /** Steuer-/Unsichtbar-Zeichen entfernen (Zero-Width, Soft-Hyphen, Bidi-Overrides, Wortfuge) — sie tarnen
  *  Muster vor der Heuristik („ig<ZWSP>noriere“). Zeilenumbruch/Tab bleiben, sie tragen Lesbarkeit. */
+// Steuerzeichen sind hier der GEGENSTAND, nicht ein Versehen: genau sie tarnen Injektions-Muster vor der
+// Heuristik. no-control-regex meldet die Absicht als Fehler — ein Falsch-Blocker, deshalb hier abgeschaltet.
+// eslint-disable-next-line no-control-regex
 const UNSICHTBAR = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u00AD\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g;
 function entferneUnsichtbare(text: string): string {
   return text.replace(UNSICHTBAR, "");
