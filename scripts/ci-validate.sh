@@ -31,6 +31,15 @@ pnpm run build:server
 pnpm run check:web-delivery
 pnpm run check:openapi
 pnpm run smoke:runtime
+# `test:e2e` gehoert ins KERN-Gate, nicht ins `full`-Profil: es braucht kein Fremdwerkzeug und kein Netz
+# (vitest gegen vitest.e2e.config.ts, gemessen 2,6 s) — genau das Kriterium, nach dem `core` geschnitten ist.
+#
+# WARUM ES HIER GEFEHLT HAT (2026-07-30): die CHOS-Verfassung fuehrt `test:e2e` in `gates.deploy` und sagt damit
+# zu, dass ein erzeugtes Verfahren seine End-zu-End-Pruefung faehrt. Gemessen lief sie in KEINEM Tor dieses Repos
+# — weder precommit noch ci noch push. Die Zusage stand in CHOS, die Ausfuehrung fehlte hier; niemand konnte die
+# Luecke sehen, weil nichts die beiden Repos gegeneinander hielt. Der Riegel dafuer ist jetzt
+# `template-gate-kongruenz.test.ts` in CHOS, und er hat genau diesen einen Fund uebrig gelassen.
+pnpm run test:e2e
 
 if [ "$CI_PROFILE" = "full" ]; then
   pnpm run test:k8s:render
