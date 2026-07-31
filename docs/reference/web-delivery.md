@@ -1,8 +1,8 @@
 # Web-Delivery-Vertrag
 
-Dieser Vertrag gilt fuer generierte Fachverfahren-Webapps, die per CI/CD als
+Dieser Vertrag gilt für generierte Fachverfahren-Webapps, die per CI/CD als
 Container in Kubernetes ausgeliefert werden. Edge/CDN-Konfiguration darf diese
-Regeln verschaerfen, aber die App-Runtime muss sichere Defaults selbst setzen.
+Regeln verschärfen, aber die App-Runtime muss sichere Defaults selbst setzen.
 
 ## Cache-Regeln
 
@@ -12,12 +12,12 @@ Regeln verschaerfen, aber die App-Runtime muss sichere Defaults selbst setzen.
   `Cache-Control: public, max-age=31536000, immutable`.
 - API-, Auth-, Sitzungs-, Health- und Metrics-Antworten werden nicht im Browser
   gecacht.
-- Runtime-Konfiguration bleibt oeffentlich, schema-versioniert und enthaelt
+- Runtime-Konfiguration bleibt öffentlich, schema-versioniert und enthält
   keine Geheimnisse oder internen Upstreams.
 
 ## Security Header
 
-Die Fastify-Runtime setzt standardmaessig:
+Die Fastify-Runtime setzt standardmäßig:
 
 - `Content-Security-Policy` oder im Rollout `Content-Security-Policy-Report-Only`
 - `Strict-Transport-Security` in Produktion
@@ -29,7 +29,7 @@ Inline-Skripte sind nicht Teil des App-Shell-Vertrags. Der Preview-Reporter
 liegt deshalb als externe Datei unter `/preview-reporter.js`. Inline-Styles
 werden als Style-Attribute und Style-Elemente erlaubt, weil React-Komponenten
 und eingebundene UI-/Visualisierungsbibliotheken dynamische Layoutwerte,
-Fortschrittsbreiten, Seitenverhaeltnisse und Laufzeit-Styles setzen.
+Fortschrittsbreiten, Seitenverhältnisse und Laufzeit-Styles setzen.
 
 ## Service Worker und PWA
 
@@ -38,7 +38,7 @@ registriert, wenn `/runtime-config.json` ihn explizit aktiviert.
 
 Der Standard-Worker darf nur gleiche-Origin-Assets unter `/assets/` mit
 Content-Hash cachen. Navigationen, APIs, `/runtime-config.json`,
-`/internal/*`, Auth-/Sitzungsdaten und Nutzerdokumente werden nie ueber den
+`/internal/*`, Auth-/Sitzungsdaten und Nutzerdokumente werden nie über den
 Worker gecacht.
 
 `pnpm run check:pwa` baut App und Server und prüft die reale Fastify-Auslieferung

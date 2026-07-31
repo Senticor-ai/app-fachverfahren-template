@@ -43,36 +43,36 @@ Der zeitgetriebene Scanner (#58, CronJob) findet überfällige `forderung.gestel
 
 ## Alternativen
 
-### A. Den PaymentPort „umdrehen" (eine Auszahlungs-/Rueckforderungs-Richtung im Port)
+### A. Den PaymentPort „umdrehen" (eine Auszahlungs-/Rückforderungs-Richtung im Port)
 
-VERWORFEN — der Kontext oben nennt den Grund: `createPayment` ist fuer den EINZUG bereits die richtige Naht
-(der Buerger zahlt die Rueckforderung ueber dieselbe ePayBL-/XBezahldienste-Strecke wie eine Gebuehr). Was der
-Port NICHT traegt, ist die FORDERUNG selbst — Sollstellung, Faelligkeit, Mahnstufen, Restbetrag. Das ist ein
-Domaenen-Modell. Es in den Port zu legen wuerde eine Zahlungs-Schnittstelle zum Forderungs-Buchhalter machen
-und jeden kuenftigen Zahlungs-Anbieter an das Mahnwesen binden.
+VERWORFEN — der Kontext oben nennt den Grund: `createPayment` ist für den EINZUG bereits die richtige Naht
+(der Bürger zahlt die Rückforderung über dieselbe ePayBL-/XBezahldienste-Strecke wie eine Gebühr). Was der
+Port NICHT trägt, ist die FORDERUNG selbst — Sollstellung, Fälligkeit, Mahnstufen, Restbetrag. Das ist ein
+Domänen-Modell. Es in den Port zu legen würde eine Zahlungs-Schnittstelle zum Forderungs-Buchhalter machen
+und jeden künftigen Zahlungs-Anbieter an das Mahnwesen binden.
 
 ### B. Eigene `forderungen`-Tabelle mit Restbetrag als Spalte
 
-VERWORFEN aus zwei Gruenden. Erstens die Rule of Three: es gibt bisher EINEN Bedarf, und eine Tabelle ist die
-teuerste Antwort auf einen einzelnen Fall (Migration, Backup, Mandanten-Isolation, Loeschkonzept). Zweitens und
+VERWORFEN aus zwei Gründen. Erstens die Rule of Three: es gibt bisher EINEN Bedarf, und eine Tabelle ist die
+teuerste Antwort auf einen einzelnen Fall (Migration, Backup, Mandanten-Isolation, Löschkonzept). Zweitens und
 schwerer: ein GESPEICHERTER Restbetrag ist eine Zweitwahrheit neben den Zahlungs-Ereignissen. Er driftet beim
 ersten Storno, bei der ersten Teilzahlung, die zweimal verbucht wird, und beim ersten Nachtrag. Der Restbetrag
 ist eine reine Ableitung (`Sollstellung − Σ Zahlungen`) und damit eine testbare Funktion — dieselbe Wahl wie
-bei der N-Augen-Zaehlung und der Bescheid-Herkunft.
+bei der N-Augen-Zählung und der Bescheid-Herkunft.
 
 ### C. Eigener Mahn-Worker neben dem Fristen-Scanner
 
-VERWORFEN. Der zeitgetriebene Scanner existiert, ist deterministisch (injizierte Zeit) und traegt bereits die
-Mandanten-Iteration. Ein zweiter Worker haette eine zweite Zeitquelle, eine zweite Fehlerbehandlung und einen
-zweiten Ort fuer die Frage „warum wurde hier nicht gemahnt?". Die Faelligkeit der Forderung ist eine Frist wie
-jede andere — sie gehoert in den EINEN Motor.
+VERWORFEN. Der zeitgetriebene Scanner existiert, ist deterministisch (injizierte Zeit) und trägt bereits die
+Mandanten-Iteration. Ein zweiter Worker hätte eine zweite Zeitquelle, eine zweite Fehlerbehandlung und einen
+zweiten Ort für die Frage „warum wurde hier nicht gemahnt?". Die Fälligkeit der Forderung ist eine Frist wie
+jede andere — sie gehört in den EINEN Motor.
 
-### D. Rueckforderung ohne eigenen Verwaltungsakt (nur als Buchung)
+### D. Rückforderung ohne eigenen Verwaltungsakt (nur als Buchung)
 
 VERWORFEN, rechtlich unhaltbar: die Erstattung nach § 50 SGB X / § 49a VwVfG setzt die Forderung dem Grunde
-UND der Hoehe nach fest — das ist ein Verwaltungsakt. Ohne ihn haette der Buerger keinen Rechtsbehelf gegen die
-Rueckforderung, und die Buchung waere eine Zahlungsaufforderung ohne Titel. Deshalb laeuft die Festsetzung
-ueber dieselbe VA-Maschinerie wie jeder andere Bescheid — mit eigenem Rechtsbehelfs-Regime (ADR-0006 §3).
+UND der Höhe nach fest — das ist ein Verwaltungsakt. Ohne ihn hätte der Bürger keinen Rechtsbehelf gegen die
+Rückforderung, und die Buchung wäre eine Zahlungsaufforderung ohne Titel. Deshalb läuft die Festsetzung
+über dieselbe VA-Maschinerie wie jeder andere Bescheid — mit eigenem Rechtsbehelfs-Regime (ADR-0006 §3).
 
 ## Konsequenzen / betroffene Flächen (bewusst benannt)
 

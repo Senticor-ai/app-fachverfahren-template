@@ -40,7 +40,7 @@ Neue Zustände: `widerspruch_in_pruefung` (Widerspruch in Bearbeitung), `abgehol
 
 ### 3. Der Widerspruchsbescheid trägt ein EIGENES Rechtsbehelfsregime (Modell-Erweiterung)
 
-Ein `erlaesstBescheid`-Übergang friert heute den VA aus dem EINEN `procedure.verwaltungsakt` (Rechtsbehelf-Regime) ein. Der Widerspruchsbescheid braucht ein ANDERES Regime (Klage/§ 74 VwGO) als der Ausgangsbescheid (Widerspruch/§ 68 ff. VwGO). Deshalb: **optionales `verwaltungsakt`-Override je Übergang** (`transition.verwaltungsakt?: VerwaltungsaktConfig`). Fehlt es, gilt weiter `procedure.verwaltungsakt` (rückwärtskompatibel). Der Freeze-Handler (buerger/cases) nimmt das Override, wenn gesetzt. So bleibt „ein Verfahren = ein Regime" der Default, und der Rechtsbehelf-gegen-Rechtsbehelf-Fall ist sauber als DATEN ausgedrückt.
+Ein `erlaesstBescheid`-Übergang friert heute den VA aus dem EINEN `procedure.verwaltungsakt` (Rechtsbehelf-Regime) ein. Der Widerspruchsbescheid braucht ein ANDERES Regime (Klage/§ 74 VwGO) als der Ausgangsbescheid (Widerspruch/§ 68 ff. VwGO). Deshalb: **optionales `verwaltungsakt`-Override je Übergang** (`transition.verwaltungsakt?: VerwaltungsaktConfig`). Fehlt es, gilt weiter `procedure.verwaltungsakt` (rückwärtskompatibel). Der Freeze-Handler (bürger/cases) nimmt das Override, wenn gesetzt. So bleibt „ein Verfahren = ein Regime" der Default, und der Rechtsbehelf-gegen-Rechtsbehelf-Fall ist sauber als DATEN ausgedrückt.
 
 ### 4. Bekanntgabe/Fristen + Bürger-Sicht
 
@@ -49,34 +49,34 @@ Abhilfe-/Widerspruchsbescheid werden — wie der Ausgangsbescheid (#60) — beim
 ## Alternativen
 
 Der Verifier verlangt diesen Abschnitt, und er verlangt ihn zu Recht: eine Entscheidung ohne die verworfenen
-Wege ist im Nachhinein nicht pruefbar. Die drei Alternativen standen bei der Entscheidung wirklich zur Wahl —
+Wege ist im Nachhinein nicht prüfbar. Die drei Alternativen standen bei der Entscheidung wirklich zur Wahl —
 jede ist im Kontext oben als Spannung benannt.
 
-### A. Eigene BFF-Route + Sonderlogik im Fall-Handler fuer das Widerspruchs-Verfahren
+### A. Eigene BFF-Route + Sonderlogik im Fall-Handler für das Widerspruchs-Verfahren
 
-VERWORFEN. Sie waere schneller zu bauen, erzeugt aber eine ZWEITE Prozess-Wahrheit ausserhalb von
-`leistung.config` — genau die Drift, gegen die `check:antrag-procedure` antritt. Schwerer noch: sie wuerde die
+VERWORFEN. Sie wäre schneller zu bauen, erzeugt aber eine ZWEITE Prozess-Wahrheit außerhalb von
+`leistung.config` — genau die Drift, gegen die `check:antrag-procedure` antritt. Schwerer noch: sie würde die
 generische Uebergangs-Maschinerie umgehen und damit RBAC, Vier-Augen-Pflicht und den append-only Audit von
-`transitionCase` neu implementieren muessen. Drei sicherheitsrelevante Mechanismen ein zweites Mal zu schreiben
+`transitionCase` neu implementieren müssen. Drei sicherheitsrelevante Mechanismen ein zweites Mal zu schreiben
 ist teurer als jede Modell-Erweiterung, und der zweite Pfad altert unbemerkt.
 
-### B. `festgesetzt` bleibt `terminal` — der Widerspruch eroeffnet einen NEUEN Fall
+### B. `festgesetzt` bleibt `terminal` — der Widerspruch eröffnet einen NEUEN Fall
 
 VERWORFEN, und zwar aus einem RECHTLICHEN Grund, nicht aus einem technischen. Das Vorverfahren
-(§§ 68 ff. VwGO) ist Teil DESSELBEN Verwaltungsverfahrens; es ist kein neuer Vorgang. Zwei Faelle wuerden die
-Akte spalten: die Bescheid-Kette (Ausgangsbescheid → Abhilfe-/Widerspruchsbescheid) waere nicht mehr an einem
-Vorgang ablesbar, `findVerwaltungsakt` fuende den „juengsten" Bescheid im falschen Fall, und der
-Bekanntgabe-Anker (`case.disclosed`) haette zwei Orte. Die technisch bequemere Variante haette die Akte
-unpruefbar gemacht.
+(§§ 68 ff. VwGO) ist Teil DESSELBEN Verwaltungsverfahrens; es ist kein neuer Vorgang. Zwei Fälle würden die
+Akte spalten: die Bescheid-Kette (Ausgangsbescheid → Abhilfe-/Widerspruchsbescheid) wäre nicht mehr an einem
+Vorgang ablesbar, `findVerwaltungsakt` fuende den „jüngsten" Bescheid im falschen Fall, und der
+Bekanntgabe-Anker (`case.disclosed`) hätte zwei Orte. Die technisch bequemere Variante hätte die Akte
+unprüfbar gemacht.
 
-### C. EIN globales Rechtsbehelfs-Regime fuer alle Bescheide (kein Override je Uebergang)
+### C. EIN globales Rechtsbehelfs-Regime für alle Bescheide (kein Override je Uebergang)
 
-VERWORFEN. Der Widerspruchsbescheid traegt rechtlich einen ANDEREN Rechtsbehelf (Klage, § 74 VwGO) als der
-Ausgangsbescheid (Widerspruch, §§ 68 ff. VwGO). Ein einziges Regime wuerde eine falsche Belehrung erzeugen — und
-eine unrichtige Rechtsbehelfsbelehrung ist keine Formalie: nach § 58 Abs. 2 VwGO laeuft dann die JAHRESfrist
-statt der Monatsfrist. Ein Modell, das den Regime-Wechsel nicht ausdruecken kann, produziert also mit
+VERWORFEN. Der Widerspruchsbescheid trägt rechtlich einen ANDEREN Rechtsbehelf (Klage, § 74 VwGO) als der
+Ausgangsbescheid (Widerspruch, §§ 68 ff. VwGO). Ein einziges Regime würde eine falsche Belehrung erzeugen — und
+eine unrichtige Rechtsbehelfsbelehrung ist keine Formalie: nach § 58 Abs. 2 VwGO läuft dann die JAHRESfrist
+statt der Monatsfrist. Ein Modell, das den Regime-Wechsel nicht ausdrücken kann, produziert also mit
 Sicherheit rechtsfehlerhafte Bescheide. Deshalb das optionale `verwaltungsakt`-Override je Uebergang, mit
-`procedure.verwaltungsakt` als unveraendertem Default (rueckwaertskompatibel).
+`procedure.verwaltungsakt` als unverändertem Default (rückwärtskompatibel).
 
 ## Konsequenzen / betroffene Gates + Tests (bewusst benannt, nicht versteckt)
 

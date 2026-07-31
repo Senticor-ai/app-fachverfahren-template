@@ -6,8 +6,8 @@
 ## Der Auftrag
 
 Ein Composable besteht **immer** aus strukturierten und unstrukturierten Fähigkeiten — Tarif, Regel, Formel,
-Prüfung neben Lesen, Verstehen, Erklären. Beide **gleichrangig**. Die Wissensseite *benutzt* die strukturierten
-wie Werkzeuge und kann neue *erzeugen*. Stromaufwärts (CHOS-CODE, fertig) trägt die versiegelte
+Prüfung neben Lesen, Verstehen, Erklären. Beide **gleichrangig**. Die Wissensseite _benutzt_ die strukturierten
+wie Werkzeuge und kann neue _erzeugen_. Stromaufwärts (CHOS-CODE, fertig) trägt die versiegelte
 Composable-Verfassung jetzt beide Seiten:
 
 ```ts
@@ -17,12 +17,12 @@ faehigkeiten.benutzt?:      { wissen: string; werkzeug: string }[]
 
 ## Was hier zu tun ist — vier Nähte, zwei davon blind
 
-| # | Datei | Warum sie blind ist |
-|---|---|---|
-| 1 | `packages/public-sector-sdk/src/composable-cert-verify.ts:167` — Manifest-Typ `faehigkeiten?: { ki?; autonomie? }` | Neues fällt in die **Index-Signatur** und verschwindet aus der Typ-Sicht. Belegte Klasse: derselbe Fehler passierte an `befugnis` (Kommentar Zeilen 182–189) |
-| 2 | `packages/public-sector-sdk/src/composable-manifest.ts:211` — `mapManifestToComposable` | Mappt ins `AgenticComposable`; was hier fehlt, existiert flussabwärts nicht |
-| 3 | `packages/app-bff-contracts/src/composables.ts:81` — `ComposableDetailDto` | **`additionalProperties: false`** ⇒ Fastify wirft Undeklariertes **still** weg |
-| 4 | `packages/app-bff-fastify/src/routes/composables.ts:81` — `toDetail` | |
+| #   | Datei                                                                                                              | Warum sie blind ist                                                                                                                                          |
+| --- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `packages/public-sector-sdk/src/composable-cert-verify.ts:167` — Manifest-Typ `faehigkeiten?: { ki?; autonomie? }` | Neues fällt in die **Index-Signatur** und verschwindet aus der Typ-Sicht. Belegte Klasse: derselbe Fehler passierte an `befugnis` (Kommentar Zeilen 182–189) |
+| 2   | `packages/public-sector-sdk/src/composable-manifest.ts:211` — `mapManifestToComposable`                            | Mappt ins `AgenticComposable`; was hier fehlt, existiert flussabwärts nicht                                                                                  |
+| 3   | `packages/app-bff-contracts/src/composables.ts:81` — `ComposableDetailDto`                                         | **`additionalProperties: false`** ⇒ Fastify wirft Undeklariertes **still** weg                                                                               |
+| 4   | `packages/app-bff-fastify/src/routes/composables.ts:81` — `toDetail`                                               |                                                                                                                                                              |
 
 Für Nähte 3 und 4 gibt es **keine** generelle Zusicherung — sie brauchen je einen eigenen Roundtrip-Test.
 
@@ -51,6 +51,7 @@ Anspruch? Die Betreiber-Perspektive ist eine andere als die des Herausgebers.
 
 Mount-Test: Manifest mit `strukturiert` ⇒ das Detail-DTO trägt es.
 **Gegenproben (nicht optional):**
+
 - DTO-Deklaration entfernen ⇒ das Feld verschwindet auf dem Draht (beweist die Fastify-Strip-Naht).
 - Manifest mit manipuliertem `strukturiert`-Block ⇒ `verifyMeshGovernanceProjektion` verwirft fail-closed
   (`composables-mounted.ts:274–277`).
@@ -62,6 +63,7 @@ Mount-Test: Manifest mit `strukturiert` ⇒ das Detail-DTO trägt es.
 Alle vier Nähte sind gezogen — und die entscheidende Frage war nicht, OB die Seite ankommt, sondern **WOHER**.
 
 **Rangfolge der Quellen** (`mapManifestToComposable`, neuer Parameter `opts.governance`):
+
 - Projektion da **und** Siegel nachgerechnet intakt ⇒ **sie** ist die Quelle.
 - Projektion da, Siegel gebrochen **oder ungeprüft** ⇒ die Seite bleibt **leer**. Ein Rückfall auf den
   unversiegelten Manifest-Block wäre der Umweg, der das Siegel wertlos machte.
