@@ -261,6 +261,48 @@ export function istMeshManifest(
 }
 
 // ── Verdikt-Typen (in-toto-Statement, Spiegel CHOS composable-cert.CertStatement) ────────────────────────────────────
+// ── DIE IDENTITAET EINER DEFINITION — dieselbe Formel wie beim Erzeuger, sonst passt kein Verdikt ─────────────────
+//
+// GEMESSEN 2026-08-04 an 44 echten Manifest/Ausweis-Paaren aus einem CHOS-Arbeitsbereich: die Frische-Pruefung
+// dieses Hauses rechnete `sha256(Datei-Bytes)` und traf das Subjekt des Verdikts in NULL von 44 Faellen. CHOS hat
+// die Formel am 2026-08-03 gewechselt (Commit 852e532d, „das Verdikt zertifiziert die DEFINITION, nicht die
+// BINDUNG") und die eigene Leseseite mitgezogen — diese Seite nicht. Folge: `certified` war hier strukturell
+// unerreichbar, jedes zertifizierte Composable fiel fail-closed auf `candidate`, und niemand sah einen Fehler:
+// die Kappung ist ja der richtige Reflex bei einem nicht passenden Digest. Ein Waechter, der IMMER kappt, sieht
+// aus wie ein strenger Waechter.
+//
+// WARUM DIE BINDUNGS-FELDER RAUS MUESSEN: dieselbe Stelle (z. B. „fachdienst") steht in mehreren Verfahren und
+// ist dort auf verschiedene Rechtsgrundlagen geerdet. Haengte die Identitaet an den vollen Bytes, waere ein
+// Verdikt per Konstruktion an EIN Verfahren gekettet und koennte nie ein zweites decken — genau die
+// Wiederverwendung, um derentwillen es die Registry gibt. Die Bindung geht nicht verloren: sie steht weiter in
+// der Datei und wird beim Mount gegen die Ziel-Verfassung geprueft.
+//
+// KOPIE MIT PFLICHT ZUR KONGRUENZ: die Quelle ist `packages/fachverfahren/composable-identitaet.ts` im
+// Erzeuger-Repo (CHOS). Zwei Repos koennen keine Funktion teilen — aber sie koennen dieselbe Antwort schulden.
+// Weicht eine Seite ab, ist die Wirkung STILL und total (siehe oben). Wer hier etwas aendert, aendert es dort
+// mit; die Kongruenz-Probe im Erzeuger-Repo haelt beide Listen gegeneinander.
+export const BINDUNGS_FELDER = ["domain", "amt", "anspruch", "governanceProjektion", "version"] as const;
+
+/** Rekursiv die Bindungs-Felder entfernen und kanonisch (schluessel-sortiert) serialisieren. Deterministisch:
+ *  gleiche Definition ⇒ gleiche Bytes, unabhaengig von der Feld-Reihenfolge der Quelle. BYTE-GLEICH mit dem
+ *  Erzeuger — inklusive Einrueckung 2 und abschliessendem Zeilenumbruch. */
+export function definitionsBytes(manifest: unknown): string {
+  const ohneBindung = (o: unknown): unknown => {
+    if (Array.isArray(o)) return o.map(ohneBindung);
+    if (o && typeof o === "object") {
+      const raus = new Set<string>(BINDUNGS_FELDER);
+      return Object.fromEntries(
+        Object.entries(o as Record<string, unknown>)
+          .filter(([k]) => !raus.has(k))
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+          .map(([k, v]) => [k, ohneBindung(v)]),
+      );
+    }
+    return o;
+  };
+  return JSON.stringify(ohneBindung(manifest), null, 2) + "\n";
+}
+
 export const IN_TOTO_STATEMENT_TYPE = "https://in-toto.io/Statement/v1";
 export const COMPOSABLE_CERT_PREDICATE_TYPE =
   "https://chos.senticor.ai/attestations/composable-certification/v1";

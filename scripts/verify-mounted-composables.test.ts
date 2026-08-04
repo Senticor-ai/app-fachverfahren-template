@@ -11,7 +11,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  BINDUNGS_FELDER,
   COMPOSABLE_CERT_SIGNATURE_DOMAIN,
+  definitionsBytes,
   stableStringify,
 } from "../packages/public-sector-sdk/src/composable-cert-verify.ts";
 import { verifyMountedComposables } from "./lib/verify-mounted-composables.mts";
@@ -70,7 +72,11 @@ function writeManifest(id: string, status: string): string {
   };
   const bytes = Buffer.from(JSON.stringify(manifest, null, 2) + "\n");
   writeFileSync(path.join(dir, `${id}.json`), bytes);
-  return createHash("sha256").update(bytes).digest("hex");
+  // DIE FIXTURE MUSS DIE FORMEL DES ERZEUGERS BENUTZEN, nicht die des Pruefers und nicht ihre eigene. Hier stand
+  // `sha256(bytes)` — und weil der Pruefer damals dasselbe rechnete, war die Probe gruen, waehrend NULL von 44
+  // echten Ausweisen durchkamen. Eine Fixture, die den Fehler des Pruefers teilt, prueft ihn nicht, sondern
+  // bestaetigt ihn: sie beweist nur, dass zwei Kopien derselben falschen Rechnung uebereinstimmen.
+  return createHash("sha256").update(definitionsBytes(manifest)).digest("hex");
 }
 
 function writeCert(
@@ -352,5 +358,57 @@ describe("verifyMountedComposables — mitgereiste Stellen-Verfassung", () => {
     const roh = readFileSync(p, "utf8");
     writeFileSync(p, roh.replace('"hitlPflicht": true', '"hitlPflicht": false'));
     expect(verifyMountedComposables(dir).fehler.join(" ")).toMatch(/verändert/);
+  });
+});
+
+// ── DIE IDENTITAET EINER DEFINITION — der Vertrag mit dem Erzeuger ────────────────────────────────────────────────
+//
+// GEMESSEN 2026-08-04 an 44 echten Manifest/Ausweis-Paaren eines CHOS-Arbeitsbereichs: die Frische-Pruefung dieses
+// Hauses rechnete `sha256(Datei-Bytes)` und traf das Subjekt des Verdikts in 0 von 44 Faellen; mit der
+// Identitaets-Formel sind es 44 von 44. Die Wirkung war STILL und total: `certified` fiel fail-closed auf
+// `candidate`, und das sieht aus wie ein strenger Waechter, nicht wie ein Defekt.
+//
+// Diese Proben nageln den Vertrag fest, damit die Formel nicht zurueckfaellt. Sie pruefen die REGEL, nicht einen
+// eingefrorenen Hash: ein eingefrorener Hash haette denselben Fehler bloss festgeschrieben.
+describe("definitionsBytes — die Identitaet der Definition (Vertrag mit dem Erzeuger)", () => {
+  const basis = {
+    schemaVersion: 1,
+    id: "sachbearbeitung",
+    titel: "Sachbearbeitung",
+    faehigkeiten: { ki: ["pruefen"], autonomie: "AAL-3" },
+  } as const;
+
+  it("entfernt die BINDUNGS-Felder — dieselbe Stelle in zwei Verfahren hat DIESELBE Identitaet", () => {
+    const inGewerbe = { ...basis, domain: "gewerbesteuer", amt: "steuern", anspruch: [{ id: "recht:a" }], version: "aaa" };
+    const inGrund = { ...basis, domain: "grundsteuer", amt: "finanzen", anspruch: [{ id: "recht:b" }], version: "bbb" };
+    expect(definitionsBytes(inGewerbe)).toBe(definitionsBytes(inGrund));
+    // GEGENPROBE: ein DEFINITIONS-Unterschied trennt sehr wohl — sonst waere die Formel blind statt teilend.
+    expect(definitionsBytes({ ...inGewerbe, titel: "Andere Stelle" })).not.toBe(definitionsBytes(inGrund));
+  });
+
+  it("entfernt sie REKURSIV, nicht nur auf oberster Ebene", () => {
+    const a = { ...basis, sub: [{ titel: "T", domain: "x", anspruch: [1] }] };
+    const b = { ...basis, sub: [{ titel: "T", domain: "y", anspruch: [2] }] };
+    expect(definitionsBytes(a)).toBe(definitionsBytes(b));
+  });
+
+  it("ist unabhaengig von der Feld-Reihenfolge der Quelle (kanonisch sortiert)", () => {
+    expect(definitionsBytes({ b: 1, a: 2 })).toBe(definitionsBytes({ a: 2, b: 1 }));
+  });
+
+  it("haelt die BYTE-Form des Erzeugers: Einrueckung 2 und abschliessender Zeilenumbruch", () => {
+    const bytes = definitionsBytes(basis);
+    expect(bytes.endsWith("\n")).toBe(true);
+    expect(bytes).toContain('\n  "id": "sachbearbeitung"');
+    // Ein einziges Byte Abweichung macht JEDES Verdikt ungueltig — deshalb die Form ausdruecklich, nicht nebenbei.
+    expect(bytes).toBe(JSON.stringify(JSON.parse(bytes), null, 2) + "\n");
+  });
+
+  it("fuehrt genau die fuenf Bindungs-Felder des Erzeugers", () => {
+    // Waechst die Liste auf EINER Seite, weichen die Digests wieder ab. Die Kongruenz beider Repos prueft der
+    // Erzeuger; hier steht der Bestand dieser Seite ausdruecklich, damit eine Aenderung nie unbemerkt bleibt.
+    expect([...BINDUNGS_FELDER].sort()).toEqual(
+      ["amt", "anspruch", "domain", "governanceProjektion", "version"],
+    );
   });
 });

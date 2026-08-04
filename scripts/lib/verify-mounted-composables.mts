@@ -21,6 +21,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import {
+  definitionsBytes,
   istMeshManifest,
   verifyMeshCertStructure,
   verifyMeshGovernanceProjektion,
@@ -36,8 +37,8 @@ const ENABLED_STATUS = new Set(["certified", "active"]);
 /** Well-known Dateiname des vertrauten ÖFFENTLICHEN Cert-Signing-Keys (Spiegel CHOS COMPOSABLE_CERT_PUBKEY_FILE). */
 const CERT_PUBKEY_FILE = "cert-signing-key.pub";
 
-const sha256 = (buf: Buffer): string =>
-  createHash("sha256").update(buf).digest("hex");
+// `sha256(Buffer)` hatte nach der Umstellung auf `definitionsBytes` keinen Aufrufer mehr — geloescht, damit
+// kein byte-basierter Rueckfall neben der Identitaets-Formel stehenbleibt.
 
 /** node:crypto-Primitive für den PURE-Package-Injektions-Seam (die Sicherheits-Logik lebt in verifyMeshCertStructure). */
 const sha256Hex = (s: string): string => createHash("sha256").update(s).digest("hex");
@@ -252,7 +253,9 @@ export function verifyMountedComposables(dir: string): MountedComposableReport {
 
     const v = verifyMeshCertStructure(certParsed, {
       composableId: id,
-      manifestSha256: sha256(raw),
+      // DIE IDENTITAET DER DEFINITION, nicht die Bytes der Datei — sonst passt das Subjekt des Verdikts nie
+      // (gemessen: 0 von 44 Treffern). Dieselbe Formel wie beim Erzeuger, siehe definitionsBytes.
+      manifestSha256: sha256Hex(definitionsBytes(manifest)),
       certSigningPublicKey: trusted,
       sha256Hex,
       verifyEd25519,
