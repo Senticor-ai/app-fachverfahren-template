@@ -21,8 +21,8 @@
 // veraltete Rueckfall-Maschine beisst genau dann, wenn der Vertrag ohnehin schon bricht.
 import { describe, expect, it } from "vitest";
 import type { TarifTabelle } from "@senticor/public-sector-sdk";
-import { leistungConfig } from "../src/leistung.config.js";
-import { antragProcedure } from "./procedure.config.js";
+import { leistungConfig } from "./leistung.config.js";
+import { antragProcedure } from "../server/procedure.config.js";
 
 /** Cent je Einheit der natuerlichen Waehrungsangabe (EUR). Der Faktor ist die einzige erlaubte Uebersetzung. */
 const CENT_JE_EUR = 100;
