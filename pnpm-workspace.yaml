@@ -45,3 +45,22 @@ catalog:
   "@fastify/type-provider-typebox": ^5.2.0
   pg: ^8.22.0
   "@types/pg": ^8.20.0
+
+# ── Sicherheits-Overrides ───────────────────────────────────────────────────────────────────────
+# `scripts/check-supply-chain.sh` faehrt `trivy fs --severity HIGH,CRITICAL --exit-code 1` im
+# pre-push-Riegel. Beide Pakete sind TRANSITIV — kein Eintrag in `dependencies` kann sie heben,
+# nur ein Override. Ort: DIESE Datei, nicht `package.json` — seit pnpm 10 liest pnpm Overrides hier,
+# und hier laeuft pnpm 11.1.0. Ein Pin an der falschen Stelle liest sich wie Schutz und ist keiner.
+#
+# Alle Spruenge bleiben INNERHALB der Hauptversion, gemessen aus dem Lockfile:
+#   react-router  7.18.1 → >=7.18.2   GHSA-qwww-vcr4-c8h2  RSC-Mode CSRF-Bypass
+#   undici        7.28.0 → >=7.29.0   CVE-2026-13697       Information disclosure + DoS
+#                 8.8.0  → >=8.9.0    dieselbe Meldung, ZWEITE Linie im Baum
+#
+# `undici` steht mit ZWEI Hauptversionen im Baum. Ein einzelner Override haette eine davon
+# stillschweigend nicht erreicht — der Scan waere gruen geworden, weil er die andere nicht mehr
+# findet, nicht weil sie geheilt waere.
+overrides:
+  react-router: ^7.18.2
+  undici@7: ^7.29.0
+  undici@8: ^8.9.0
