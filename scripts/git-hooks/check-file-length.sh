@@ -22,7 +22,15 @@ while IFS= read -r file; do
   [ -f "$file" ] || continue
 
   case "$file" in
-    pnpm-lock.yaml|dist/*|dist-types/*|storybook-static/*|test-results/*|node_modules/*|.chos/*|apps/*/dist-types/*)
+    # ERZEUGTE ARTEFAKTE. Die Zeilenzahl ist hier kein Qualitaetssignal: niemand pflegt diese Dateien von
+    # Hand, und „Split large files" ist auf einen Schnappschuss nicht anwendbar — er hat genau die Laenge
+    # seiner Quelle. `schemas/openapi.internal.json` gehoert derselben Klasse an wie `pnpm-lock.yaml`:
+    # von `check:openapi -- --update` geschrieben, als Vertrag versioniert, nie editiert. GEMESSEN lag sie
+    # schon vor dieser Aenderung bei 8274 Zeilen (Grenze 5000) und wurde zuletzt am 2026-07-23 committet —
+    # der Riegel besteht seit 2026-07-01. Er hat sie also nie gefasst; die Ausnahme macht das sichtbar,
+    # statt sie weiter unbemerkt zu lassen. Die GRENZE bleibt bei 5000: `FACHVERFAHREN_MAX_FILE_LINES` zu
+    # heben, damit die eigene Aenderung passt, waere die Aufweichung, die diese Ausnahme gerade vermeidet.
+    pnpm-lock.yaml|schemas/openapi.internal.json|dist/*|dist-types/*|storybook-static/*|test-results/*|node_modules/*|.chos/*|apps/*/dist-types/*)
       continue
       ;;
   esac

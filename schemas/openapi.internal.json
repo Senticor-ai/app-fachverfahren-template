@@ -186,6 +186,10 @@
                             "additionalProperties": {},
                             "type": "object"
                           },
+                          "eingangsnummer": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
                           "eingereichtAm": { "minLength": 1, "type": "string" },
                           "procedureId": { "minLength": 1, "type": "string" },
                           "procedureVersion": {
@@ -203,7 +207,8 @@
                           "version",
                           "eingereichtAm",
                           "abgeschlossenAm",
-                          "data"
+                          "data",
+                          "eingangsnummer"
                         ],
                         "type": "object"
                       },
@@ -334,6 +339,7 @@
                     },
                     "antragId": { "minLength": 1, "type": "string" },
                     "data": { "additionalProperties": {}, "type": "object" },
+                    "eingangsnummer": { "minLength": 1, "type": "string" },
                     "eingereichtAm": { "minLength": 1, "type": "string" },
                     "procedureId": { "minLength": 1, "type": "string" },
                     "procedureVersion": { "minLength": 1, "type": "string" },
@@ -348,7 +354,8 @@
                     "version",
                     "eingereichtAm",
                     "abgeschlossenAm",
-                    "data"
+                    "data",
+                    "eingangsnummer"
                   ],
                   "type": "object"
                 }
@@ -466,6 +473,7 @@
                     },
                     "antragId": { "minLength": 1, "type": "string" },
                     "data": { "additionalProperties": {}, "type": "object" },
+                    "eingangsnummer": { "minLength": 1, "type": "string" },
                     "eingereichtAm": { "minLength": 1, "type": "string" },
                     "procedureId": { "minLength": 1, "type": "string" },
                     "procedureVersion": { "minLength": 1, "type": "string" },
@@ -480,7 +488,8 @@
                     "version",
                     "eingereichtAm",
                     "abgeschlossenAm",
-                    "data"
+                    "data",
+                    "eingangsnummer"
                   ],
                   "type": "object"
                 }
@@ -590,16 +599,61 @@
                 "schema": {
                   "additionalProperties": false,
                   "properties": {
+                    "adressat": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "anschrift": { "type": "string" },
+                        "name": { "minLength": 1, "type": "string" },
+                        "vertreter": { "type": "string" }
+                      },
+                      "required": ["name"],
+                      "type": "object"
+                    },
                     "aktenzeichen": { "minLength": 1, "type": "string" },
+                    "behoerde": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "anschrift": { "type": "string" },
+                        "name": { "minLength": 1, "type": "string" }
+                      },
+                      "required": ["name"],
+                      "type": "object"
+                    },
                     "checksumSha256": {
                       "maxLength": 64,
                       "minLength": 64,
                       "type": "string"
                     },
+                    "entwurf": { "type": "boolean" },
                     "fiktionNorm": { "minLength": 1, "type": "string" },
                     "fiktionTage": { "minimum": 0, "type": "integer" },
                     "issuedAt": { "minLength": 1, "type": "string" },
                     "issuedBy": { "minLength": 1, "type": "string" },
+                    "leistungsgebot": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "betrag": { "type": "number" },
+                        "faelligkeiten": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "betrag": { "type": "number" },
+                              "datum": { "minLength": 1, "type": "string" }
+                            },
+                            "required": ["datum", "betrag"],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "iban": { "type": "string" },
+                        "kassenzeichen": { "type": "string" },
+                        "verwendungszweck": { "type": "string" },
+                        "waehrung": { "type": "string" },
+                        "zahlungsempfaenger": { "type": "string" }
+                      },
+                      "required": ["betrag"],
+                      "type": "object"
+                    },
                     "rechtsbehelf": {
                       "additionalProperties": false,
                       "properties": {
@@ -610,6 +664,7 @@
                             { "enum": ["klage"], "type": "string" }
                           ]
                         },
+                        "form": { "minLength": 1, "type": "string" },
                         "fristEinheit": {
                           "anyOf": [
                             { "enum": ["monat"], "type": "string" },
@@ -619,6 +674,7 @@
                         },
                         "fristWert": { "minimum": 1, "type": "integer" },
                         "norm": { "minLength": 1, "type": "string" },
+                        "sitz": { "minLength": 1, "type": "string" },
                         "stelle": { "minLength": 1, "type": "string" }
                       },
                       "required": [
@@ -641,7 +697,18 @@
                         { "enum": ["client-berechnet"], "type": "string" },
                         { "enum": ["server-nachgerechnet"], "type": "string" }
                       ]
-                    }
+                    },
+                    "unterschrift": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "maschinell": { "type": "boolean" },
+                        "name": { "type": "string" },
+                        "vermerk": { "type": "string" }
+                      },
+                      "required": ["maschinell"],
+                      "type": "object"
+                    },
+                    "zeitraum": { "minLength": 1, "type": "string" }
                   },
                   "required": [
                     "aktenzeichen",
@@ -1635,6 +1702,7 @@
                 "schema": {
                   "additionalProperties": false,
                   "properties": {
+                    "kiAnbieter": { "minLength": 1, "type": "string" },
                     "permissions": {
                       "items": { "minLength": 1, "type": "string" },
                       "type": "array"
@@ -1644,7 +1712,7 @@
                       "type": "array"
                     }
                   },
-                  "required": ["rbacRoles", "permissions"],
+                  "required": ["rbacRoles", "permissions", "kiAnbieter"],
                   "type": "object"
                 }
               }
@@ -1732,6 +1800,10 @@
                             "additionalProperties": {},
                             "type": "object"
                           },
+                          "eingangsnummer": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
                           "openedAt": { "minLength": 1, "type": "string" },
                           "procedureId": { "minLength": 1, "type": "string" },
                           "procedureVersion": {
@@ -1754,7 +1826,8 @@
                           "subjectIds",
                           "openedAt",
                           "closedAt",
-                          "data"
+                          "data",
+                          "eingangsnummer"
                         ],
                         "type": "object"
                       },
@@ -1890,6 +1963,7 @@
                       ]
                     },
                     "data": { "additionalProperties": {}, "type": "object" },
+                    "eingangsnummer": { "minLength": 1, "type": "string" },
                     "openedAt": { "minLength": 1, "type": "string" },
                     "procedureId": { "minLength": 1, "type": "string" },
                     "procedureVersion": { "minLength": 1, "type": "string" },
@@ -1909,7 +1983,8 @@
                     "subjectIds",
                     "openedAt",
                     "closedAt",
-                    "data"
+                    "data",
+                    "eingangsnummer"
                   ],
                   "type": "object"
                 }
@@ -2027,6 +2102,7 @@
                       ]
                     },
                     "data": { "additionalProperties": {}, "type": "object" },
+                    "eingangsnummer": { "minLength": 1, "type": "string" },
                     "openedAt": { "minLength": 1, "type": "string" },
                     "procedureId": { "minLength": 1, "type": "string" },
                     "procedureVersion": { "minLength": 1, "type": "string" },
@@ -2046,7 +2122,8 @@
                     "subjectIds",
                     "openedAt",
                     "closedAt",
-                    "data"
+                    "data",
+                    "eingangsnummer"
                   ],
                   "type": "object"
                 }
@@ -2766,6 +2843,7 @@
                           "additionalProperties": {},
                           "type": "object"
                         },
+                        "eingangsnummer": { "minLength": 1, "type": "string" },
                         "openedAt": { "minLength": 1, "type": "string" },
                         "procedureId": { "minLength": 1, "type": "string" },
                         "procedureVersion": {
@@ -2788,7 +2866,8 @@
                         "subjectIds",
                         "openedAt",
                         "closedAt",
-                        "data"
+                        "data",
+                        "eingangsnummer"
                       ],
                       "type": "object"
                     },
@@ -3593,6 +3672,7 @@
                       ]
                     },
                     "data": { "additionalProperties": {}, "type": "object" },
+                    "eingangsnummer": { "minLength": 1, "type": "string" },
                     "openedAt": { "minLength": 1, "type": "string" },
                     "procedureId": { "minLength": 1, "type": "string" },
                     "procedureVersion": { "minLength": 1, "type": "string" },
@@ -3612,7 +3692,8 @@
                     "subjectIds",
                     "openedAt",
                     "closedAt",
-                    "data"
+                    "data",
+                    "eingangsnummer"
                   ],
                   "type": "object"
                 }
@@ -4816,6 +4897,41 @@
                           "displayName": { "minLength": 1, "type": "string" },
                           "enabled": { "type": "boolean" },
                           "hasSpine": { "type": "boolean" },
+                          "herkunft": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "art": {
+                                "anyOf": [
+                                  {
+                                    "enum": ["registry-mount"],
+                                    "type": "string"
+                                  },
+                                  {
+                                    "enum": ["lokal-abgeleitet"],
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "mountedAt": { "type": "string" },
+                              "quelle": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "publishedAt": { "type": "string" },
+                                    "tenant": { "type": "string" },
+                                    "verbundId": { "type": "string" }
+                                  },
+                                  "required": ["verbundId", "tenant"],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "recordHash": { "type": "string" },
+                              "version": { "type": "string" }
+                            },
+                            "required": ["art"],
+                            "type": "object"
+                          },
                           "id": { "minLength": 1, "type": "string" },
                           "klasse": { "minLength": 1, "type": "string" },
                           "status": { "minLength": 1, "type": "string" },
@@ -4829,7 +4945,8 @@
                           "status",
                           "assurance",
                           "enabled",
-                          "hasSpine"
+                          "hasSpine",
+                          "herkunft"
                         ],
                         "type": "object"
                       },
@@ -4914,6 +5031,18 @@
                   "additionalProperties": false,
                   "properties": {
                     "assurance": { "minLength": 1, "type": "string" },
+                    "benutzt": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "werkzeug": { "minLength": 1, "type": "string" },
+                          "wissen": { "minLength": 1, "type": "string" }
+                        },
+                        "required": ["wissen", "werkzeug"],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
                     "certification": {
                       "additionalProperties": false,
                       "properties": {
@@ -4929,6 +5058,35 @@
                     "displayName": { "minLength": 1, "type": "string" },
                     "enabled": { "type": "boolean" },
                     "evals": { "items": { "type": "string" }, "type": "array" },
+                    "herkunft": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "art": {
+                          "anyOf": [
+                            { "enum": ["registry-mount"], "type": "string" },
+                            { "enum": ["lokal-abgeleitet"], "type": "string" }
+                          ]
+                        },
+                        "mountedAt": { "type": "string" },
+                        "quelle": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "publishedAt": { "type": "string" },
+                              "tenant": { "type": "string" },
+                              "verbundId": { "type": "string" }
+                            },
+                            "required": ["verbundId", "tenant"],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "recordHash": { "type": "string" },
+                        "version": { "type": "string" }
+                      },
+                      "required": ["art"],
+                      "type": "object"
+                    },
                     "id": { "minLength": 1, "type": "string" },
                     "klasse": { "minLength": 1, "type": "string" },
                     "moduleId": { "minLength": 1, "type": "string" },
@@ -4989,6 +5147,27 @@
                       "type": "object"
                     },
                     "status": { "minLength": 1, "type": "string" },
+                    "strukturiert": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "ergebnis": { "type": "string" },
+                          "erzeugtVon": { "type": "string" },
+                          "evalSuite": { "type": "string" },
+                          "freigegebenVon": { "type": "string" },
+                          "grundlagen": {
+                            "items": { "type": "string" },
+                            "type": "array"
+                          },
+                          "id": { "minLength": 1, "type": "string" },
+                          "klasse": { "type": "string" },
+                          "programm": { "type": "string" }
+                        },
+                        "required": ["id", "ergebnis"],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
                     "version": { "minLength": 1, "type": "string" }
                   },
                   "required": [
@@ -5003,6 +5182,7 @@
                     "owners",
                     "evals",
                     "replaceableBy",
+                    "herkunft",
                     "certification"
                   ],
                   "type": "object"
@@ -5061,6 +5241,322 @@
           }
         },
         "summary": "Ein Composable im Detail — inkl. Contract Envelope, Spine-Agent und Zertifizierungsreife",
+        "tags": ["composables"]
+      }
+    },
+    "/api/composables/{id}/chat": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": { "minLength": 1, "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "antwortAlsDatei": { "type": "boolean" },
+                  "caseId": { "minLength": 1, "type": "string" },
+                  "dateien": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "contentBase64": {
+                          "maxLength": 14000000,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "fileName": {
+                          "maxLength": 255,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "mimeType": {
+                          "maxLength": 255,
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": ["fileName", "mimeType", "contentBase64"],
+                      "type": "object"
+                    },
+                    "maxItems": 8,
+                    "type": "array"
+                  },
+                  "nachricht": {
+                    "maxLength": 20000,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "verlauf": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "rolle": {
+                          "anyOf": [
+                            { "enum": ["nutzer"], "type": "string" },
+                            { "enum": ["assistent"], "type": "string" }
+                          ]
+                        },
+                        "text": {
+                          "maxLength": 20000,
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": ["rolle", "text"],
+                      "type": "object"
+                    },
+                    "maxItems": 50,
+                    "type": "array"
+                  }
+                },
+                "required": ["nachricht"],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "antwort": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "confidence": {
+                          "maximum": 1,
+                          "minimum": 0,
+                          "type": "number"
+                        },
+                        "euAiActClass": {
+                          "anyOf": [
+                            { "enum": ["minimal"], "type": "string" },
+                            { "enum": ["limited-risk"], "type": "string" },
+                            { "enum": ["high-risk"], "type": "string" }
+                          ]
+                        },
+                        "marking": {
+                          "enum": ["ki-vorschlag"],
+                          "type": "string"
+                        },
+                        "modelId": { "minLength": 1, "type": "string" },
+                        "rationale": { "minLength": 1, "type": "string" },
+                        "reviewRequired": { "enum": [true], "type": "boolean" },
+                        "sources": {
+                          "items": { "type": "string" },
+                          "type": "array"
+                        },
+                        "value": {}
+                      },
+                      "required": [
+                        "value",
+                        "confidence",
+                        "modelId",
+                        "rationale",
+                        "sources",
+                        "marking",
+                        "euAiActClass",
+                        "reviewRequired"
+                      ],
+                      "type": "object"
+                    },
+                    "autonomy": { "minLength": 1, "type": "string" },
+                    "composableId": { "minLength": 1, "type": "string" },
+                    "datei": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "contentBase64": { "minLength": 1, "type": "string" },
+                        "ref": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "attachmentId": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "checksumSha256": {
+                              "maxLength": 64,
+                              "minLength": 64,
+                              "type": "string"
+                            },
+                            "fileName": { "minLength": 1, "type": "string" },
+                            "mimeType": { "minLength": 1, "type": "string" },
+                            "sizeBytes": { "minimum": 0, "type": "integer" }
+                          },
+                          "required": [
+                            "attachmentId",
+                            "fileName",
+                            "mimeType",
+                            "sizeBytes",
+                            "checksumSha256"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": ["ref", "contentBase64"],
+                      "type": "object"
+                    },
+                    "dateienRein": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "attachmentId": { "minLength": 1, "type": "string" },
+                          "checksumSha256": {
+                            "maxLength": 64,
+                            "minLength": 64,
+                            "type": "string"
+                          },
+                          "fileName": { "minLength": 1, "type": "string" },
+                          "mimeType": { "minLength": 1, "type": "string" },
+                          "sizeBytes": { "minimum": 0, "type": "integer" }
+                        },
+                        "required": [
+                          "attachmentId",
+                          "fileName",
+                          "mimeType",
+                          "sizeBytes",
+                          "checksumSha256"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "erdung": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "geerdet": { "type": "boolean" },
+                        "quellen": {
+                          "items": { "type": "string" },
+                          "type": "array"
+                        },
+                        "wissensEintraege": { "minimum": 0, "type": "integer" }
+                      },
+                      "required": ["geerdet", "wissensEintraege", "quellen"],
+                      "type": "object"
+                    },
+                    "rechtsnah": { "type": "boolean" }
+                  },
+                  "required": [
+                    "composableId",
+                    "autonomy",
+                    "rechtsnah",
+                    "antwort",
+                    "erdung",
+                    "dateienRein"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": { "minLength": 1, "type": "string" },
+                    "requestId": { "type": "string" }
+                  },
+                  "required": ["error"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Mit dem Spine-Agent eines Composables chatten (geerdet, evidenziert, HCAI — reviewRequired, nie eine Entscheidung)",
         "tags": ["composables"]
       }
     },
