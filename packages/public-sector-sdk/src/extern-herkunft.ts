@@ -78,7 +78,9 @@ export function vierAugenPflichtBeiExtern(
   herkunft: Herkunft,
   transition: { issuesVerwaltungsakt?: boolean },
 ): boolean {
-  return herkunft === HERKUNFT_EXTERN && transition.issuesVerwaltungsakt === true;
+  return (
+    herkunft === HERKUNFT_EXTERN && transition.issuesVerwaltungsakt === true
+  );
 }
 
 /** Die Werkzeuge, die eine Stelle unter extern-Taint noch benutzen darf: LESEN und VORSCHLAGEN. Alles
@@ -97,7 +99,9 @@ export function kappeWerkzeugeUnterTaint(
   klassifiziere: (werkzeug: string) => string,
 ): string[] {
   if (herkunft === HERKUNFT_INTERN) return [...werkzeuge];
-  return werkzeuge.filter((w) => TAINT_WERKZEUG_ALLOWLIST.has(klassifiziere(w)));
+  return werkzeuge.filter((w) =>
+    TAINT_WERKZEUG_ALLOWLIST.has(klassifiziere(w)),
+  );
 }
 
 /** Der Banner, der jeden Quarantäne-Block einleitet. Sprachlich unmissverständlich, ohne Fachjargon. */
@@ -128,8 +132,14 @@ function escapeGrenzen(text: string): string {
  *  Muster vor der Heuristik („ig<ZWSP>noriere“). Zeilenumbruch/Tab bleiben, sie tragen Lesbarkeit. */
 // Steuerzeichen sind hier der GEGENSTAND, nicht ein Versehen: genau sie tarnen Injektions-Muster vor der
 // Heuristik. no-control-regex meldet die Absicht als Fehler — ein Falsch-Blocker, deshalb hier abgeschaltet.
-// eslint-disable-next-line no-control-regex
-const UNSICHTBAR = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u00AD\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g;
+// BLOCKFORM, nicht `eslint-disable-next-line`: die Zeilenform ist an die FOLGEZEILE gekoppelt, und ein
+// Umbruch trennt sie von ihrem Ziel. Genau das ist hier passiert — Prettier brach die Deklaration, die
+// Direktive zeigte danach auf `const UNSICHTBAR =`, der Ausdruck stand eine Zeile tiefer: ESLint meldete
+// die Direktive als UNBENUTZT und den Ausdruck zugleich als Fehler. Der Block haelt auch nach jedem Umbruch.
+/* eslint-disable no-control-regex */
+const UNSICHTBAR =
+  /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u00AD\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g;
+/* eslint-enable no-control-regex */
 function entferneUnsichtbare(text: string): string {
   return text.replace(UNSICHTBAR, "");
 }
@@ -169,10 +179,18 @@ export function externQuarantaene(
       return;
     }
     if (typeof wert === "string") {
-      const bereinigt = escapeGrenzen(entferneUnsichtbare(wert)).slice(0, maxLaenge);
-      if (scanInjection(wert).suspicious || scanInjection(bereinigt).suspicious) {
+      const bereinigt = escapeGrenzen(entferneUnsichtbare(wert)).slice(
+        0,
+        maxLaenge,
+      );
+      if (
+        scanInjection(wert).suspicious ||
+        scanInjection(bereinigt).suspicious
+      ) {
         auffaelligkeiten.push(pfad);
-        zeilen.push(`${pfad} = ${bereinigt}   [AUFFÄLLIG: liest sich wie eine Anweisung]`);
+        zeilen.push(
+          `${pfad} = ${bereinigt}   [AUFFÄLLIG: liest sich wie eine Anweisung]`,
+        );
       } else {
         zeilen.push(`${pfad} = ${bereinigt}`);
       }

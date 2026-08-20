@@ -17,7 +17,10 @@
 
 /** Der Default, wenn ein Verfahren nichts deklariert. Bewusst großzügig — eine Drossel, die echte
  *  Nutzung behindert, wird abgeschaltet und schützt dann gar nicht mehr. */
-export const DROSSEL_DEFAULT = { proAkteur: 20, fensterSekunden: 3600 } as const;
+export const DROSSEL_DEFAULT = {
+  proAkteur: 20,
+  fensterSekunden: 3600,
+} as const;
 
 export interface DrosselRegeln {
   proAkteur: number;
@@ -25,9 +28,7 @@ export interface DrosselRegeln {
 }
 
 export function drosselRegelnAus(
-  deklariert:
-    | { proAkteur?: number; fensterSekunden?: number }
-    | undefined,
+  deklariert: { proAkteur?: number; fensterSekunden?: number } | undefined,
 ): DrosselRegeln {
   return {
     proAkteur: deklariert?.proAkteur ?? DROSSEL_DEFAULT.proAkteur,

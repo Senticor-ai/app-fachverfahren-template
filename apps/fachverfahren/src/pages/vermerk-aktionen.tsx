@@ -147,7 +147,9 @@ export function VermerkAktionen({
                   {vm.urheber}
                 </span>
                 {vm.bezugVermerkId ? (
-                  <span className="text-xs text-muted-foreground">↳ Antwort</span>
+                  <span className="text-xs text-muted-foreground">
+                    ↳ Antwort
+                  </span>
                 ) : null}
                 {REVIEW_LABEL[vm.reviewStatus] ? (
                   <span className="text-xs text-muted-foreground">

@@ -29,7 +29,10 @@ export function AmtVorgangPage(): React.JSX.Element {
   if (laedt)
     return (
       <Shell persona="sachbearbeitung" activeNavKey="eingang">
-        <p className="p-4 text-sm text-muted-foreground md:p-8" aria-busy="true">
+        <p
+          className="p-4 text-sm text-muted-foreground md:p-8"
+          aria-busy="true"
+        >
           Der Vorgang wird geladen …
         </p>
       </Shell>

@@ -175,7 +175,9 @@ describe("personaBereiche", () => {
 
   it("PER-KEY FAIL-OPEN: ein 1-von-3-Modell laesst die uebrigen Arbeitsbereiche generisch stehen (keine Sackgasse)", () => {
     const bereiche = personaBereiche({
-      personas: [{ key: "buerger", label: "Antragsteller:in", sub: "Vorgang melden" }],
+      personas: [
+        { key: "buerger", label: "Antragsteller:in", sub: "Vorgang melden" },
+      ],
     }).filter((bereich) => bereich.persona);
     expect(bereiche.map((b) => b.persona)).toEqual([
       "buerger",
@@ -236,10 +238,30 @@ describe("sichtbareBereiche", () => {
 describe("verfahrens-eigene Personas (P0-1: Beschaffung/HR)", () => {
   const beschaffung: Pick<LeistungConfig, "personas"> = {
     personas: [
-      { key: "requester", label: "Anfordernde Stelle", home: "/anforderung", routePrefix: "/anforderung" },
-      { key: "approver", label: "Freigabe", home: "/freigabe", routePrefix: "/freigabe" },
-      { key: "einkauf", label: "Einkauf", home: "/einkauf", routePrefix: "/einkauf" },
-      { key: "lieferant", label: "Lieferant", home: "/lieferant", routePrefix: "/lieferant" },
+      {
+        key: "requester",
+        label: "Anfordernde Stelle",
+        home: "/anforderung",
+        routePrefix: "/anforderung",
+      },
+      {
+        key: "approver",
+        label: "Freigabe",
+        home: "/freigabe",
+        routePrefix: "/freigabe",
+      },
+      {
+        key: "einkauf",
+        label: "Einkauf",
+        home: "/einkauf",
+        routePrefix: "/einkauf",
+      },
+      {
+        key: "lieferant",
+        label: "Lieferant",
+        home: "/lieferant",
+        routePrefix: "/lieferant",
+      },
     ],
   };
 

@@ -73,7 +73,9 @@ export function personaHome(
   permissions: readonly string[] | undefined,
   config: Pick<LeistungConfig, "personas"> = {},
 ): string {
-  const first = personaKeys(config).find((persona) => allowed.includes(persona));
+  const first = personaKeys(config).find((persona) =>
+    allowed.includes(persona),
+  );
   if (first) return personaRoute(first, config);
   if (permissions?.includes("boards.collaborate")) return "/boards";
   return "/";

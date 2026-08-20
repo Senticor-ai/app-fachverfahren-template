@@ -70,7 +70,14 @@ export function registerIdentityRoutes(
         contextOf(request),
       );
       if (!result.ok) {
-        return sendPortFailure(reply, deps, request, result.error, failStatus(result.error.retryable), "identity.failed");
+        return sendPortFailure(
+          reply,
+          deps,
+          request,
+          result.error,
+          failStatus(result.error.retryable),
+          "identity.failed",
+        );
       }
       return reply.code(200).send(result.value);
     },
@@ -101,7 +108,14 @@ export function registerIdentityRoutes(
         request.body.minimumAssuranceLevel,
       );
       if (!result.ok) {
-        return sendPortFailure(reply, deps, request, result.error, failStatus(result.error.retryable), "identity.failed");
+        return sendPortFailure(
+          reply,
+          deps,
+          request,
+          result.error,
+          failStatus(result.error.retryable),
+          "identity.failed",
+        );
       }
       return reply.code(200).send(result.value);
     },

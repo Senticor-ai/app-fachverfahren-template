@@ -42,7 +42,8 @@ export function HilfePage(): React.JSX.Element {
         </Link>
         <h1 className="text-base font-semibold">Doku-Wiki</h1>
         <span className="text-xs text-muted-foreground">
-          {DOCS.length} Dokumente aus dem Repository (README · AGENTS · docs/ · Skills)
+          {DOCS.length} Dokumente aus dem Repository (README · AGENTS · docs/ ·
+          Skills)
         </span>
       </header>
       <div className="mx-auto w-full max-w-6xl px-6 pt-6">

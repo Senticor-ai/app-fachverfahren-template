@@ -17,11 +17,31 @@ NUR diese vier (keine generischen Default-Personas):
 
 ```ts
 personas: [
-  { key: "requester",  label: "Anfordernde Stelle", home: "/anforderung", routePrefix: "/anforderung" },
-  { key: "approver",   label: "Freigabe",           home: "/freigabe",    routePrefix: "/freigabe" },
-  { key: "einkauf",    label: "Einkauf",            home: "/einkauf",     routePrefix: "/einkauf" },
-  { key: "lieferant",  label: "Lieferant",          home: "/lieferant",   routePrefix: "/lieferant" },
-]
+  {
+    key: "requester",
+    label: "Anfordernde Stelle",
+    home: "/anforderung",
+    routePrefix: "/anforderung",
+  },
+  {
+    key: "approver",
+    label: "Freigabe",
+    home: "/freigabe",
+    routePrefix: "/freigabe",
+  },
+  {
+    key: "einkauf",
+    label: "Einkauf",
+    home: "/einkauf",
+    routePrefix: "/einkauf",
+  },
+  {
+    key: "lieferant",
+    label: "Lieferant",
+    home: "/lieferant",
+    routePrefix: "/lieferant",
+  },
+];
 ```
 
 Sidebar, Landing-Einstiege, URL↔Persona-Zuordnung und die Admin-Zuweisung leiten sich

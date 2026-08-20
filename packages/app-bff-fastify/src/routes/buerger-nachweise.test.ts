@@ -81,9 +81,9 @@ describe("BFF Nachweis-Upload (/api/buerger/antraege/:id/nachweise)", () => {
     });
     expect(dl.statusCode).toBe(200);
     const download = dl.json();
-    expect(Buffer.from(download.contentBase64, "base64").equals(PDF_BYTES)).toBe(
-      true,
-    );
+    expect(
+      Buffer.from(download.contentBase64, "base64").equals(PDF_BYTES),
+    ).toBe(true);
     expect(download.checksumSha256).toBe(ref.checksumSha256);
     await app.close();
   });
@@ -94,7 +94,11 @@ describe("BFF Nachweis-Upload (/api/buerger/antraege/:id/nachweise)", () => {
       method: "POST",
       url: `/api/buerger/antraege/${antragId}/nachweise`,
       // dekodiert zu 0 Bytes.
-      payload: { fileName: "x.txt", mimeType: "text/plain", contentBase64: "====" },
+      payload: {
+        fileName: "x.txt",
+        mimeType: "text/plain",
+        contentBase64: "====",
+      },
     });
     expect(res.statusCode).toBe(400);
     await app.close();

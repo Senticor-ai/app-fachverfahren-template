@@ -23,10 +23,10 @@ function toNachricht(
  * liefert chronologisch, das Postfach zeigt sie in der gelieferten Reihenfolge.
  */
 export async function ladePostfach(): Promise<PostfachNachricht[]> {
-  const response = await fetch(
-    apiPath("/api/mailbox?box=inbox&scope=own"),
-    { credentials: "include", headers: { "content-type": "application/json" } },
-  );
+  const response = await fetch(apiPath("/api/mailbox?box=inbox&scope=own"), {
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+  });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     throw new CaseRequestError(

@@ -141,7 +141,10 @@ export const ComposableDetailDtoSchema = Type.Object(
     benutzt: Type.Optional(
       Type.Array(
         Type.Object(
-          { wissen: Type.String({ minLength: 1 }), werkzeug: Type.String({ minLength: 1 }) },
+          {
+            wissen: Type.String({ minLength: 1 }),
+            werkzeug: Type.String({ minLength: 1 }),
+          },
           { additionalProperties: false },
         ),
       ),

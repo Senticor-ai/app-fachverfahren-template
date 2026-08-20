@@ -10,11 +10,12 @@ import {
 
 /** Ein fetch-Stub, der eine gültige Ollama-/api/generate-Antwort liefert. */
 function stubOk(responseText = "Beispiel-Vorschlag"): typeof fetch {
-  return vi.fn(async () =>
-    new Response(JSON.stringify({ response: responseText }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    }),
+  return vi.fn(
+    async () =>
+      new Response(JSON.stringify({ response: responseText }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
   ) as unknown as typeof fetch;
 }
 
@@ -109,11 +110,12 @@ describe("Ollama AiAssistPort — adapterspezifische Invarianten", () => {
   });
 
   it("converse: der Verlauf reist als echte Chat-Rollen an /api/chat; HCAI-Marker hart gesetzt", async () => {
-    const fetchImpl = vi.fn(async () =>
-      new Response(
-        JSON.stringify({ message: { content: "Geerdete Antwort." } }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      ),
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ message: { content: "Geerdete Antwort." } }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
     ) as unknown as typeof fetch;
     const port = createOllamaAiAssistPort({
       baseUrl: "http://ollama.test:11434",

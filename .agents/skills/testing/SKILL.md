@@ -39,7 +39,7 @@ Projekte `unit` + `template-tooling`. Die schwereren Ebenen sind eigene Kommando
 
 - **Stories als Tests im ECHTEN Browser** — `pnpm run test:storybook`
   (`--project storybook`): jede Story rendert headless in Chromium (`@vitest/
-  browser` + Playwright), führt `play`-Interaktionen aus UND prüft Axe-A11y
+browser` + Playwright), führt `play`-Interaktionen aus UND prüft Axe-A11y
   (`.storybook/preview.ts` `a11y.test = "error"` → Verstoß = rot). ~39 Stories.
 - **Komponenten im ECHTEN Browser** — `pnpm run test:browser`
   (`vitest.browser.config.ts`, Chromium/Playwright headless): die

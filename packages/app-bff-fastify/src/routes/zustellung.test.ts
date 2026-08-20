@@ -22,16 +22,24 @@ const failingMailbox: MailboxPort = {
     semantics: defaultSemantics,
   },
   async sendMessage() {
-    return capabilityFailure("mailbox/gateway-rejected", "De-Mail-Gateway lehnte ab", {
-      retryable: false,
-      classification: "confidential",
-    });
+    return capabilityFailure(
+      "mailbox/gateway-rejected",
+      "De-Mail-Gateway lehnte ab",
+      {
+        retryable: false,
+        classification: "confidential",
+      },
+    );
   },
   async getDeliveryStatus() {
-    return capabilityFailure("mailbox/unavailable", "Gateway nicht erreichbar", {
-      retryable: true,
-      classification: "confidential",
-    });
+    return capabilityFailure(
+      "mailbox/unavailable",
+      "Gateway nicht erreichbar",
+      {
+        retryable: true,
+        classification: "confidential",
+      },
+    );
   },
 };
 
@@ -44,7 +52,9 @@ const bescheid = {
 
 describe("BFF /api/zustellung", () => {
   it("200: Sachbearbeitung stellt einen Bescheid zu → deliveryId + Audit (Zustellnachweis)", async () => {
-    const { app, auditSink } = await buildBffApp({ session: caseworkerSession() });
+    const { app, auditSink } = await buildBffApp({
+      session: caseworkerSession(),
+    });
     const res = await app.inject({
       method: "POST",
       url: "/api/zustellung",

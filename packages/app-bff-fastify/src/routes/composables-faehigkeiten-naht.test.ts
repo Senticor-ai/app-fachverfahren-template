@@ -27,7 +27,12 @@ function composable(over: Partial<AgenticComposable> = {}): AgenticComposable {
     klasse: "outcome",
     status: "certified",
     assurance: "CAL-2",
-    outcome: { fuerWen: "Sachbearbeitung", ergebnis: "beschiedener Antrag", messung: "Durchlaufzeit", nichtScope: [] },
+    outcome: {
+      fuerWen: "Sachbearbeitung",
+      ergebnis: "beschiedener Antrag",
+      messung: "Durchlaufzeit",
+      nichtScope: [],
+    },
     owners: { capabilityOwner: "amt", serviceOwner: "fachbereich" },
     moduleId: "musterverfahren",
     spine: {
@@ -48,7 +53,10 @@ const detail = async (c: AgenticComposable) => {
     session: caseworkerSession(),
     composableRegistry: createInMemoryComposableRegistry([c]),
   });
-  const res = await app.inject({ method: "GET", url: `/api/composables/${c.id}` });
+  const res = await app.inject({
+    method: "GET",
+    url: `/api/composables/${c.id}`,
+  });
   const body = res.json();
   await app.close();
   return { status: res.statusCode, body };
@@ -86,14 +94,20 @@ describe("S6 · beide Faehigkeits-Seiten auf dem Draht", () => {
         freigegebenVon: "amtsleitung",
       },
     ]);
-    expect(body.benutzt).toEqual([{ wissen: "unterlagen-lesen", werkzeug: "steuer-tarif" }]);
+    expect(body.benutzt).toEqual([
+      { wissen: "unterlagen-lesen", werkzeug: "steuer-tarif" },
+    ]);
   });
 
   it("GEGENPROBE zur Strip-Naht: ein NICHT deklariertes Feld verschwindet im selben Aufruf", async () => {
     const { body } = await detail(
       composable({
         strukturiert: [
-          { id: "steuer-tarif", ergebnis: "der festgesetzte Betrag", tabelle: [[1, 2]] } as never,
+          {
+            id: "steuer-tarif",
+            ergebnis: "der festgesetzte Betrag",
+            tabelle: [[1, 2]],
+          } as never,
         ],
       }),
     );
@@ -107,7 +121,12 @@ describe("S6 · beide Faehigkeits-Seiten auf dem Draht", () => {
     const { body } = await detail(
       composable({
         strukturiert: [
-          { id: "erzeugte-regel", ergebnis: "geprüfter Tatbestand", programm: "regel:erzeugt", erzeugtVon: "unterlagen-lesen" },
+          {
+            id: "erzeugte-regel",
+            ergebnis: "geprüfter Tatbestand",
+            programm: "regel:erzeugt",
+            erzeugtVon: "unterlagen-lesen",
+          },
         ],
       }),
     );
@@ -127,7 +146,9 @@ describe("S6 · beide Faehigkeits-Seiten auf dem Draht", () => {
     const { app } = await buildBffApp({
       session: caseworkerSession(),
       composableRegistry: createInMemoryComposableRegistry([
-        composable({ strukturiert: [{ id: "steuer-tarif", ergebnis: "Betrag" }] }),
+        composable({
+          strukturiert: [{ id: "steuer-tarif", ergebnis: "Betrag" }],
+        }),
       ]),
     });
     const res = await app.inject({ method: "GET", url: "/api/composables" });

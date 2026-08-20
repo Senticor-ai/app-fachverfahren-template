@@ -65,7 +65,11 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
 export function createLocalBlobStoragePort(): BlobStoragePort {
   const blobs = new Map<string, BlobObject>();
   return {
-    descriptor: descriptor("blob-storage", "Local Blob Storage", "confidential"),
+    descriptor: descriptor(
+      "blob-storage",
+      "Local Blob Storage",
+      "confidential",
+    ),
     async put(_context, input) {
       const attachmentId = id("att");
       const ref: AttachmentRef = {
@@ -171,7 +175,10 @@ export function createLocalAiAssistPort(
  * fingiert einen sofort abgeschlossenen Roundtrip (deterministisch, ohne Netz/ePayBL). Für den Durchstich.
  */
 export function createLocalPaymentPort(): PaymentPort {
-  const payments = new Map<string, { amountMinor: number; reference: string }>();
+  const payments = new Map<
+    string,
+    { amountMinor: number; reference: string }
+  >();
   return {
     descriptor: descriptor("payment", "Local Payment", "confidential"),
     async createPayment(_context, request) {

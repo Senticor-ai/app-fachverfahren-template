@@ -62,7 +62,11 @@ export interface MapManifestOptions {
    *  genommen, nicht aus dem Manifest-Block. Der Manifest-Block ist hand-editierbar, ohne dass ein Siegel bricht —
    *  genau das Loch, das die Projektion geschlossen hat. Liegt eine Projektion vor, entscheidet also ihr Siegel;
    *  ohne Verdikt gilt sie als ungeprueft und die Seite bleibt LEER (fail-closed, kein Green-Wash-Umweg). */
-  governance?: { vorhanden: boolean; intakt: boolean; projektion?: MeshGovernanceProjektionFaehigkeiten };
+  governance?: {
+    vorhanden: boolean;
+    intakt: boolean;
+    projektion?: MeshGovernanceProjektionFaehigkeiten;
+  };
 }
 
 /** Nur der Teil der Projektion, den dieser Mapper liest — ausdruecklich benannt statt per Index-Signatur. */
@@ -164,7 +168,9 @@ function gedeckelteAutonomie(
     (a) => a === "pruefung" || a === "subsumtion" || a === "review",
   );
   if (!rechtsnah) return deklariert;
-  return aalRang(deklariert) > 2 ? ("AAL-2" as AgenticAutonomyLevel) : deklariert;
+  return aalRang(deklariert) > 2
+    ? ("AAL-2" as AgenticAutonomyLevel)
+    : deklariert;
 }
 
 /**
@@ -280,16 +286,25 @@ export function mapManifestToComposable(
   // Ihr Siegel entscheidet dann allein: ohne intaktes Verdikt bleibt die Seite leer, auch wenn der (unversiegelte)
   // Manifest-Block etwas anderes behauptet. Nur wo GAR KEINE Projektion mitkam (Alt-Bestand), traegt der
   // Manifest-Block — dieselbe Quelle, aus der dieser Mapper auch `ki`, `befugnis` und `leistungen` liest.
-  const projVorhanden = (manifest as { governanceProjektion?: unknown }).governanceProjektion !== undefined;
+  const projVorhanden =
+    (manifest as { governanceProjektion?: unknown }).governanceProjektion !==
+    undefined;
   const seite = projVorhanden
-    ? (opts.governance?.intakt ? opts.governance.projektion?.faehigkeiten : undefined)
+    ? opts.governance?.intakt
+      ? opts.governance.projektion?.faehigkeiten
+      : undefined
     : manifest.faehigkeiten;
   const strukturiert = (seite?.strukturiert ?? []).filter(
-    (s): s is ComposableStrukturFaehigkeit => !!s && typeof s.id === "string" && !!s.id.trim(),
+    (s): s is ComposableStrukturFaehigkeit =>
+      !!s && typeof s.id === "string" && !!s.id.trim(),
   );
   const benutzt = (seite?.benutzt ?? []).filter(
     (k): k is ComposableWerkzeugKante =>
-      !!k && typeof k.wissen === "string" && !!k.wissen.trim() && typeof k.werkzeug === "string" && !!k.werkzeug.trim(),
+      !!k &&
+      typeof k.wissen === "string" &&
+      !!k.wissen.trim() &&
+      typeof k.werkzeug === "string" &&
+      !!k.werkzeug.trim(),
   );
 
   const composable: AgenticComposable = {

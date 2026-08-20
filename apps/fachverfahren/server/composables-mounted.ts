@@ -316,7 +316,10 @@ export function loadMountedComposables(
       // strukturierte Faehigkeits-Seite. Ohne diese Zeile waere das Feld vorgesehen, typisiert und nie gefuellt —
       // die Defektklasse, die diese Woche siebenmal aufgefallen ist. `gov` ist an dieser Stelle bereits
       // nachgerechnet: ein gebrochenes Siegel hat den Mount weiter oben uebersprungen.
-      const mounted = mapManifestToComposable(manifest, { attestation, governance: gov });
+      const mounted = mapManifestToComposable(manifest, {
+        attestation,
+        governance: gov,
+      });
       composables.push({ ...mounted, herkunft: ladeHerkunft(dir, id) });
       // ARCHETYP-BRUCH sichtbar machen (nicht werfen): traegt die Stelle eine Befugnis, die ihr Archetyp
       // ausschliesst? Der haeufigste Schnitt-Fehler — ein Initiator, der Bescheide erlaesst, ist kein

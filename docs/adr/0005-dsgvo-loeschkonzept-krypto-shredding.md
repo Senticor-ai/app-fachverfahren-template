@@ -49,17 +49,18 @@ strukturell intakt, während die personenbezogenen Inhalte irreversibel unlesbar
 
 ## Alternativen
 
-| Alternative | Vorteile | Nachteile | Verdikt |
-| --- | --- | --- | --- |
-| **A — Krypto-Shredding** (gewählt, Kern) | ketten-/beweis-kompatibel; irreversibel; skaliert (Schlüssel je Betroffenem) | Schlüssel-Management (KMS/Rotation) ist neue Pflicht; Altbestand nicht verschlüsselt | **gewählt** (+ B für Altbestand) |
-| **B — Redaction/Pseudonymisierung** (gewählt, ergänzend) | funktioniert für unverschlüsselten Altbestand; feldgenau | destruktiv am Klartext → muss referenziell + auditiert erfolgen, sonst Kettenbruch | **gewählt** für Altbestand/Einzelfelder |
-| **C — reiner Retention-Ablauf** (gewählt, Auslöser) | gesetzeskonform für fristbasierte Löschung | deckt Art.-17-Einzelanträge nicht ab | **gewählt** als Auslöser, nicht allein |
-| **D — Hard-Deletion der Audit-Zeile** | „echt gelöscht" | bricht Hash-Kette + Beweis; verletzt Revisionssicherheit | **abgelehnt** |
-| **E — nichts tun (Status quo)** | kein Aufwand | DSGVO-Verstoß; Blocker für Produktivbetrieb | **abgelehnt** |
+| Alternative                                              | Vorteile                                                                     | Nachteile                                                                            | Verdikt                                 |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------- |
+| **A — Krypto-Shredding** (gewählt, Kern)                 | ketten-/beweis-kompatibel; irreversibel; skaliert (Schlüssel je Betroffenem) | Schlüssel-Management (KMS/Rotation) ist neue Pflicht; Altbestand nicht verschlüsselt | **gewählt** (+ B für Altbestand)        |
+| **B — Redaction/Pseudonymisierung** (gewählt, ergänzend) | funktioniert für unverschlüsselten Altbestand; feldgenau                     | destruktiv am Klartext → muss referenziell + auditiert erfolgen, sonst Kettenbruch   | **gewählt** für Altbestand/Einzelfelder |
+| **C — reiner Retention-Ablauf** (gewählt, Auslöser)      | gesetzeskonform für fristbasierte Löschung                                   | deckt Art.-17-Einzelanträge nicht ab                                                 | **gewählt** als Auslöser, nicht allein  |
+| **D — Hard-Deletion der Audit-Zeile**                    | „echt gelöscht"                                                              | bricht Hash-Kette + Beweis; verletzt Revisionssicherheit                             | **abgelehnt**                           |
+| **E — nichts tun (Status quo)**                          | kein Aufwand                                                                 | DSGVO-Verstoß; Blocker für Produktivbetrieb                                          | **abgelehnt**                           |
 
 ## Konsequenzen
 
 **Neue Pflichten / Folgekosten:**
+
 - **Schlüssel-Management je Betroffenem** (KMS-Naht/Port; Erzeugung bei Anlage, Vernichtung bei Löschung) —
   eigener Umsetzungs-Slice; die personenbezogene Nutzlast wandert hinter eine Verschlüsselungs-Naht.
 - **Redaction-fähige Kanonisierung**: `audit-chain.ts` muss so bleiben, dass ein krypto-geshreddeter Payload

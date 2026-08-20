@@ -119,7 +119,8 @@ export async function exchangeCodeForTokens(
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: body.toString(),
   });
-  if (!res.ok) throw new OidcError(`OIDC token exchange failed (${res.status})`);
+  if (!res.ok)
+    throw new OidcError(`OIDC token exchange failed (${res.status})`);
   const doc = (await res.json()) as Record<string, unknown>;
   if (typeof doc["id_token"] !== "string") {
     throw new OidcError("OIDC token response missing id_token");
@@ -174,7 +175,9 @@ export async function validateIdToken(
   }
   return {
     subject,
-    ...(typeof payload["email"] === "string" ? { email: payload["email"] } : {}),
+    ...(typeof payload["email"] === "string"
+      ? { email: payload["email"] }
+      : {}),
     ...(typeof payload["name"] === "string" ? { name: payload["name"] } : {}),
     raw: payload,
   };

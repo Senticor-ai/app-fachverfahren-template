@@ -34,7 +34,8 @@ export function registerAiAssistRoutes(
       preHandler: auth.preHandler,
       schema: {
         tags: ["ai-assist"],
-        summary: "KI-Assistenz anfordern (assistiv, HCAI — nie eine Entscheidung)",
+        summary:
+          "KI-Assistenz anfordern (assistiv, HCAI — nie eine Entscheidung)",
         body: AiAssistRequestSchema,
         response: {
           200: AiSuggestionDtoSchema,
@@ -70,9 +71,10 @@ export function registerAiAssistRoutes(
         // erreichbar (503) — kein fingierter Vorschlag, kein 200 mit erfundenem Inhalt.
         const status =
           result.error.code === "ai-assist/high-risk-refused" ? 422 : 503;
-        return reply
-          .code(status)
-          .send({ error: result.error.message, requestId: requestIdOf(request) });
+        return reply.code(status).send({
+          error: result.error.message,
+          requestId: requestIdOf(request),
+        });
       }
 
       // KI-Nutzung ist auditpflichtig (Nachvollziehbarkeit): der Vorschlag ist erzeugt, Modell + Aufgabe

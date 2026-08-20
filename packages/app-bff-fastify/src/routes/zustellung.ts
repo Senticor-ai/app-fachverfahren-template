@@ -81,7 +81,14 @@ export function registerZustellungRoutes(
         attachments: request.body.attachments ?? [],
       });
       if (!result.ok) {
-        return sendPortFailure(reply, deps, request, result.error, failStatus(result.error.retryable), "zustellung.failed");
+        return sendPortFailure(
+          reply,
+          deps,
+          request,
+          result.error,
+          failStatus(result.error.retryable),
+          "zustellung.failed",
+        );
       }
       // Zustellung ist auditpflichtig (Zustellnachweis): Referenz + Zustell-Id, kein Bescheid-Inhalt.
       await deps.auditSink.emit({
@@ -123,7 +130,14 @@ export function registerZustellungRoutes(
         request.params.deliveryId,
       );
       if (!result.ok) {
-        return sendPortFailure(reply, deps, request, result.error, failStatus(result.error.retryable), "zustellung.failed");
+        return sendPortFailure(
+          reply,
+          deps,
+          request,
+          result.error,
+          failStatus(result.error.retryable),
+          "zustellung.failed",
+        );
       }
       return reply.code(200).send(result.value);
     },

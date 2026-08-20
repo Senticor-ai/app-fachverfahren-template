@@ -308,7 +308,13 @@ describe("Agenten-CLI (mesh-cli)", () => {
 
   it("composable chat: governed Chat-Runde -> Vorschlag mit reviewRequired + Erdungs-Block + chat.turn-Evidence", async () => {
     const results = await executeMeshCommands([
-      ["composable", "chat", "musterverfahren", "--message", "Welche Frist gilt?"],
+      [
+        "composable",
+        "chat",
+        "musterverfahren",
+        "--message",
+        "Welche Frist gilt?",
+      ],
       ["composable", "evidence", "musterverfahren"],
     ]);
     expect(results[0]?.ok).toBe(true);

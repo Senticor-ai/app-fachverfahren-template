@@ -294,7 +294,8 @@ export function registerVermerkRoutes(
       preHandler: writeAuth.preHandler,
       schema: {
         tags: ["vermerke"],
-        summary: "KI-Aktenvermerk-Entwurf erzeugen (prüfpflichtig, ki-vorschlag)",
+        summary:
+          "KI-Aktenvermerk-Entwurf erzeugen (prüfpflichtig, ki-vorschlag)",
         params: CaseIdParamsSchema,
         body: KiVermerkRequestSchema,
         response: {
@@ -332,7 +333,9 @@ export function registerVermerkRoutes(
       const bbReviews = reviewMapOf(bisher);
       const blackboard = bisher
         .filter((e) => e.eventType === NOTE_EVENT_TYPE)
-        .map((e) => toVermerkDto(e, appCase.caseId, bbReviews.get(e.auditEventId)))
+        .map((e) =>
+          toVermerkDto(e, appCase.caseId, bbReviews.get(e.auditEventId)),
+        )
         .filter((v) => v.sichtbarkeit === "public")
         // Fail-safe am LESE-Kontext (nicht nur am Export): ein vom Menschen VERWORFENER KI-Entwurf darf den
         // nächsten KI-Vorschlag NICHT mehr kontaminieren — verworfenes Wissen ist aus dem Kontext raus.
@@ -354,9 +357,7 @@ export function registerVermerkRoutes(
       // eine Festsetzung aus externen Daten liegt in cases.ts, nicht hier.)
       const herkunft = herkunftAusEreignissen(bisher);
       const quarantaene =
-        herkunft === "extern"
-          ? externQuarantaene(appCase.data)
-          : undefined;
+        herkunft === "extern" ? externQuarantaene(appCase.data) : undefined;
 
       // Den (austauschbaren) AiAssistPort fragen — Kontext AUSSCHLIESSLICH aus der Sitzung + geteilter Akte.
       const result = await deps.aiAssist.suggest(
@@ -501,7 +502,8 @@ export function registerVermerkRoutes(
       preHandler: readAuth.preHandler,
       schema: {
         tags: ["vermerke"],
-        summary: "Kontext-Bundle der Akte für die agentische Weiterverarbeitung (public, neutralisiert)",
+        summary:
+          "Kontext-Bundle der Akte für die agentische Weiterverarbeitung (public, neutralisiert)",
         params: CaseIdParamsSchema,
         response: { 200: WissenExportDtoSchema, ...errorResponses },
       },
@@ -528,7 +530,9 @@ export function registerVermerkRoutes(
       const reviews = reviewMapOf(events);
       const eintraege = events
         .filter((e) => e.eventType === NOTE_EVENT_TYPE)
-        .map((e) => toVermerkDto(e, appCase.caseId, reviews.get(e.auditEventId)))
+        .map((e) =>
+          toVermerkDto(e, appCase.caseId, reviews.get(e.auditEventId)),
+        )
         .filter((v) => v.sichtbarkeit === "public")
         // Fail-safe (symmetrisch zum Verfahrens-Wiki): ein vom Menschen VERWORFENER KI-Entwurf darf sich
         // NICHT über die Brücke in Agent-Skills/Kontext fortpflanzen — verworfenes Wissen wird ausgeschlossen.

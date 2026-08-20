@@ -44,15 +44,24 @@ import path from "node:path";
  * Status-KONSTANTEN, ihre Lebenszyklus-TABELLE, ihre HITL-Semantik und ihre Ableitungs-FUNKTION.
  */
 const FABRIK_NAMEN = [
-  "RUN_STATUSES",         // die Wire-Statusliste des Bau-Laufs
+  "RUN_STATUSES", // die Wire-Statusliste des Bau-Laufs
   "RUN_STATUS_LIFECYCLE", // die Lebenszyklus-Tabelle (phase/abortable/active/humanNeed)
-  "humanNeedAus",         // die Ableitung Status ⊕ Ursache ⇒ Handlungs-Wort
-  "humanNeed",            // die HITL-Aussage der Fabrik (entscheidung · reparatur · fortsetzen)
-  "needsHuman",           // ihre grobe Vorfassung — sie soll auch nicht als Kopie wiederkehren
+  "humanNeedAus", // die Ableitung Status ⊕ Ursache ⇒ Handlungs-Wort
+  "humanNeed", // die HITL-Aussage der Fabrik (entscheidung · reparatur · fortsetzen)
+  "needsHuman", // ihre grobe Vorfassung — sie soll auch nicht als Kopie wiederkehren
 ] as const;
 
 /** Wo gesucht wird: der gesamte Quellbaum des KIT, ohne Fremdcode und ohne Bau-Ergebnisse. */
-const AUSGENOMMEN = new Set(["node_modules", ".git", "dist", "build", "storybook-static", "coverage", ".turbo", ".next"]);
+const AUSGENOMMEN = new Set([
+  "node_modules",
+  ".git",
+  "dist",
+  "build",
+  "storybook-static",
+  "coverage",
+  ".turbo",
+  ".next",
+]);
 const ENDUNGEN = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"];
 
 function quellDateien(wurzel: string): string[] {
@@ -61,11 +70,18 @@ function quellDateien(wurzel: string): string[] {
   while (stapel.length) {
     const cur = stapel.pop()!;
     let einträge: fs.Dirent[];
-    try { einträge = fs.readdirSync(cur, { withFileTypes: true }); } catch { continue; }
+    try {
+      einträge = fs.readdirSync(cur, { withFileTypes: true });
+    } catch {
+      continue;
+    }
     for (const e of einträge) {
       if (AUSGENOMMEN.has(e.name)) continue;
       const p = path.join(cur, e.name);
-      if (e.isDirectory()) { stapel.push(p); continue; }
+      if (e.isDirectory()) {
+        stapel.push(p);
+        continue;
+      }
       if (!ENDUNGEN.some((x) => e.name.endsWith(x))) continue;
       // Diese Datei selbst nennt die Namen naturgemäß — sonst könnte sie nicht nach ihnen suchen.
       if (p.endsWith("lauf-lebenszyklus-grenze.test.ts")) continue;
@@ -81,32 +97,47 @@ describe("Grenze: das KIT führt VORGÄNGE, nicht Bauläufe", () => {
   it("der Quellbaum ist auffindbar (ein leerer Wächter wäre ein Falsch-Grün)", () => {
     const dateien = quellDateien(repoWurzel);
     // Ohne diese Zusicherung wäre die Prüfung unten bei einem falschen Pfad still grün — die teuerste Sorte Test.
-    expect(dateien.length, `Quellbaum unter ${repoWurzel} ist leer — der Pfad stimmt nicht`).toBeGreaterThan(50);
+    expect(
+      dateien.length,
+      `Quellbaum unter ${repoWurzel} ist leer — der Pfad stimmt nicht`,
+    ).toBeGreaterThan(50);
   });
 
-  it.each(FABRIK_NAMEN)("kein KIT-Quellcode spiegelt das Fabrik-Vokabular „%s“", (name) => {
-    const treffer: string[] = [];
-    for (const p of quellDateien(repoWurzel)) {
-      let inhalt: string;
-      try { inhalt = fs.readFileSync(p, "utf8"); } catch { continue; } // OHNE Limit — Truncation verfälscht die Evidenz
-      if (inhalt.includes(name)) treffer.push(path.relative(repoWurzel, p));
-    }
-    expect(
-      treffer,
-      `„${name}“ gehört dem LAUF-Lebenszyklus der Fabrik (CHOS-CODE packages/fachverfahren/run-status.ts). Eine ` +
-      `Kopie hier wäre eine dritte Wahrheit ohne Quelle und ohne Kongruenz-Test — in einem Repo, das Bauläufe ` +
-      `fachlich nicht kennt. Braucht die Anwendung wirklich einen Lauf-Zustand, kommt er über den Draht (die ` +
-      `Fabrik projiziert ihn), nie über eine Tabelle hier. Gefunden in:\n  ${treffer.join("\n  ")}`,
-    ).toEqual([]);
-  });
+  it.each(FABRIK_NAMEN)(
+    "kein KIT-Quellcode spiegelt das Fabrik-Vokabular „%s“",
+    (name) => {
+      const treffer: string[] = [];
+      for (const p of quellDateien(repoWurzel)) {
+        let inhalt: string;
+        try {
+          inhalt = fs.readFileSync(p, "utf8");
+        } catch {
+          continue;
+        } // OHNE Limit — Truncation verfälscht die Evidenz
+        if (inhalt.includes(name)) treffer.push(path.relative(repoWurzel, p));
+      }
+      expect(
+        treffer,
+        `„${name}“ gehört dem LAUF-Lebenszyklus der Fabrik (CHOS-CODE packages/fachverfahren/run-status.ts). Eine ` +
+          `Kopie hier wäre eine dritte Wahrheit ohne Quelle und ohne Kongruenz-Test — in einem Repo, das Bauläufe ` +
+          `fachlich nicht kennt. Braucht die Anwendung wirklich einen Lauf-Zustand, kommt er über den Draht (die ` +
+          `Fabrik projiziert ihn), nie über eine Tabelle hier. Gefunden in:\n  ${treffer.join("\n  ")}`,
+      ).toEqual([]);
+    },
+  );
 
   it("das EIGENE Vorgangs-Vokabular hat weiterhin genau EINE Definition", () => {
     // Die Gegenrichtung: die Trennung ist nur dann sauber, wenn das KIT seine eigene Wahrheit auch an EINER Stelle
     // führt. `types.ts` ist diese Stelle; alle übrigen Vorkommen sind Konsumenten (Store, Komponenten, Stories).
     const typen = path.join(__dirname, "types.ts");
-    expect(fs.existsSync(typen), "packages/fachverfahren-kit/src/types.ts ist die Heimat des Vorgangs-Vokabulars").toBe(true);
+    expect(
+      fs.existsSync(typen),
+      "packages/fachverfahren-kit/src/types.ts ist die Heimat des Vorgangs-Vokabulars",
+    ).toBe(true);
     const inhalt = fs.readFileSync(typen, "utf8");
     // Die Datei muss den Vorgang WIRKLICH typisieren — sonst wäre die Aussage oben eine Behauptung.
-    expect(/\bVorgang\b/.test(inhalt), "types.ts typisiert den Vorgang").toBe(true);
+    expect(/\bVorgang\b/.test(inhalt), "types.ts typisiert den Vorgang").toBe(
+      true,
+    );
   });
 });

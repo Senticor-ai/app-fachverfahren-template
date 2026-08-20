@@ -27,13 +27,29 @@ describe("Composable-Lieferung", () => {
     const c = mapManifestToComposable({
       ...basis(),
       leistungen: [
-        { schritt: "Bescheid erlassen", ergebnis: "bescheid_erlassen", vierAugen: true, begruendungsPflicht: true, erlaesstBescheid: true },
-        { schritt: "Identität prüfen", ergebnis: "identitaet_geprueft", vierAugen: false, begruendungsPflicht: false, erlaesstBescheid: false },
+        {
+          schritt: "Bescheid erlassen",
+          ergebnis: "bescheid_erlassen",
+          vierAugen: true,
+          begruendungsPflicht: true,
+          erlaesstBescheid: true,
+        },
+        {
+          schritt: "Identität prüfen",
+          ergebnis: "identitaet_geprueft",
+          vierAugen: false,
+          begruendungsPflicht: false,
+          erlaesstBescheid: false,
+        },
       ],
     });
     expect(c.leistungen).toHaveLength(2);
     // Die drei Marker sind Rechtsfolgen, keine Nuancen — ginge einer verloren, waere die Stelle falsch beschrieben.
-    expect(c.leistungen?.[0]).toMatchObject({ vierAugen: true, begruendungsPflicht: true, erlaesstBescheid: true });
+    expect(c.leistungen?.[0]).toMatchObject({
+      vierAugen: true,
+      begruendungsPflicht: true,
+      erlaesstBescheid: true,
+    });
     expect(c.leistungen?.[1]?.erlaesstBescheid).toBe(false);
   });
 
@@ -55,13 +71,28 @@ describe("Composable-Lieferung", () => {
   });
 
   it("behandelt eine leere Liste wie keine — sonst behauptete die Huelle eine Lieferung", () => {
-    const c = mapManifestToComposable({ ...basis(), leistungen: [], artefakte: [] });
+    const c = mapManifestToComposable({
+      ...basis(),
+      leistungen: [],
+      artefakte: [],
+    });
     expect(c.leistungen).toBeUndefined();
     expect(c.artefakte).toBeUndefined();
   });
 
   it("aendert nichts am uebrigen Mount-Verhalten (Spine aus faehigkeiten.ki bleibt)", () => {
-    const c = mapManifestToComposable({ ...basis(), leistungen: [{ schritt: "x", ergebnis: "y", vierAugen: false, begruendungsPflicht: false, erlaesstBescheid: false }] });
+    const c = mapManifestToComposable({
+      ...basis(),
+      leistungen: [
+        {
+          schritt: "x",
+          ergebnis: "y",
+          vierAugen: false,
+          begruendungsPflicht: false,
+          erlaesstBescheid: false,
+        },
+      ],
+    });
     expect(c.spine?.skills).toEqual(["subsumtion", "bescheid-entwurf"]);
     expect(c.spine?.knowledgeDomains).toContain("recht:grstg");
   });

@@ -28,7 +28,9 @@ beforeEach(() => {
   dir = mkdtempSync(path.join(tmpdir(), "mounted-composables-"));
   const kp = generateKeyPairSync("ed25519");
   signerPriv = kp.privateKey;
-  signerPub = kp.publicKey.export({ format: "der", type: "spki" }).toString("base64url");
+  signerPub = kp.publicKey
+    .export({ format: "der", type: "spki" })
+    .toString("base64url");
 });
 afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
@@ -49,7 +51,9 @@ function attestFor(
   priv: KeyObject = signerPriv,
   pub: string = signerPub,
 ): { alg: string; publicKey: string; sig: string } {
-  const digest = createHash("sha256").update(stableStringify(statement)).digest("hex");
+  const digest = createHash("sha256")
+    .update(stableStringify(statement))
+    .digest("hex");
   const sig = edSign(
     null,
     Buffer.from(`${COMPOSABLE_CERT_SIGNATURE_DOMAIN}\0${digest}`, "utf8"),
@@ -165,7 +169,9 @@ describe("verifyMountedComposables — Anspruch ∧ Beleg (fail-closed)", () => 
       allPass: true,
       forgeSigner: {
         priv: fremd.privateKey,
-        pub: fremd.publicKey.export({ format: "der", type: "spki" }).toString("base64url"),
+        pub: fremd.publicKey
+          .export({ format: "der", type: "spki" })
+          .toString("base64url"),
       },
     });
     const r = verifyMountedComposables(dir);
@@ -186,7 +192,10 @@ describe("verifyMountedComposables — Anspruch ∧ Beleg (fail-closed)", () => 
   it("VERWIRFT ein certified Manifest mit verdientem aber UNSIGNIERTEM Verdikt (Attestation fehlt)", () => {
     writePubkey();
     const digest = writeManifest("sachbearbeitung", "certified");
-    writeCert("sachbearbeitung", digest, { allPass: true, noAttestation: true });
+    writeCert("sachbearbeitung", digest, {
+      allPass: true,
+      noAttestation: true,
+    });
     const r = verifyMountedComposables(dir);
     expect(r.ok).toBe(false);
     expect(r.verdient).toBe(0);
@@ -243,7 +252,10 @@ describe("verifyMountedComposables — mitgereiste Stellen-Verfassung", () => {
   const QUELL_DIGEST = "a".repeat(64);
 
   /** Baut Manifest + passende, versiegelte yaml — beide aus DERSELBEN Projektion (wie der CHOS-Emitter). */
-  function writeMitVerfassung(id: string, opts: { entscheidung?: string } = {}): {
+  function writeMitVerfassung(
+    id: string,
+    opts: { entscheidung?: string } = {},
+  ): {
     projektion: Record<string, unknown>;
     yamlText: string;
   } {
@@ -254,11 +266,24 @@ describe("verifyMountedComposables — mitgereiste Stellen-Verfassung", () => {
       domain: "hundesteuer",
       regime: { normativ: true },
       stellen: [{ id, art: "flaeche", akteur: "mensch" }],
-      regeln: [{ id: "vier-augen", label: "Vier-Augen vor Bescheid", art: "verbindlich", class: "blocking", verify: "code" }],
-      befugnis: { entscheidung: opts.entscheidung ?? "erlaesst-va", hitlPflicht: true },
+      regeln: [
+        {
+          id: "vier-augen",
+          label: "Vier-Augen vor Bescheid",
+          art: "verbindlich",
+          class: "blocking",
+          verify: "code",
+        },
+      ],
+      befugnis: {
+        entscheidung: opts.entscheidung ?? "erlaesst-va",
+        hitlPflicht: true,
+      },
       herkunft: { verfassungDigest: QUELL_DIGEST, revision: 4711 },
     };
-    const digest = createHash("sha256").update(stableStringify(ohneSiegel)).digest("hex");
+    const digest = createHash("sha256")
+      .update(stableStringify(ohneSiegel))
+      .digest("hex");
     const projektion = { ...ohneSiegel, digest };
     const manifest = {
       schemaVersion: 1,
@@ -271,7 +296,10 @@ describe("verifyMountedComposables — mitgereiste Stellen-Verfassung", () => {
       certification: { status: "candidate", cal: 2 },
       governanceProjektion: projektion,
     };
-    writeFileSync(path.join(dir, `${id}.json`), JSON.stringify(manifest, null, 2) + "\n");
+    writeFileSync(
+      path.join(dir, `${id}.json`),
+      JSON.stringify(manifest, null, 2) + "\n",
+    );
     const yamlText = [
       "# erzeugt, nicht geschrieben",
       `_meta:`,
@@ -287,7 +315,11 @@ describe("verifyMountedComposables — mitgereiste Stellen-Verfassung", () => {
   /** Minimaler, deterministischer yaml-Dump der Projektion (die Gate-Prüfung parst ihn mit `yaml`). */
   function yamlVon(o: unknown, einzug = ""): string {
     if (Array.isArray(o)) {
-      return o.map((v) => `${einzug}- ${yamlVon(v, einzug + "  ").replace(/^\s+/, "")}`).join("\n");
+      return o
+        .map(
+          (v) => `${einzug}- ${yamlVon(v, einzug + "  ").replace(/^\s+/, "")}`,
+        )
+        .join("\n");
     }
     if (o && typeof o === "object") {
       return Object.entries(o as Record<string, unknown>)
@@ -322,7 +354,9 @@ describe("verifyMountedComposables — mitgereiste Stellen-Verfassung", () => {
       path.join(dir, "sachbearbeitung.governance.yaml"),
       yamlText.replace('"erlaesst-va"', '"keine"'),
     );
-    expect(govFehler(verifyMountedComposables(dir)).join(" ")).toMatch(/nicht \(mehr\) die erzeugte/);
+    expect(govFehler(verifyMountedComposables(dir)).join(" ")).toMatch(
+      /nicht \(mehr\) die erzeugte/,
+    );
   });
 
   it("eine Verfassung mit FREMDEM Siegel wird verworfen", () => {
@@ -340,23 +374,33 @@ describe("verifyMountedComposables — mitgereiste Stellen-Verfassung", () => {
       path.join(dir, "sachbearbeitung.governance.yaml"),
       yamlText.replace(GENERATOR, "mensch:von-hand"),
     );
-    expect(govFehler(verifyMountedComposables(dir)).join(" ")).toMatch(/Erzeuger-Marker/);
+    expect(govFehler(verifyMountedComposables(dir)).join(" ")).toMatch(
+      /Erzeuger-Marker/,
+    );
   });
 
   it("ein _meta, das eine ANDERE Quell-Verfassung benennt, ist ein Widerspruch in sich", () => {
     const { yamlText } = writeMitVerfassung("sachbearbeitung");
     writeFileSync(
       path.join(dir, "sachbearbeitung.governance.yaml"),
-      yamlText.replace(`sourceSha256: ${QUELL_DIGEST}`, `sourceSha256: ${"f".repeat(64)}`),
+      yamlText.replace(
+        `sourceSha256: ${QUELL_DIGEST}`,
+        `sourceSha256: ${"f".repeat(64)}`,
+      ),
     );
-    expect(govFehler(verifyMountedComposables(dir)).join(" ")).toMatch(/zwei Herkünfte/);
+    expect(govFehler(verifyMountedComposables(dir)).join(" ")).toMatch(
+      /zwei Herkünfte/,
+    );
   });
 
   it("eine handgelockerte Projektion IM MANIFEST bricht ihr Siegel (der Betriebs-Pfad ist ebenso geschützt)", () => {
     writeMitVerfassung("sachbearbeitung");
     const p = path.join(dir, "sachbearbeitung.json");
     const roh = readFileSync(p, "utf8");
-    writeFileSync(p, roh.replace('"hitlPflicht": true', '"hitlPflicht": false'));
+    writeFileSync(
+      p,
+      roh.replace('"hitlPflicht": true', '"hitlPflicht": false'),
+    );
     expect(verifyMountedComposables(dir).fehler.join(" ")).toMatch(/verändert/);
   });
 });
@@ -379,11 +423,25 @@ describe("definitionsBytes — die Identitaet der Definition (Vertrag mit dem Er
   } as const;
 
   it("entfernt die BINDUNGS-Felder — dieselbe Stelle in zwei Verfahren hat DIESELBE Identitaet", () => {
-    const inGewerbe = { ...basis, domain: "gewerbesteuer", amt: "steuern", anspruch: [{ id: "recht:a" }], version: "aaa" };
-    const inGrund = { ...basis, domain: "grundsteuer", amt: "finanzen", anspruch: [{ id: "recht:b" }], version: "bbb" };
+    const inGewerbe = {
+      ...basis,
+      domain: "gewerbesteuer",
+      amt: "steuern",
+      anspruch: [{ id: "recht:a" }],
+      version: "aaa",
+    };
+    const inGrund = {
+      ...basis,
+      domain: "grundsteuer",
+      amt: "finanzen",
+      anspruch: [{ id: "recht:b" }],
+      version: "bbb",
+    };
     expect(definitionsBytes(inGewerbe)).toBe(definitionsBytes(inGrund));
     // GEGENPROBE: ein DEFINITIONS-Unterschied trennt sehr wohl — sonst waere die Formel blind statt teilend.
-    expect(definitionsBytes({ ...inGewerbe, titel: "Andere Stelle" })).not.toBe(definitionsBytes(inGrund));
+    expect(definitionsBytes({ ...inGewerbe, titel: "Andere Stelle" })).not.toBe(
+      definitionsBytes(inGrund),
+    );
   });
 
   it("entfernt sie REKURSIV, nicht nur auf oberster Ebene", () => {
@@ -393,7 +451,9 @@ describe("definitionsBytes — die Identitaet der Definition (Vertrag mit dem Er
   });
 
   it("ist unabhaengig von der Feld-Reihenfolge der Quelle (kanonisch sortiert)", () => {
-    expect(definitionsBytes({ b: 1, a: 2 })).toBe(definitionsBytes({ a: 2, b: 1 }));
+    expect(definitionsBytes({ b: 1, a: 2 })).toBe(
+      definitionsBytes({ a: 2, b: 1 }),
+    );
   });
 
   it("haelt die BYTE-Form des Erzeugers: Einrueckung 2 und abschliessender Zeilenumbruch", () => {
@@ -407,8 +467,12 @@ describe("definitionsBytes — die Identitaet der Definition (Vertrag mit dem Er
   it("fuehrt genau die fuenf Bindungs-Felder des Erzeugers", () => {
     // Waechst die Liste auf EINER Seite, weichen die Digests wieder ab. Die Kongruenz beider Repos prueft der
     // Erzeuger; hier steht der Bestand dieser Seite ausdruecklich, damit eine Aenderung nie unbemerkt bleibt.
-    expect([...BINDUNGS_FELDER].sort()).toEqual(
-      ["amt", "anspruch", "domain", "governanceProjektion", "version"],
-    );
+    expect([...BINDUNGS_FELDER].sort()).toEqual([
+      "amt",
+      "anspruch",
+      "domain",
+      "governanceProjektion",
+      "version",
+    ]);
   });
 });

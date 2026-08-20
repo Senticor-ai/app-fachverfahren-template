@@ -121,15 +121,24 @@ function toDetail(c: AgenticComposable): ComposableDetailDto {
             ergebnis: s.ergebnis,
             ...(s.klasse !== undefined ? { klasse: s.klasse } : {}),
             ...(s.programm !== undefined ? { programm: s.programm } : {}),
-            ...(s.grundlagen !== undefined ? { grundlagen: [...s.grundlagen] } : {}),
+            ...(s.grundlagen !== undefined
+              ? { grundlagen: [...s.grundlagen] }
+              : {}),
             ...(s.evalSuite !== undefined ? { evalSuite: s.evalSuite } : {}),
             ...(s.erzeugtVon !== undefined ? { erzeugtVon: s.erzeugtVon } : {}),
-            ...(s.freigegebenVon !== undefined ? { freigegebenVon: s.freigegebenVon } : {}),
+            ...(s.freigegebenVon !== undefined
+              ? { freigegebenVon: s.freigegebenVon }
+              : {}),
           })),
         }
       : {}),
     ...(c.benutzt?.length
-      ? { benutzt: c.benutzt.map((k) => ({ wissen: k.wissen, werkzeug: k.werkzeug })) }
+      ? {
+          benutzt: c.benutzt.map((k) => ({
+            wissen: k.wissen,
+            werkzeug: k.werkzeug,
+          })),
+        }
       : {}),
   };
 }

@@ -122,10 +122,7 @@ export function AmtVerfahrenWikiPage(): React.JSX.Element {
   return (
     <Shell persona="sachbearbeitung" activeNavKey="akten">
       <section className="mx-auto w-full max-w-4xl px-6 py-6">
-        <Link
-          to="/amt/akten"
-          className="text-sm text-primary hover:underline"
-        >
+        <Link to="/amt/akten" className="text-sm text-primary hover:underline">
           ← Zu den Akten
         </Link>
         <h1 className="mt-3 text-lg font-semibold text-foreground">

@@ -98,12 +98,14 @@ async function wissenStoreMit(texte: string[]): Promise<{
   return { store, eintragIds };
 }
 
-async function chatApp(opts: {
-  composables?: AgenticComposable[];
-  wissenStore?: InMemoryWissenStore;
-  aiAssist?: AiAssistPort;
-  session?: ReturnType<typeof caseworkerSession>;
-} = {}) {
+async function chatApp(
+  opts: {
+    composables?: AgenticComposable[];
+    wissenStore?: InMemoryWissenStore;
+    aiAssist?: AiAssistPort;
+    session?: ReturnType<typeof caseworkerSession>;
+  } = {},
+) {
   return buildBffApp({
     session: opts.session ?? caseworkerSession(),
     composableRegistry: createInMemoryComposableRegistry(
@@ -223,7 +225,10 @@ describe("BFF Composable-Chat POST /api/composables/:id/chat", () => {
     const res = await app.inject({
       method: "POST",
       url: "/api/composables/musterverfahren/chat",
-      payload: { nachricht: "Erstelle einen Prüfvermerk.", antwortAlsDatei: true },
+      payload: {
+        nachricht: "Erstelle einen Prüfvermerk.",
+        antwortAlsDatei: true,
+      },
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
@@ -246,7 +251,11 @@ describe("BFF Composable-Chat POST /api/composables/:id/chat", () => {
       payload: {
         nachricht: "Prüfe.",
         dateien: [
-          { fileName: "leer.txt", mimeType: "text/plain", contentBase64: "!!!" },
+          {
+            fileName: "leer.txt",
+            mimeType: "text/plain",
+            contentBase64: "!!!",
+          },
         ],
       },
     });

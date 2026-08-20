@@ -82,9 +82,7 @@ export const TESTKONTEN: readonly TestkontoDeklaration[] = [
 
 /** Warum kein Testzugang ausgewiesen wird — jeder Grund ist eine bewusste Sperre, keine Panne. */
 export type TestzugangGrund =
-  | "produktivbetrieb"
-  | "kein-ephemerer-store"
-  | "kein-passwort";
+  "produktivbetrieb" | "kein-ephemerer-store" | "kein-passwort";
 
 export interface TestzugangKonto {
   readonly email: string;

@@ -104,7 +104,9 @@ export interface OidcRouteDeps {
   /** fetch injizierbar (Mock-IdP im Test). */
   fetchImpl?: typeof fetch;
   /** JWKS-Key-Resolver injizierbar (Test); PROD: createRemoteJWKSet(jwks_uri). */
-  keySetFor?: (jwksUri: string) => Parameters<typeof validateIdToken>[1]["keySet"];
+  keySetFor?: (
+    jwksUri: string,
+  ) => Parameters<typeof validateIdToken>[1]["keySet"];
   now?: () => Date;
 }
 

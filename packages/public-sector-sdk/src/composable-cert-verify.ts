@@ -35,7 +35,14 @@ export function stableStringify(v: unknown): string {
   if (typeof v !== "object") return JSON.stringify(v);
   if (Array.isArray(v)) return "[" + v.map(stableStringify).join(",") + "]";
   const o = v as Record<string, unknown>;
-  return "{" + Object.keys(o).sort().map((k) => JSON.stringify(k) + ":" + stableStringify(o[k])).join(",") + "}";
+  return (
+    "{" +
+    Object.keys(o)
+      .sort()
+      .map((k) => JSON.stringify(k) + ":" + stableStringify(o[k]))
+      .join(",") +
+    "}"
+  );
 }
 
 // ── Manifest-Typen (die EINE Identität einer zuständigen Stelle, CHOS mesh-derive/mesh-emit) ─────────────────────────
@@ -56,9 +63,28 @@ export interface MeshGovernanceProjektion {
   composableId?: string;
   domain?: string;
   regime?: { normativ?: boolean };
-  stellen?: { id: string; art?: string; zone?: string; akteur?: string; titel?: string }[];
-  regeln?: { id: string; label: string; art: string; class?: string; verify?: string; role?: string; requirement?: string }[];
-  capabilities?: { id: string; ergebnis: string; wissen?: string[]; evalSuite?: string }[];
+  stellen?: {
+    id: string;
+    art?: string;
+    zone?: string;
+    akteur?: string;
+    titel?: string;
+  }[];
+  regeln?: {
+    id: string;
+    label: string;
+    art: string;
+    class?: string;
+    verify?: string;
+    role?: string;
+    requirement?: string;
+  }[];
+  capabilities?: {
+    id: string;
+    ergebnis: string;
+    wissen?: string[];
+    evalSuite?: string;
+  }[];
   befugnis?: { entscheidung?: string; hitlPflicht?: boolean; aal?: number };
   faehigkeiten?: {
     ki?: string[];
@@ -142,9 +168,18 @@ export function verifyMeshGovernanceProjektion(
       `Die mitgereiste Verfassung trägt schemaVersion ${String(p.schemaVersion)} — dieser Träger versteht ${MESH_GOVERNANCE_PROJEKTION_SCHEMA_VERSION} (fail-closed statt Schema-Raten).`,
     );
   }
-  if (p.art !== "projektion") gruende.push("Die mitgereiste Verfassung gibt sich nicht als abgeleitete Projektion aus (art ≠ \"projektion\") — kein Vertrauen.");
-  if (typeof p.digest !== "string" || !p.digest) gruende.push("Die mitgereiste Verfassung trägt kein Siegel (digest) — nicht prüfbar, also nicht belastbar.");
-  if (p.composableId !== id) gruende.push(`Die mitgereiste Verfassung gehört zur Stelle „${String(p.composableId)}“, gemountet wird „${id}“ — inkongruent (fail-closed).`);
+  if (p.art !== "projektion")
+    gruende.push(
+      'Die mitgereiste Verfassung gibt sich nicht als abgeleitete Projektion aus (art ≠ "projektion") — kein Vertrauen.',
+    );
+  if (typeof p.digest !== "string" || !p.digest)
+    gruende.push(
+      "Die mitgereiste Verfassung trägt kein Siegel (digest) — nicht prüfbar, also nicht belastbar.",
+    );
+  if (p.composableId !== id)
+    gruende.push(
+      `Die mitgereiste Verfassung gehört zur Stelle „${String(p.composableId)}“, gemountet wird „${id}“ — inkongruent (fail-closed).`,
+    );
   if (gruende.length) return { vorhanden: true, intakt: false, gruende };
   if (!opts.sha256Hex) {
     return {
@@ -155,7 +190,9 @@ export function verifyMeshGovernanceProjektion(
       ],
     };
   }
-  const { digest, ...ohneSiegel } = p as Record<string, unknown> & { digest: string };
+  const { digest, ...ohneSiegel } = p as Record<string, unknown> & {
+    digest: string;
+  };
   const nachgerechnet = opts.sha256Hex(stableStringify(ohneSiegel));
   if (nachgerechnet !== digest) {
     return {
@@ -281,7 +318,13 @@ export function istMeshManifest(
 // Erzeuger-Repo (CHOS). Zwei Repos koennen keine Funktion teilen — aber sie koennen dieselbe Antwort schulden.
 // Weicht eine Seite ab, ist die Wirkung STILL und total (siehe oben). Wer hier etwas aendert, aendert es dort
 // mit; die Kongruenz-Probe im Erzeuger-Repo haelt beide Listen gegeneinander.
-export const BINDUNGS_FELDER = ["domain", "amt", "anspruch", "governanceProjektion", "version"] as const;
+export const BINDUNGS_FELDER = [
+  "domain",
+  "amt",
+  "anspruch",
+  "governanceProjektion",
+  "version",
+] as const;
 
 /** Rekursiv die Bindungs-Felder entfernen und kanonisch (schluessel-sortiert) serialisieren. Deterministisch:
  *  gleiche Definition ⇒ gleiche Bytes, unabhaengig von der Feld-Reihenfolge der Quelle. BYTE-GLEICH mit dem
@@ -407,7 +450,12 @@ export interface MeshCertVerifyOptions {
   sha256Hex?: (input: string) => string;
   /** INJIZIERTE public-only Ed25519-Verifikation (node:crypto beim Aufrufer): Nachricht = `${domain}\0${digestHex}`,
    *  `publicKey`/`signature` base64url. Die Autoritäts-/Form-Prüfung (Trust-Anker-Gleichheit, alg, Domäne) bleibt HIER. */
-  verifyEd25519?: (publicKey: string, domain: string, digestHex: string, signature: string | undefined) => boolean;
+  verifyEd25519?: (
+    publicKey: string,
+    domain: string,
+    digestHex: string,
+    signature: string | undefined,
+  ) => boolean;
   /** ÄLTERER, rückwärts-kompatibler HMAC-Injektions-Seam (nur genutzt, wenn KEINE asymmetrische Prüfung möglich ist). */
   verifySignature?: (payload: string, sig: string | undefined) => boolean;
   /** Kanonische Serialisierung des Statements für den HMAC-Payload (muss byte-gleich zur CHOS-Signier-Seite sein). */
@@ -513,7 +561,12 @@ export function verifyMeshCertStructure(
       att.alg === "Ed25519" &&
       typeof att.publicKey === "string" &&
       att.publicKey === opts.certSigningPublicKey &&
-      opts.verifyEd25519(att.publicKey, COMPOSABLE_CERT_SIGNATURE_DOMAIN, digest, att.sig);
+      opts.verifyEd25519(
+        att.publicKey,
+        COMPOSABLE_CERT_SIGNATURE_DOMAIN,
+        digest,
+        att.sig,
+      );
     if (okSig) signatureChecked = true;
     else {
       reasons.push(
@@ -539,7 +592,9 @@ export function verifyMeshCertStructure(
     signatureChecked,
     countersigned,
     governanceAttested: valid && !!bezeugterGovDigest,
-    ...(valid && bezeugterGovDigest ? { governanceSha256: bezeugterGovDigest } : {}),
+    ...(valid && bezeugterGovDigest
+      ? { governanceSha256: bezeugterGovDigest }
+      : {}),
     ...(valid && recomputedAxes ? { axes: recomputedAxes } : {}),
     ...(valid && st?.predicate?.finishedAt
       ? { finishedAt: st.predicate.finishedAt }

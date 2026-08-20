@@ -25,7 +25,9 @@ const TARIF = {
 };
 
 /** Ein mountbares Manifest — minimal, generisch, ohne Domaenen-Annahme. */
-function manifest(over: Partial<MeshComposableManifest> = {}): MeshComposableManifest {
+function manifest(
+  over: Partial<MeshComposableManifest> = {},
+): MeshComposableManifest {
   return {
     schemaVersion: 1,
     domain: "musterverfahren",
@@ -38,7 +40,11 @@ function manifest(over: Partial<MeshComposableManifest> = {}): MeshComposableMan
 }
 
 /** Ein nachgerechnetes Projektions-Verdikt, wie es der Mount-Pfad bildet. */
-const verdikt = (intakt: boolean, strukturiert: unknown[] = [TARIF], benutzt: unknown[] = []) => ({
+const verdikt = (
+  intakt: boolean,
+  strukturiert: unknown[] = [TARIF],
+  benutzt: unknown[] = [],
+) => ({
   vorhanden: true,
   intakt,
   projektion: { faehigkeiten: { strukturiert, benutzt } } as never,
@@ -52,13 +58,25 @@ describe("S6 · die Quelle der strukturierten Faehigkeits-Seite", () => {
   });
 
   it("Projektion vorhanden UND intakt → die Seite kommt aus der VERSIEGELTEN Quelle", () => {
-    const m = manifest({ governanceProjektion: { composableId: "sachbearbeitung" } as never });
+    const m = manifest({
+      governanceProjektion: { composableId: "sachbearbeitung" } as never,
+    });
     const c = mapManifestToComposable(m, {
-      governance: verdikt(true, [TARIF], [{ wissen: "unterlagen-lesen", werkzeug: "steuer-tarif" }]),
+      governance: verdikt(
+        true,
+        [TARIF],
+        [{ wissen: "unterlagen-lesen", werkzeug: "steuer-tarif" }],
+      ),
     });
     expect(c.strukturiert).toHaveLength(1);
-    expect(c.strukturiert?.[0]).toMatchObject({ id: "steuer-tarif", klasse: "tarif", programm: "tarif:staffel" });
-    expect(c.benutzt).toEqual([{ wissen: "unterlagen-lesen", werkzeug: "steuer-tarif" }]);
+    expect(c.strukturiert?.[0]).toMatchObject({
+      id: "steuer-tarif",
+      klasse: "tarif",
+      programm: "tarif:staffel",
+    });
+    expect(c.benutzt).toEqual([
+      { wissen: "unterlagen-lesen", werkzeug: "steuer-tarif" },
+    ]);
   });
 
   it("FAIL-CLOSED: Siegel gebrochen → die Seite bleibt leer, auch wenn der Manifest-Block etwas behauptet", () => {
@@ -66,7 +84,10 @@ describe("S6 · die Quelle der strukturierten Faehigkeits-Seite", () => {
     // Ein Rueckfall auf den unversiegelten Block waere der Umweg, der das Siegel wertlos machte.
     const m = manifest({
       governanceProjektion: { composableId: "sachbearbeitung" } as never,
-      faehigkeiten: { ki: ["unterlagen-lesen"], strukturiert: [{ ...TARIF, id: "untergeschoben" }] } as never,
+      faehigkeiten: {
+        ki: ["unterlagen-lesen"],
+        strukturiert: [{ ...TARIF, id: "untergeschoben" }],
+      } as never,
     });
     const c = mapManifestToComposable(m, { governance: verdikt(false) });
     expect(c.strukturiert).toBeUndefined();
@@ -75,7 +96,10 @@ describe("S6 · die Quelle der strukturierten Faehigkeits-Seite", () => {
   it("FAIL-CLOSED: Projektion vorhanden, aber KEIN Verdikt uebergeben → ungeprueft ist keine Quelle", () => {
     const m = manifest({
       governanceProjektion: { composableId: "sachbearbeitung" } as never,
-      faehigkeiten: { ki: ["unterlagen-lesen"], strukturiert: [TARIF] } as never,
+      faehigkeiten: {
+        ki: ["unterlagen-lesen"],
+        strukturiert: [TARIF],
+      } as never,
     });
     expect(mapManifestToComposable(m).strukturiert).toBeUndefined();
   });
@@ -110,7 +134,10 @@ describe("S6 · die Quelle der strukturierten Faehigkeits-Seite", () => {
       faehigkeiten: {
         ki: ["unterlagen-lesen"],
         strukturiert: [{ ergebnis: "ohne id" }, TARIF, null],
-        benutzt: [{ wissen: "unterlagen-lesen" }, { wissen: "unterlagen-lesen", werkzeug: "steuer-tarif" }],
+        benutzt: [
+          { wissen: "unterlagen-lesen" },
+          { wissen: "unterlagen-lesen", werkzeug: "steuer-tarif" },
+        ],
       } as never,
     });
     const c = mapManifestToComposable(m);
