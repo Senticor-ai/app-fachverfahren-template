@@ -23,9 +23,20 @@ esac
 # (Vorlage/Konsument-Checks, Builds, Web-Delivery), das der Scaffolded-App-CI-Harness pro PR fährt.
 CI_PROFILE="${CI_PROFILE:-full}"
 
+# BAUEN VOR PRUEFEN. `check:precommit` enthaelt `check:procedure-contract`, und dieser Pruefer laedt
+# `apps/*/server/procedure.config.ts`, die ihrerseits `@senticor/public-sector-sdk` ueber den PAKETNAMEN
+# importiert — aufgeloest also nach `dist/index.js`. Ohne vorherigen Bau gibt es dieses `dist/` nicht.
+#
+# Im Hauptrepo fiel das nie auf: dort liegt ein `dist/` aus frueheren Bauten herum, der Pruefer fand es,
+# und die Reihenfolge sah richtig aus. In einer FRISCH erzeugten App gibt es keinen Altbestand — `dist/`
+# steht in den `ignoredNames` des Scaffolds und wird bewusst nicht mitkopiert. GEMESSEN fiel
+# `test:generated-app-ci` dort mit ERR_MODULE_NOT_FOUND auf `@senticor/public-sector-sdk/dist/index.js`.
+#
+# Eine Pruefung, die gebauten Code braucht, kann nicht vor dem Bau stehen. Dass sie es hier konnte,
+# lag an einem Nebenprodukt der Entwicklungsumgebung — nicht an der Ordnung.
+pnpm run build:packages
 pnpm run check:precommit
 pnpm run check:dockerfile-paths
-pnpm run build:packages
 pnpm run build:app
 pnpm run build:server
 pnpm run check:web-delivery
