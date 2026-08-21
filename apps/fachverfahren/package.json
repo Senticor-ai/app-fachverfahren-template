@@ -69,6 +69,12 @@
         "startScript": "start",
         "portEnv": "PORT",
         "defaultPort": 8080,
+        "extraPorts": [
+          {
+            "env": "INTERNAL_PORT",
+            "defaultPort": 9090
+          }
+        ],
         "healthPath": "/auth/status",
         "gateProbePath": "/auth/session",
         "proxyTargetEnv": "VITE_DEV_API_PROXY_TARGET",

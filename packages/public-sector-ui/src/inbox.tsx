@@ -20,7 +20,19 @@ import { SavedViewsToolbar, type SavedView } from "./workspace.js";
 // ganze Zeile per Enter/Space aktivierbar, Zahlen mit tabular-nums (ps-num). Reine, geprüfte Komponenten —
 // der Motor komponiert daraus Sachbearbeitungs-Screens.
 
-/** Fachstatus eines Vorgangs (steuert Sortierung, Filter und die Status-Darstellung). */
+/**
+ * Fachstatus einer Zeile dieser Arbeitsliste (steuert Sortierung, Filter und die Status-Darstellung).
+ *
+ * ACHTUNG — DAS IST NICHT DER VORGANGS-STATUS DER ANWENDUNG. Diese drei Wörter sind das PROP-Vokabular
+ * einer domänen-neutralen Referenz-Komponente: `public-sector-ui` ist die Storybook-/Design-Fläche und
+ * ist KEINE Abhängigkeit von `apps/fachverfahren` (geprüft: die App importiert das Paket nicht). Der
+ * echte Vorgangs-Status ist ein offener `string` aus `ProcedureVersion.allowedStates` und damit
+ * verfahrens-variabel (siehe `Case.state` in public-sector-sdk/domain-kernel.ts).
+ *
+ * Wer diese Komponente in einer echten App montiert, MAPPT den Fall-Zustand des Verfahrens auf diese
+ * Anzeige-Klassen (n → 3) — er tauscht sie nicht gegen sie aus und erweitert sie nicht um die Zustände
+ * eines einzelnen Verfahrens. Sonst wandert Fachvokabular EINES Verfahrens in die neutrale Vorlage.
+ */
 export type CaseRowStatus = "offen" | "in-pruefung" | "entschieden";
 
 export interface CaseRow {

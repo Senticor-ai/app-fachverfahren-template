@@ -5,6 +5,11 @@
 // Lebenszyklus der Aufgabe. `data`/`dataPatch` sind frei-formig — nur DORT ist additionalProperties erlaubt.
 import { Type, type Static } from "@sinclair/typebox";
 
+/** Der Aufgaben-Lebenszyklus als LAUFZEIT-Schema. Die fachliche Wahrheit dieser vier Wörter ist
+ *  `TaskState` in public-sector-sdk/domain-kernel.ts (dort steht auch, warum es sie überhaupt als
+ *  Union geben darf: verfahrens-UNABHÄNGIG, anders als der Vorgangs-Status). Diese Wire-Schicht hängt
+ *  bewusst NUR an typebox und darf den Kernel nicht importieren — es ist dieselbe Menge in anderer
+ *  Darstellung, keine zweite Meinung. Änderung hier ⇒ auch dort und in app-store-postgres. */
 export const TaskStateSchema = Type.Union([
   Type.Literal("open"),
   Type.Literal("claimed"),

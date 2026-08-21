@@ -159,6 +159,7 @@ export {
   VermerkListDtoSchema,
   VermerkQuelleSchema,
   VermerkRequestSchema,
+  VermerkReviewEntscheidungSchema,
   VermerkReviewRequestSchema,
   VermerkReviewStatusSchema,
   VermerkSichtbarkeitSchema,
@@ -170,7 +171,9 @@ export {
   type VermerkKind,
   type VermerkListDto,
   type VermerkRequestDto,
+  type VermerkReviewEntscheidung,
   type VermerkReviewRequestDto,
+  type VermerkReviewStatus,
   type WissenEintragDto,
   type WissenExportDto,
 } from "./vermerke.js";

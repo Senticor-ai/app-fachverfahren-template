@@ -13,7 +13,10 @@ import {
   ErrorState,
   SkeletonCard,
 } from "@senticor/fachverfahren-kit";
-import type { VermerkDto } from "@senticor/app-bff-contracts";
+import type {
+  VermerkDto,
+  VermerkReviewEntscheidung,
+} from "@senticor/app-bff-contracts";
 import { casePort } from "../app/case-port.js";
 import type {
   CaseAllowedActions,
@@ -143,7 +146,7 @@ export function AmtAktePage(): React.JSX.Element {
     [id, silentReload],
   );
   const handleReview = useCallback(
-    async (vermerkId: string, entscheidung: "bestaetigt" | "verworfen") => {
+    async (vermerkId: string, entscheidung: VermerkReviewEntscheidung) => {
       await casePort.reviewVermerk(id, vermerkId, { entscheidung });
       await silentReload();
     },

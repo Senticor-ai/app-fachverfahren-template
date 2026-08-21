@@ -19,7 +19,12 @@ import type {
   VermerkReviewRequestDto,
 } from "@senticor/app-bff-contracts";
 
-/** Fall/Dossier-Zusammenfassung — 1:1 zur BFF-`CaseDto`. */
+/** Fall/Dossier-Zusammenfassung — 1:1 zur BFF-`CaseDto`.
+ *
+ *  `state` ist ABSICHTLICH ein offener `string` und KEINE Literal-Union: der Vorgangs-Status ist
+ *  verfahrens-VARIABEL und kommt als DATEN aus `ProcedureVersion.allowedStates` (abgeleitet aus
+ *  leistung.contract.json bzw. BPMN). Eine Aufzählung hier wäre eine zweite Wahrheit über den
+ *  Lebenszyklus und würde jede generierte App auf das Vokabular der Vorlage festnageln. */
 export interface CaseSummary {
   caseId: string;
   procedureId: string;
@@ -31,8 +36,10 @@ export interface CaseSummary {
   closedAt: string | null;
 }
 
-/** Lebenszyklus einer Aufgabe (fester Server-Vertrag). */
-export type CaseTaskState = "open" | "claimed" | "completed" | "cancelled";
+/** Lebenszyklus einer Aufgabe (fester Server-Vertrag) — ABGELEITET aus dem Wire-Vertrag, nicht
+ *  nachgetippt. Der Dateikopf verbietet das Duplizieren der DTOs; für diese vier Wörter war die
+ *  Regel gebrochen (eine von vier gemessenen Definitionen derselben Menge). */
+export type CaseTaskState = TaskDto["state"];
 
 /** Aufgabe/Ziel/Schritt/Termin einer Akte — 1:1 zur BFF-`TaskDto`. `taskKind` ist frei
  *  (dossier-/verfahrensdefiniert: aufgabe|ziel|checkliste-item|termin), `data` frei-formig. */

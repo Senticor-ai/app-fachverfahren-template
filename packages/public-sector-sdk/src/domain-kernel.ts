@@ -197,6 +197,28 @@ export interface Case {
   tenantId: string;
   authorityId: string;
   jurisdictionId: string;
+  /**
+   * DER VORGANGS-STATUS — und er ist ABSICHTLICH ein offener `string`, KEINE Literal-Union.
+   *
+   * WARUM (die Naht, damit sie niemand erneut ausgraben muss): der Lebenszyklus eines Vorgangs ist
+   * verfahrens-VARIABEL und wird ABGELEITET, nicht im Template festgeschrieben. Die Kette ist:
+   *   Fachkonzept (stateDiagram-v2 / BPMN)
+   *     → CHOS-Governance verlangt das Kapitel `vorgangs-lebenszyklus` (cognitive-hive.governance.yaml)
+   *     → das Gate `statusmachine-kongruent` verbietet ERFUNDENE Zustände (jeder state.key/label muss
+   *       normalisiert im Fachkonzept vorkommen) und friert die Wahrheit als .chos/prozess-states.json ein
+   *     → leistung.config.statusMachine → leistung.contract.json (`zustellung` + `statusMachine`)
+   *     → apps/<app>/server/procedure.config.ts liest den Vertrag (antragQuelleAusVertrag)
+   *     → statusMachineToProcedureVersion → `ProcedureVersion.allowedStates` / `allowedTransitions`
+   *     → `transitionCase` prüft `state` GEGEN DIESE DATEN.
+   *
+   * Deshalb gilt: die zulässigen Worte stehen in den DATEN der `ProcedureVersion`, niemals in einem
+   * Typ dieses Kernels. Jede Literal-Union hier wäre eine zweite Wahrheit über den Lebenszyklus und
+   * würde jede generierte Anwendung auf das Vokabular der neutralen Vorlage festnageln.
+   *
+   * NICHT VERWECHSELN: der Vorgangs-Status ist WEDER der Lauf-Status der Fabrik (den kennt das KIT
+   * bewusst nicht — der Lauf-Lebenszyklus ist Sache der Fabrik, nicht der erzeugten Anwendung) NOCH
+   * der Freigabe-Zustand (der ist hier eine ZAHL: `requiredApprovals`, siehe `CaseTransition`).
+   */
   state: string;
   version: number;
   subjectIds: string[];
@@ -243,11 +265,28 @@ export interface CaseTransition {
   guard?: Bedingung;
 }
 
+/**
+ * Der Lebenszyklus einer AUFGABE — im Gegensatz zum Vorgangs-Status ein FESTES, verfahrens-
+ * UNABHÄNGIGES Vokabular (eine Aufgabe ist offen, übernommen, erledigt oder abgebrochen — das gilt
+ * in jedem Fachverfahren gleich). Darum darf es hier als Union stehen: es ist NICHTS, was ein
+ * Fachkonzept variiert, also auch nichts, was aus der Governance abgeleitet werden könnte.
+ *
+ * DIES IST DIE EINE WAHRHEIT dafür. Gemessen gab es vier Definitionen derselben vier Wörter. Zwei
+ * davon MÜSSEN struktur-bedingt eigene Kopien bleiben, weil die Pakete absichtlich abhängigkeitsfrei
+ * sind und diesen Kernel NICHT importieren dürfen:
+ *   - `app-bff-contracts` (TaskStateSchema): reine Wire-Schicht, hängt nur an typebox. Braucht ohnehin
+ *     ein LAUFZEIT-Schema, kein Typ — die Kopie ist eine andere Darstellungsform, keine zweite Meinung.
+ *   - `app-store-postgres` (TaskState): Speicher-Schicht ohne interne Abhängigkeiten.
+ * Wer diese vier Wörter ändert, MUSS alle drei Stellen ändern; das Wire-Schema ist dabei die Form, die
+ * `check:openapi` byte-genau festhält. Konsumenten mit Abhängigkeit (App/BFF) leiten ab statt zu tippen.
+ */
+export type TaskState = "open" | "claimed" | "completed" | "cancelled";
+
 export interface Task {
   taskId: string;
   caseId: string;
   title: string;
-  state: "open" | "claimed" | "completed" | "cancelled";
+  state: TaskState;
   assignedTo?: string;
   dueAt?: string;
 }

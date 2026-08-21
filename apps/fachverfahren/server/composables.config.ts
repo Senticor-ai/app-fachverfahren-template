@@ -59,6 +59,36 @@ export function createComposableRegistry(
     log(
       `[composables] ${mounted.length} Stelle(n) gemountet, ${uebersprungen.length} fail-closed übersprungen: ${uebersprungen.map((u) => `${u.file} (${u.grund})`).join(" · ")}`,
     );
+  } else {
+    // DER ERFOLG WAR STUMM — und damit war der Null-Zustand von aussen nicht vom Erfolg zu unterscheiden.
+    //
+    // GEMESSEN (2026-07-30, erzeugtes Verfahren `grundsteuer`): der Server lief mit 0 gemounteten Stellen, weil sein
+    // kompiliertes `dist-server` ZWEI TAGE aelter war als seine Quelle und noch den alten, relativ aufgeloesten
+    // Mount-Pfad trug. Nach dem Neubau montierten 9 von 9 Manifesten, 0 uebersprungen. Beide Zustaende sahen im
+    // Betrieb IDENTISCH aus: der Rueckfall-Zweig meldet nur die Abwesenheit, und die 9 Muster-Composables des Kits
+    // tragen dieselben Namen wie die generierten Stellen — es gab keine Zeile, an der man den Unterschied sah.
+    //
+    // Eine Zusicherung braucht ihre POSITIV-KONTROLLE. Deshalb sagt der Erfolg jetzt, WIE VIELE Stellen aus WELCHEM
+    // Verzeichnis leben und WIE sie heissen. Das ist die einzige Zeile, an der ein Betrieb den Unterschied zwischen
+    // „die generierten Stellen arbeiten" und „das Template-Muster arbeitet" ablesen kann.
+    // UND DIE VIERTE ZAHL, die bisher fehlte: GEMOUNTET ist nicht WAEHLBAR.
+    //
+    // GEMESSEN (2026-07-30, drei erzeugte Verfahren): 6/6, 8/8 und 9/9 Manifeste gemountet, 0 uebersprungen — und
+    // `registry.listEnabled()` = 0 an ALLEN dreien. Die Laufzeit-Auswahl geht ueber `istEnabled` (status ∈
+    // certified|active); die generierten Stellen stehen im Lebenszyklus auf `incubated`/`candidate`. Drei
+    // uebereinstimmende Mount-Zahlen koennen also vollstaendig taeuschen, weil der Konsument nach einem VIERTEN
+    // Kriterium auswaehlt. Diese Zeile ist der Ort, an dem ein Betrieb das sieht.
+    const waehlbar = mounted.filter(
+      (c) => c.status === "certified" || c.status === "active",
+    );
+    const stati = [
+      ...new Set(mounted.map((c) => String(c.status ?? "(ohne status)"))),
+    ].sort();
+    log(
+      `[composables] ${mounted.length} generierte Stelle(n) gemountet aus ${dir}: ${mounted.map((c) => c.id).join(", ")}` +
+        ` — davon ${waehlbar.length} laufzeit-waehlbar (status: ${stati.join("/")}` +
+        `${waehlbar.length === 0 ? "; waehlbar wird eine Stelle mit certified/active, also ueber eine Zertifizierung — nicht ueber ein Flag" : ""}).`,
+    );
   }
   // ARCHETYP-BRUCH benennen — unabhängig davon, ob gemountet oder zurückgefallen wurde.
   //
