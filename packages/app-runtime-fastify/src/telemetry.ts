@@ -7,7 +7,11 @@
 // Pakete: kleinere Abhängigkeit, keine Monkey-Patches, und der Span-Vertrag bleibt in unserem Code sichtbar.
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
-import { Resource } from "@opentelemetry/resources";
+// `Resource` war bis OTel 1.x eine KLASSE (`new Resource({...})`). In 2.x ist der Name nur noch ein
+// TYP; die Fabrik heisst `resourceFromAttributes`. GEMESSEN an resources@2.7.1:
+//   export type { Resource } … · export { resourceFromAttributes, defaultResource, emptyResource }
+// `tsc` benennt das genau: „'Resource' only refers to a type, but is being used as a value here."
+import { resourceFromAttributes } from "@opentelemetry/resources";
 import type { BuildInfo } from "./config.js";
 import { logInfo } from "./logging.js";
 
@@ -28,7 +32,7 @@ export function startTelemetry(input: {
   if (!endpoint) return undefined;
   const serviceName = env["OTEL_SERVICE_NAME"]?.trim() || input.serviceName;
   const sdk = new NodeSDK({
-    resource: new Resource({
+    resource: resourceFromAttributes({
       "service.name": serviceName,
       "service.version": input.buildInfo.version,
     }),

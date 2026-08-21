@@ -68,12 +68,18 @@ export function registerStaticDelivery(
     // Delivery-Vertrag verlangt /.well-known/security.txt (check-web-delivery).
     dotfiles: "allow",
     serveDotFiles: true,
+    // `res` ist seit @fastify/static v10 eine Fastify-`Reply`, nicht mehr die rohe Node-Antwort.
+    // GEMESSEN an v10.1.3: `constructor.name === "_Reply"`, `typeof res.header === "function"`,
+    // `typeof res.setHeader === "undefined"`. Unter v9 lief hier `res.setHeader(...)`; unter v10 warf
+    // das `TypeError: res.setHeader is not a function` — INNERHALB des Plugins, also als unbehandelte
+    // Ablehnung. Die zwoelf Zeugen des Delivery-Vertrags liefen daraufhin in ihr 20-s-Zeitlimit, statt
+    // eine Meldung zu zeigen: der Fehler erreichte den Aufrufer nie.
     setHeaders: (res, filePath) => {
-      res.setHeader(
+      res.header(
         "cache-control",
         cachePolicyForFile(config.staticDir, filePath),
       );
-      res.setHeader("content-type", contentType(filePath));
+      res.header("content-type", contentType(filePath));
     },
   });
   app.setNotFoundHandler(async (request, reply) => {

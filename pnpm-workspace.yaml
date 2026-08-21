@@ -83,7 +83,18 @@ overrides:
   "@opentelemetry/sdk-node": ^0.217.0
   "@opentelemetry/exporter-prometheus": ^0.217.0
   "@opentelemetry/propagator-jaeger": ^2.9.0
+  # DIE LINIE MUSS GANZ MITKOMMEN. `sdk-node@0.217` bringt die 2.x-Reihe mit, waehrend andere Pfade
+  # weiter 1.30.1 zogen — GEMESSEN standen `resources`, `sdk-trace-base`, `core` und `sdk-metrics`
+  # mit ZWEI Linien im Baum. Das ist kein Kosmetik-Problem: `tsc` meldete
+  # „Property 'getRawAttributes' is missing in type Resource (1.30.1) but required in Resource (2.7.1)" —
+  # zwei Fassungen desselben Typs, und die Naht dazwischen ist der Telemetrie-Aufbau.
+  "@opentelemetry/resources": ^2.7.1
+  "@opentelemetry/sdk-trace-base": ^2.7.1
+  "@opentelemetry/core": ^2.7.1
+  "@opentelemetry/sdk-metrics": ^2.7.1
+  "@opentelemetry/exporter-trace-otlp-http": ^0.217.0
   # NACHZUG DER DRITTEN CHARGE: das neue OTel-SDK bringt `protobufjs` 8.0.1 mit, und das traegt selbst
   # zwei Meldungen (behoben in 8.4.1). Ein Sprung, der eine Verwundbarkeit schliesst, kann eine neue
   # EINSCHLEPPEN — deshalb wurde nach der Charge erneut gescannt, statt die Zahl von vorher zu glauben.
   protobufjs: ^8.4.1
+  "@fastify/static": ^10.1.1
