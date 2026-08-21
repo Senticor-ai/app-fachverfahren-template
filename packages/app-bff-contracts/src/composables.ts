@@ -111,6 +111,44 @@ export const ComposableDetailDtoSchema = Type.Object(
       },
       { additionalProperties: false },
     ),
+    /** DIE STRUKTURIERTE FAEHIGKEITS-SEITE — gleichrangig zur Wissensseite (`spine.skills`).
+     *
+     *  MUSS HIER STEHEN: dieses Schema traegt `additionalProperties: false`, und Fastify wirft Undeklariertes
+     *  STILL weg. Ein Feld, das der Mapper korrekt setzt und der Serializer schweigend entfernt, sieht auf der
+     *  Flaeche exakt so aus wie „gibt es nicht" — nur dass niemand den Unterschied bemerkt.
+     *
+     *  ES REIST DER ANSPRUCH: `programm` ist eine Kennung, nie der Koerper. Die Darstellung (Tarif-Tabelle,
+     *  DMN, Formel, Code) bleibt beim Herausgeber; dieses Kit hat sie nicht und soll sie nicht haben. */
+    strukturiert: Type.Optional(
+      Type.Array(
+        Type.Object(
+          {
+            id: Type.String({ minLength: 1 }),
+            ergebnis: Type.String(),
+            klasse: Type.Optional(Type.String()),
+            programm: Type.Optional(Type.String()),
+            grundlagen: Type.Optional(Type.Array(Type.String())),
+            evalSuite: Type.Optional(Type.String()),
+            /** Erzeugt, aber nicht freigegeben ⇒ der Betreiber betriebe eine ungelesene Regel. Sichtbar. */
+            erzeugtVon: Type.Optional(Type.String()),
+            freigegebenVon: Type.Optional(Type.String()),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+    ),
+    /** WERKZEUG-KANTEN: welche Wissens-Faehigkeit welches Programm aufruft. */
+    benutzt: Type.Optional(
+      Type.Array(
+        Type.Object(
+          {
+            wissen: Type.String({ minLength: 1 }),
+            werkzeug: Type.String({ minLength: 1 }),
+          },
+          { additionalProperties: false },
+        ),
+      ),
+    ),
   },
   { additionalProperties: false },
 );

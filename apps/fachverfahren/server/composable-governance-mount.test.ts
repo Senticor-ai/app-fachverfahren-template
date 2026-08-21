@@ -50,7 +50,9 @@ function projektion(
     composableId: ID,
     domain: "musterverfahren",
     regime: { normativ: true },
-    stellen: [{ id: ID, art: "flaeche", zone: "sachbearbeitung", akteur: "beide" }],
+    stellen: [
+      { id: ID, art: "flaeche", zone: "sachbearbeitung", akteur: "beide" },
+    ],
     regeln: [
       {
         id: "vier-augen-bescheid",
@@ -82,7 +84,11 @@ function manifest(
     akteur: "beide",
     governance: {
       regeln: [
-        { id: "vier-augen-bescheid", label: "Vier-Augen vor Bescheid", art: "verbindlich" },
+        {
+          id: "vier-augen-bescheid",
+          label: "Vier-Augen vor Bescheid",
+          art: "verbindlich",
+        },
       ],
     },
     faehigkeiten: { ki: ["antrag_pruefen"], autonomie: "AAL-3" },
@@ -109,7 +115,9 @@ describe("② AUFRUF — die Befugnis ist die Achse, nicht die Regel-Klasse", ()
     expect(c.spine?.autonomy).toBe("AAL-2");
     expect(c.spine?.aufgaben).toContain("pruefung");
     // Der nichtScope sagt es dem Fachbereich in Klartext.
-    expect(c.outcome.nichtScope.join(" ")).toContain("autonome rechtsnahe Entscheidung");
+    expect(c.outcome.nichtScope.join(" ")).toContain(
+      "autonome rechtsnahe Entscheidung",
+    );
   });
 
   it("die Kappung ist SICHTBAR (Provenienz), nicht still", () => {
@@ -120,14 +128,20 @@ describe("② AUFRUF — die Befugnis ist die Achse, nicht die Regel-Klasse", ()
   });
 
   it("`entwurf-only` (der Mensch führt) macht ebenfalls rechtsnah — die Achse ist die Entscheidung, nicht das Label", () => {
-    const m = manifest({ befugnis: { entscheidung: "entwurf-only", hitlPflicht: true } });
+    const m = manifest({
+      befugnis: { entscheidung: "entwurf-only", hitlPflicht: true },
+    });
     expect(manifestSpineAufgaben(m)).toContain("pruefung");
   });
 
   it("ÜBERBLOCKUNG: eine NICHT-rechtsnahe Stelle behält ihre deklarierte Autonomie und wird nicht verworfen", () => {
     const auskunft = manifest({
       id: "buerger",
-      governance: { regeln: [{ id: "barrierefrei", label: "Barrierefreiheit", art: "optional" }] },
+      governance: {
+        regeln: [
+          { id: "barrierefrei", label: "Barrierefreiheit", art: "optional" },
+        ],
+      },
       befugnis: { entscheidung: "keine", hitlPflicht: false },
     });
     const c = mapManifestToComposable(auskunft);
@@ -139,11 +153,16 @@ describe("② AUFRUF — die Befugnis ist die Achse, nicht die Regel-Klasse", ()
     // Der gefährliche Fall: die Rechtsnah-Decke darf einen Widerspruch zur Plattform-Obergrenze nicht in ein
     // stilles Kappen verwandeln. AAL-4 ist keine Kappungs-, sondern eine Verwerfungs-Frage.
     expect(() =>
-      mapManifestToComposable(manifest({ faehigkeiten: { ki: ["x"], autonomie: "AAL-4" } })),
+      mapManifestToComposable(
+        manifest({ faehigkeiten: { ki: ["x"], autonomie: "AAL-4" } }),
+      ),
     ).toThrow(/AAL-3/);
     expect(() =>
       mapManifestToComposable(
-        manifest({ faehigkeiten: { ki: ["x"], autonomie: "AAL-4" }, befugnis: { entscheidung: "keine", hitlPflicht: false } }),
+        manifest({
+          faehigkeiten: { ki: ["x"], autonomie: "AAL-4" },
+          befugnis: { entscheidung: "keine", hitlPflicht: false },
+        }),
       ),
     ).toThrow(/AAL-3/);
   });
@@ -152,7 +171,10 @@ describe("② AUFRUF — die Befugnis ist die Achse, nicht die Regel-Klasse", ()
 describe("① MOUNT — die mitgereiste Verfassung wird nachgerechnet, nicht geglaubt", () => {
   it("eine unveränderte Projektion ist vorhanden ∧ intakt (der Wächter blockt den Normalfall nicht)", () => {
     const p = projektion();
-    const v = verifyMeshGovernanceProjektion(p, { composableId: ID, sha256Hex });
+    const v = verifyMeshGovernanceProjektion(p, {
+      composableId: ID,
+      sha256Hex,
+    });
     expect(v.vorhanden).toBe(true);
     expect(v.intakt).toBe(true);
     expect(v.digest).toBe(p.digest);
@@ -160,8 +182,14 @@ describe("① MOUNT — die mitgereiste Verfassung wird nachgerechnet, nicht geg
 
   it("TAMPER: eine unterwegs gelockerte Befugnis bricht das Siegel", () => {
     const p = projektion();
-    const gefaelscht = { ...p, befugnis: { ...p.befugnis, hitlPflicht: false } };
-    const v = verifyMeshGovernanceProjektion(gefaelscht, { composableId: ID, sha256Hex });
+    const gefaelscht = {
+      ...p,
+      befugnis: { ...p.befugnis, hitlPflicht: false },
+    };
+    const v = verifyMeshGovernanceProjektion(gefaelscht, {
+      composableId: ID,
+      sha256Hex,
+    });
     expect(v.vorhanden).toBe(true);
     expect(v.intakt).toBe(false);
     expect(v.gruende.join(" ")).toMatch(/verändert/);
@@ -169,12 +197,18 @@ describe("① MOUNT — die mitgereiste Verfassung wird nachgerechnet, nicht geg
 
   it("TAMPER: eine heimlich entfernte Schutzregel bricht das Siegel ebenso", () => {
     const p = projektion();
-    const v = verifyMeshGovernanceProjektion({ ...p, regeln: [] }, { composableId: ID, sha256Hex });
+    const v = verifyMeshGovernanceProjektion(
+      { ...p, regeln: [] },
+      { composableId: ID, sha256Hex },
+    );
     expect(v.intakt).toBe(false);
   });
 
   it("eine Projektion für eine ANDERE Stelle ist inkongruent (fail-closed)", () => {
-    const v = verifyMeshGovernanceProjektion(projektion(), { composableId: "aufsicht", sha256Hex });
+    const v = verifyMeshGovernanceProjektion(projektion(), {
+      composableId: "aufsicht",
+      sha256Hex,
+    });
     expect(v.intakt).toBe(false);
     expect(v.gruende.join(" ")).toMatch(/inkongruent/);
   });
@@ -189,13 +223,18 @@ describe("① MOUNT — die mitgereiste Verfassung wird nachgerechnet, nicht geg
   });
 
   it("GEGENPROBE: OHNE injizierte sha256-Funktion gilt „ungeprüft“ NICHT als „in Ordnung“", () => {
-    const v = verifyMeshGovernanceProjektion(projektion(), { composableId: ID });
+    const v = verifyMeshGovernanceProjektion(projektion(), {
+      composableId: ID,
+    });
     expect(v.intakt).toBe(false);
     expect(v.gruende.join(" ")).toMatch(/nicht nachgerechnet/);
   });
 
   it("ÜBERBLOCKUNG: eine Stelle OHNE Projektion (Alt-Bestand) ist „nicht vorhanden“ — kein Mount-Blocker", () => {
-    const v = verifyMeshGovernanceProjektion(undefined, { composableId: ID, sha256Hex });
+    const v = verifyMeshGovernanceProjektion(undefined, {
+      composableId: ID,
+      sha256Hex,
+    });
     expect(v.vorhanden).toBe(false);
     expect(v.gruende.join(" ")).toMatch(/behauptet nichts/);
   });
@@ -203,7 +242,10 @@ describe("① MOUNT — die mitgereiste Verfassung wird nachgerechnet, nicht geg
 
 /** Ein in-toto-Verdikt mit beiden Subjekten (Manifest + Governance) — strukturell gültig, aber unverdient
  *  (earned:false), weil es hier nur um die SUBJEKT-Achse geht. */
-function verdikt(opts: { govDigest?: string | undefined; manifestSha256: string }): MeshCertFile {
+function verdikt(opts: {
+  govDigest?: string | undefined;
+  manifestSha256: string;
+}): MeshCertFile {
   return {
     statement: {
       _type: IN_TOTO_STATEMENT_TYPE,
@@ -211,7 +253,12 @@ function verdikt(opts: { govDigest?: string | undefined; manifestSha256: string 
       subject: [
         { name: ID, digest: { sha256: opts.manifestSha256 } },
         ...(opts.govDigest
-          ? [{ name: meshCertGovernanceSubject(ID), digest: { sha256: opts.govDigest } }]
+          ? [
+              {
+                name: meshCertGovernanceSubject(ID),
+                digest: { sha256: opts.govDigest },
+              },
+            ]
           : []),
       ],
       predicate: {
@@ -230,41 +277,56 @@ describe("① MOUNT — das Verdikt bezeugt, unter WELCHER Governance zertifizie
 
   it("mit passendem `<id>#governance`-Subjekt gilt die Governance als bezeugt", () => {
     const p = projektion();
-    const v = verifyMeshCertStructure(verdikt({ govDigest: p.digest ?? undefined, manifestSha256: MANIFEST_SHA }), {
-      composableId: ID,
-      manifestSha256: MANIFEST_SHA,
-      governanceSha256: p.digest ?? null,
-    });
+    const v = verifyMeshCertStructure(
+      verdikt({
+        govDigest: p.digest ?? undefined,
+        manifestSha256: MANIFEST_SHA,
+      }),
+      {
+        composableId: ID,
+        manifestSha256: MANIFEST_SHA,
+        governanceSha256: p.digest ?? null,
+      },
+    );
     expect(v.governanceAttested).toBe(true);
     expect(v.governanceSha256).toBe(p.digest);
   });
 
   it("ein Verdikt, das eine ANDERE Governance bezeugt, ist ungültig (ausgetauschte Verfassung)", () => {
-    const v = verifyMeshCertStructure(verdikt({ govDigest: "c".repeat(64), manifestSha256: MANIFEST_SHA }), {
-      composableId: ID,
-      manifestSha256: MANIFEST_SHA,
-      governanceSha256: projektion().digest ?? null,
-    });
+    const v = verifyMeshCertStructure(
+      verdikt({ govDigest: "c".repeat(64), manifestSha256: MANIFEST_SHA }),
+      {
+        composableId: ID,
+        manifestSha256: MANIFEST_SHA,
+        governanceSha256: projektion().digest ?? null,
+      },
+    );
     expect(v.valid).toBe(false);
     expect(v.reasons.join(" ")).toMatch(/Governance-Projektion weicht ab/);
   });
 
   it("ein Verdikt bezeugt Governance, die Stelle führt aber keine (gültige) mehr — ungültig", () => {
-    const v = verifyMeshCertStructure(verdikt({ govDigest: "c".repeat(64), manifestSha256: MANIFEST_SHA }), {
-      composableId: ID,
-      manifestSha256: MANIFEST_SHA,
-      governanceSha256: null,
-    });
+    const v = verifyMeshCertStructure(
+      verdikt({ govDigest: "c".repeat(64), manifestSha256: MANIFEST_SHA }),
+      {
+        composableId: ID,
+        manifestSha256: MANIFEST_SHA,
+        governanceSha256: null,
+      },
+    );
     expect(v.valid).toBe(false);
     expect(v.reasons.join(" ")).toMatch(/nicht mehr nachweisbar/);
   });
 
   it("GEGENPROBE: OHNE Governance-Subjekt sagt das Verdikt ehrlich NICHTS — und blockt trotzdem nicht", () => {
-    const v = verifyMeshCertStructure(verdikt({ manifestSha256: MANIFEST_SHA }), {
-      composableId: ID,
-      manifestSha256: MANIFEST_SHA,
-      governanceSha256: projektion().digest ?? null,
-    });
+    const v = verifyMeshCertStructure(
+      verdikt({ manifestSha256: MANIFEST_SHA }),
+      {
+        composableId: ID,
+        manifestSha256: MANIFEST_SHA,
+        governanceSha256: projektion().digest ?? null,
+      },
+    );
     expect(v.governanceAttested).toBe(false);
     expect(v.reasons.join(" ")).not.toMatch(/Governance/);
   });

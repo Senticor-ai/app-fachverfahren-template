@@ -110,7 +110,11 @@
       "version": 1,
       "publicPackage": "@senticor/platform-contracts",
       "documentation": "docs/capabilities/ai-assist.md",
-      "extensionPoints": ["model-provider", "prompt-template", "confidence-policy"],
+      "extensionPoints": [
+        "model-provider",
+        "prompt-template",
+        "confidence-policy"
+      ],
       "contractTests": ["test:ai-assist"],
       "forbidden": ["module-local-llm-client", "autonomous-legal-decision"]
     },

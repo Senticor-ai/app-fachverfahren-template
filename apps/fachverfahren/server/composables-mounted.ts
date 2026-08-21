@@ -29,6 +29,7 @@ import {
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import {
+  definitionsBytes,
   istMeshManifest,
   mapManifestToComposable,
   verifyMeshCertStructure,
@@ -39,8 +40,9 @@ import {
   type MeshComposableManifest,
 } from "@senticor/public-sector-sdk";
 
-const sha256 = (buf: Buffer): string =>
-  createHash("sha256").update(buf).digest("hex");
+// `sha256(Buffer)` stand hier und hatte nach der Umstellung auf `definitionsBytes` KEINEN Aufrufer mehr —
+// geloescht statt stehengelassen: ein zweiter, byte-basierter Hash-Weg neben der Identitaets-Formel ist genau
+// der Rueckfall, ueber den die Divergenz zurueckkaeme.
 
 /** node:crypto-Primitive für den PURE-Package-Injektions-Seam (die Sicherheits-Logik lebt in verifyMeshCertStructure). */
 const sha256Hex = (s: string): string =>
@@ -286,7 +288,9 @@ export function loadMountedComposables(
         const cert = JSON.parse(readFileSync(certPath, "utf8")) as unknown;
         const v = verifyMeshCertStructure(cert, {
           composableId: id,
-          manifestSha256: sha256(raw),
+          // DIE IDENTITAET DER DEFINITION, nicht die Bytes der Datei — sonst passt das Subjekt des Verdikts nie
+          // (gemessen: 0 von 44 Treffern). Dieselbe Formel wie beim Erzeuger, siehe definitionsBytes.
+          manifestSha256: sha256Hex(definitionsBytes(manifest)),
           certSigningPublicKey: trusted,
           sha256Hex,
           verifyEd25519,
@@ -308,7 +312,14 @@ export function loadMountedComposables(
     try {
       // Reuse-Herkunft aus der neben dem Manifest liegenden Mount-Provenienz (`<id>.mount.json`) — die EINE
       // Wahrheit des ERP-Reuse. Absent/malformt ⇒ „lokal abgeleitet" (best-effort, nie geraten, nie geworfen).
-      const mounted = mapManifestToComposable(manifest, { attestation });
+      // DIE VERSIEGELTE VERFASSUNG WIRD DURCHGEREICHT, nicht bloss geprueft: aus IHR nimmt der Mapper die
+      // strukturierte Faehigkeits-Seite. Ohne diese Zeile waere das Feld vorgesehen, typisiert und nie gefuellt —
+      // die Defektklasse, die diese Woche siebenmal aufgefallen ist. `gov` ist an dieser Stelle bereits
+      // nachgerechnet: ein gebrochenes Siegel hat den Mount weiter oben uebersprungen.
+      const mounted = mapManifestToComposable(manifest, {
+        attestation,
+        governance: gov,
+      });
       composables.push({ ...mounted, herkunft: ladeHerkunft(dir, id) });
       // ARCHETYP-BRUCH sichtbar machen (nicht werfen): traegt die Stelle eine Befugnis, die ihr Archetyp
       // ausschliesst? Der haeufigste Schnitt-Fehler — ein Initiator, der Bescheide erlaesst, ist kein

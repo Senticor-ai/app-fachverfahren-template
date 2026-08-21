@@ -27,6 +27,8 @@ import type {
   ComposableClass,
   ComposableOwners,
   ComposableStatus,
+  ComposableStrukturFaehigkeit,
+  ComposableWerkzeugKante,
   SpineAgent,
   SpineAufgabe,
 } from "./composable.js";
@@ -54,6 +56,25 @@ export interface MapManifestOptions {
   aufgaben?: SpineAufgabe[];
   /** Der VERDIENTE Zertifikat-Beleg (verifyMeshCertStructure). Ohne ihn wird deklariertes certified/active gekappt. */
   attestation?: MountAttestation;
+  /** Das NACHGERECHNETE Verdikt der mitgereisten Verfassung (verifyMeshGovernanceProjektion).
+   *
+   *  WARUM DIESER PARAMETER EXISTIERT: die strukturierte Faehigkeits-Seite wird aus der VERSIEGELTEN Projektion
+   *  genommen, nicht aus dem Manifest-Block. Der Manifest-Block ist hand-editierbar, ohne dass ein Siegel bricht —
+   *  genau das Loch, das die Projektion geschlossen hat. Liegt eine Projektion vor, entscheidet also ihr Siegel;
+   *  ohne Verdikt gilt sie als ungeprueft und die Seite bleibt LEER (fail-closed, kein Green-Wash-Umweg). */
+  governance?: {
+    vorhanden: boolean;
+    intakt: boolean;
+    projektion?: MeshGovernanceProjektionFaehigkeiten;
+  };
+}
+
+/** Nur der Teil der Projektion, den dieser Mapper liest — ausdruecklich benannt statt per Index-Signatur. */
+export interface MeshGovernanceProjektionFaehigkeiten {
+  faehigkeiten?: {
+    strukturiert?: ComposableStrukturFaehigkeit[];
+    benutzt?: ComposableWerkzeugKante[];
+  };
 }
 
 const KNOWN_STATUS: readonly ComposableStatus[] = [
@@ -147,7 +168,9 @@ function gedeckelteAutonomie(
     (a) => a === "pruefung" || a === "subsumtion" || a === "review",
   );
   if (!rechtsnah) return deklariert;
-  return aalRang(deklariert) > 2 ? ("AAL-2" as AgenticAutonomyLevel) : deklariert;
+  return aalRang(deklariert) > 2
+    ? ("AAL-2" as AgenticAutonomyLevel)
+    : deklariert;
 }
 
 /**
@@ -258,6 +281,32 @@ export function mapManifestToComposable(
   const evals = dedup(manifest.evalSuiten ?? []);
   if (evals.length === 0 && earned) evals.push(`cert:${id}`);
 
+  // ── DIE STRUKTURIERTE SEITE: welche Quelle zaehlt ────────────────────────────────────────────────
+  // Liegt eine Projektion bei, ist SIE der Traeger — versiegelt, nachrechenbar, und genau deshalb eingefuehrt.
+  // Ihr Siegel entscheidet dann allein: ohne intaktes Verdikt bleibt die Seite leer, auch wenn der (unversiegelte)
+  // Manifest-Block etwas anderes behauptet. Nur wo GAR KEINE Projektion mitkam (Alt-Bestand), traegt der
+  // Manifest-Block — dieselbe Quelle, aus der dieser Mapper auch `ki`, `befugnis` und `leistungen` liest.
+  const projVorhanden =
+    (manifest as { governanceProjektion?: unknown }).governanceProjektion !==
+    undefined;
+  const seite = projVorhanden
+    ? opts.governance?.intakt
+      ? opts.governance.projektion?.faehigkeiten
+      : undefined
+    : manifest.faehigkeiten;
+  const strukturiert = (seite?.strukturiert ?? []).filter(
+    (s): s is ComposableStrukturFaehigkeit =>
+      !!s && typeof s.id === "string" && !!s.id.trim(),
+  );
+  const benutzt = (seite?.benutzt ?? []).filter(
+    (k): k is ComposableWerkzeugKante =>
+      !!k &&
+      typeof k.wissen === "string" &&
+      !!k.wissen.trim() &&
+      typeof k.werkzeug === "string" &&
+      !!k.werkzeug.trim(),
+  );
+
   const composable: AgenticComposable = {
     id,
     version: opts.version ?? "1.0.0",
@@ -288,6 +337,10 @@ export function mapManifestToComposable(
     // Fehlen die Felder, entscheidet/liefert die Stelle nichts — das ist eine Aussage, keine Luecke.
     ...(manifest.leistungen?.length ? { leistungen: manifest.leistungen } : {}),
     ...(manifest.artefakte?.length ? { artefakte: manifest.artefakte } : {}),
+    // BEIDE FAEHIGKEITS-SEITEN. Die Wissensseite liegt im `spine` (oben), die strukturierte hier — gleichrangig.
+    // Die Rangfolge der QUELLEN ist die eigentliche Aussage, s. strukturierteSeite().
+    ...(strukturiert.length ? { strukturiert } : {}),
+    ...(benutzt.length ? { benutzt } : {}),
   };
 
   return assertComposable(composable);

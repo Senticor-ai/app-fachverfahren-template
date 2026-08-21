@@ -63,7 +63,9 @@ export function personaFromPath(
 ): Persona {
   const kandidaten = personas
     .filter((p) => p.routePrefix)
-    .sort((a, b) => (b.routePrefix?.length ?? 0) - (a.routePrefix?.length ?? 0));
+    .sort(
+      (a, b) => (b.routePrefix?.length ?? 0) - (a.routePrefix?.length ?? 0),
+    );
   for (const p of kandidaten) {
     if (p.routePrefix && pathname.startsWith(p.routePrefix)) return p.key;
   }

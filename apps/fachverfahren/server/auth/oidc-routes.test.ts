@@ -55,7 +55,9 @@ const mockFetch = (async (url: string | URL) => {
   return new Response("not found", { status: 404 });
 }) as unknown as typeof fetch;
 
-async function buildApp(authStore: InMemoryAuthStore): Promise<FastifyInstance> {
+async function buildApp(
+  authStore: InMemoryAuthStore,
+): Promise<FastifyInstance> {
   const app = fastify({ logger: false });
   await app.register(fastifyCookie);
   registerAuthRoutes(app, {

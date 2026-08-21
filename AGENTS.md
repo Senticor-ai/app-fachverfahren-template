@@ -53,7 +53,7 @@ sind **gleichrangige Peer-Knoten**.
 
 Was das Template davon HEUTE trägt (der OSS-Runtime-Anteil):
 
-- **KOORDINATION — der Aktenvermerk als Blackboard** *(gebaut)*. Die geteilte
+- **KOORDINATION — der Aktenvermerk als Blackboard** _(gebaut)_. Die geteilte
   Fall-Akte ist der Arbeitsraum, in den Mensch UND Agent gleichrangig
   **typisierte Zellen** schreiben (`kind` ∈ hypothese/teilergebnis/frage/befund/
   entscheidung/notiz), jede mit Peer-Kennung (`urheber` = `human:<rolle>` ODER
@@ -64,11 +64,11 @@ Was das Template davon HEUTE trägt (der OSS-Runtime-Anteil):
   **Agenten-CLI** (`apps/fachverfahren/server/dev/mesh-cli.ts`, Package-Script
   `mesh`) gegen eine deterministische **Golden Fixture** — ohne Browser/Server/
   finalen Build, über dieselben Routen (die CLI reimplementiert nichts).
-- **FÄHIGKEIT — austauschbare Ports** *(teilweise)*. Capabilities sind Ports mit
+- **FÄHIGKEIT — austauschbare Ports** _(teilweise)_. Capabilities sind Ports mit
   Conformance-Vertrag und per Env wählbaren Anbietern (`AiAssistPort` local↔ollama,
   `BlobStoragePort`); ein Baustein konsumiert sie governt (RBAC), nie einen
   konkreten Anbieter (Skill `ki-assistenz`, `platform/capabilities.json`).
-- **DATEN — Datenanbindung** *(dünn)*. Register/Nachweise als Daten-Naht
+- **DATEN — Datenanbindung** _(dünn)_. Register/Nachweise als Daten-Naht
   (`leistung.config` `register`/`nachweise()`, Nachweis-Upload über `BlobStoragePort`).
 
 **Ehrlich abgegrenzt:** das VOLLE Mesh (GraphStore-Substrat, Capability-Mesh mit
@@ -119,7 +119,7 @@ optional):
 | Feld               | Vertrag                                                                                                                                                                                                                                                               |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`, `label`      | Slug und Anzeigename der Leistung                                                                                                                                                                                                                                     |
-| `kommune`          | Trägerin / erlassende Stelle der Leistung — Kommune ODER Behörde ODER interne Stelle, z. B. `"Stadt Musterstadt"`, `"Bundesamt für …"`, `"Zentrale Vergabe"`                                                                                                                                                                                                                    |
+| `kommune`          | Trägerin / erlassende Stelle der Leistung — Kommune ODER Behörde ODER interne Stelle, z. B. `"Stadt Musterstadt"`, `"Bundesamt für …"`, `"Zentrale Vergabe"`                                                                                                          |
 | `rechtsgrundlagen` | Liste `{ norm, titel, satzung? }` — nur belegte Normen, nie erfunden                                                                                                                                                                                                  |
 | `antrag.steps`     | Schritte mit Feldern (`FeldDef`: `name/label/typ/required/pattern/onceOnly/…`); jedes Pflichtfeld mit passender Validierung                                                                                                                                           |
 | `statusMachine`    | `initial` + `states` (Endzustände mit `terminal: true`) + `transitions` (`rollen`, kritische Entscheidungen mit `vierAugen: true`, `detailPflicht`)                                                                                                                   |

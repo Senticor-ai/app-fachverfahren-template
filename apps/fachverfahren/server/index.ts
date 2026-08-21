@@ -35,10 +35,10 @@ import {
   createAuditStoreFromEnv,
   createAuthStoreFromEnv,
   createCaseStoreFromEnv,
+  createEvidenceLedgerFromEnv,
   createKanbanStoreFromEnv,
   createTaskStoreFromEnv,
   createWissenStoreFromEnv,
-  InMemoryEvidenceLedger,
   type AppStore,
   type AuditStore,
   type AuthStore,
@@ -374,8 +374,12 @@ export async function startRuntime(
     ]),
     // Agentic Composables (Blueprint v5.0): die deklarierten Fähigkeitseinheiten mit Spine-Agent.
     composableRegistry: createComposableRegistry(),
-    // Evidence-Ledger (Blueprint §15.3): hash-verketteter Nachweis der Spine-Handlungen (Template-Stub In-Memory).
-    evidenceLedger: new InMemoryEvidenceLedger(),
+    // Evidence-Ledger (Blueprint §15.3): hash-verketteter Nachweis der Spine-Handlungen — DAUERHAFT, wie
+    // jeder andere Speicher per Env gewählt (Postgres · chos · fail-closed; In-Memory nur mit
+    // APP_STORE_MODE=memory und dann mit lauter Warnung). Vorher stand hier fest `new
+    // InMemoryEvidenceLedger()`: der Nachweis überlebte keinen Neustart, während Fall-Akte, Audit und
+    // Verfahrens-Wissen längst durable waren. Eine Kette, die verschwindet, beweist nichts.
+    evidenceLedger: createEvidenceLedgerFromEnv(env),
     sessionResolver: createCookieSessionResolver(authStore),
     auditSink: createAuditSinkFromEnv(env),
     // Port-Registry: KI-Anbieter per Env (local-fake default; AI_ASSIST_PROVIDER=ollama für den echten Adapter).

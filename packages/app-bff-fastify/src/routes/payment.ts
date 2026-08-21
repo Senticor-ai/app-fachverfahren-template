@@ -46,7 +46,8 @@ export function registerPaymentRoutes(
       preHandler: auth.preHandler,
       schema: {
         tags: ["payment"],
-        summary: "Zahlung/Gebühr für einen eigenen Vorgang veranlassen (ePayBL-Naht)",
+        summary:
+          "Zahlung/Gebühr für einen eigenen Vorgang veranlassen (ePayBL-Naht)",
         body: PaymentCreateRequestSchema,
         response: {
           200: PaymentStatusDtoSchema,
@@ -80,7 +81,14 @@ export function registerPaymentRoutes(
           : {}),
       });
       if (!result.ok) {
-        return sendPortFailure(reply, deps, request, result.error, failStatus(result.error.retryable), "payment.failed");
+        return sendPortFailure(
+          reply,
+          deps,
+          request,
+          result.error,
+          failStatus(result.error.retryable),
+          "payment.failed",
+        );
       }
       // Zahlungs-Veranlassung ist auditpflichtig (Kassen-Nachvollzug): Referenz + Status, kein PII.
       await deps.auditSink.emit({
@@ -132,7 +140,14 @@ export function registerPaymentRoutes(
         request.params.paymentId,
       );
       if (!result.ok) {
-        return sendPortFailure(reply, deps, request, result.error, failStatus(result.error.retryable), "payment.failed");
+        return sendPortFailure(
+          reply,
+          deps,
+          request,
+          result.error,
+          failStatus(result.error.retryable),
+          "payment.failed",
+        );
       }
       return reply.code(200).send(result.value);
     },

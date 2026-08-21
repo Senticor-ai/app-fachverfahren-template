@@ -23,6 +23,7 @@ wie procedure.config):** das neutrale Musterverfahren als fahrbares Composable m
 vollem Spine-Eskalationspfad.
 
 **Drei gleichwertige Schnittstellen (Blueprint §9):**
+
 - Human/Deterministisch (REST): `GET /api/composables` (Discovery),
   `GET /api/composables/:id` (Detail + Zertifizierungsreife).
 - Agentic/Runtime: `POST /api/composables/:id/spine/:aufgabe` — führt eine

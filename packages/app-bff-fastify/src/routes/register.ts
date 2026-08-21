@@ -38,7 +38,8 @@ export function registerRegisterRoutes(
       preHandler: auth.preHandler,
       schema: {
         tags: ["register"],
-        summary: "Einen Nachweis aus einem Register abrufen (Once-Only, zweckgebunden)",
+        summary:
+          "Einen Nachweis aus einem Register abrufen (Once-Only, zweckgebunden)",
         body: EvidenceRequestDtoSchema,
         response: {
           200: EvidenceRecordDtoSchema,
@@ -74,7 +75,14 @@ export function registerRegisterRoutes(
           : {}),
       });
       if (!result.ok) {
-        return sendPortFailure(reply, deps, request, result.error, failStatus(result.error.retryable), "register.evidence.failed");
+        return sendPortFailure(
+          reply,
+          deps,
+          request,
+          result.error,
+          failStatus(result.error.retryable),
+          "register.evidence.failed",
+        );
       }
       // Datensparsam auditiert: Nachweis-TYP + Zweck + Aussteller — NICHT die abgerufenen Personendaten.
       await deps.auditSink.emit({

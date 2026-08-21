@@ -41,6 +41,39 @@ Zahlt der Bürger die Rückforderung, wird `createPayment` mit `purpose="rueckfo
 
 Der zeitgetriebene Scanner (#58, CronJob) findet überfällige `forderung.gestellt` ohne ausreichende Zahlung und legt einen `frist.mahnung`-Task/`forderung.gemahnt`-Ereignis an (deterministisch, injizierte Zeit). Keine neue Worker-Infrastruktur — der Motor `runDeadlineScanForTenants` wird um die Forderungs-Fälligkeit erweitert.
 
+## Alternativen
+
+### A. Den PaymentPort „umdrehen" (eine Auszahlungs-/Rückforderungs-Richtung im Port)
+
+VERWORFEN — der Kontext oben nennt den Grund: `createPayment` ist für den EINZUG bereits die richtige Naht
+(der Bürger zahlt die Rückforderung über dieselbe ePayBL-/XBezahldienste-Strecke wie eine Gebühr). Was der
+Port NICHT trägt, ist die FORDERUNG selbst — Sollstellung, Fälligkeit, Mahnstufen, Restbetrag. Das ist ein
+Domänen-Modell. Es in den Port zu legen würde eine Zahlungs-Schnittstelle zum Forderungs-Buchhalter machen
+und jeden künftigen Zahlungs-Anbieter an das Mahnwesen binden.
+
+### B. Eigene `forderungen`-Tabelle mit Restbetrag als Spalte
+
+VERWORFEN aus zwei Gründen. Erstens die Rule of Three: es gibt bisher EINEN Bedarf, und eine Tabelle ist die
+teuerste Antwort auf einen einzelnen Fall (Migration, Backup, Mandanten-Isolation, Löschkonzept). Zweitens und
+schwerer: ein GESPEICHERTER Restbetrag ist eine Zweitwahrheit neben den Zahlungs-Ereignissen. Er driftet beim
+ersten Storno, bei der ersten Teilzahlung, die zweimal verbucht wird, und beim ersten Nachtrag. Der Restbetrag
+ist eine reine Ableitung (`Sollstellung − Σ Zahlungen`) und damit eine testbare Funktion — dieselbe Wahl wie
+bei der N-Augen-Zählung und der Bescheid-Herkunft.
+
+### C. Eigener Mahn-Worker neben dem Fristen-Scanner
+
+VERWORFEN. Der zeitgetriebene Scanner existiert, ist deterministisch (injizierte Zeit) und trägt bereits die
+Mandanten-Iteration. Ein zweiter Worker hätte eine zweite Zeitquelle, eine zweite Fehlerbehandlung und einen
+zweiten Ort für die Frage „warum wurde hier nicht gemahnt?". Die Fälligkeit der Forderung ist eine Frist wie
+jede andere — sie gehört in den EINEN Motor.
+
+### D. Rückforderung ohne eigenen Verwaltungsakt (nur als Buchung)
+
+VERWORFEN, rechtlich unhaltbar: die Erstattung nach § 50 SGB X / § 49a VwVfG setzt die Forderung dem Grunde
+UND der Höhe nach fest — das ist ein Verwaltungsakt. Ohne ihn hätte der Bürger keinen Rechtsbehelf gegen die
+Rückforderung, und die Buchung wäre eine Zahlungsaufforderung ohne Titel. Deshalb läuft die Festsetzung
+über dieselbe VA-Maschinerie wie jeder andere Bescheid — mit eigenem Rechtsbehelfs-Regime (ADR-0006 §3).
+
 ## Konsequenzen / betroffene Flächen (bewusst benannt)
 
 - **Zustandsmaschine**: optionaler Rückforderungs-Zweig (z. B. `festgesetzt → rueckforderung_festgesetzt → erstattet | niedergeschlagen`) als DATEN in `leistung.config` + Spiegel (Drift-Gate) — analog ADR-0006.

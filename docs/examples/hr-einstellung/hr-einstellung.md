@@ -8,10 +8,25 @@ kein neuer Server-Code. Kernel-Beweis: `packages/public-sector-sdk/src/hr-bluepr
 
 ```ts
 personas: [
-  { key: "fachbereich",    label: "Fachbereich",     home: "/fachbereich",    routePrefix: "/fachbereich" },
-  { key: "personalstelle", label: "Personalstelle",  home: "/personal",       routePrefix: "/personal" },
-  { key: "vorgesetzter",   label: "Freigabe",        home: "/freigabe",       routePrefix: "/freigabe" },
-]
+  {
+    key: "fachbereich",
+    label: "Fachbereich",
+    home: "/fachbereich",
+    routePrefix: "/fachbereich",
+  },
+  {
+    key: "personalstelle",
+    label: "Personalstelle",
+    home: "/personal",
+    routePrefix: "/personal",
+  },
+  {
+    key: "vorgesetzter",
+    label: "Freigabe",
+    home: "/freigabe",
+    routePrefix: "/freigabe",
+  },
+];
 ```
 
 ## Verfahren (`procedure.config.ts` → `ProcedureVersion`)

@@ -169,12 +169,12 @@ Zustände/Übergänge als DATEN (ADR-0006 / ADR-0007):
   ein `festgesetzt`, das ein Widerspruch wieder öffnet (symmetrisch zum BPMN-
   `senticor:closesCase`). Ein terminaler Zustand dürfte keine ausgehenden Übergänge haben.
 - **Widerspruchs-Verfahren**: `festgesetzt → widerspruch_in_pruefung →
-  abgeholfen | widerspruch_zurueckgewiesen` (Vier-Augen). Der Widerspruchsbescheid
+abgeholfen | widerspruch_zurueckgewiesen` (Vier-Augen). Der Widerspruchsbescheid
   ist ein VA mit EIGENEM Rechtsbehelfsregime (KLAGE, nicht erneut Widerspruch) —
   dafür trägt der Übergang ein per-Übergang-Override `Transition.verwaltungsakt`
   (überschreibt `zustellung.rechtsbehelf`); ohne Override gilt das Verfahrens-Regime.
 - **Rückforderungs-Verfahren**: `festgesetzt → rueckforderung_festgesetzt →
-  erstattet | niedergeschlagen`. Der stellende Übergang trägt
+erstattet | niedergeschlagen`. Der stellende Übergang trägt
   `Transition.stelltForderung: { tarif, diskriminator, zahlungsfristTage }` — der
   Server schreibt eine **Sollstellung** (`forderung.gestellt`) mit SERVER-
   AUTORITATIVER Höhe (`berechneTarif(tarif, case.data[diskriminator])`, nie ein

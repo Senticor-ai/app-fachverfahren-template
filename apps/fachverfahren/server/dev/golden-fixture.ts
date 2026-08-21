@@ -279,7 +279,8 @@ export async function seedGoldenMesh(deps: GoldenMeshSeedDeps): Promise<void> {
     });
     const schonDa = new Set(vorhandene.map((e) => e.auditEventId));
     for (const v of fixture.vermerke) {
-      if (!schonDa.has(v.auditEventId)) await deps.caseStore.appendAuditEvent(v);
+      if (!schonDa.has(v.auditEventId))
+        await deps.caseStore.appendAuditEvent(v);
     }
     log("info", "dev.golden-mesh.vermerke.seeded", {
       caseId: dossierDemo.caseId,

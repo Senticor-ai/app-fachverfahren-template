@@ -143,7 +143,10 @@ export function pruefeAnlage(
   // Endung muss zur Deklaration passen (sonst „rechnung.pdf.html"-Verwirrung im Download).
   const endung = endungVon(fileName);
   if (endung && !typ.endungen.includes(endung))
-    return { ok: false, ablehnung: { grund: "inhalt-passt-nicht-zur-deklaration" } };
+    return {
+      ok: false,
+      ablehnung: { grund: "inhalt-passt-nicht-zur-deklaration" },
+    };
 
   // DER KERN: die BYTES müssen die Deklaration bestätigen.
   if (typ.signaturen.length > 0) {

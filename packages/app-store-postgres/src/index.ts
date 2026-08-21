@@ -155,10 +155,14 @@ export {
 } from "./audit-chain.js";
 export type { AuditChainResult } from "./audit-chain.js";
 export {
+  createEvidenceLedgerFromEnv,
   InMemoryEvidenceLedger,
+  PostgresEvidenceLedger,
+  UnavailableEvidenceLedger,
   evidenceEntryHash,
   verifyEvidenceChain,
 } from "./evidence-ledger.js";
+export { ChosEvidenceLedger } from "./chos-evidence-ledger.js";
 export type {
   EvidenceEntry,
   EvidenceAppendInput,

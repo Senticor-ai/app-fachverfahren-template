@@ -45,3 +45,56 @@ catalog:
   "@fastify/type-provider-typebox": ^5.2.0
   pg: ^8.22.0
   "@types/pg": ^8.20.0
+
+# ── Sicherheits-Overrides ───────────────────────────────────────────────────────────────────────
+# `scripts/check-supply-chain.sh` faehrt `trivy fs --severity HIGH,CRITICAL --exit-code 1` im
+# pre-push-Riegel. Beide Pakete sind TRANSITIV — kein Eintrag in `dependencies` kann sie heben,
+# nur ein Override. Ort: DIESE Datei, nicht `package.json` — seit pnpm 10 liest pnpm Overrides hier,
+# und hier laeuft pnpm 11.1.0. Ein Pin an der falschen Stelle liest sich wie Schutz und ist keiner.
+#
+# Alle Spruenge bleiben INNERHALB der Hauptversion, gemessen aus dem Lockfile:
+#   react-router  7.18.1 → >=7.18.2   GHSA-qwww-vcr4-c8h2  RSC-Mode CSRF-Bypass
+#   undici        7.28.0 → >=7.29.0   CVE-2026-13697       Information disclosure + DoS
+#                 8.8.0  → >=8.9.0    dieselbe Meldung, ZWEITE Linie im Baum
+#
+# `undici` steht mit ZWEI Hauptversionen im Baum. Ein einzelner Override haette eine davon
+# stillschweigend nicht erreicht — der Scan waere gruen geworden, weil er die andere nicht mehr
+# findet, nicht weil sie geheilt waere.
+overrides:
+  react-router: ^7.18.2
+  undici@7: ^7.29.0
+  undici@8: ^8.9.0
+  # Zweite Charge, ebenfalls alle INNERHALB der Hauptversion. Wie bei `undici` stehen zwei davon mit
+  # MEHREREN Linien im Baum; je Linie ein eigener Eintrag, sonst bliebe eine still ungehoben:
+  #   brace-expansion  5.0.7 → >=5.0.8   CVE-2026-14257 · CVE-2026-69152
+  #   fast-uri         3.1.3 → >=3.1.5   CVE-2026-16221 · CVE-2026-18446
+  #                    4.1.0 → >=4.1.2   dieselben zwei Meldungen, ZWEITE Linie
+  #   find-my-way      9.6.0 → >=9.7.0   CVE-2026-47219
+  brace-expansion@5: ^5.0.8
+  fast-uri@3: ^3.1.5
+  fast-uri@4: ^4.1.2
+  find-my-way: ^9.7.0
+  # DRITTE CHARGE — HAUPTVERSIONS-WECHSEL, also mit Bruchrisiko. Sie stehen hier nur, weil der Testlauf
+  # sie deckt (1355 Zusicherungen); ohne diesen Beleg gehoeren sie nicht in einen Override, sondern in
+  # eine eigene Welle. Wer sie anfasst, faehrt die Tests, statt der Versionsnummer zu glauben.
+  #   @opentelemetry/sdk-node             0.57.2 → 0.217.0  CVE-2026-44902
+  #   @opentelemetry/exporter-prometheus  0.57.2 → 0.217.0  dieselbe Meldung
+  #   @opentelemetry/propagator-jaeger    1.30.1 → 2.9.0    CVE-2026-59892
+  "@opentelemetry/sdk-node": ^0.217.0
+  "@opentelemetry/exporter-prometheus": ^0.217.0
+  "@opentelemetry/propagator-jaeger": ^2.9.0
+  # DIE LINIE MUSS GANZ MITKOMMEN. `sdk-node@0.217` bringt die 2.x-Reihe mit, waehrend andere Pfade
+  # weiter 1.30.1 zogen — GEMESSEN standen `resources`, `sdk-trace-base`, `core` und `sdk-metrics`
+  # mit ZWEI Linien im Baum. Das ist kein Kosmetik-Problem: `tsc` meldete
+  # „Property 'getRawAttributes' is missing in type Resource (1.30.1) but required in Resource (2.7.1)" —
+  # zwei Fassungen desselben Typs, und die Naht dazwischen ist der Telemetrie-Aufbau.
+  "@opentelemetry/resources": ^2.7.1
+  "@opentelemetry/sdk-trace-base": ^2.7.1
+  "@opentelemetry/core": ^2.7.1
+  "@opentelemetry/sdk-metrics": ^2.7.1
+  "@opentelemetry/exporter-trace-otlp-http": ^0.217.0
+  # NACHZUG DER DRITTEN CHARGE: das neue OTel-SDK bringt `protobufjs` 8.0.1 mit, und das traegt selbst
+  # zwei Meldungen (behoben in 8.4.1). Ein Sprung, der eine Verwundbarkeit schliesst, kann eine neue
+  # EINSCHLEPPEN — deshalb wurde nach der Charge erneut gescannt, statt die Zahl von vorher zu glauben.
+  protobufjs: ^8.4.1
+  "@fastify/static": ^10.1.1

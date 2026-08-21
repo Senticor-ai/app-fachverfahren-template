@@ -11,7 +11,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { istEnabled } from "@senticor/public-sector-sdk";
+import { definitionsBytes, istEnabled } from "@senticor/public-sector-sdk";
 import {
   COMPOSABLE_CERT_PREDICATE_TYPE,
   COMPOSABLE_CERT_SIGNATURE_DOMAIN,
@@ -134,7 +134,11 @@ function writeManifest(
 ): string {
   const bytes = serialize(m);
   writeFileSync(path.join(dir, `${m.id}.json`), bytes);
-  const digest = sha256(bytes);
+  // DIESELBE FORMEL WIE DER ERZEUGER, nicht die Bytes der Datei. `0dd7140` hat den Mount von `sha256(raw)` auf
+  // `sha256Hex(definitionsBytes(manifest))` umgestellt, weil das Verdikt-Subjekt sonst in 0 von 44 Faellen traf.
+  // Diese Vorrichtung blieb bei der alten Formel zurueck — dann behauptet der Zeuge ein „verdientes Verdikt",
+  // das der Mount zu Recht nicht anerkennt, und meldet einen Defekt, den es nicht gibt.
+  const digest = sha256(definitionsBytes(m));
   if (opts.withPubkey ?? opts.withEarnedCert) writePubkey(dir);
   if (opts.withEarnedCert) {
     const cert = opts.certOverride

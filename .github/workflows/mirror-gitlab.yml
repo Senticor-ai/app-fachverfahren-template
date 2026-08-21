@@ -21,7 +21,12 @@ jobs:
     name: Push main to GitLab
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # TEMPLATE-ONLY, wie deploy-demo-consumer.yml: renderDomainApp kopiert .github/workflows/ MIT in den
+    # Konsumenten. Ohne diesen Guard liefe die Konsumenten-Kopie dieses Workflows in JEDEM generierten
+    # Fachverfahren mit. Der Guard steht bei deploy-demo-consumer.yml seit Langem und ist dort begruendet —
+    # er fehlte bei den Geschwistern mit DEMSELBEN Ausloeser-Muster. Eine Lehre, die nur an einer Datei
+    # haengt, ist keine Regel.
+    if: ${{ github.repository == 'Senticor-ai/app-fachverfahren-template' && github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Checkout validated commit

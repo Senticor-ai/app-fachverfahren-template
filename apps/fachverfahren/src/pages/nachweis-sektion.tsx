@@ -138,7 +138,10 @@ export function NachweisSektion({
         </p>
       ) : null}
 
-      <label htmlFor={feldId} className="mt-4 block text-sm text-muted-foreground">
+      <label
+        htmlFor={feldId}
+        className="mt-4 block text-sm text-muted-foreground"
+      >
         Datei wählen
       </label>
       <input

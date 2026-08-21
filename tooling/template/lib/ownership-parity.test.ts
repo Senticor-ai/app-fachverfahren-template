@@ -89,8 +89,20 @@ const updateUnmanagedPaths: string[] = [
   "dev/**",
   "tests/e2e/**",
   "tests/pg/**",
-  // Doku außerhalb der verwalteten docs/agents|assets|reference|capabilities-Bäume.
-  "docs/UX-UPGRADE-PLAN.md",
+  // Arbeitsplaene der VORLAGE selbst: Projekt-Steuerung dieses Repos, kein Konsumenten-Fundament.
+  // Seit dem Doku-Umbau 2026-07-31 liegen sie geschlossen unter `docs/planning/` (vorher lose im
+  // docs-Wurzelverzeichnis als `docs/UX-UPGRADE-PLAN.md` + `docs/PLAN-*.md`). EIN Ordner-Muster statt
+  // zweier Einzel-/Namensmuster — damit der naechste Plan die Ratsche nicht erneut rot faerbt und der
+  // Dead-Entry-Test unten das Muster ehrlich haelt (verschwindet der letzte Plan, meldet er den toten
+  // Eintrag).
+  "docs/planning/**",
+  // Der Doku-INDEX (2026-07-31 neu angelegt): Konsumenten-Hoheit, und zwar nicht aus Bequemlichkeit.
+  // Er benennt die Bereiche nach Rolle — und die Mehrzahl davon (adr/, planning/, architecture/,
+  // compliance/ …) steht genau in dieser Liste, gehoert also dem Konsumenten. Ein von der Vorlage
+  // ERSETZTER Index wuerde bei jedem Update auf Ordner zeigen, die der Konsument anders fuehrt: er
+  // waere ein Verzeichnis fremder Wahrheit ueber eigenem Bestand. Die Vorlage liefert ihn einmal als
+  // Startpunkt; ab dann pflegt ihn, wem der Inhalt gehoert.
+  "docs/README.md",
   "docs/adr/**",
   "docs/architecture/**",
   "docs/compliance/**",

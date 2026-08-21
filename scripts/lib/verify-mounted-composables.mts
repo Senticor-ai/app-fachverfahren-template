@@ -16,11 +16,16 @@
 // ein deklariert enabled Composable ist NUR mit VERDIENTEM UND signatur-verifiziertem Verdikt „verdient". Fehlt der
 // vertraute Key (kein cert-signing-key.pub / kein ENV), bleibt die Signatur ungeprüft ⇒ certified/active wird
 // fail-closed als nicht-verdient behandelt (kein Über-Claim ohne Authentizitäts-Beleg).
-import { createHash, createPublicKey, verify as ed25519Verify } from "node:crypto";
+import {
+  createHash,
+  createPublicKey,
+  verify as ed25519Verify,
+} from "node:crypto";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import {
+  definitionsBytes,
   istMeshManifest,
   verifyMeshCertStructure,
   verifyMeshGovernanceProjektion,
@@ -29,18 +34,20 @@ import {
 
 /** Der Erzeuger-Marker in der mitgereisten Stellen-Verfassung — byte-gleich zur CHOS-Seite
  *  (`COMPOSABLE_GOVERNANCE_YAML_GENERATOR`). Eine hand-geschriebene yaml trägt ihn nicht. */
-const GOVERNANCE_YAML_GENERATOR = "chos:packages/fachverfahren/composable-governance-yaml.ts";
+const GOVERNANCE_YAML_GENERATOR =
+  "chos:packages/fachverfahren/composable-governance-yaml.ts";
 
 const ENABLED_STATUS = new Set(["certified", "active"]);
 
 /** Well-known Dateiname des vertrauten ÖFFENTLICHEN Cert-Signing-Keys (Spiegel CHOS COMPOSABLE_CERT_PUBKEY_FILE). */
 const CERT_PUBKEY_FILE = "cert-signing-key.pub";
 
-const sha256 = (buf: Buffer): string =>
-  createHash("sha256").update(buf).digest("hex");
+// `sha256(Buffer)` hatte nach der Umstellung auf `definitionsBytes` keinen Aufrufer mehr — geloescht, damit
+// kein byte-basierter Rueckfall neben der Identitaets-Formel stehenbleibt.
 
 /** node:crypto-Primitive für den PURE-Package-Injektions-Seam (die Sicherheits-Logik lebt in verifyMeshCertStructure). */
-const sha256Hex = (s: string): string => createHash("sha256").update(s).digest("hex");
+const sha256Hex = (s: string): string =>
+  createHash("sha256").update(s).digest("hex");
 const verifyEd25519 = (
   publicKey: string,
   domain: string,
@@ -49,9 +56,18 @@ const verifyEd25519 = (
 ): boolean => {
   if (!signature || typeof publicKey !== "string") return false;
   try {
-    const pub = createPublicKey({ key: Buffer.from(publicKey, "base64url"), format: "der", type: "spki" });
+    const pub = createPublicKey({
+      key: Buffer.from(publicKey, "base64url"),
+      format: "der",
+      type: "spki",
+    });
     if (pub.asymmetricKeyType !== "ed25519") return false;
-    return ed25519Verify(null, Buffer.from(`${domain}\0${digestHex}`, "utf8"), pub, Buffer.from(signature, "base64url"));
+    return ed25519Verify(
+      null,
+      Buffer.from(`${domain}\0${digestHex}`, "utf8"),
+      pub,
+      Buffer.from(signature, "base64url"),
+    );
   } catch {
     return false;
   }
@@ -115,19 +131,25 @@ function pruefeMitgereisteVerfassung(
     ];
   }
   if (!doc || typeof doc !== "object" || Array.isArray(doc)) {
-    return [`${id}: die mitgereiste Stellen-Verfassung enthält kein Governance-Dokument (fail-closed).`];
+    return [
+      `${id}: die mitgereiste Stellen-Verfassung enthält kein Governance-Dokument (fail-closed).`,
+    ];
   }
   const { _meta, ...projektion } = doc as Record<string, unknown>;
-  const meta = (_meta && typeof _meta === "object" && !Array.isArray(_meta)
-    ? (_meta as Record<string, unknown>)
-    : {});
+  const meta =
+    _meta && typeof _meta === "object" && !Array.isArray(_meta)
+      ? (_meta as Record<string, unknown>)
+      : {};
   const fehler: string[] = [];
   if (meta["generatedBy"] !== GOVERNANCE_YAML_GENERATOR) {
     fehler.push(
       `${id}: die mitgereiste Stellen-Verfassung trägt keinen gültigen Erzeuger-Marker (_meta.generatedBy) — sie ist nicht erzeugt, sondern geschrieben worden. Eine Verfassung wird nicht von Hand in ein Composable gelegt.`,
     );
   }
-  const v = verifyMeshGovernanceProjektion(projektion, { composableId: id, sha256Hex });
+  const v = verifyMeshGovernanceProjektion(projektion, {
+    composableId: id,
+    sha256Hex,
+  });
   if (!v.vorhanden || !v.intakt) {
     fehler.push(
       `${id}: die mitgereiste Stellen-Verfassung (${id}.governance.yaml) ist nicht (mehr) die erzeugte — ${v.gruende.join("; ")}`,
@@ -252,7 +274,9 @@ export function verifyMountedComposables(dir: string): MountedComposableReport {
 
     const v = verifyMeshCertStructure(certParsed, {
       composableId: id,
-      manifestSha256: sha256(raw),
+      // DIE IDENTITAET DER DEFINITION, nicht die Bytes der Datei — sonst passt das Subjekt des Verdikts nie
+      // (gemessen: 0 von 44 Treffern). Dieselbe Formel wie beim Erzeuger, siehe definitionsBytes.
+      manifestSha256: sha256Hex(definitionsBytes(manifest)),
       certSigningPublicKey: trusted,
       sha256Hex,
       verifyEd25519,
@@ -262,7 +286,10 @@ export function verifyMountedComposables(dir: string): MountedComposableReport {
     });
     // Ein enabled Composable OHNE bezeugte Governance ist kein Fehler, aber eine ehrliche Lücke: sein Verdikt sagt
     // über die Verfassung, unter der es verdient wurde, nichts. Sichtbar machen statt still hinnehmen.
-    if (ENABLED_STATUS.has(status) && belegtGovernanceFehlt(v.governanceAttested, gov.vorhanden)) {
+    if (
+      ENABLED_STATUS.has(status) &&
+      belegtGovernanceFehlt(v.governanceAttested, gov.vorhanden)
+    ) {
       hinweise.push(
         `${id}: deklariert „${status}", aber das Verdikt bezeugt KEINE Governance (kein Subjekt „${id}#governance") — es ist nicht belegt, unter welcher Verfassung die Stelle zertifiziert wurde.`,
       );

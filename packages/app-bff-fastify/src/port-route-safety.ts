@@ -11,7 +11,11 @@ import type { BffDeps } from "./deps.js";
 import { requestIdOf, sessionOf } from "./route-auth.js";
 
 /** Der klassifikations-sichere Fehler-Body: vertrauliche Klassen → nur der Code; sonst die Anbieter-Message. */
-function safeError(err: { code: string; message: string; classification: string }): string {
+function safeError(err: {
+  code: string;
+  message: string;
+  classification: string;
+}): string {
   const sensitive =
     err.classification === "confidential" ||
     err.classification === "restricted" ||
@@ -26,7 +30,12 @@ export async function sendPortFailure(
   reply: FastifyReply,
   deps: BffDeps,
   request: FastifyRequest,
-  err: { code: string; message: string; classification: string; retryable: boolean },
+  err: {
+    code: string;
+    message: string;
+    classification: string;
+    retryable: boolean;
+  },
   status: 502 | 503,
   eventType: string,
 ): Promise<FastifyReply> {

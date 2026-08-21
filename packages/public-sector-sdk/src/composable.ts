@@ -173,6 +173,43 @@ export interface AgenticComposable {
   leistungen?: ComposableLeistung[];
   /** WAS in welcher BAU-Phase entsteht (aus RACI x produces). Ergaenzt `leistungen` um die Herstellungs-Sicht. */
   artefakte?: ComposableArtefakt[];
+  /** DIE STRUKTURIERTE FAEHIGKEITS-SEITE — gleichrangig zur Wissensseite (`spine.skills`), nicht ihr Zulieferer.
+   *
+   *  Ein Composable besteht IMMER aus beidem: Tarif, Regel, Formel, Pruefung NEBEN Lesen, Verstehen, Erklaeren.
+   *  Bisher kannte dieser Typ nur `spine` — ein rein deterministisches Composable galt als „ohne Faehigkeiten",
+   *  und ein rechnendes Composable konnte nicht sagen, WOMIT es rechnet.
+   *
+   *  ES REIST DER ANSPRUCH, NIE DER KOERPER: `programm` ist eine Kennung. Sie sagt, DASS ein Programm existiert
+   *  und welches — nicht, was es tut. Wer das Composable betreibt, kann damit beurteilen, ob er es betreiben
+   *  darf; nachbauen kann er es nicht. */
+  strukturiert?: ComposableStrukturFaehigkeit[];
+  /** WERKZEUG-KANTEN: welche Wissens-Faehigkeit welches Programm aufruft. Die Wissensseite BENUTZT die
+   *  strukturierte wie ein Werkzeug — sie rechnet nicht selbst, sie ruft auf und traegt das Ergebnis mit Beleg
+   *  weiter. Diese Kante ist die Governance-Aussage dazu. */
+  benutzt?: ComposableWerkzeugKante[];
+}
+
+/** Eine STRUKTURIERTE Faehigkeit, wie sie beim Betreiber ankommt — der Anspruch, nicht das Programm. */
+export interface ComposableStrukturFaehigkeit {
+  id: string;
+  ergebnis: string;
+  /** Die Klasse (tarif | regel | formel | pruefung | frist | …) — DATEN der Verfassung, kein Engine-Vokabular. */
+  klasse?: string;
+  /** Die KENNUNG des Programms. Der Koerper bleibt beim Herausgeber. */
+  programm?: string;
+  /** Die Rechtsgrundlagen DIESER Faehigkeit (nicht die der Leistung). */
+  grundlagen?: string[];
+  evalSuite?: string;
+  /** Von einer Wissens-Faehigkeit ERZEUGT — und von wem freigegeben. Fehlt die Freigabe, betreibt der Betreiber
+   *  eine ungelesene Regel. Das muss er SEHEN koennen, darum reist der Befund mit. */
+  erzeugtVon?: string;
+  freigegebenVon?: string;
+}
+
+/** Wissens-Faehigkeit → Programm. WER WEN benutzen darf, nie WIE das Programm rechnet. */
+export interface ComposableWerkzeugKante {
+  wissen: string;
+  werkzeug: string;
 }
 
 /** Ein Verfahrensschritt, den diese Stelle verantwortet — die fachliche Leistung des Composables. */

@@ -38,7 +38,8 @@ async function markdownUnter(dir: string): Promise<string[]> {
     for (const entry of entries) {
       const abs = join(current, entry.name);
       if (entry.isDirectory()) {
-        if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+        if (entry.name === "node_modules" || entry.name.startsWith("."))
+          continue;
         await walk(abs);
       } else if (entry.isFile() && entry.name.endsWith(".md")) {
         treffer.push(relative(repoRoot, abs));

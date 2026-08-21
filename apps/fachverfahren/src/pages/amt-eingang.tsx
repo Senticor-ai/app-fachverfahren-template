@@ -40,7 +40,10 @@ export function AmtEingangPage(): React.JSX.Element {
   return (
     <Shell persona="sachbearbeitung" activeNavKey="eingang">
       {laedt ? (
-        <p className="p-4 text-sm text-muted-foreground md:p-8" aria-busy="true">
+        <p
+          className="p-4 text-sm text-muted-foreground md:p-8"
+          aria-busy="true"
+        >
           Der Eingang wird geladen …
         </p>
       ) : fehler ? (

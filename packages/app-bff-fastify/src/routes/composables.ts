@@ -111,6 +111,35 @@ function toDetail(c: AgenticComposable): ComposableDetailDto {
     replaceableBy: [...c.replaceableBy],
     herkunft: toHerkunft(c),
     certification: certificationReadiness(c),
+    // BEIDE SEITEN auf den Draht. Der Anspruch reist, der Programm-Koerper nie — er liegt beim Herausgeber
+    // unter `.chos/business-logic` und wird weder beim Publish noch beim Mount noch im Container-Payload
+    // transportiert. Ein gemountetes Composable zeigt deshalb die Kennung und ihre Grundlagen, nicht die Tabelle.
+    ...(c.strukturiert?.length
+      ? {
+          strukturiert: c.strukturiert.map((s) => ({
+            id: s.id,
+            ergebnis: s.ergebnis,
+            ...(s.klasse !== undefined ? { klasse: s.klasse } : {}),
+            ...(s.programm !== undefined ? { programm: s.programm } : {}),
+            ...(s.grundlagen !== undefined
+              ? { grundlagen: [...s.grundlagen] }
+              : {}),
+            ...(s.evalSuite !== undefined ? { evalSuite: s.evalSuite } : {}),
+            ...(s.erzeugtVon !== undefined ? { erzeugtVon: s.erzeugtVon } : {}),
+            ...(s.freigegebenVon !== undefined
+              ? { freigegebenVon: s.freigegebenVon }
+              : {}),
+          })),
+        }
+      : {}),
+    ...(c.benutzt?.length
+      ? {
+          benutzt: c.benutzt.map((k) => ({
+            wissen: k.wissen,
+            werkzeug: k.werkzeug,
+          })),
+        }
+      : {}),
   };
 }
 

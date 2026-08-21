@@ -21,6 +21,7 @@ export * from "./audit.js";
 export * from "./rbac.js";
 export * from "./forderung.js";
 export * from "./tarif.js";
+export * from "./tenor-nachrechnung.js";
 export * from "./rechtsbehelf-frist.js";
 // rechtsbehelf-text — DER EINE Belehrungssatz-Bauer (Web + PDF mounten dasselbe Modul, statt zwei Sätze zu bauen).
 export * from "./rechtsbehelf-text.js";

@@ -233,7 +233,8 @@ export function registerVerfahrenWissenRoutes(
       preHandler: writeAuth.preHandler,
       schema: {
         tags: ["verfahren-wissen"],
-        summary: "KI-Verfahrens-Wissen erzeugen (liest das bisherige Wiki als Kontext)",
+        summary:
+          "KI-Verfahrens-Wissen erzeugen (liest das bisherige Wiki als Kontext)",
         params: VerfahrenWissenParamsSchema,
         body: KiWissenRequestSchema,
         response: {
@@ -258,12 +259,11 @@ export function registerVerfahrenWissenRoutes(
         return storeUnavailable(request, reply);
       }
       // Fail-safe am LESE-Kontext: verworfenes KI-Wissen darf den nächsten KI-Vorschlag NICHT kontaminieren.
-      const wiki = kuratierteWissensEintraege(bisher)
-        .map((e) => ({
-          art: e.art,
-          urheber: e.urheber,
-          text: neutralisiereInjektion(e.text),
-        }));
+      const wiki = kuratierteWissensEintraege(bisher).map((e) => ({
+        art: e.art,
+        urheber: e.urheber,
+        text: neutralisiereInjektion(e.text),
+      }));
 
       const result = await deps.aiAssist.suggest(
         {
@@ -329,7 +329,8 @@ export function registerVerfahrenWissenRoutes(
       preHandler: readAuth.preHandler,
       schema: {
         tags: ["verfahren-wissen"],
-        summary: "Das Wissen eines Verfahrens lesen (chronologisch, behörden-scoped)",
+        summary:
+          "Das Wissen eines Verfahrens lesen (chronologisch, behörden-scoped)",
         params: VerfahrenWissenParamsSchema,
         response: { 200: WissenViewListDtoSchema, ...errorResponses },
       },
@@ -362,7 +363,8 @@ export function registerVerfahrenWissenRoutes(
       preHandler: readAuth.preHandler,
       schema: {
         tags: ["verfahren-wissen"],
-        summary: "Kontext-Bundle des Verfahrens-Wissens (neutralisiert) für die agentische Weiterverarbeitung",
+        summary:
+          "Kontext-Bundle des Verfahrens-Wissens (neutralisiert) für die agentische Weiterverarbeitung",
         params: VerfahrenWissenParamsSchema,
         response: { 200: WissenVerfahrenExportDtoSchema, ...errorResponses },
       },

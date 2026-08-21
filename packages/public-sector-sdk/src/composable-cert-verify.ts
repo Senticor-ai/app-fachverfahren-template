@@ -35,7 +35,14 @@ export function stableStringify(v: unknown): string {
   if (typeof v !== "object") return JSON.stringify(v);
   if (Array.isArray(v)) return "[" + v.map(stableStringify).join(",") + "]";
   const o = v as Record<string, unknown>;
-  return "{" + Object.keys(o).sort().map((k) => JSON.stringify(k) + ":" + stableStringify(o[k])).join(",") + "}";
+  return (
+    "{" +
+    Object.keys(o)
+      .sort()
+      .map((k) => JSON.stringify(k) + ":" + stableStringify(o[k]))
+      .join(",") +
+    "}"
+  );
 }
 
 // ── Manifest-Typen (die EINE Identität einer zuständigen Stelle, CHOS mesh-derive/mesh-emit) ─────────────────────────
@@ -56,11 +63,55 @@ export interface MeshGovernanceProjektion {
   composableId?: string;
   domain?: string;
   regime?: { normativ?: boolean };
-  stellen?: { id: string; art?: string; zone?: string; akteur?: string; titel?: string }[];
-  regeln?: { id: string; label: string; art: string; class?: string; verify?: string; role?: string; requirement?: string }[];
-  capabilities?: { id: string; ergebnis: string; wissen?: string[]; evalSuite?: string }[];
+  stellen?: {
+    id: string;
+    art?: string;
+    zone?: string;
+    akteur?: string;
+    titel?: string;
+  }[];
+  regeln?: {
+    id: string;
+    label: string;
+    art: string;
+    class?: string;
+    verify?: string;
+    role?: string;
+    requirement?: string;
+  }[];
+  capabilities?: {
+    id: string;
+    ergebnis: string;
+    wissen?: string[];
+    evalSuite?: string;
+  }[];
   befugnis?: { entscheidung?: string; hitlPflicht?: boolean; aal?: number };
-  faehigkeiten?: { ki?: string[]; entitlements?: string[]; autonomie?: string; aal?: number };
+  faehigkeiten?: {
+    ki?: string[];
+    entitlements?: string[];
+    autonomie?: string;
+    aal?: number;
+    /** DIE ZWEITE, GLEICHRANGIGE SEITE. Es reist der ANSPRUCH — `programm` ist eine KENNUNG (`tarif:…`,
+     *  `regel:…`, `dmn:…`), nie der Koerper: der ist nachbaubare Substanz und bleibt beim Herausgeber (§7).
+     *  Ohne diese Zeilen faellt die Seite in die Index-Signatur unten und ist dem KIT unbekannt — genau der
+     *  Weg, auf dem `befugnis` schon einmal verloren ging (s. Kommentar am Manifest-Typ). */
+    strukturiert?: {
+      id: string;
+      ergebnis: string;
+      klasse?: string;
+      programm?: string;
+      grundlagen?: string[];
+      evalSuite?: string;
+      /** Erzeugt von einer Wissens-Faehigkeit — und von wem freigegeben. OHNE Freigabe ist das ein Befund,
+       *  der im fremden Traeger sichtbar bleiben MUSS: der Betreiber entscheidet damit, ob er eine
+       *  ungelesene Regel betreibt. */
+      erzeugtVon?: string;
+      freigegebenVon?: string;
+    }[];
+    /** WERKZEUG-KANTEN: welche Wissens-Faehigkeit welches Programm aufruft. Eine Governance-Aussage
+     *  (WER WEN benutzen darf), kein Bauplan (WIE das Programm rechnet). */
+    benutzt?: { wissen: string; werkzeug: string }[];
+  };
   herkunft?: { verfassungDigest?: string; revision?: number };
   digest?: string;
   [k: string]: unknown;
@@ -117,9 +168,18 @@ export function verifyMeshGovernanceProjektion(
       `Die mitgereiste Verfassung trägt schemaVersion ${String(p.schemaVersion)} — dieser Träger versteht ${MESH_GOVERNANCE_PROJEKTION_SCHEMA_VERSION} (fail-closed statt Schema-Raten).`,
     );
   }
-  if (p.art !== "projektion") gruende.push("Die mitgereiste Verfassung gibt sich nicht als abgeleitete Projektion aus (art ≠ \"projektion\") — kein Vertrauen.");
-  if (typeof p.digest !== "string" || !p.digest) gruende.push("Die mitgereiste Verfassung trägt kein Siegel (digest) — nicht prüfbar, also nicht belastbar.");
-  if (p.composableId !== id) gruende.push(`Die mitgereiste Verfassung gehört zur Stelle „${String(p.composableId)}“, gemountet wird „${id}“ — inkongruent (fail-closed).`);
+  if (p.art !== "projektion")
+    gruende.push(
+      'Die mitgereiste Verfassung gibt sich nicht als abgeleitete Projektion aus (art ≠ "projektion") — kein Vertrauen.',
+    );
+  if (typeof p.digest !== "string" || !p.digest)
+    gruende.push(
+      "Die mitgereiste Verfassung trägt kein Siegel (digest) — nicht prüfbar, also nicht belastbar.",
+    );
+  if (p.composableId !== id)
+    gruende.push(
+      `Die mitgereiste Verfassung gehört zur Stelle „${String(p.composableId)}“, gemountet wird „${id}“ — inkongruent (fail-closed).`,
+    );
   if (gruende.length) return { vorhanden: true, intakt: false, gruende };
   if (!opts.sha256Hex) {
     return {
@@ -130,7 +190,9 @@ export function verifyMeshGovernanceProjektion(
       ],
     };
   }
-  const { digest, ...ohneSiegel } = p as Record<string, unknown> & { digest: string };
+  const { digest, ...ohneSiegel } = p as Record<string, unknown> & {
+    digest: string;
+  };
   const nachgerechnet = opts.sha256Hex(stableStringify(ohneSiegel));
   if (nachgerechnet !== digest) {
     return {
@@ -164,7 +226,24 @@ export interface MeshComposableManifest {
       art: "verbindlich" | "mit-freigabe" | "optional";
     }[];
   };
-  faehigkeiten?: { ki?: string[]; autonomie?: string };
+  /** `strukturiert`/`benutzt` stehen hier fuer den Alt-Bestand OHNE mitgereiste Projektion. Wo eine
+   *  Projektion vorliegt, ist SIE der Traeger (versiegelt) — dieser Block ist dann nicht die Wahrheit,
+   *  sondern nur ihre unversiegelte Kopie. Die Rangfolge setzt `mapManifestToComposable` durch. */
+  faehigkeiten?: {
+    ki?: string[];
+    autonomie?: string;
+    strukturiert?: {
+      id: string;
+      ergebnis: string;
+      klasse?: string;
+      programm?: string;
+      grundlagen?: string[];
+      evalSuite?: string;
+      erzeugtVon?: string;
+      freigegebenVon?: string;
+    }[];
+    benutzt?: { wissen: string; werkzeug: string }[];
+  };
   wissen?: string[];
   evalSuiten?: string[];
   /** WAS die Stelle im laufenden Verfahren ENTSCHEIDET — abgeleitet aus der Zustandsmaschine (Uebergaenge x
@@ -219,6 +298,54 @@ export function istMeshManifest(
 }
 
 // ── Verdikt-Typen (in-toto-Statement, Spiegel CHOS composable-cert.CertStatement) ────────────────────────────────────
+// ── DIE IDENTITAET EINER DEFINITION — dieselbe Formel wie beim Erzeuger, sonst passt kein Verdikt ─────────────────
+//
+// GEMESSEN 2026-08-04 an 44 echten Manifest/Ausweis-Paaren aus einem CHOS-Arbeitsbereich: die Frische-Pruefung
+// dieses Hauses rechnete `sha256(Datei-Bytes)` und traf das Subjekt des Verdikts in NULL von 44 Faellen. CHOS hat
+// die Formel am 2026-08-03 gewechselt (Commit 852e532d, „das Verdikt zertifiziert die DEFINITION, nicht die
+// BINDUNG") und die eigene Leseseite mitgezogen — diese Seite nicht. Folge: `certified` war hier strukturell
+// unerreichbar, jedes zertifizierte Composable fiel fail-closed auf `candidate`, und niemand sah einen Fehler:
+// die Kappung ist ja der richtige Reflex bei einem nicht passenden Digest. Ein Waechter, der IMMER kappt, sieht
+// aus wie ein strenger Waechter.
+//
+// WARUM DIE BINDUNGS-FELDER RAUS MUESSEN: dieselbe Stelle (z. B. „fachdienst") steht in mehreren Verfahren und
+// ist dort auf verschiedene Rechtsgrundlagen geerdet. Haengte die Identitaet an den vollen Bytes, waere ein
+// Verdikt per Konstruktion an EIN Verfahren gekettet und koennte nie ein zweites decken — genau die
+// Wiederverwendung, um derentwillen es die Registry gibt. Die Bindung geht nicht verloren: sie steht weiter in
+// der Datei und wird beim Mount gegen die Ziel-Verfassung geprueft.
+//
+// KOPIE MIT PFLICHT ZUR KONGRUENZ: die Quelle ist `packages/fachverfahren/composable-identitaet.ts` im
+// Erzeuger-Repo (CHOS). Zwei Repos koennen keine Funktion teilen — aber sie koennen dieselbe Antwort schulden.
+// Weicht eine Seite ab, ist die Wirkung STILL und total (siehe oben). Wer hier etwas aendert, aendert es dort
+// mit; die Kongruenz-Probe im Erzeuger-Repo haelt beide Listen gegeneinander.
+export const BINDUNGS_FELDER = [
+  "domain",
+  "amt",
+  "anspruch",
+  "governanceProjektion",
+  "version",
+] as const;
+
+/** Rekursiv die Bindungs-Felder entfernen und kanonisch (schluessel-sortiert) serialisieren. Deterministisch:
+ *  gleiche Definition ⇒ gleiche Bytes, unabhaengig von der Feld-Reihenfolge der Quelle. BYTE-GLEICH mit dem
+ *  Erzeuger — inklusive Einrueckung 2 und abschliessendem Zeilenumbruch. */
+export function definitionsBytes(manifest: unknown): string {
+  const ohneBindung = (o: unknown): unknown => {
+    if (Array.isArray(o)) return o.map(ohneBindung);
+    if (o && typeof o === "object") {
+      const raus = new Set<string>(BINDUNGS_FELDER);
+      return Object.fromEntries(
+        Object.entries(o as Record<string, unknown>)
+          .filter(([k]) => !raus.has(k))
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+          .map(([k, v]) => [k, ohneBindung(v)]),
+      );
+    }
+    return o;
+  };
+  return JSON.stringify(ohneBindung(manifest), null, 2) + "\n";
+}
+
 export const IN_TOTO_STATEMENT_TYPE = "https://in-toto.io/Statement/v1";
 export const COMPOSABLE_CERT_PREDICATE_TYPE =
   "https://chos.senticor.ai/attestations/composable-certification/v1";
@@ -323,7 +450,12 @@ export interface MeshCertVerifyOptions {
   sha256Hex?: (input: string) => string;
   /** INJIZIERTE public-only Ed25519-Verifikation (node:crypto beim Aufrufer): Nachricht = `${domain}\0${digestHex}`,
    *  `publicKey`/`signature` base64url. Die Autoritäts-/Form-Prüfung (Trust-Anker-Gleichheit, alg, Domäne) bleibt HIER. */
-  verifyEd25519?: (publicKey: string, domain: string, digestHex: string, signature: string | undefined) => boolean;
+  verifyEd25519?: (
+    publicKey: string,
+    domain: string,
+    digestHex: string,
+    signature: string | undefined,
+  ) => boolean;
   /** ÄLTERER, rückwärts-kompatibler HMAC-Injektions-Seam (nur genutzt, wenn KEINE asymmetrische Prüfung möglich ist). */
   verifySignature?: (payload: string, sig: string | undefined) => boolean;
   /** Kanonische Serialisierung des Statements für den HMAC-Payload (muss byte-gleich zur CHOS-Signier-Seite sein). */
@@ -429,7 +561,12 @@ export function verifyMeshCertStructure(
       att.alg === "Ed25519" &&
       typeof att.publicKey === "string" &&
       att.publicKey === opts.certSigningPublicKey &&
-      opts.verifyEd25519(att.publicKey, COMPOSABLE_CERT_SIGNATURE_DOMAIN, digest, att.sig);
+      opts.verifyEd25519(
+        att.publicKey,
+        COMPOSABLE_CERT_SIGNATURE_DOMAIN,
+        digest,
+        att.sig,
+      );
     if (okSig) signatureChecked = true;
     else {
       reasons.push(
@@ -455,7 +592,9 @@ export function verifyMeshCertStructure(
     signatureChecked,
     countersigned,
     governanceAttested: valid && !!bezeugterGovDigest,
-    ...(valid && bezeugterGovDigest ? { governanceSha256: bezeugterGovDigest } : {}),
+    ...(valid && bezeugterGovDigest
+      ? { governanceSha256: bezeugterGovDigest }
+      : {}),
     ...(valid && recomputedAxes ? { axes: recomputedAxes } : {}),
     ...(valid && st?.predicate?.finishedAt
       ? { finishedAt: st.predicate.finishedAt }

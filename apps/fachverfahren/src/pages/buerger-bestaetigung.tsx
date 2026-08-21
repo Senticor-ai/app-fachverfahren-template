@@ -44,7 +44,9 @@ export function BuergerBestaetigungPage(): React.JSX.Element {
                 Eingangsnachweis und stehen so auch in Ihrem Postfach. */}
             <dl className="mt-4 grid gap-3 sm:grid-cols-2">
               <div>
-                <dt className="text-xs text-muted-foreground">Eingangsnummer</dt>
+                <dt className="text-xs text-muted-foreground">
+                  Eingangsnummer
+                </dt>
                 <dd className="font-mono text-sm font-medium text-foreground">
                   {v.vorgangsnummer}
                 </dd>

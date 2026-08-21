@@ -153,7 +153,11 @@ export function createOllamaAiAssistPort(
         const res = await fetchImpl(`${baseUrl}/api/chat`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ model: config.model, messages, stream: false }),
+          body: JSON.stringify({
+            model: config.model,
+            messages,
+            stream: false,
+          }),
           signal: controller.signal,
         });
         if (!res.ok) {
