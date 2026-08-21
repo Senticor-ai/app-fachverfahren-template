@@ -74,3 +74,16 @@ overrides:
   fast-uri@3: ^3.1.5
   fast-uri@4: ^4.1.2
   find-my-way: ^9.7.0
+  # DRITTE CHARGE — HAUPTVERSIONS-WECHSEL, also mit Bruchrisiko. Sie stehen hier nur, weil der Testlauf
+  # sie deckt (1355 Zusicherungen); ohne diesen Beleg gehoeren sie nicht in einen Override, sondern in
+  # eine eigene Welle. Wer sie anfasst, faehrt die Tests, statt der Versionsnummer zu glauben.
+  #   @opentelemetry/sdk-node             0.57.2 → 0.217.0  CVE-2026-44902
+  #   @opentelemetry/exporter-prometheus  0.57.2 → 0.217.0  dieselbe Meldung
+  #   @opentelemetry/propagator-jaeger    1.30.1 → 2.9.0    CVE-2026-59892
+  "@opentelemetry/sdk-node": ^0.217.0
+  "@opentelemetry/exporter-prometheus": ^0.217.0
+  "@opentelemetry/propagator-jaeger": ^2.9.0
+  # NACHZUG DER DRITTEN CHARGE: das neue OTel-SDK bringt `protobufjs` 8.0.1 mit, und das traegt selbst
+  # zwei Meldungen (behoben in 8.4.1). Ein Sprung, der eine Verwundbarkeit schliesst, kann eine neue
+  # EINSCHLEPPEN — deshalb wurde nach der Charge erneut gescannt, statt die Zahl von vorher zu glauben.
+  protobufjs: ^8.4.1
