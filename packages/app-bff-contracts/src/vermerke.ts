@@ -46,6 +46,30 @@ export const VermerkReviewStatusSchema = Type.Union([
   Type.Literal("bestaetigt"),
   Type.Literal("verworfen"),
 ]);
+export type VermerkReviewStatus = Static<typeof VermerkReviewStatusSchema>;
+
+/**
+ * DIE EINE PRÜF-ENTSCHEIDUNG (HITL über einen KI-Entwurf): bestätigen oder verwerfen.
+ *
+ * WARUM ALS BENANNTES SCHEMA (und nicht inline in VermerkReviewRequestSchema): das Vokabular WAR
+ * hier schon die eine Wahrheit — aber nur als anonyme Union INNERHALB des Request-Objekts. Damit gab
+ * es nichts zu importieren, und jeder Konsument tippte die zwei Wörter neu: gemessen 7 Definitionen
+ * derselben Menge {bestaetigt, verworfen} (2× Route-lokal, 4× in App-Seiten, 1× hier). Ein benanntes
+ * Schema + der abgeleitete Typ machen die eine Wahrheit ZITIERBAR — das ist die Wurzel, nicht die
+ * einzelnen Kopien.
+ *
+ * ACHTUNG ABGRENZUNG: das ist NICHT der Vorgangs-Status (der ist `ProcedureVersion.allowedStates`,
+ * verfahrens-DATEN) und NICHT der Freigabe-/Vier-Augen-Zustand (der ist server-seitig eine ZAHL,
+ * `requiredApprovals`, kein Vokabular). Diese Menge beschreibt allein den Ausgang EINER menschlichen
+ * Prüfung eines KI-Beitrags.
+ */
+export const VermerkReviewEntscheidungSchema = Type.Union([
+  Type.Literal("bestaetigt"),
+  Type.Literal("verworfen"),
+]);
+export type VermerkReviewEntscheidung = Static<
+  typeof VermerkReviewEntscheidungSchema
+>;
 
 /** Einen menschlichen Blackboard-Beitrag schreiben. Urheber/Peer kommt server-seitig aus der Sitzung. */
 export const VermerkRequestSchema = Type.Object(
@@ -80,13 +104,11 @@ export const KiVermerkRequestSchema = Type.Object(
 );
 export type KiVermerkRequestDto = Static<typeof KiVermerkRequestSchema>;
 
-/** Einen KI-Vermerk-Entwurf prüfen: bestätigen (in die Akte übernehmen) oder verwerfen. */
+/** Einen KI-Vermerk-Entwurf prüfen: bestätigen (in die Akte übernehmen) oder verwerfen.
+ *  Das Vokabular kommt aus `VermerkReviewEntscheidungSchema` — hier steht es NICHT ein zweites Mal. */
 export const VermerkReviewRequestSchema = Type.Object(
   {
-    entscheidung: Type.Union([
-      Type.Literal("bestaetigt"),
-      Type.Literal("verworfen"),
-    ]),
+    entscheidung: VermerkReviewEntscheidungSchema,
   },
   { additionalProperties: false },
 );

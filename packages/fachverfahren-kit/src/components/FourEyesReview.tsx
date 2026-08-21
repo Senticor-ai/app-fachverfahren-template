@@ -36,7 +36,23 @@ import {
 } from "../ui/form-field.js";
 import { useStatusRegion } from "./StatusRegion.js";
 
-/** Lebenszyklus einer rechtsnahen Entscheidung im Vier-Augen-Verfahren. */
+/**
+ * Lebenszyklus einer rechtsnahen Entscheidung im Vier-Augen-Verfahren — ANSICHTS-Zustand DIESER
+ * Karte, bewusst KEIN Server-Vokabular.
+ *
+ * BEWUSSTE TRENNUNG (bitte nicht „vereinheitlichen"): der Server kennt für die Freigabe GAR KEIN
+ * Wort-Vokabular. Er modelliert sie als ZAHL — `CaseTransition.requiredApprovals` (`requiresFourEyes`
+ * ist genau `requiredApprovals: 2`) plus die Menge DISTINKTER Freigebender, ausgewertet von
+ * `approvalsSatisfied` in public-sector-sdk/domain-kernel.ts. Das ist absichtlich engine-neutral, damit
+ * ein BPMN-/Camunda-/n8n-Adapter sein eigenes Modell darauf abbilden kann.
+ *
+ * Die fünf Wörter hier sind die Stufen, die dieses UI-Element NACHEINANDER anzeigt (Entwurf →
+ * vorgelegt → in Prüfung → freigegeben/abgelehnt). Sie an `requiredApprovals` oder an
+ * `ProcedureVersion.allowedStates` zu „binden" wäre FALSCH: der Vorgangs-Status ist verfahrens-
+ * variabel und kommt aus den Governance-abgeleiteten Daten, die Freigabe ist eine Zählung, und diese
+ * Liste ist die Darstellungs-Reihenfolge einer Karte. Drei verschiedene Dinge, drei Wahrheiten an
+ * drei Orten — eine gemeinsame Aufzählung würde alle drei falsch machen.
+ */
 export type FourEyesStatus =
   "entwurf" | "vorgelegt" | "inPruefung" | "freigegeben" | "abgelehnt";
 

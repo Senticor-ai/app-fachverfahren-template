@@ -8,6 +8,11 @@ import { createPgClient, type PgClient } from "./client.js";
 import { createChosClientFromEnv } from "./chos-client.js";
 import { ChosTaskStore } from "./chos-task-store.js";
 
+/** Aufgaben-Lebenszyklus. Fachliche Wahrheit: `TaskState` in public-sector-sdk/domain-kernel.ts
+ *  (dort auch die Begründung, warum das — anders als der Vorgangs-Status — eine feste Union sein darf).
+ *  Diese Speicher-Schicht ist absichtlich abhängigkeitsfrei (nur pg + fractional-indexing) und kann den
+ *  Kernel nicht importieren; die Kopie ist strukturbedingt. Änderung hier ⇒ auch dort und in
+ *  app-bff-contracts/tasks.ts (TaskStateSchema). */
 export type TaskState = "open" | "claimed" | "completed" | "cancelled";
 
 /** Eine Aufgabe/ein Ziel/ein Schritt/ein Termin einer Akte. Erweitert SDK-`Task` (taskId/caseId/title/state/
