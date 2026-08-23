@@ -15,11 +15,36 @@ prepare:
       command: pnpm run build:packages && pnpm run build:app && pnpm run build:server
 
 test:
+  # NUR das `unit`-Projekt: die vitest-Konfiguration dieser Vorlage trennt bereits
+  # `template-tooling` (tooling/template/**, mkdtemp + Full-Repo-Render + Subprozesse, 120s-Budget)
+  # von `unit` (alles andere). Im Deploy-Tor einer GENERIERTEN App hat die Selbstpruefung des
+  # GENERATORS nichts zu suchen -- sie blockierte den Rollout mit 8 Fehlschlaegen, davon 5 auch bei
+  # 120s (Codesphere-Workspace, 2026-08-23). Im Vorlagen-Repo laeuft sie weiter ueber `pnpm test`
+  # bzw. `pnpm run test:template`. Wir schneiden also NICHT die Konfiguration auf, sondern waehlen
+  # das Projekt -- die Trennung existiert schon.
   steps:
     - name: Validate (typecheck + unit)
-      command: pnpm run --if-present typecheck && pnpm run --if-present test
+      command: pnpm run --if-present typecheck && pnpm vitest run --project unit
 
+# SCHEMA-HINWEIS (hart erkauft): unter `run:` MUSS ein BENANNTER Service stehen, mit `network.ports`
+# und `network.paths`. Die wrapper-lose Form (`run: steps:`) liess `cs start pipeline` mit
+# `500 (An internal error occurred)` scheitern -- ohne Validierungsfehler, was die Ursache verdeckte
+# (Trace-IDs SYaKGPD, laqdIQC, 2026-08-23). Codesphere-Support hat dieselbe Wrapper-Pflicht schon fuer
+# die CHOS-Landscape bestaetigt. Also: NICHT den Wrapper entfernen.
+#
+# plan 402 = Pro on-demand (8 CPU / 16 GiB) statt der 1 CPU / 2 GiB des Standard-Plans 101: auf 101
+# brauchten die Tests der generierten App 625s und die Render-Tests rissen selbst 120s.
 run:
-  steps:
-    - name: Fachverfahren-Server
-      command: node apps/fachverfahren/dist-server/index.js
+  fachverfahren:
+    steps:
+      - name: Fachverfahren-Server
+        command: PORT=3000 node apps/fachverfahren/dist-server/index.js
+    plan: 402
+    replicas: 1
+    network:
+      ports:
+        - port: 3000
+          isPublic: true
+      paths:
+        - port: 3000
+          path: /
