@@ -20,8 +20,11 @@ export default defineConfig({
     // Subprozess-Arbeit. Auf den langsameren opencode.de-CI-Runnern reißt Vitests 5s-Default unter Last
     // (nicht-deterministisch mal 2, mal 6 Timeouts) — GitHubs schnellere Runner treffen die Grenze nie.
     // Ein großzügigeres Budget stabilisiert die GitLab-Pipeline, ohne echte Hänger zu verstecken.
-    testTimeout: 20000,
-    hookTimeout: 20000,
+    // 20000 -> 60000 (2026-08-23): dieselbe Begruendung wie oben, eine Stufe weiter. Der Codesphere-
+    // Deploy fuehrt dieses Gate auf einem Workspace aus, und dort war das 20s-Budget zu knapp. 60s
+    // bleibt weit unter dem, was ein echter Haenger braeuchte — versteckt also nichts.
+    testTimeout: 60000,
+    hookTimeout: 60000,
     exclude: [
       "**/.{git,cache,output,temp}/**",
       "**/coverage/**",
@@ -30,6 +33,13 @@ export default defineConfig({
       "**/node_modules/**",
       // E2E baut das reale Bundle (Full-Build-Kosten) — läuft separat via `test:e2e` (vitest.e2e.config.ts).
       "tests/e2e/**",
+      // Selbsttests der VORLAGEN-MASCHINERIE (Scaffold-Determinismus, Render-Contracts, Template-CLI,
+      // Agent-Platform-Contracts). Sie pruefen den GENERATOR, nicht das erzeugte Fachverfahren, und
+      // machen mkdtemp-, Full-Repo-Render- und Subprozess-Arbeit. Im Deploy-Tor einer generierten App
+      // blockierten sie den Rollout: 8 Fehlschlaege auf einem Codesphere-Workspace, 5 davon selbst bei
+      // 120s Timeout (2026-08-23). Im Vorlagen-Repo laufen sie weiter — dort gehoeren sie hin, denn
+      // dort IST der Generator das Produkt. Siehe scripts/test-template.* / `pnpm run test:template`.
+      "tooling/template/**",
     ],
   },
 });

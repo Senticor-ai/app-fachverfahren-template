@@ -19,7 +19,22 @@ test:
     - name: Validate (typecheck + unit)
       command: pnpm run --if-present typecheck && pnpm run --if-present test
 
+# SCHEMA-HINWEIS (hart erkauft): unter `run:` MUSS ein BENANNTER Service stehen, mit `network.ports`
+# und `network.paths`. Die wrapper-lose Form (`run: steps:`) liess `cs start pipeline` mit
+# `500 (An internal error occurred)` scheitern — ohne Validierungsfehler, was die Ursache verdeckte
+# (Trace-IDs SYaKGPD, laqdIQC, 2026-08-23). Codesphere-Support hat dieselbe Wrapper-Pflicht schon fuer
+# die CHOS-Landscape bestaetigt. Also: NICHT den Wrapper entfernen.
 run:
-  steps:
-    - name: Fachverfahren-Server
-      command: node apps/fachverfahren/dist-server/index.js
+  fachverfahren:
+    steps:
+      - name: Fachverfahren-Server
+        command: PORT=3000 node apps/fachverfahren/dist-server/index.js
+    plan: 402
+    replicas: 1
+    network:
+      ports:
+        - port: 3000
+          isPublic: true
+      paths:
+        - port: 3000
+          path: /
