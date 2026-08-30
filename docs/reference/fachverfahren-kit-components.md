@@ -115,6 +115,7 @@ und deaktivierte Bulk-Actions ohne Auswahl.
 - `MermaidView`
 - `RichTextEditor`
 - `FileBrowser`
+- `WissensPanel`
 
 ### AI, Status And Feedback
 
