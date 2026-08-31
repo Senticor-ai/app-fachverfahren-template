@@ -83,6 +83,15 @@
           "APP_STORE_MODE": "memory"
         }
       }
+    },
+    "seam": {
+      "//": "THE DOMAIN SEAM OF THIS APP — the files that legitimately carry procedure vocabulary although they live outside modules/<domain>. `leistung.config.ts` is, in this kit's own words, 'DIE EINE Austausch-Naht dieser App'; the other three are generated FROM it. The domain-leakage gate protects SHARED code from hard-coded vocabulary — the seam is by design not shared, and reading this declaration is what keeps that distinction honest. Paths are relative to this app directory, so they survive the scaffold rename. Absent => nothing is exempt (the previous behaviour).",
+      "files": [
+        "src/leistung.config.ts",
+        "leistung.contract.json",
+        "public/leistung.contract.json",
+        "public/runtime-config.json"
+      ]
     }
   }
 }

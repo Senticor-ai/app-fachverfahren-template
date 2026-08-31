@@ -1337,6 +1337,21 @@ async function validateDomainLeakage(root: string) {
     });
   }
   const forbiddenRoots = ["apps", "packages", "jurisdictions"];
+  // ── THE DECLARED DOMAIN SEAM IS NOT SHARED CODE ─────────────────────────────────────────────────────────────
+  // This gate protects SHARED code from hard-coded procedure vocabulary. One family of files is, by this kit's own
+  // documentation, the exact opposite: `leistung.config.ts` calls itself "DIE EINE Austausch-Naht dieser App — die
+  // `LeistungConfig`, aus der die gesamte App rendert", and three further files are generated FROM it. They live
+  // under `apps/` and they carry the procedure's vocabulary because that is their entire purpose.
+  //
+  // MEASURED 2026-08-31 in two fully built procedures: `agent:bootstrap` reported eighteen leakage blockers, and
+  // every one of them named one of these four files. Reporting the seam as leakage does not protect anything — it
+  // buries the leaks that would matter (a procedure term hard-coded into `packages/`) under the one file that is
+  // supposed to have them.
+  //
+  // The exemption is DECLARED, never guessed: the app names its own seam in `package.json` under `chos.seam.files`,
+  // relative to the app directory, so it survives the scaffold rename. No declaration => no exemption => the
+  // previous behaviour, byte for byte.
+  const seamFiles = await collectDeclaredSeam(root);
   const files = (
     await Promise.all(
       forbiddenRoots.map((entry) =>
@@ -1360,6 +1375,9 @@ async function validateDomainLeakage(root: string) {
       if (rel.startsWith(spec.module.destination)) {
         continue;
       }
+      if (seamFiles.has(rel)) {
+        continue;
+      }
       // Das generierte Doc-Wiki-Manifest aggregiert Repo-Doku (inkl. Skills, die Beispiel-Verfahren wie
       // Hundesteuer NENNEN) — Dokumentation, kein Runtime-Domaenencode. Der Leckage-Gate schuetzt AUTHORED
       // Code vor hart kodiertem Domaenen-Vokabular; ein generiertes Doku-Aggregat ist bewusst ausgenommen.
@@ -1379,6 +1397,30 @@ async function validateDomainLeakage(root: string) {
     }
   }
   return failures;
+}
+
+/** The seam files an app DECLARES for itself (`package.json` -> `chos.seam.files`, relative to the app dir),
+ *  returned as repo-relative paths. Every app under `apps/` is asked; an app without the declaration contributes
+ *  nothing. A malformed entry is ignored rather than silently widening the exemption — an exemption that grows by
+ *  accident is worse than one that is missing. */
+async function collectDeclaredSeam(root: string): Promise<Set<string>> {
+  const seam = new Set<string>();
+  const apps = await readdir(join(root, "apps"), {
+    withFileTypes: true,
+  }).catch(() => []);
+  for (const app of apps) {
+    if (!app.isDirectory()) continue;
+    const pkg = await readJson<{
+      chos?: { seam?: { files?: unknown } };
+    }>(join(root, "apps", app.name, "package.json")).catch(() => null);
+    const files = pkg?.chos?.seam?.files;
+    if (!Array.isArray(files)) continue;
+    for (const entry of files) {
+      if (typeof entry !== "string" || !entry || entry.includes("..")) continue;
+      seam.add(join("apps", app.name, entry));
+    }
+  }
+  return seam;
 }
 
 async function listModuleDirectories(root: string) {
