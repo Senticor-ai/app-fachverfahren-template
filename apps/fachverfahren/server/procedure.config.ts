@@ -365,12 +365,69 @@ interface VertragsStatusMaschine {
   }[];
 }
 
+/** DIE PFLICHTANGABEN DES VERWALTUNGSAKTS AUS DEM VERTRAG — und, wo er schweigt, LIEBER KEINE.
+ *
+ * ── GEMESSEN 2026-08-31 an zwei fertig gebauten Verfahren ────────────────────────────────────────────────
+ * `antragQuelleAusVertrag` spreizt `...basisOhneRegime` und erbte damit `verwaltungsaktInhalt` WOERTLICH aus
+ * `MUSTER_ANTRAG` — samt der Demo-Datenpfade (`antragsteller.vorname`, die es im erzeugten Verfahren nicht
+ * gibt) und samt `zahlungsempfaenger: "Stadtkasse Musterstadt"`. Der Bescheid der Gemeinde Musterhausen
+ * forderte also zur Zahlung an die Kasse einer FREMDEN Kommune, und der Inhaltsadressat blieb leer, weil die
+ * geerbten Pfade auf Felder zeigen, die dieses Verfahren nicht fuehrt (§ 119 Abs. 1 AO · § 254 Abs. 1 AO).
+ *
+ * Das ist exakt die Klasse, die diese Datei fuer `verwaltungsakt` bereits geloest hat, mit ihrer eigenen
+ * Begruendung: «lieber gar kein Bescheid (fail-closed am Erlass) als ein Bescheid mit der Belehrung eines
+ * fremden Verfahrens». Fuer die Pflichtangaben gilt dasselbe Wort fuer Wort.
+ *
+ * ABGELEITET WIRD NUR, WAS DER VERTRAG WIRKLICH SAGT:
+ *   `zahlungsempfaenger`  aus `kommune` — die erlassende Behoerde IST die Kasse; das ist keine Vermutung.
+ *   alles Uebrige         nur, wenn der Vertrag es unter `verwaltungsaktInhalt` DEKLARIERT.
+ * Schweigt er, wird der Block ENTFERNT statt geerbt. Ein leeres Feld ist ein sichtbarer Mangel; ein Feld mit
+ * dem Wert eines fremden Verfahrens ist eine stille Falschaussage. */
+function verwaltungsaktInhaltAusVertrag(roh: {
+  kommune?: unknown;
+  verwaltungsaktInhalt?: unknown;
+}): StatusMachineSource["verwaltungsaktInhalt"] | undefined {
+  const deklariert =
+    roh.verwaltungsaktInhalt && typeof roh.verwaltungsaktInhalt === "object"
+      ? (roh.verwaltungsaktInhalt as NonNullable<
+          StatusMachineSource["verwaltungsaktInhalt"]
+        >)
+      : undefined;
+  const kommune =
+    typeof roh.kommune === "string" && roh.kommune.trim()
+      ? roh.kommune.trim()
+      : undefined;
+  if (!deklariert && !kommune) return undefined;
+  const basis =
+    deklariert ??
+    ({} as NonNullable<StatusMachineSource["verwaltungsaktInhalt"]>);
+  // Der Zahlungsempfaenger folgt der erlassenden Behoerde, es sei denn der Vertrag nennt ausdruecklich einen
+  // anderen (Kassenzeichen einer gemeinsamen Kasse) — deklariert schlaegt abgeleitet.
+  const lg = basis.leistungsgebot;
+  const leistungsgebot =
+    lg && typeof lg === "object"
+      ? {
+          ...lg,
+          ...(lg.zahlungsempfaenger || !kommune
+            ? {}
+            : { zahlungsempfaenger: kommune }),
+        }
+      : undefined;
+  const raus = {
+    ...basis,
+    ...(leistungsgebot ? { leistungsgebot } : {}),
+  };
+  return Object.keys(raus).length > 0 ? raus : undefined;
+}
+
 function antragQuelleAusVertrag(): StatusMachineSource | null {
   try {
     const roh = JSON.parse(
       fs.readFileSync(path.join(APP_DIR, "leistung.contract.json"), "utf8"),
     ) as {
       id?: unknown;
+      kommune?: unknown;
+      verwaltungsaktInhalt?: unknown;
       rechtsgrundlagen?: { norm?: unknown }[];
       statusMachine?: VertragsStatusMaschine;
       zustellung?: VertragsZustellung;
@@ -432,12 +489,19 @@ function antragQuelleAusVertrag(): StatusMachineSource | null {
     // Regime, wird `verwaltungsakt` bewusst ENTFERNT statt geerbt: lieber gar kein Bescheid (fail-closed am
     // Erlass) als ein Bescheid mit der Belehrung eines fremden Verfahrens.
     const verwaltungsakt = verwaltungsaktAusVertrag(roh.zustellung);
-    const { verwaltungsakt: _musterRegime, ...basisOhneRegime } = MUSTER_ANTRAG;
+    const verwaltungsaktInhalt = verwaltungsaktInhaltAusVertrag(roh);
+    // DIE PFLICHTANGABEN WERDEN EBENSO WENIG GEERBT WIE DAS REGIME — s. `verwaltungsaktInhaltAusVertrag`.
+    const {
+      verwaltungsakt: _musterRegime,
+      verwaltungsaktInhalt: _musterInhalt,
+      ...basisOhneRegime
+    } = MUSTER_ANTRAG;
     return {
       ...basisOhneRegime,
       procedureId: id,
       ...(legalBasisIds.length > 0 ? { legalBasisIds } : {}),
       ...(verwaltungsakt ? { verwaltungsakt } : {}),
+      ...(verwaltungsaktInhalt ? { verwaltungsaktInhalt } : {}),
       states,
       transitions,
     };

@@ -473,6 +473,7 @@ import type {
   FeldBedingung,
   BedingungGruppe,
   Bedingung,
+  VerwaltungsaktInhaltConfig,
 } from "@senticor/public-sector-sdk";
 export type { BedingungOperator, FeldBedingung, BedingungGruppe, Bedingung };
 
@@ -817,6 +818,23 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   ePayment?: EPaymentConfig | undefined;
   /** Gesetzt ⇒ Bescheid-Tab (PdfViewer) im ReviewWorkspace + Bürger-Postfach (Zustellnachweis). */
   zustellung?: ZustellungConfig | undefined;
+  /**
+   * DIE PFLICHTANGABEN DES VERWALTUNGSAKTS — woher der erlassende Bescheid Inhaltsadressat, Zeitraum,
+   * Leistungsgebot und Unterschrift NIMMT (§ 119 Abs. 1 AO · § 254 Abs. 1 AO · § 119 Abs. 3 S. 2 AO).
+   *
+   * ── WARUM DIESES FELD HIER FEHLTE, UND WAS DAS KOSTETE (gemessen 2026-08-31) ──────────────────────────
+   * Die Naht trug es NICHT. `procedure.config.ts` konnte die Angaben deshalb nur aus seinem neutralen
+   * `MUSTER_ANTRAG` erben — samt dessen Demo-Datenpfaden und dessen `zahlungsempfaenger`. An zwei fertig
+   * gebauten Verfahren gemessen hiess das: der Bescheid der einen Gemeinde forderte zur Zahlung an die Kasse
+   * einer ANDEREN, und der Inhaltsadressat blieb leer, weil die geerbten Pfade auf Felder zeigen, die das
+   * Verfahren nicht fuehrt. Ein erzeugendes Verfahren hatte keinen Ort, an dem es das richtigstellen konnte.
+   *
+   * Es ist OPTIONAL und bleibt es: schweigt die Naht, ENTFERNT `procedure.config.ts` den Block, statt ihn zu
+   * erben — dieselbe fail-closed-Doktrin wie beim Rechtsbehelfs-Regime («lieber gar kein Bescheid als einer
+   * mit der Belehrung eines fremden Verfahrens»). Ein leeres Feld ist ein sichtbarer Mangel; ein Feld mit dem
+   * Wert eines fremden Verfahrens ist eine stille Falschaussage.
+   */
+  verwaltungsaktInhalt?: VerwaltungsaktInhaltConfig | undefined;
   /** Gesetzt ⇒ TerminFristPanel (Fristen-Überwachung + Terminbuchung) als Bürger-Route. */
   termin?: TerminConfig | undefined;
   /** `enabled` ⇒ AdressValidierung (deterministischer Registerabgleich) im Bürger-Antrag. */
