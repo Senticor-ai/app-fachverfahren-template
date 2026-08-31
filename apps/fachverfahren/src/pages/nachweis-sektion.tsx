@@ -10,6 +10,8 @@ import {
   nachweisHochladen,
   type NachweisRefDto,
 } from "../antrag-client.js";
+import { useLadelage } from "../app/ladelage.js";
+import { FehlerFlaeche } from "../app/fehler-flaeche.js";
 
 /** File → base64 (ohne den `data:…;base64,`-Präfix). */
 function fileToBase64(file: File): Promise<string> {
@@ -52,20 +54,17 @@ export function NachweisSektion({
     }
   }, [antragId]);
 
+  // ── A FAILED FETCH IS NOT "NOTHING UPLOADED" ──────────────────────────────────────────────────────────
+  // `.catch(() => undefined)` used to send a 401, a 500 and a dropped connection into the same branch as an
+  // empty list, and the citizen read "Noch keine Nachweise hochgeladen." on their own application page —
+  // while the required document may well be lying on the server. They upload it twice, or believe the
+  // application is complete when it is not. Same construction as four sibling pages (`app/ladelage.ts`).
+  const ladeListe = useCallback(() => ladeNachweise(antragId), [antragId]);
+  const { lage, erneut } = useLadelage(ladeListe);
   useEffect(() => {
-    let ab = false;
-    ladeNachweise(antragId)
-      .then((n) => {
-        if (!ab) setNachweise(n);
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (!ab) setStatus("idle");
-      });
-    return () => {
-      ab = true;
-    };
-  }, [antragId]);
+    if (lage.art === "geladen") setNachweise(lage.wert);
+    if (lage.art !== "laedt") setStatus("idle");
+  }, [lage]);
 
   async function hochladen(): Promise<void> {
     if (!datei) return;
@@ -132,6 +131,15 @@ export function NachweisSektion({
             </li>
           ))}
         </ul>
+      ) : lage.art === "fehler" ? (
+        <FehlerFlaeche
+          className="mt-3"
+          titel="Ihre Nachweise konnten gerade nicht geladen werden."
+          klarstellung="Das heißt NICHT, dass keine hinterlegt sind — wir konnten es nur nicht feststellen. Bitte laden Sie erneut, bevor Sie eine Datei ein zweites Mal hochladen."
+          grund={lage.grund}
+          status={lage.status}
+          erneut={erneut}
+        />
       ) : status !== "laedt" ? (
         <p className="mt-3 text-sm text-muted-foreground">
           Noch keine Nachweise hochgeladen.

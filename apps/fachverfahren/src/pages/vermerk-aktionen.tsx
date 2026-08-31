@@ -6,6 +6,11 @@ import { useId, useState } from "react";
 import { Button } from "@senticor/fachverfahren-kit";
 import type { VermerkDto } from "@senticor/app-bff-contracts";
 
+/** The reason behind the injection-suspicion marker — ONE wording for the tooltip and the visible line. Two
+ *  copies of the same sentence drift, and the one that drifts is always the one nobody reads. */
+const INJEKTIONSVERDACHT_GRUND =
+  "Möglicher Prompt-Injektions-Inhalt — beim Lesen durch einen Agenten neutralisiert.";
+
 const feldClass =
   "w-full rounded-md border border-input bg-background p-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
@@ -156,15 +161,24 @@ export function VermerkAktionen({
                     · {REVIEW_LABEL[vm.reviewStatus]}
                   </span>
                 ) : null}
+                {/* THE REASON IS IN THE TEXT FLOW, NOT ONLY IN `title=`. Visible was the keyword alone; WHAT
+                    it means — and that the content was already neutralised — lived exclusively in the tooltip
+                    of a <span> without tabIndex: unreachable by keyboard, absent on touch. The `title` stays
+                    as the hover duplicate; the sentence is now readable by everyone. */}
                 {vm.verdacht ? (
                   <span
                     className="text-xs font-medium text-destructive"
-                    title="Möglicher Prompt-Injektions-Inhalt — beim Lesen durch einen Agenten neutralisiert."
+                    title={INJEKTIONSVERDACHT_GRUND}
                   >
                     ⚠ Injektionsverdacht
                   </span>
                 ) : null}
               </div>
+              {vm.verdacht ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {INJEKTIONSVERDACHT_GRUND}
+                </p>
+              ) : null}
               <p className="mt-1 whitespace-pre-wrap text-foreground">
                 {vm.text}
               </p>

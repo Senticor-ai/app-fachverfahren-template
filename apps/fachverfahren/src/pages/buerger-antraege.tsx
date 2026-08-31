@@ -8,19 +8,32 @@ import { StatusPill } from "@senticor/fachverfahren-kit";
 import { Shell } from "../app/shell.js";
 import { useStoreVersion } from "../app/use-store-version.js";
 import { store } from "../store.js";
+import { grundVon, statusVon } from "../app/ladelage.js";
+import { FehlerFlaeche } from "../app/fehler-flaeche.js";
 
 export function BuergerAntraegePage(): React.JSX.Element {
   useStoreVersion();
   const [laedt, setLaedt] = useState(store.laden !== undefined);
+  const [fehler, setFehler] = useState<{
+    grund: string;
+    status: number | null;
+  } | null>(null);
+  const [versuch, setVersuch] = useState(0);
   useEffect(() => {
     if (store.laden === undefined) {
       setLaedt(false);
       return;
     }
     let abgebrochen = false;
+    setFehler(null);
     store
       .laden()
-      .catch(() => undefined)
+      .catch((e: unknown) => {
+        // A failed load is not "no applications yet": the sentence below would otherwise tell a citizen whose
+        // session expired that they never filed anything. Same class as five sibling pages (app/ladelage.ts).
+        if (!abgebrochen)
+          setFehler({ grund: grundVon(e), status: statusVon(e) });
+      })
       .finally(() => {
         if (!abgebrochen) setLaedt(false);
       });
@@ -28,7 +41,7 @@ export function BuergerAntraegePage(): React.JSX.Element {
       abgebrochen = true;
     };
     // Bewusst leere Deps: nur EINMAL beim Mounten hydrieren.
-  }, []);
+  }, [versuch]);
 
   const vorgaenge = store.list();
   const states = store.config.statusMachine.states;
@@ -45,6 +58,15 @@ export function BuergerAntraegePage(): React.JSX.Element {
           <p className="mt-6 text-sm text-muted-foreground" aria-busy="true">
             Ihre Anträge werden geladen …
           </p>
+        ) : fehler ? (
+          <FehlerFlaeche
+            className="mt-6"
+            titel="Ihre Anträge konnten gerade nicht geladen werden."
+            klarstellung="Das heißt NICHT, dass Sie keinen gestellt haben — wir konnten es nur nicht feststellen."
+            grund={fehler.grund}
+            status={fehler.status}
+            erneut={() => setVersuch((n) => n + 1)}
+          />
         ) : vorgaenge.length === 0 ? (
           <div className="mt-6 rounded-lg border border-border bg-card p-6">
             <p className="text-sm text-muted-foreground">

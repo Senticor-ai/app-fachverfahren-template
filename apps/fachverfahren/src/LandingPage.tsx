@@ -48,6 +48,12 @@ export function LandingPage(): React.ReactElement | null {
     if (from) return <Navigate to={from} replace />;
   }
 
+  // Der abgewiesene Weg — aus DEMSELBEN `state.from`, das der Deep-Link-Restore ohnehin liest. Kein
+  // zweiter Kanal, keine zweite Wahrheit; nur eine zweite FRAGE an denselben Wert.
+  const abgewiesenerWeg = postLoginRedirect(
+    (location.state as { from?: unknown } | null)?.from,
+  );
+
   const registerOffen =
     view === "login" && session.registration === "open_unverified";
   const showRegister = registerOffen && authMode === "register";
@@ -84,6 +90,23 @@ export function LandingPage(): React.ReactElement | null {
             {store.config.kommune}
           </p>
         </header>
+        {/* ── WHY THE CLICK CAME BACK HERE ──────────────────────────────────────────────────────────────
+            Unauthenticated, this page shows ALL area entry points, and a click on one of them bounced
+            wordlessly through the session gate right back to this same page. A first-time user pressed the
+            big "Bürger:in" card and stood in front of the identical screen with not one line of
+            explanation — the state that this house calls a dead end.
+            The guards already carried `state.from`; only nobody said it out loud. Reading it here costs one
+            sentence and no new mechanism. */}
+        {view !== "authenticated" && abgewiesenerWeg ? (
+          <p
+            className="rounded-md border border-border bg-background px-4 py-3 text-center text-sm text-muted-foreground"
+            role="status"
+          >
+            Für <strong>{abgewiesenerWeg}</strong> ist eine Anmeldung
+            erforderlich. Melden Sie sich an — danach geht es dort weiter, wo
+            Sie hinwollten.
+          </p>
+        ) : null}
         <div className="grid items-start gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>

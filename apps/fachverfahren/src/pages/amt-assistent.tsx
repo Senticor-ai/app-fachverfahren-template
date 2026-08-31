@@ -17,6 +17,8 @@ import {
 } from "../composable-chat-client.js";
 import { apiPath } from "../case-client.js";
 import { store } from "../store.js";
+import { grundVon, statusVon } from "../app/ladelage.js";
+import { FehlerFlaeche } from "../app/fehler-flaeche.js";
 
 /** Eine Quelle der Reuse-Herkunft lesbar zusammenfassen (Verbund · Tenant), leere Felder weglassen. */
 function quelleLabel(q: {
@@ -93,14 +95,32 @@ export function AmtAssistentPage(): React.JSX.Element {
       .then((d?: { kiAnbieter?: string }) => {
         if (!ab && d?.kiAnbieter) setKiAnbieter(d.kiAnbieter);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        // BEWUSST folgenlos — und das steht hier als CODE, nicht nur als Kommentar. `kiAnbieter` reichert einen
+        // Hinweistext an; er ist kein Inhalt. Faellt der Abruf, entsteht keine falsche Aussage und es gaebe
+        // nichts, was der Nutzer daraufhin tun koennte — eine Fehlerflaeche waere hier Laerm.
+        // Zurueckgesetzt wird trotzdem: ein Anbietername aus einem FRUEHEREN, erfolgreichen Abruf waere sonst
+        // eine Behauptung ueber einen Zustand, den wir gerade nicht feststellen konnten.
+        if (!ab) setKiAnbieter(undefined);
+      });
     return () => {
       ab = true;
     };
   }, []);
 
+  // ── "BITTE ERNEUT VERSUCHEN" WITHOUT A CONTROL ────────────────────────────────────────────────────────
+  // The load hung on an effect with an empty dependency list, so there was no path to run it again short of
+  // leaving the route and coming back. The message named a remedy the page did not offer. The retry counter
+  // makes the named remedy real; the cause now travels too, instead of being flattened to a status word.
+  const [versuch, setVersuch] = useState(0);
+  const [ladeGrund, setLadeGrund] = useState<{
+    grund: string;
+    status: number | null;
+  } | null>(null);
   useEffect(() => {
     let ab = false;
+    setStatus("laedt");
+    setLadeGrund(null);
     ladeComposables()
       .then((liste) => {
         if (ab) return;
@@ -112,13 +132,15 @@ export function AmtAssistentPage(): React.JSX.Element {
         setAusgewaehlt(chattbar[0]?.id);
         setStatus("idle");
       })
-      .catch(() => {
-        if (!ab) setStatus("fehler");
+      .catch((e: unknown) => {
+        if (ab) return;
+        setLadeGrund({ grund: grundVon(e), status: statusVon(e) });
+        setStatus("fehler");
       });
     return () => {
       ab = true;
     };
-  }, []);
+  }, [versuch]);
 
   // Ein Port je Auswahl; ohne ki.chat-Angebot KEIN Port — das AssistentPanel rendert dann seinen
   // deaktivierten Zustand (Insel-eigener Hinweis, kein zweiter Leerzustand hier).
@@ -159,14 +181,14 @@ export function AmtAssistentPage(): React.JSX.Element {
         ) : null}
 
         {status === "fehler" ? (
-          <Callout
-            tone="warn"
-            title="Composables nicht ladbar"
+          <FehlerFlaeche
             className="mt-4"
-          >
-            Die Composable-Liste konnte nicht geladen werden. Bitte erneut
-            versuchen.
-          </Callout>
+            titel="Die Composable-Liste konnte gerade nicht geladen werden."
+            klarstellung="Das heißt NICHT, dass keine Stellen montiert sind — wir konnten es nur nicht feststellen."
+            {...(ladeGrund?.grund ? { grund: ladeGrund.grund } : {})}
+            status={ladeGrund?.status ?? null}
+            erneut={() => setVersuch((n) => n + 1)}
+          />
         ) : null}
 
         {composables.length > 1 ? (

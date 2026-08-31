@@ -55,6 +55,16 @@ export function LoginForm({
         return;
       }
       await onSuccess();
+    } catch {
+      // ── A DROPPED NETWORK LEFT THE SCREEN SILENT ──────────────────────────────────────────────────────
+      // `try … finally` without a `catch`: `fetch` REJECTS on a network failure, DNS outage, aborted or
+      // blocked request, and that rejection ran past `setError` into an unhandled promise rejection. For the
+      // user this meant: click, the button goes inactive and active again, and NOTHING appears — no cause,
+      // no remedy, no way to tell it apart from a wrong password. Measured 2026-08-31 in two independently
+      // built procedures; the same shape stood in all three forms of this file.
+      setError(
+        "Verbindung zum Server nicht möglich. Bitte prüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -130,6 +140,16 @@ export function BootstrapForm({
         return;
       }
       await onSuccess();
+    } catch {
+      // ── A DROPPED NETWORK LEFT THE SCREEN SILENT ──────────────────────────────────────────────────────
+      // `try … finally` without a `catch`: `fetch` REJECTS on a network failure, DNS outage, aborted or
+      // blocked request, and that rejection ran past `setError` into an unhandled promise rejection. For the
+      // user this meant: click, the button goes inactive and active again, and NOTHING appears — no cause,
+      // no remedy, no way to tell it apart from a wrong password. Measured 2026-08-31 in two independently
+      // built procedures; the same shape stood in all three forms of this file.
+      setError(
+        "Verbindung zum Server nicht möglich. Bitte prüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -246,6 +266,16 @@ export function RegisterForm({
       setMessage(
         body.message ??
           "Falls die E-Mail-Adresse noch nicht registriert war, wurde Ihr Konto angelegt. Melden Sie sich jetzt an.",
+      );
+    } catch {
+      // ── A DROPPED NETWORK LEFT THE SCREEN SILENT ──────────────────────────────────────────────────────
+      // `try … finally` without a `catch`: `fetch` REJECTS on a network failure, DNS outage, aborted or
+      // blocked request, and that rejection ran past `setError` into an unhandled promise rejection. For the
+      // user this meant: click, the button goes inactive and active again, and NOTHING appears — no cause,
+      // no remedy, no way to tell it apart from a wrong password. Measured 2026-08-31 in two independently
+      // built procedures; the same shape stood in all three forms of this file.
+      setError(
+        "Verbindung zum Server nicht möglich. Bitte prüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.",
       );
     } finally {
       setSubmitting(false);

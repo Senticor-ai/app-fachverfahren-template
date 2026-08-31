@@ -38,6 +38,7 @@ export function NeueAkteForm({
       .catch(() => {
         if (alive) setFehler("Verfahren konnten nicht geladen werden.");
       });
+
     return () => {
       alive = false;
     };
@@ -81,6 +82,15 @@ export function NeueAkteForm({
     }
   }
 
+  // EINE Bedingung, ZWEI Leser: der Knopf sperrt danach, und der Satz erklaert danach. Ein zweiter Ausdruck
+  // fuer dieselbe Frage waere die naechste Drift zwischen dem, was gesperrt ist, und dem, was dasteht.
+  const sperrGrund =
+    selected === undefined
+      ? "Bitte wählen Sie zuerst ein Verfahren aus."
+      : subject.trim() === ""
+        ? "Bitte tragen Sie die Kennung der beteiligten Person ein — ohne sie kann keine Akte angelegt werden."
+        : null;
+
   return (
     <form
       onSubmit={(event) => void submit(event)}
@@ -116,8 +126,15 @@ export function NeueAkteForm({
           </select>
         </div>
         <div className="flex flex-col gap-1.5">
+          {/* The field decides whether the submit button is usable, but carried no `required`, no marking
+              and no hint — the first-time user saw a greyed-out button and had to guess which of the two
+              inputs was missing. Marked as required AND named as the reason below. */}
           <label htmlFor="neue-akte-subject" className="text-sm font-medium">
-            Beteiligte:r (Kennung)
+            Beteiligte:r (Kennung){" "}
+            <span aria-hidden="true" className="text-destructive">
+              *
+            </span>
+            <span className="sr-only"> (Pflichtfeld)</span>
           </label>
           <input
             id="neue-akte-subject"
@@ -125,6 +142,8 @@ export function NeueAkteForm({
             onChange={(event) => setSubject(event.target.value)}
             placeholder="z. B. subject.42"
             className={inputClass}
+            required
+            aria-required="true"
           />
         </div>
       </div>
@@ -141,6 +160,19 @@ export function NeueAkteForm({
         </p>
       )}
 
+      {/* ── A LOCKED CONTROL NAMES ITS REASON, IN THE TEXT FLOW ───────────────────────────────────────────
+          The button was disabled while the participant identifier was empty — with no visible reason, no
+          `aria-describedby`, nothing. The reason is derived from the SAME condition that disables the
+          button, so the two cannot drift apart: one expression, two readers. */}
+      {sperrGrund ? (
+        <p
+          id="neue-akte-sperrgrund"
+          className="mt-2 text-xs text-muted-foreground"
+        >
+          {sperrGrund}
+        </p>
+      ) : null}
+
       <div className="mt-4 flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
           Abbrechen
@@ -148,8 +180,11 @@ export function NeueAkteForm({
         <Button
           type="submit"
           size="sm"
-          disabled={busy || selected === undefined || subject.trim() === ""}
+          disabled={busy || sperrGrund !== null}
           aria-busy={busy}
+          {...(sperrGrund
+            ? { "aria-describedby": "neue-akte-sperrgrund" }
+            : {})}
         >
           Akte anlegen
         </Button>
