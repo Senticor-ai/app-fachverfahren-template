@@ -243,7 +243,7 @@ export function KommandoPalette({
         aria-labelledby={dialogTitelId}
         className={cn(
           "relative w-full max-w-xl overflow-hidden rounded-xl border border-border bg-card shadow-2xl",
-          "motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-150",
+          "motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-(--fv-duration-base)",
         )}
       >
         <h2 id={dialogTitelId} className="sr-only">
