@@ -59,6 +59,9 @@ export const defaultOwnership: TemplateOwnership = {
     "docs/capabilities/**": "replace",
     "sources/registry.yaml": "replace",
     "sources/source-lock.json": "structured-merge",
+    // The check runner is template infrastructure, not consumer code: a consumer that forked it
+    // would silently drift away from the chain the template guarantees. Same class as tooling/template.
+    "tooling/check/**": "replace",
     "tooling/template/**": "replace",
     "scripts/check-template-*.mjs": "replace",
     "scripts/check-openapi.mjs": "replace",

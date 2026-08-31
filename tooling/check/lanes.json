@@ -1,0 +1,19 @@
+{
+  "$comment": [
+    "LANE ASSIGNMENT FOR THE PRE-COMMIT CHAIN — DATA, not code.",
+    "The chain itself stays the ONE truth: run-checks.mjs reads package.json.scripts['precommit:check'].",
+    "This file only says WHICH ENTRIES MAY NOT RUN CONCURRENTLY, and why. An entry that is not listed",
+    "here runs in the parallel lane — that is the safe default for a pure validator, and adding a new",
+    "read-only check therefore needs no change here.",
+    "MEASURED 2026-08-31 on this repo, serial baseline 37.0 s over 23 entries:",
+    "  18 validators  5.2 s total (avg 306 ms, of which ~180 ms is bare node startup)",
+    "  format:check   4.1 s | lint 3.7 s | typecheck 5.0 s | test 11.0 s | test:template 6.6 s"
+  ],
+  "serial": [
+    {
+      "id": "typecheck",
+      "before": ["test"],
+      "why": "`tsc -b` WRITES build output (tsconfig.tsbuildinfo, packages/*/dist). vitest imports built packages, so running them concurrently races on those files. Measured: on a warm tree tsc -b writes nothing, which is exactly why this must be DECLARED rather than detected — the race only appears on a cold tree, i.e. in CI and in every freshly generated app."
+    }
+  ]
+}
