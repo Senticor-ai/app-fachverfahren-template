@@ -117,8 +117,13 @@ const textFileNames = new Set([
 /** Is `dir` a LIVE/governed consumer project (not the pristine template)? Such a project carries CHOS-overlay markers:
  *  a `.chos/` directory OR `cognitive-hive.governance.yaml` (which, in a project, is a symlink into the shared source).
  *  The domain-app scaffold must render from the pristine template only — scaffolding from a consumer would follow the
- *  cognitive-hive symlink and corrupt the shared source governance (CHOS-CODE#68). The pristine template ships neither. */
-async function isLiveConsumerProject(dir: string): Promise<boolean> {
+ *  cognitive-hive symlink and corrupt the shared source governance (CHOS-CODE#68). The pristine template ships neither.
+ *
+ *  EXPORTED since 2026-08-31, and for one reason: the witnesses of this engine need the SAME answer the guard uses.
+ *  Measured against two fully built procedures, eight scaffold assertions were red in every generated application —
+ *  not because the engine is broken, but because a governed consumer has no pristine source to render FROM. A witness
+ *  that copied the detection would be the second truth about the same question. */
+export async function isLiveConsumerProject(dir: string): Promise<boolean> {
   for (const marker of [".chos", "cognitive-hive.governance.yaml"]) {
     try {
       await access(join(dir, marker));
