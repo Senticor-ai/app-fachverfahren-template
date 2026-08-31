@@ -133,3 +133,30 @@ describe("dokumentTitel — der Reiter nennt die Leistung", () => {
     );
   });
 });
+
+describe("Dokument-Titel — jede Einstiegsflaeche setzt ihn", () => {
+  // ── DIE KLASSE, NICHT DIE ZWEI STELLEN ─────────────────────────────────────────────────────────────────
+  // `Shell` setzt den Titel fuer alle Fach-Sichten. Die LANDING rendert keine Shell — und ist die erste Seite,
+  // die jemand sieht. Ohne diese Zusicherung truege ausgerechnet der Einstieg weiter den Titel der
+  // unveraenderten Vorlage, und der naechste Container ohne Shell faende niemand.
+  it("jeder Seiten-Container ohne `Shell` setzt den Titel selbst", () => {
+    const container = dateien(QUELLE).filter((p) => {
+      const t = readFileSync(p, "utf8");
+      // Ein Seiten-Container ist, was eine ganze Seite rendert: `<main` auf oberster Ebene ODER die Shell.
+      return /<main[\s>]/.test(t) || /<Shell[\s>]/.test(t);
+    });
+    // POSITIV-KONTROLLE: ohne sie waere «keiner verletzt es» von «ich finde keine Container» nicht zu trennen.
+    expect(container.length).toBeGreaterThan(3);
+
+    const ohneTitel = container.filter((p) => {
+      const t = readFileSync(p, "utf8");
+      // Wer `Shell` rendert, erbt den Titel von dort — das ist der EINE erlaubte Weg neben dem Hook.
+      return !/<Shell[\s>]/.test(t) && !/useDokumentTitel\s*\(/.test(t);
+    });
+    expect(
+      ohneTitel.map((p) => p.slice(QUELLE.length + 1)),
+      "Ein Seiten-Container ohne Titel traegt den der unveraenderten Vorlage — WCAG 2.4.2 (Stufe A, BITV 2.0). " +
+        "Entweder `Shell` rendern (die setzt ihn) oder `useDokumentTitel(store.config, <seite>)` rufen.",
+    ).toEqual([]);
+  });
+});

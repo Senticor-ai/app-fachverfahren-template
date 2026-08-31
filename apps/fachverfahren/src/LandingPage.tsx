@@ -31,6 +31,7 @@ import { landingView, postLoginRedirect } from "./landing-state.js";
 import { personaBereiche, sichtbareBereiche } from "./personas.js";
 import { useSession } from "./session.js";
 import { store } from "./store.js";
+import { useDokumentTitel } from "./app/dokument-titel.js";
 
 export function LandingPage(): React.ReactElement | null {
   const session = useSession();
@@ -47,6 +48,11 @@ export function LandingPage(): React.ReactElement | null {
     );
     if (from) return <Navigate to={from} replace />;
   }
+
+  // ── DIE LANDING IST DIE EINZIGE SEITE OHNE `Shell` — UND DIE ERSTE, DIE JEMAND SIEHT ──────────────────
+  // Der Reiter-Titel wird in `Shell` gesetzt; diese Seite rendert keine. Ohne diese Zeile truege ausgerechnet
+  // der Einstieg weiter `Fachverfahren - Referenz-App` aus der unveraenderten Vorlage (WCAG 2.4.2, Stufe A).
+  useDokumentTitel(store.config);
 
   // Der abgewiesene Weg — aus DEMSELBEN `state.from`, das der Deep-Link-Restore ohnehin liest. Kein
   // zweiter Kanal, keine zweite Wahrheit; nur eine zweite FRAGE an denselben Wert.
