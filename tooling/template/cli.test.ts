@@ -206,6 +206,40 @@ describe("template CLI", () => {
     "merges new default ownership entries during template:update",
     { timeout: 300_000 },
     async () => {
+      // Ohne pristine Quelle kann `template:update` nicht laufen — dieselbe Lage wie beim Scaffold darueber,
+      // und der Riegel dahinter ist derselbe (CHOS-CODE#68). Im governten Konsumenten wird deshalb die
+      // VERWEIGERUNG geprueft statt der Aktualisierung: die Eigenschaft schuetzt genau dort etwas.
+      if (!PRISTINE) {
+        const guard = await mkdtemp(
+          join(tmpdir(), "template-cli-guard-update-"),
+        );
+        try {
+          let text = "";
+          let code = 0;
+          try {
+            await runTemplate([
+              "scaffold",
+              "--domain",
+              "x",
+              "--display-name",
+              "X",
+              "--target",
+              join(guard, "app"),
+              "--allow-existing-empty",
+              "--allow-dirty",
+              "--json",
+            ]);
+          } catch (e) {
+            code = 1;
+            text = String((e as Error)?.message ?? e);
+          }
+          erklaertSichBeimVerweigern(code, text);
+          expect(text).toMatch(/live\/governed consumer project|CHOS-CODE#68/);
+        } finally {
+          await rm(guard, { recursive: true, force: true });
+        }
+        return;
+      }
       const templateRoot = process.cwd();
       const root = await mkdtemp(join(tmpdir(), "template-cli-update-test-"));
       try {

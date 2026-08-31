@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { runGit } from "./git.ts";
 import {
@@ -8,7 +6,7 @@ import {
   matchesOwnershipPattern,
 } from "./manifest.ts";
 import { managedCandidateFiles } from "./merge.ts";
-import { isRenderedRepoPath } from "./render.ts";
+import { isLiveConsumerProject, isRenderedRepoPath } from "./render.ts";
 
 // Ownership-/Scaffold-Paritäts-Ratsche: JEDE Datei, die der Scaffold in Konsumenten kopiert,
 // braucht eine EXPLIZITE Update-Entscheidung. `explainOwnership` fällt für ungelistete Pfade auf
@@ -103,7 +101,8 @@ const updateUnmanagedPaths: string[] = [
   // waere ein Verzeichnis fremder Wahrheit ueber eigenem Bestand. Die Vorlage liefert ihn einmal als
   // Startpunkt; ab dann pflegt ihn, wem der Inhalt gehoert.
   "docs/README.md",
-  "docs/adr/**",
+  // `docs/adr/**` ist seit 2026-08-31 im Manifest als `consumer` gefuehrt — also explizit klassifiziert
+  // und hier tot. Die Liste schrumpft mit, genau wie ihr Kopf es vorsieht.
   "docs/architecture/**",
   "docs/compliance/**",
   "docs/contributing/**",
@@ -168,13 +167,18 @@ const root = process.cwd();
 
 // Die Baum-Prüfungen gelten nur der PRISTINEN Vorlage: Konsumenten führen diese Tests über die
 // verbatim kopierte Engine ebenfalls aus, und deren Bäume enthalten legitim eigene Dateien.
-// Gleiches Selbsttest-Idiom wie die Engine (`sourcePackage.name.includes("fachverfahren-template")`).
-const rootPackage = JSON.parse(
-  await readFile(join(root, "package.json"), "utf8"),
-) as { name?: string };
-const isPristineTemplate = (rootPackage.name ?? "").includes(
-  "fachverfahren-template",
-);
+//
+// ── DER RIEGEL WAR RICHTIG UND FRAGTE DAS FALSCHE (gemessen 2026-08-31) ──────────────────────────────────
+// Er fragte nach dem PAKETNAMEN — `sourcePackage.name.includes("fachverfahren-template")`. Ein Konsument, der
+// die Vorlage klont, ohne sie umzubenennen, traegt diesen Namen weiter; gemessen an zwei fertig gebauten
+// Verfahren steht in beiden `senticor-app-fachverfahren-template` in der Wurzel-`package.json`. Der Riegel
+// hielt sie also fuer die pristine Vorlage, liess die Baum-Pruefungen laufen und meldete die sechzehn Dateien
+// des governten Baus als unklassifiziert — in JEDEM erzeugten Verfahren.
+//
+// Gefragt wird jetzt nach der EIGENSCHAFT, und zwar mit DEMSELBEN Praedikat, das der Scaffold-Riegel benutzt
+// (`isLiveConsumerProject`, CHOS-CODE#68): traegt der Baum CHOS-Overlay-Marken (`.chos/`, `cognitive-hive.*`),
+// ist er ein governter Konsument. Ein Name kann mitwandern; diese Marken entstehen erst im Bau.
+const isPristineTemplate = !(await isLiveConsumerProject(root));
 
 async function listRenderedTrackedFiles(): Promise<string[]> {
   const result = await runGit(["ls-files", "-z"], { cwd: root });

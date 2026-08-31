@@ -50,6 +50,17 @@ export const defaultOwnership: TemplateOwnership = {
     "pnpm-workspace.yaml": "structured-merge",
     "agent.discovery.json": "replace",
     ".agents/skills/**": "replace",
+    // ── DER INHALT DES GOVERNTEN BAUS GEHOERT DEM KONSUMENTEN ───────────────────────────────────────────
+    // Das Fachkonzept IST das fachliche Erzeugnis des Verfahrens, die ADRs sind seine Architektur-
+    // Entscheidungen, `platform/govtech.yaml` seine Betriebswahl. Ohne Eintrag fielen sie auf `(default)
+    // merge` — und ein merge-Pfad ausserhalb der kuratierten Kandidatenliste wird von `template:update` fuer
+    // immer stillschweigend uebersprungen. Das war bis 2026-08-31 der Zustand, gemessen an zwei fertig
+    // gebauten Verfahren: sechzehn Dateien ohne jede Update-Entscheidung.
+    // `consumer` sagt es ausdruecklich: die Vorlage fasst diese Pfade NIE an. Ein Upgrade darf nicht in das
+    // Fachkonzept eines laufenden Verfahrens schreiben.
+    "docs/fachkonzept/**": "consumer",
+    "docs/adr/**": "consumer",
+    "platform/govtech.yaml": "consumer",
     "docs/agents/**": "replace",
     "docs/assets/**": "replace",
     "docs/reference/**": "replace",
