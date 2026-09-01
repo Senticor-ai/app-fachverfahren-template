@@ -9,57 +9,29 @@
 //     KEINE neue Datei darf literale Dauer-Klassen einführen.
 //
 // Baseline aktualisieren (nur beim Absenken): `node scripts/check-motion-tokens.mjs --update-baseline`.
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { extname, join, relative } from "node:path";
+import { join, relative } from "node:path";
 import { ohneDokumentationsNutzlast } from "./lib/doku-nutzlast.mjs";
+// The exclusion set and the tree walk are SHARED (scripts/lib/source-exclusion.mjs,
+// scripts/lib/source-scan.mjs): one truth about what is build output, derived from `.gitignore`,
+// and a walk that FAILS instead of reporting an empty tree. Do not re-declare either here.
+import {
+  collectSourceFiles,
+  loadSourceExclusions,
+  readTextFile,
+} from "./lib/source-scan.mjs";
 
 const root = process.cwd();
 const sourceRoots = ["apps", "packages", "modules"];
 const baselinePath = join(root, "scripts", "motion-baseline.json");
-const ignoredDirectories = new Set([
-  ".git",
-  ".turbo",
-  ".vite",
-  "coverage",
-  "dist",
-  "dist-server",
-  "dist-types",
-  "node_modules",
-  "storybook-static",
-]);
-const scannedExtensions = new Set([".css", ".ts", ".tsx"]);
+const scannedExtensions = [".css", ".ts", ".tsx"];
+const exclusions = await loadSourceExclusions(root);
 
 // Literale Tailwind-Dauer-Klasse: `duration-150` u. ä. — NICHT `duration-(--fv-…)`, nicht
 // `transition-duration`, nicht `--fv-duration-*` (kein Ziffern-Suffix nach `duration-`).
 const LITERAL_DURATION = /\bduration-\d+\b/g;
 const BOUNCE = /\banimate-bounce\b/;
-
-async function directoryExists(path) {
-  try {
-    await readdir(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function collectFiles(startDirectory) {
-  if (!(await directoryExists(startDirectory))) return [];
-  const entries = await readdir(startDirectory, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries) {
-    const path = join(startDirectory, entry.name);
-    if (entry.isDirectory()) {
-      if (!ignoredDirectories.has(entry.name)) {
-        files.push(...(await collectFiles(path)));
-      }
-      continue;
-    }
-    if (scannedExtensions.has(extname(path))) files.push(path);
-  }
-  return files;
-}
 
 const display = (path) => relative(root, path).split("\\").join("/");
 
@@ -67,12 +39,16 @@ const display = (path) => relative(root, path).split("\\").join("/");
 const durationCounts = {}; // relPath -> count literaler Dauer-Klassen
 const bounceHits = []; // "relPath:line"
 for (const sourceRoot of sourceRoots) {
-  const files = await collectFiles(join(root, sourceRoot));
+  const files = await collectSourceFiles(join(root, sourceRoot), {
+    extensions: scannedExtensions,
+    exclusions,
+    optional: true,
+  });
   for (const file of files) {
     const rel = display(file);
     // Dokumentations-Nutzlast ausblenden, BEVOR gezaehlt wird: der Doku-Korpus zitiert `animate-bounce` und
     // Dauer-Klassen, weil er die Motion-Regel ERKLAERT. Zeilennummern bleiben erhalten (Nutzlast wird leer).
-    const text = ohneDokumentationsNutzlast(await readFile(file, "utf8"));
+    const text = ohneDokumentationsNutzlast(await readTextFile(file));
     const durMatches = text.match(LITERAL_DURATION);
     if (durMatches && durMatches.length > 0)
       durationCounts[rel] = durMatches.length;
@@ -95,7 +71,7 @@ if (process.argv.includes("--update-baseline")) {
 }
 
 const baseline = existsSync(baselinePath)
-  ? JSON.parse(await readFile(baselinePath, "utf8"))
+  ? JSON.parse(await readTextFile(baselinePath))
   : {};
 
 const violations = [];

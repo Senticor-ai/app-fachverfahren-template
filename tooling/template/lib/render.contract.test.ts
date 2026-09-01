@@ -1,21 +1,31 @@
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
+import {
+  BUILT_IN_EXCLUSIONS,
+  isNotSource,
+} from "../../../scripts/lib/source-exclusion.mjs";
+import { readDirectoryEntries } from "../../../scripts/lib/source-scan.mjs";
 import { renderDomainApp } from "./render.ts";
 import { assertRefusesToScaffold, canScaffoldFrom } from "./pristine-source.ts";
 
 // Verzeichnisse, die beim Residue-Scan NICHT als Fehler zählen: Build-/Abhängigkeits-Ausgaben und
 // die Provenienz-Metadaten (.template/lock.json führt bewusst den Namen der QUELL-Vorlage
 // `senticor-app-fachverfahren-template` — das ist korrekte Herkunft, kein Residue).
-const scanIgnored = new Set([".git", "node_modules", ".template"]);
+// ⭐ Hung onto the shared floor, never rewritten (scripts/lib/source-exclusion.mjs). `.template` is the
+// only addition and it is not build output: `.template/lock.json` deliberately carries the name of the
+// SOURCE template — correct provenance, not residue.
+const scanIgnored = new Set([...BUILT_IN_EXCLUSIONS, ".template"]);
 
+// ⛔ NOT `.catch(() => [])`. A residue scan that cannot read the rendered tree would report ZERO residue
+// and this contract test would pass on a failure to look.
 async function collectFiles(root: string): Promise<string[]> {
-  const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
+  const entries = await readDirectoryEntries(root);
   const files: string[] = [];
   for (const entry of entries) {
     if (entry.isDirectory()) {
-      if (!scanIgnored.has(entry.name)) {
+      if (!isNotSource(entry.name, scanIgnored)) {
         files.push(...(await collectFiles(join(root, entry.name))));
       }
     } else {

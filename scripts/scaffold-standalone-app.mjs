@@ -8,6 +8,9 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
+// ONE TRUTH about what is build output — see scripts/lib/source-exclusion.mjs. The list that used to
+// stand in `shouldSkip` knew five names and not `.git`, `storybook-static` or `playwright-report`.
+import { isNotSource, sourceExclusions } from "./lib/source-exclusion.mjs";
 
 const root = process.cwd();
 const rawArgs = process.argv.slice(2);
@@ -24,6 +27,10 @@ if (!targetArg) {
 
 const targetDir = resolve(root, targetArg);
 const appSourceDir = join(root, "apps/fachverfahren");
+// Derived from THIS repo's .gitignore, so a build output added there is skipped here without a second edit.
+const exclusions = sourceExclusions(
+  await readFile(join(root, ".gitignore"), "utf8"),
+);
 const appTargetDir = targetDir;
 const rootPackage = await readJson(join(root, "package.json"));
 const appPackage = await readJson(join(appSourceDir, "package.json"));
@@ -205,8 +212,7 @@ function rewriteSpec(field, name, spec) {
 
 function shouldSkip(source) {
   const relativeSource = source.slice(appSourceDir.length + 1);
-  return ["node_modules", "dist", "dist-server", "dist-types", "coverage"].some(
-    (ignored) =>
-      relativeSource === ignored || relativeSource.startsWith(`${ignored}/`),
-  );
+  return relativeSource
+    .split("/")
+    .some((part) => isNotSource(part, exclusions));
 }

@@ -18,6 +18,13 @@ import {
   writeTemplateMetadata,
 } from "./manifest.ts";
 import { readJson, type PackageJson } from "./structured-edit.ts";
+// ONE TRUTH about what is build output (scripts/lib/source-exclusion.mjs) and a tree walk that FAILS
+// instead of reporting an empty tree (scripts/lib/source-scan.mjs).
+import {
+  BUILT_IN_EXCLUSIONS,
+  isNotSource,
+} from "../../../scripts/lib/source-exclusion.mjs";
+import { readDirectoryEntries } from "../../../scripts/lib/source-scan.mjs";
 
 interface RenderDomainAppOptions {
   domain: string;
@@ -31,25 +38,19 @@ interface RenderDomainAppOptions {
   };
 }
 
+/** ⭐ HUNG ONTO THE SHARED FLOOR, NEVER REWRITTEN. `BUILT_IN_EXCLUSIONS` is the ONE answer to «is this
+ *  build output?» (scripts/lib/source-exclusion.mjs); what stands here is only what is true for the
+ *  SCAFFOLD COPY in addition — machine-local scratch that no generated app should inherit. Measured
+ *  2026-09-01, this widening drops exactly ONE name that exists in this tree today: `.opencode`, a
+ *  git-ignored symlink into a sibling checkout that the scaffold would otherwise copy verbatim into every
+ *  generated application. Nothing else in the tree changes hands. */
 const ignoredNames = new Set([
-  ".git",
-  ".agent",
-  // Codesphere-Workspace-Toolchain (ci.yml installiert Node 24 + pnpm nach <app>/.local):
-  // Laufzeitartefakt, nie mitscaffolden/scannen.
+  ...BUILT_IN_EXCLUSIONS,
+  // Codesphere workspace toolchain (ci.yml installs Node 24 + pnpm into <app>/.local): a runtime
+  // artefact, never scaffolded and never scanned.
   ".local",
-  ".pnpm",
-  ".pnpm-tools",
-  ".pnpm-store",
   ".tmp",
-  "coverage",
-  "dist",
-  "dist-server",
-  "dist-types",
-  "node_modules",
-  "playwright-report",
-  "storybook-static",
   "temp",
-  "test-results",
   "tmp",
 ]);
 
@@ -433,13 +434,17 @@ async function writeEnvExample(root: string) {
   );
 }
 
+/** ⛔ NOT `readdir(...).catch(() => [])`. This walk feeds the post-scaffold text substitution: an
+ *  unreadable directory used to mean «no files here», so the rename would silently skip a whole subtree
+ *  and the generated app would keep the template's identity in it. `readDirectoryEntries` fails instead —
+ *  and forgives ONLY an ENOENT root, which the caller must declare. */
 async function collectFiles(root: string): Promise<string[]> {
-  const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
+  const entries = await readDirectoryEntries(root, { optional: true });
   const files = [];
   for (const entry of entries) {
     const path = join(root, entry.name);
     if (entry.isDirectory()) {
-      if (!ignoredNames.has(entry.name)) {
+      if (!isNotSource(entry.name, ignoredNames)) {
         files.push(...(await collectFiles(path)));
       }
     } else {
@@ -471,7 +476,9 @@ export function isRenderedRepoPath(relativePath: string): boolean {
   if (basename(relativePath).endsWith(".tsbuildinfo")) {
     return false;
   }
-  return !relativePath.split("/").some((part) => ignoredNames.has(part));
+  return !relativePath
+    .split("/")
+    .some((part) => isNotSource(part, ignoredNames));
 }
 
 function isTextFile(path: string) {

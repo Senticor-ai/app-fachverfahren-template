@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://senticor.local/schemas/leistung-config.schema.json",
+  "title": "LeistungConfig — Pflicht-Kern",
+  "description": "GENERIERT aus packages/fachverfahren-kit/src/leistung-contract-form.ts via `node --experimental-strip-types scripts/emit-leistung-schema.mts` — NICHT von Hand editieren. Der PRÜFER (scripts/check-leistung-contract.mts) bleibt die Wahrheit; dieses Schema ist seine JSON-ausdrückbare Teilmenge. Nicht abgebildet, weil JSON-Schema es nicht tragen kann: StatusMachine-Graph (initial existiert, mind. ein Endzustand, keine Sackgasse, keine Unerreichbarkeit, Rollen je Übergang), Frische des Snapshots und die Zweckbindung der Datenanbindung.",
+  "type": "object",
+  "required": [
+    "id",
+    "label",
+    "kommune",
+    "rechtsgrundlagen",
+    "antrag",
+    "statusMachine",
+    "detailSektionen",
+    "register"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Slug der Leistung — die Adresse des Verfahrens im Repo und in der Route."
+    },
+    "label": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Anzeigename der Leistung (Bürger-Oberfläche und Bescheid-Kopf)."
+    },
+    "kommune": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Die erlassende Behörde — ohne sie hat der Verwaltungsakt keinen Urheber."
+    },
+    "rechtsgrundlagen": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Geerdet-Prinzip: mind. eine Norm { norm, titel, satzung? }. Kein Verfahren ohne Rechtsgrundlage."
+    },
+    "antrag": {
+      "type": "object",
+      "required": [
+        "steps"
+      ],
+      "properties": {
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Der Antragsassistent braucht mind. einen Schritt (StepDef mit id, titel, felder[])."
+        }
+      },
+      "additionalProperties": true
+    },
+    "statusMachine": {
+      "type": "object",
+      "required": [
+        "states"
+      ],
+      "properties": {
+        "states": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Zustände { key, label, terminal? } der Bearbeitung. Der Prüfer fordert darüber hinaus: initial existiert, mind. ein terminaler Zustand, keine Sackgasse, keine Unerreichbarkeit, Rollen je Übergang."
+        }
+      },
+      "additionalProperties": true
+    },
+    "detailSektionen": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Die Sachbearbeiter-Detailsicht braucht mind. eine Sektion — sonst sieht die Fachkraft den Vorgang nicht."
+    },
+    "register": {
+      "type": "object",
+      "required": [
+        "suchfelder"
+      ],
+      "properties": {
+        "suchfelder": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Once-Only: mind. ein Suchfeld, über das ein bestehender Vorgang gefunden wird, statt neu erfragt zu werden."
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

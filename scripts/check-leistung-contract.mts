@@ -17,6 +17,10 @@ import {
   type LeistungContractSnapshot,
 } from "../packages/fachverfahren-kit/src/contract-snapshot.ts";
 import { verifyDatenanbindung } from "../packages/fachverfahren-kit/src/lib/datenanbindung.ts";
+import {
+  pruefeForm,
+  zuJsonSchema,
+} from "../packages/fachverfahren-kit/src/leistung-contract-form.ts";
 import { leistungConfig } from "../apps/fachverfahren/src/leistung.config.ts";
 
 const CONTRACT_URL = new URL(
@@ -64,26 +68,18 @@ if (committed && committed !== frisch) {
 }
 
 // ── 2) STRUKTUR (generisch) ───────────────────────────────────────────────────
-if (!snap.id || typeof snap.id !== "string") fail("contract.id fehlt/leer.");
-if (!snap.label || typeof snap.label !== "string")
-  fail("contract.label fehlt/leer.");
-if (!snap.kommune || typeof snap.kommune !== "string")
-  fail("contract.kommune fehlt/leer.");
-
-if (!Array.isArray(snap.rechtsgrundlagen) || snap.rechtsgrundlagen.length < 1)
-  fail(
-    "contract.rechtsgrundlagen muss mind. 1 Norm enthalten (Geerdet-Prinzip).",
-  );
-
+// Die PFLICHT-FORM steht EINMAL als Daten in packages/fachverfahren-kit/src/leistung-contract-form.ts.
+// HIER STAND die Form als acht handgeschriebene if-Bloecke; sie wanderte 2026-09-01 in jene Konstante,
+// weil `schemas/leistung-config.schema.json` sonst eine ZWEITE Wahrheit ueber dieselbe Pflichtmenge
+// waere. Der Pruefer bleibt die Wahrheit — er FUEHRT die Konstante aus, das Schema PROJIZIERT sie nur.
+for (const verstoss of pruefeForm(snap)) fail(verstoss);
+// Nur fuer die Erfolgsmeldung unten — die Pflicht `>= 1 Schritt` prueft bereits pruefeForm.
 const steps = snap.antrag?.steps ?? [];
-if (!Array.isArray(steps) || steps.length < 1)
-  fail("contract.antrag.steps muss mind. 1 Schritt enthalten.");
 
-// StatusMachine — widerspruchsfrei.
+// Die graph-wertigen Zusicherungen bleiben HIER: ein JSON-Schema kann sie nicht tragen.
 const sm = snap.statusMachine;
-if (!sm || !Array.isArray(sm.states) || sm.states.length < 1) {
-  fail("contract.statusMachine.states muss mind. 1 Zustand enthalten.");
-} else {
+if (sm && Array.isArray(sm.states) && sm.states.length >= 1) {
+  // StatusMachine — widerspruchsfrei (nur wenn ueberhaupt Zustaende da sind).
   const keys = new Set(sm.states.map((s) => s.key));
   if (!sm.initial || !keys.has(sm.initial))
     fail(
@@ -133,20 +129,32 @@ if (!sm || !Array.isArray(sm.states) || sm.states.length < 1) {
   }
 }
 
-if (!Array.isArray(snap.detailSektionen) || snap.detailSektionen.length < 1)
-  fail(
-    "contract.detailSektionen muss mind. 1 Sektion enthalten (SB-Detailsicht).",
-  );
-
-const suchfelder = snap.register?.suchfelder;
-if (!Array.isArray(suchfelder) || suchfelder.length < 1)
-  fail(
-    "contract.register.suchfelder muss mind. 1 Once-Only-Suchfeld enthalten.",
-  );
-
 // DATENANBINDUNG (generische, sichere Naht): je deklarierte Anbindung Zweckbindung (Art. 5 DSGVO) + Verbindungsklasse
 // (BSI TR-03190 bei register/extern). Fehlt `datenanbindung` ganz → keine Mängel → kein Falsch-Block (additiv).
 for (const m of verifyDatenanbindung(snap).mangel) fail(m.text);
+
+// ── 3) SCHEMA-FRISCHE ─────────────────────────────────────────────────────────
+// Das Gate nach dem Muster von `check:docs-manifest` (emit + Byte-Vergleich), aber INNERHALB dieses
+// Pruefers: er ist der Eigentuemer der Pflicht-Form, also haelt er auch ihre Projektion frisch. So
+// haengt das Frische-Gate an einer Kette, die es schon gibt (precommit:check, check:agent-domain).
+const SCHEMA_URL = new URL(
+  "../schemas/leistung-config.schema.json",
+  import.meta.url,
+);
+const schemaFrisch = JSON.stringify(zuJsonSchema(), null, 2) + "\n";
+let schemaCommitted = "";
+try {
+  schemaCommitted = readFileSync(SCHEMA_URL, "utf8");
+} catch {
+  fail(
+    "schemas/leistung-config.schema.json fehlt — `node --experimental-strip-types scripts/emit-leistung-schema.mts` ausfuehren.",
+  );
+}
+if (schemaCommitted && schemaCommitted !== schemaFrisch)
+  fail(
+    "schemas/leistung-config.schema.json ist NICHT frisch (Pflicht-Form geaendert oder Schema von Hand editiert) — " +
+      "`node --experimental-strip-types scripts/emit-leistung-schema.mts` ausfuehren und committen.",
+  );
 
 // ── Ergebnis ──────────────────────────────────────────────────────────────────
 if (fehler.length > 0) {
@@ -155,6 +163,6 @@ if (fehler.length > 0) {
   process.exitCode = 1;
 } else {
   console.log(
-    `leistung-contract ok — ${snap.id} · ${steps.length} Schritte · ${snap.statusMachine.states.length} Status · ${snap.detailSektionen.length} Detail-Sektionen · frisch.`,
+    `leistung-contract ok — ${snap.id} · ${steps.length} Schritte · ${snap.statusMachine.states.length} Status · ${snap.detailSektionen.length} Detail-Sektionen · frisch · Schema frisch.`,
   );
 }

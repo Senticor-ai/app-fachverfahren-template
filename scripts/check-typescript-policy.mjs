@@ -1,19 +1,15 @@
-import { readdir, readFile } from "node:fs/promises";
 import { basename, extname, join, relative } from "node:path";
+// The exclusion set and the tree walk are SHARED (scripts/lib/source-exclusion.mjs,
+// scripts/lib/source-scan.mjs): one truth about what is build output, derived from `.gitignore`,
+// and a walk that FAILS instead of reporting an empty tree. Do not re-declare either here.
+import {
+  collectSourceFiles,
+  loadSourceExclusions,
+  readTextFile,
+} from "./lib/source-scan.mjs";
 
 const root = process.cwd();
 const implementationRoots = ["apps", "packages", "jurisdictions", "modules"];
-const ignoredDirectories = new Set([
-  ".git",
-  ".turbo",
-  ".vite",
-  "coverage",
-  "dist",
-  "dist-server",
-  "dist-types",
-  "node_modules",
-  "storybook-static",
-]);
 const generatedJavaScriptAssets = new Set([
   "apps/fachverfahren/public/preview-reporter.js",
   "apps/fachverfahren/public/service-worker.js",
@@ -21,39 +17,7 @@ const generatedJavaScriptAssets = new Set([
   "packages/fachverfahren-kit/tailwind-preset.cjs",
 ]);
 const forbiddenJavaScriptExtensions = new Set([".js", ".jsx", ".cjs", ".mjs"]);
-
-async function directoryExists(path) {
-  try {
-    await readdir(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function collectFiles(startDirectory) {
-  if (!(await directoryExists(startDirectory))) {
-    return [];
-  }
-
-  const entries = await readdir(startDirectory, { withFileTypes: true });
-  const files = [];
-
-  for (const entry of entries) {
-    const path = join(startDirectory, entry.name);
-
-    if (entry.isDirectory()) {
-      if (!ignoredDirectories.has(entry.name)) {
-        files.push(...(await collectFiles(path)));
-      }
-      continue;
-    }
-
-    files.push(path);
-  }
-
-  return files;
-}
+const exclusions = await loadSourceExclusions(root);
 
 function display(path) {
   return relative(root, path);
@@ -62,7 +26,10 @@ function display(path) {
 const violations = [];
 
 for (const implementationRoot of implementationRoots) {
-  const files = await collectFiles(join(root, implementationRoot));
+  const files = await collectSourceFiles(join(root, implementationRoot), {
+    exclusions,
+    optional: true,
+  });
 
   for (const file of files) {
     const relativePath = display(file);
@@ -85,7 +52,7 @@ for (const implementationRoot of implementationRoots) {
       continue;
     }
 
-    const content = await readFile(file, "utf8");
+    const content = await readTextFile(file);
     const allowJsPatterns = [/\ballowJs\s*:\s*true\b/, /"allowJs"\s*:\s*true/];
 
     if (allowJsPatterns.some((pattern) => pattern.test(content))) {

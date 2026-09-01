@@ -137,6 +137,10 @@ const updateUnmanagedPaths: string[] = [
   "scripts/check-domain-contracts.mjs",
   "scripts/check-esm-policy.mjs",
   "scripts/check-leistung-contract.mts",
+  // Emit der Pflicht-Form nach schemas/leistung-config.schema.json. Gehoert derselben Klasse an wie
+  // check-leistung-contract.mts, dessen Frische-Gate ihn erzwingt: Repo-Maintainer-Skript, kein
+  // Konsumenten-Fundament. Sein ERZEUGNIS (schemas/**) ist dagegen `replace` und reist mit.
+  "scripts/emit-leistung-schema.mts",
   "scripts/check-motion-tokens.mjs",
   "scripts/check-procedure-contract.mts",
   "scripts/check-pwa-browser.mjs",

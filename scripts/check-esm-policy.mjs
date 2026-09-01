@@ -1,19 +1,17 @@
-import { readFile, readdir } from "node:fs/promises";
 import { extname, join, relative } from "node:path";
+// The exclusion set and the tree walk are SHARED (scripts/lib/source-exclusion.mjs,
+// scripts/lib/source-scan.mjs): one truth about what is build output, derived from `.gitignore`,
+// and a walk that FAILS instead of reporting an empty tree. Do not re-declare either here.
+import {
+  collectSourceFiles,
+  loadSourceExclusions,
+  readTextFile,
+} from "./lib/source-scan.mjs";
 
 const root = process.cwd();
-const ignoredDirectories = new Set([
-  ".git",
-  ".turbo",
-  ".vite",
-  "coverage",
-  "dist",
-  "dist-server",
-  "node_modules",
-]);
-
 const packageRoots = ["apps", "packages", "jurisdictions"];
 const sourceRoots = ["apps", "packages", "jurisdictions", "modules", "scripts"];
+const exclusions = await loadSourceExclusions(root);
 // Generierte oder statische Browser-JS-Assets hier allowlisten; Implementierungscode bleibt TypeScript-only.
 const generatedJavaScriptAssets = new Set([
   "apps/fachverfahren/public/preview-reporter.js",
@@ -26,63 +24,29 @@ const allowedCommonJsAssets = new Set([
   "packages/fachverfahren-kit/tailwind-preset.cjs",
 ]);
 
-async function directoryExists(path) {
-  try {
-    await readdir(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function collectFiles(startDirectory, predicate) {
-  if (!(await directoryExists(startDirectory))) {
-    return [];
-  }
-
-  const entries = await readdir(startDirectory, { withFileTypes: true });
-  const files = [];
-
-  for (const entry of entries) {
-    if (entry.isDirectory()) {
-      if (!ignoredDirectories.has(entry.name)) {
-        files.push(
-          ...(await collectFiles(join(startDirectory, entry.name), predicate)),
-        );
-      }
-      continue;
-    }
-
-    const path = join(startDirectory, entry.name);
-    if (predicate(path)) {
-      files.push(path);
-    }
-  }
-
-  return files;
-}
-
 async function collectPackageJsonFiles() {
   const files = [join(root, "package.json")];
   for (const workspaceRoot of packageRoots) {
     files.push(
-      ...(await collectFiles(join(root, workspaceRoot), (path) =>
-        path.endsWith("package.json"),
-      )),
+      ...(await collectSourceFiles(join(root, workspaceRoot), {
+        exclusions,
+        optional: true,
+        extensions: ["package.json"],
+      })),
     );
   }
   return files;
 }
 
-async function collectSourceFiles() {
+async function collectPolicySourceFiles() {
   const files = [];
   for (const sourceRoot of sourceRoots) {
     files.push(
-      ...(await collectFiles(join(root, sourceRoot), (path) =>
-        [".ts", ".tsx", ".js", ".mjs", ".cjs", ".cts", ".mts"].includes(
-          extname(path),
-        ),
-      )),
+      ...(await collectSourceFiles(join(root, sourceRoot), {
+        exclusions,
+        optional: true,
+        extensions: [".ts", ".tsx", ".js", ".mjs", ".cjs", ".cts", ".mts"],
+      })),
     );
   }
   return files;
@@ -95,7 +59,7 @@ function display(path) {
 const violations = [];
 
 for (const packageJsonPath of await collectPackageJsonFiles()) {
-  const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8"));
+  const packageJson = JSON.parse(await readTextFile(packageJsonPath));
   if (packageJson.type !== "module") {
     violations.push(
       `${display(packageJsonPath)} must declare "type": "module"`,
@@ -103,7 +67,7 @@ for (const packageJsonPath of await collectPackageJsonFiles()) {
   }
 }
 
-for (const sourceFile of await collectSourceFiles()) {
+for (const sourceFile of await collectPolicySourceFiles()) {
   const relativePath = display(sourceFile);
   const extension = extname(sourceFile);
 
@@ -124,7 +88,7 @@ for (const sourceFile of await collectSourceFiles()) {
     violations.push(`${relativePath} is JavaScript source; use TypeScript`);
   }
 
-  const content = await readFile(sourceFile, "utf8");
+  const content = await readTextFile(sourceFile);
   const commonJsPatterns = [
     /\brequire\s*\(/,
     /\bmodule\s*\.\s*exports\b/,
