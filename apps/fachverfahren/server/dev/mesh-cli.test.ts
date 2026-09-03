@@ -344,7 +344,11 @@ describe("Agenten-CLI (mesh-cli)", () => {
     expect(results[0]?.ok).toBe(true);
     const d = results[0]?.data as {
       antwort: { reviewRequired: boolean; marking: string };
-      erdung: { geerdet: boolean; quellen: string[] };
+      erdung: {
+        geerdet: boolean;
+        quellen: string[];
+        domainsOhneWissen: string[];
+      };
     };
     expect(d.antwort.reviewRequired).toBe(true);
     expect(d.antwort.marking).toBe("ki-vorschlag");
@@ -360,15 +364,31 @@ describe("Agenten-CLI (mesh-cli)", () => {
       declared.length,
       "the chosen place declares no knowledge domain — then grounding cannot be checked",
     ).toBeGreaterThan(0);
-    for (const dom of declared)
-      expect(d.erdung.quellen).toContain(`domain:${dom}`);
-    // And nothing beyond them: an invented domain would be exactly the fabrication the server prevents.
-    const domainSources = d.erdung.quellen.filter((q) =>
-      q.startsWith("domain:"),
-    );
-    expect([...domainSources].sort()).toEqual(
-      [...declared].map((x) => `domain:${x}`).sort(),
-    );
+    // ⛔ 2026-09-03 — THIS ASSERTION READ «every declared domain is a citable source», AND THAT WAS THE
+    // FALSEHOOD ITSELF. `knowledgeDomains` carries TWO kinds of value: the procedure id (resolvable here)
+    // and the CHOS corpus nodes a generated place also declares (`seed-*`) — this application does not
+    // carry that corpus. Listing the unresolvable ones under `domain:` made them look citable, and the
+    // round still reported `geerdet: true`. An absence that looks like a success.
+    //
+    // ⭐ THE INVARIANT IS NOW A PARTITION, not a completeness claim — and it is STRICTLY STRONGER: every
+    // declared domain is EITHER a citable source OR named as missing. Nothing may fall out of both, and
+    // nothing may appear in both. That keeps the anti-fabrication half (no source that was not declared)
+    // and adds the half that was missing (no silent loss).
+    const domainSources = d.erdung.quellen
+      .filter((q) => q.startsWith("domain:"))
+      .map((q) => q.slice("domain:".length));
+    const offen = d.erdung.domainsOhneWissen ?? [];
+    expect(
+      [...domainSources, ...offen].sort(),
+      "a declared knowledge domain is neither citable nor named as missing — it fell out silently",
+    ).toEqual([...declared].sort());
+    expect(
+      domainSources.filter((x) => offen.includes(x)),
+      "a domain is both citable and missing — the two sets must be disjoint",
+    ).toEqual([]);
+    // POSITIVE CONTROL: at least one domain really did resolve — otherwise this partition would also hold
+    // with an empty source list, and it would prove nothing about the grounding.
+    expect(domainSources.length).toBeGreaterThan(0);
     const ev = results[1]?.data as {
       entries: { entryType: string }[];
       chain: { valid: boolean };

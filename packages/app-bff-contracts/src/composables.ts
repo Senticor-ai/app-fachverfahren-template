@@ -274,8 +274,26 @@ export const ComposableChatReplyDtoSchema = Type.Object(
         /** true ⇔ mindestens ein kuratierter Wissenseintrag hat die Runde geerdet (fail-closed ehrlich). */
         geerdet: Type.Boolean(),
         wissensEintraege: Type.Integer({ minimum: 0 }),
-        /** Zitierfähige Quellen: `wissen:<eintragId>` + `domain:<knowledgeDomain>` — nie erfundene Normen. */
+        /** Zitierfähige Quellen: `wissen:<eintragId>` + `domain:<procedureId>` + `anspruch:<id>` — nie
+         *  erfundene Normen. `domain:` nennt nur AUFGELÖSTE Domänen; was nicht aufging, steht in
+         *  `domainsOhneWissen`. */
         quellen: Type.Array(Type.String()),
+        /** Die Rechtsgrundlagen, die diese STELLE selbst deklariert (`anspruch` des Mesh-Manifests).
+         *  ⛔ Sie NENNEN die Norm, sie tragen sie NICHT — deshalb heben sie `geerdet` nicht. */
+        rechtsgrundlagen: Type.Array(
+          Type.Object(
+            {
+              id: Type.String({ minLength: 1 }),
+              titel: Type.String({ minLength: 1 }),
+              ubiquitaer: Type.Optional(Type.Boolean()),
+            },
+            { additionalProperties: false },
+          ),
+        ),
+        /** BENANNTE ABSENZ: deklarierte Wissens-Domänen, zu denen HIER kein Wissen vorliegt (z. B. die
+         *  CHOS-Korpus-Knoten `seed-*`, die dieses Verfahren nicht mitführt). Vorher fielen sie lautlos
+         *  weg, und die Antwort meldete trotzdem `geerdet: true`. */
+        domainsOhneWissen: Type.Array(Type.String()),
       },
       { additionalProperties: false },
     ),

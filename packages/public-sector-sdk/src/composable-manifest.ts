@@ -267,6 +267,15 @@ export function mapManifestToComposable(
       aufgaben,
       skills: ki,
       knowledgeDomains: dedup([manifest.domain, ...(manifest.wissen ?? [])]),
+      // ⭐ `anspruch` REIST JETZT MIT — bis 2026-09-03 endete es hier, obwohl es Titel traegt und damit
+      // das einzige Feld ist, das die RECHTSGRUNDLAGE einer Stelle ohne Korpus-Zugriff benennen kann.
+      rechtsgrundlagen: (manifest.anspruch ?? [])
+        .filter((a) => a && typeof a.id === "string" && !!a.id.trim())
+        .map((a) => ({
+          id: a.id,
+          titel: typeof a.titel === "string" && a.titel.trim() ? a.titel : a.id,
+          ...(a.ubiquitaer === true ? { ubiquitaer: true } : {}),
+        })),
     };
   }
 

@@ -90,6 +90,21 @@ export interface SpineAgent {
   skills: string[];
   /** Deklarative Knowledge-Domains, gegen die der Spine erdet/zitiert (Blueprint §13). */
   knowledgeDomains: string[];
+  /**
+   * DIE SELBST DEKLARIERTEN RECHTSGRUNDLAGEN dieser Stelle — `anspruch` des Mesh-Manifests.
+   *
+   * ⛔ 2026-09-03 — SIE STARBEN BIS HEUTE AM MOUNT. Gemessen am emittierten Manifest von
+   * eines Live-Laufs: jede Stelle fuehrt 5 Anspruchsgrundlagen MIT TITEL (Landesabgabenrecht, Erhebung
+   * kommunaler Abgaben, Autoritaetsfamilie, E-Government, Onlinezugang). `mapManifestToComposable` las `wissen`,
+   * `faehigkeiten`, `befugnis` und `leistungen` — `anspruch` kam in keiner Zeile vor. Der Assistent
+   * einer rechtsnahen Stelle wusste damit nicht, worauf sich seine eigene Stelle stuetzt.
+   *
+   * ⛔ WAS SIE NICHT SIND: der WORTLAUT der Norm. Sie NENNEN die Grundlage, sie tragen sie nicht.
+   * Deshalb heben sie `erdung.geerdet` NICHT — das bleibt an den kuratierten Wissenseintraegen.
+   * «GEERDET beglaubigt die EXISTENZ der Norm, nie ihren GEHALT» ist die teuerste Lehre dieses
+   * Hauses; ein Titel, der als Beleg zaehlt, waere genau ihr Rueckfall.
+   */
+  rechtsgrundlagen?: { id: string; titel: string; ubiquitaer?: boolean }[];
 }
 
 /** Capability Outcome (Blueprint §5.1) — welche Fähigkeit für wen, wie gemessen, was ausdrücklich NICHT. */
@@ -323,9 +338,39 @@ export interface ComposableRegistry {
   listEnabled(): AgenticComposable[];
 }
 
-/** Ist der Status produktiv nutzbar (enabled)? certified/active zählen, restricted/deprecated/… nicht. */
+/**
+ * Is this composable selectable AT RUNTIME?
+ *
+ * ⛔ THIS LINE READ `c.status === "certified" || c.status === "active"` — THE CERTIFICATION LOCK.
+ * REMOVED 2026-09-03 on an explicit, REPEATED user directive: certification was struck from the
+ * constitution on 2026-08-28 («certification at the earliest at production — burning time and money on it
+ * during the first product slice makes no sense»), and the user had to repeat the order because THIS line,
+ * inside the generated product, carried the effect on its own after the constitutional half was done.
+ *
+ * ## What it cost, measured
+ * On the running product (2026-09-03): **8 of 8 generated composables mounted, 0 runtime-selectable.**
+ * Generated composables sit at `incubated`/`candidate` in the lifecycle — and the certification that would
+ * have raised them to `certified` is switched off by the very same directive. The condition was therefore
+ * structurally unsatisfiable: a lock with no key, i.e. a dead end.
+ * The same measurement during the build (2026-08-28): 52.7 % of wall-clock time, 130–513 s per composable
+ * strictly serial, ~0.74 USD — and futile, because `normGedeckt` was `false` in 39 of 39 verdicts (the
+ * missing Land-level law corpus).
+ *
+ * ## What STAYS — this is not relabelling
+ * `status` is UNCHANGED on the composable and is still served and displayed: a composable still states
+ * honestly whether it is `incubated`, `candidate`, `certified` or `active`. What fell is only that this
+ * state BLOCKS USE. The statement remains; the gate is gone.
+ *
+ * ## How it comes back for production
+ * The directive says «at the earliest at production». Whoever re-arms the lock there must NOT do it here,
+ * but bound to the BUILD DEPTH (`produktiv` at the earliest) — otherwise this exact dead end returns in
+ * every first-slice run.
+ *
+ * ⛔ NON-GOAL: `deprecated`/`retired` stay excluded. Making a retired composable selectable would no longer
+ * be a relaxation of the certification lock, but a different defect.
+ */
 export function istEnabled(c: AgenticComposable): boolean {
-  return c.status === "certified" || c.status === "active";
+  return c.status !== "deprecated" && c.status !== "retired";
 }
 
 /** Baut eine In-Memory-`ComposableRegistry` aus einer Liste von Composables (wirft bei wohlgeformten Verstößen
