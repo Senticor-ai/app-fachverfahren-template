@@ -21,7 +21,7 @@ export const SpineAgentDtoSchema = Type.Object(
 export type SpineAgentDto = Static<typeof SpineAgentDtoSchema>;
 
 /** Eine publizierende Quelle der Reuse-Herkunft (Provenienz) — Verbund/Tenant/Zeitpunkt. */
-export const ComposableHerkunftQuelleDtoSchema = Type.Object(
+export const ComposableProvenanceSourceDtoSchema = Type.Object(
   {
     verbundId: Type.String(),
     tenant: Type.String(),
@@ -29,8 +29,8 @@ export const ComposableHerkunftQuelleDtoSchema = Type.Object(
   },
   { additionalProperties: false },
 );
-export type ComposableHerkunftQuelleDto = Static<
-  typeof ComposableHerkunftQuelleDtoSchema
+export type ComposableProvenanceSourceDto = Static<
+  typeof ComposableProvenanceSourceDtoSchema
 >;
 
 /** Reuse-Herkunft (Blueprint §18 „ERP-Reuse"): aus der geteilten Mesh-Registry GEMOUNTET (registry-mount, mit
@@ -43,7 +43,7 @@ export const ComposableHerkunftDtoSchema = Type.Object(
       Type.Literal("lokal-abgeleitet"),
     ]),
     /** Nur bei registry-mount: die publizierenden Quellen (kann leer sein). */
-    quelle: Type.Optional(Type.Array(ComposableHerkunftQuelleDtoSchema)),
+    quelle: Type.Optional(Type.Array(ComposableProvenanceSourceDtoSchema)),
     version: Type.Optional(Type.String()),
     recordHash: Type.Optional(Type.String()),
     mountedAt: Type.Optional(Type.String()),

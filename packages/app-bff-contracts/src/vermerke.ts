@@ -92,7 +92,7 @@ export type VermerkRequestDto = Static<typeof VermerkRequestSchema>;
 /** Einen KI-Beitrag (ENTWURF) anfordern: die KI erzeugt den Text aus Aufgabe + (PII-armem) Kontext.
  *  `kind` steuert den Zell-Typ (Default `teilergebnis` — ein KI-Beitrag ist typischerweise ein Zwischen-
  *  ergebnis); `bezugVermerkId` lässt die KI auf eine offene Zelle (z.B. `frage`) antworten. */
-export const KiVermerkRequestSchema = Type.Object(
+export const AiVermerkRequestSchema = Type.Object(
   {
     task: Type.String({ minLength: 1 }),
     input: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
@@ -102,7 +102,7 @@ export const KiVermerkRequestSchema = Type.Object(
   },
   { additionalProperties: false },
 );
-export type KiVermerkRequestDto = Static<typeof KiVermerkRequestSchema>;
+export type AiVermerkRequestDto = Static<typeof AiVermerkRequestSchema>;
 
 /** Einen KI-Vermerk-Entwurf prüfen: bestätigen (in die Akte übernehmen) oder verwerfen.
  *  Das Vokabular kommt aus `VermerkReviewEntscheidungSchema` — hier steht es NICHT ein zweites Mal. */

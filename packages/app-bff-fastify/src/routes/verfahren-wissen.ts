@@ -8,7 +8,7 @@ import type { FastifyInstance } from "fastify";
 import type { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 import {
   ErrorEnvelopeSchema,
-  KiWissenRequestSchema,
+  AiKnowledgeRequestSchema,
   VerfahrenWissenEintragParamsSchema,
   VerfahrenWissenParamsSchema,
   WissenEintragRequestSchema,
@@ -236,7 +236,7 @@ export function registerVerfahrenWissenRoutes(
         summary:
           "KI-Verfahrens-Wissen erzeugen (liest das bisherige Wiki als Kontext)",
         params: VerfahrenWissenParamsSchema,
-        body: KiWissenRequestSchema,
+        body: AiKnowledgeRequestSchema,
         response: {
           201: WissenViewDtoSchema,
           422: ErrorEnvelopeSchema,

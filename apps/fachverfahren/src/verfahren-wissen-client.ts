@@ -2,7 +2,7 @@
 // DIESELBE Konvention wie case-/antrag-client (Session-Cookie, BASE_URL-Präfix, DTOs aus @senticor/app-bff-
 // contracts — nicht dupliziert). Behörden-Scope kommt server-seitig aus der Sitzung.
 import type {
-  KiWissenRequestDto,
+  AiKnowledgeRequestDto,
   WissenEintragRequestDto,
   WissenReviewRequestDto,
   WissenViewDto,
@@ -55,7 +55,7 @@ export async function schreibeVerfahrenWissen(
 export async function kiVerfahrenWissen(
   procedureId: string,
   version: string,
-  eintrag: KiWissenRequestDto,
+  eintrag: AiKnowledgeRequestDto,
 ): Promise<WissenViewDto> {
   return request<WissenViewDto>(`${basis(procedureId, version)}/ki`, {
     method: "POST",

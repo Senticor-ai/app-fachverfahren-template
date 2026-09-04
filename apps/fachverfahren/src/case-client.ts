@@ -9,7 +9,7 @@ import type {
   CaseCreateRequestDto,
   CaseDto,
   CaseTransitionRequestDto,
-  KiVermerkRequestDto,
+  AiVermerkRequestDto,
   TaskCreateRequestDto,
   TaskDto,
   TaskPatchRequestDto,
@@ -143,7 +143,7 @@ export interface CasePort {
   /** Einen KI-Aktenvermerk-ENTWURF anfordern (prüfpflichtig, ki-vorschlag). */
   createKiVermerk(
     caseId: string,
-    req: KiVermerkRequestDto,
+    req: AiVermerkRequestDto,
   ): Promise<VermerkDto>;
   /** Die Aktenvermerke eines Falls lesen (chronologisch, mit abgeleitetem Prüfstatus). */
   listVermerke(caseId: string): Promise<VermerkDto[]>;
