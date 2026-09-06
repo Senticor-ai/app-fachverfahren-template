@@ -57,7 +57,7 @@
 //
 // ══ PURE ON PURPOSE ══════════════════════════════════════════════════════════════════════════════════
 //
-// No IO here. The caller reads the file and hands in the TEXT (scripts/lib/source-scan.mjs does that, and
+// No IO here. The caller reads the file and hands in the TEXT (scripts/lib/source-scan.ts does that, and
 // its failure behaviour is fail-CLOSED). That keeps the witness testable at the seam without putting a
 // tree on disk, and it makes "the file is missing or unreadable" a property of the SIGNATURE
 // (`null`/`undefined` allowed, built-in set returned) rather than a `catch` hidden in some caller.
@@ -121,8 +121,10 @@ const GLOB_CHARACTERS = /[*?[\]]/;
  *   empty set — never an error, because "there is no .gitignore" is a real and ordinary answer.
  * @returns {Set<string>}
  */
-export function directoryNamesFromGitignore(text) {
-  const names = new Set();
+export function directoryNamesFromGitignore(
+  text: string | null | undefined,
+): Set<string> {
+  const names = new Set<string>();
   if (!text) return names;
   for (const raw of text.split("\n")) {
     // Trailing whitespace is meaningless in `.gitignore` (unless escaped); this drops CR too.
@@ -152,8 +154,10 @@ export function directoryNamesFromGitignore(text) {
  * @param {string | null | undefined} gitignoreText
  * @returns {Set<string>}
  */
-export function sourceExclusions(gitignoreText) {
-  const set = new Set(BUILT_IN_EXCLUSIONS);
+export function sourceExclusions(
+  gitignoreText: string | null | undefined,
+): Set<string> {
+  const set = new Set<string>(BUILT_IN_EXCLUSIONS);
   for (const name of directoryNamesFromGitignore(gitignoreText)) set.add(name);
   return set;
 }
@@ -168,7 +172,10 @@ export function sourceExclusions(gitignoreText) {
  * @param {ReadonlySet<string>} [exclusions]
  * @returns {boolean}
  */
-export function isNotSource(name, exclusions = BUILT_IN_EXCLUSIONS) {
+export function isNotSource(
+  name: string,
+  exclusions: ReadonlySet<string> = BUILT_IN_EXCLUSIONS,
+): boolean {
   return (
     exclusions.has(name) ||
     OUTPUT_PREFIXES.some(

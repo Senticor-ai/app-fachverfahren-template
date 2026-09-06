@@ -1,4 +1,4 @@
-// Witness for scripts/lib/source-scan.mjs — «a tree that cannot be read is a FAILURE, not an empty report».
+// Witness for scripts/lib/source-scan.ts — «a tree that cannot be read is a FAILURE, not an empty report».
 //
 // ⚠️ REAL PERMISSIONS, NOT A STUB. Every red case below makes a real directory or file unreadable with
 // chmod and then asks the scanner. A test that only inspects what a fake `readdir` returned proves the fake
@@ -13,8 +13,8 @@ import {
   loadSourceExclusions,
   readDirectoryEntries,
   readTextFile,
-} from "./source-scan.mjs";
-import { BUILT_IN_EXCLUSIONS } from "./source-exclusion.mjs";
+} from "./source-scan.ts";
+import { BUILT_IN_EXCLUSIONS } from "./source-exclusion.ts";
 
 const locked: string[] = [];
 let root: string | undefined;

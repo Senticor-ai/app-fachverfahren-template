@@ -5,15 +5,15 @@ import { describe, expect, it } from "vitest";
 import {
   BUILT_IN_EXCLUSIONS,
   isNotSource,
-} from "../../../scripts/lib/source-exclusion.mjs";
-import { readDirectoryEntries } from "../../../scripts/lib/source-scan.mjs";
+} from "../../../scripts/lib/source-exclusion.ts";
+import { readDirectoryEntries } from "../../../scripts/lib/source-scan.ts";
 import { renderDomainApp } from "./render.ts";
 import { assertRefusesToScaffold, canScaffoldFrom } from "./pristine-source.ts";
 
 // Verzeichnisse, die beim Residue-Scan NICHT als Fehler zählen: Build-/Abhängigkeits-Ausgaben und
 // die Provenienz-Metadaten (.template/lock.json führt bewusst den Namen der QUELL-Vorlage
 // `senticor-app-fachverfahren-template` — das ist korrekte Herkunft, kein Residue).
-// ⭐ Hung onto the shared floor, never rewritten (scripts/lib/source-exclusion.mjs). `.template` is the
+// ⭐ Hung onto the shared floor, never rewritten (scripts/lib/source-exclusion.ts). `.template` is the
 // only addition and it is not build output: `.template/lock.json` deliberately carries the name of the
 // SOURCE template — correct provenance, not residue.
 const scanIgnored = new Set([...BUILT_IN_EXCLUSIONS, ".template"]);

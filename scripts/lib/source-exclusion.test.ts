@@ -1,4 +1,4 @@
-// Witness for scripts/lib/source-exclusion.mjs — the ONE answer to «is this build output?».
+// Witness for scripts/lib/source-exclusion.ts — the ONE answer to «is this build output?».
 //
 // Two jobs here. The unit tests pin the derivation's DELIBERATE limits (each rejection in the module head
 // has a damage case; each one gets an assertion). The last block is the ANTI-DRIFT RATCHET: it counts the
@@ -15,7 +15,7 @@ import {
   directoryNamesFromGitignore,
   isNotSource,
   sourceExclusions,
-} from "./source-exclusion.mjs";
+} from "./source-exclusion.ts";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -114,13 +114,13 @@ describe("ANTI-DRIFT RATCHET — how many hand-written exclusion lists are left?
   /** The ONE place the answer is allowed to be written out, plus the config files that must repeat it in a
    *  syntax that cannot import (ignore files are plain text; vitest's `exclude` is glob, not basename). */
   const ALLOWED = new Set([
-    "scripts/lib/source-exclusion.mjs",
+    "scripts/lib/source-exclusion.ts",
     "scripts/lib/source-exclusion.test.ts",
     // ⛔ OUT OF REACH, AND THE REASON IS MEASURED — not an exemption of convenience.
     // `packages/fachverfahren-kit/tsconfig.json` is `strict: true` with `allowJs` off (repo policy,
     // enforced by scripts/check-typescript-policy.mjs) and it EMITS declarations to dist-types. Importing
     // this `.mjs` from there produces `TS7016: Could not find a declaration file for module
-    // '../../../scripts/lib/source-exclusion.mjs'` — verified 2026-09-01 by running
+    // '../../../scripts/lib/source-exclusion.ts'` — verified 2026-09-01 by running
     // `tsc --noEmit -p packages/fachverfahren-kit/tsconfig.json` with the import in place.
     // The remedy is a decision this cut does not get to make on its own: either the shared truth moves
     // into a real workspace package, or a hand-written `.d.mts` is added (a second declaration surface,

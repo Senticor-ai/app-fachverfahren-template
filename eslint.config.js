@@ -9,7 +9,7 @@ import prettier from "eslint-config-prettier";
 // and it was one of the SEVEN copies that had drifted apart. It now derives from the same
 // `.gitignore` every gate reads. Anything ESLint alone must skip is appended below, with its reason.
 import { readFileSync } from "node:fs";
-import { sourceExclusions } from "./scripts/lib/source-exclusion.mjs";
+import { sourceExclusions } from "./scripts/lib/source-exclusion.ts";
 
 const gitignore = (() => {
   try {

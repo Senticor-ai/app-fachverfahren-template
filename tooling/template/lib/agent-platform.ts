@@ -5,7 +5,7 @@ import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { parse as parseYaml } from "yaml";
 // ONE TRUTH about what is build output, and a tree walk that FAILS instead of reporting an empty tree:
-// scripts/lib/source-exclusion.mjs + scripts/lib/source-scan.mjs. Kept in `scripts/lib` because the
+// scripts/lib/source-exclusion.ts + scripts/lib/source-scan.ts. Kept in `scripts/lib` because the
 // plain-node `scripts/check-*.mjs` gates and eslint.config.js must import the SAME set — a gate list
 // that only tooling can read is how the seven copies drifted apart in the first place.
 import {
@@ -13,7 +13,7 @@ import {
   loadSourceExclusions,
   readDirectoryEntries,
   readTextFile,
-} from "../../../scripts/lib/source-scan.mjs";
+} from "../../../scripts/lib/source-scan.ts";
 import { getGitCommit, getGitShortStatus } from "./git.ts";
 import { readJson, writeFileAtomic } from "./structured-edit.ts";
 import type { PackageJson } from "./structured-edit.ts";

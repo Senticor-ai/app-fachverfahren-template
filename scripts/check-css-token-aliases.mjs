@@ -1,13 +1,13 @@
 import { join, relative } from "node:path";
-import { istDokumentationsNutzlast } from "./lib/doku-nutzlast.mjs";
-// The exclusion set and the tree walk are SHARED (scripts/lib/source-exclusion.mjs,
-// scripts/lib/source-scan.mjs): one truth about what is build output, derived from `.gitignore`,
+import { istDokumentationsNutzlast } from "./lib/doku-nutzlast.ts";
+// The exclusion set and the tree walk are SHARED (scripts/lib/source-exclusion.ts,
+// scripts/lib/source-scan.ts): one truth about what is build output, derived from `.gitignore`,
 // and a walk that FAILS instead of reporting an empty tree. Do not re-declare either here.
 import {
   collectSourceFiles,
   loadSourceExclusions,
   readTextFile,
-} from "./lib/source-scan.mjs";
+} from "./lib/source-scan.ts";
 
 const root = process.cwd();
 const sourceRoots = ["apps", "packages", "modules"];

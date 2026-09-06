@@ -18,13 +18,13 @@ import {
   writeTemplateMetadata,
 } from "./manifest.ts";
 import { readJson, type PackageJson } from "./structured-edit.ts";
-// ONE TRUTH about what is build output (scripts/lib/source-exclusion.mjs) and a tree walk that FAILS
-// instead of reporting an empty tree (scripts/lib/source-scan.mjs).
+// ONE TRUTH about what is build output (scripts/lib/source-exclusion.ts) and a tree walk that FAILS
+// instead of reporting an empty tree (scripts/lib/source-scan.ts).
 import {
   BUILT_IN_EXCLUSIONS,
   isNotSource,
-} from "../../../scripts/lib/source-exclusion.mjs";
-import { readDirectoryEntries } from "../../../scripts/lib/source-scan.mjs";
+} from "../../../scripts/lib/source-exclusion.ts";
+import { readDirectoryEntries } from "../../../scripts/lib/source-scan.ts";
 
 interface RenderDomainAppOptions {
   domain: string;
@@ -39,7 +39,7 @@ interface RenderDomainAppOptions {
 }
 
 /** ⭐ HUNG ONTO THE SHARED FLOOR, NEVER REWRITTEN. `BUILT_IN_EXCLUSIONS` is the ONE answer to «is this
- *  build output?» (scripts/lib/source-exclusion.mjs); what stands here is only what is true for the
+ *  build output?» (scripts/lib/source-exclusion.ts); what stands here is only what is true for the
  *  SCAFFOLD COPY in addition — machine-local scratch that no generated app should inherit. Measured
  *  2026-09-01, this widening drops exactly ONE name that exists in this tree today: `.opencode`, a
  *  git-ignored symlink into a sibling checkout that the scaffold would otherwise copy verbatim into every

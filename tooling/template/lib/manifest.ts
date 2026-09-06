@@ -83,7 +83,7 @@ export const defaultOwnership: TemplateOwnership = {
     "scripts/validate-k8s-render.sh": "replace",
     // DIE EINE QUELLEN-WAHRHEIT REIST MIT UND GEHOERT DER VORLAGE (2026-09-01).
     //
-    // `scripts/lib/source-exclusion.mjs` beantwortet «ist das eine Quelle?» fuer die vier `check-*.mjs`,
+    // `scripts/lib/source-exclusion.ts` beantwortet «ist das eine Quelle?» fuer die vier `check-*.mjs`,
     // fuer `eslint.config.js` und fuer das Tooling. Sie stand vorher ZEHNMAL als Literal im Baum, mit drei
     // gemessenen Drifts — und eine davon liess `validateModuleBoundaries` 232 erzeugte Deklarationen
     // (1,4 MB `dist-types`) als QUELLE lesen.
@@ -93,7 +93,7 @@ export const defaultOwnership: TemplateOwnership = {
     // mitreisen: ihre Importeure tun es, und ein Klon mit `check-esm-policy.mjs` ohne diese Datei stuerbe
     // beim ersten `check:fast` an einem fehlenden Import.
     // ⚠️ ENG AUF `source-*`, NICHT `scripts/lib/**`: unter `scripts/lib/` liegen bereits
-    // `verify-mounted-composables.mts` und `doku-nutzlast.mjs`, und die stehen mit Grund als
+    // `verify-mounted-composables.mts` und `doku-nutzlast.ts`, und die stehen mit Grund als
     // Konsumenten-Hoheit in der Opt-out-Liste. Ein Glob ueber das ganze Verzeichnis haette sie
     // STILL zu Vorlagen-Eigentum gemacht — eine Umklassifizierung als Nebenwirkung, und genau die
     // Klasse, gegen die die Ratsche ueber tote Opt-out-Eintraege gebaut ist. Sie hat es gefangen.

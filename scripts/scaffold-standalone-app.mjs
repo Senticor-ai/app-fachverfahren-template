@@ -8,9 +8,9 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
-// ONE TRUTH about what is build output — see scripts/lib/source-exclusion.mjs. The list that used to
+// ONE TRUTH about what is build output — see scripts/lib/source-exclusion.ts. The list that used to
 // stand in `shouldSkip` knew five names and not `.git`, `storybook-static` or `playwright-report`.
-import { isNotSource, sourceExclusions } from "./lib/source-exclusion.mjs";
+import { isNotSource, sourceExclusions } from "./lib/source-exclusion.ts";
 
 const root = process.cwd();
 const rawArgs = process.argv.slice(2);

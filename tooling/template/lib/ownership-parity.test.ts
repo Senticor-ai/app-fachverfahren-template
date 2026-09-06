@@ -42,6 +42,9 @@ const updateUnmanagedPaths: string[] = [
   "mise.toml",
   "tsconfig.base.json",
   "tsconfig.json",
+  // NEU 2026-09-06: die Deckung fuer `scripts/**`. Sie gehoert in dieselbe Gruppe wie ihre vier
+  // Nachbarn — Werkzeug-Konfiguration der Vorlage, die ein erzeugtes Verfahren nicht erbt.
+  "tsconfig.scripts.json",
   "tsconfig.storybook.json",
   "tsconfig.strict.json",
   "vitest.browser.config.ts",
@@ -129,7 +132,7 @@ const updateUnmanagedPaths: string[] = [
   "scripts/lib/verify-mounted-composables.mts",
   // Geteilter Nutzlast-Filter der Quell-Gates (CSS-Token + Motion): Dokumentation ist kein Code. Gehoert zu
   // denselben Repo-Maintainer-Skripten wie die Gates, die ihn benutzen — kein Konsumenten-Fundament.
-  "scripts/lib/doku-nutzlast.mjs",
+  "scripts/lib/doku-nutzlast.ts",
   "scripts/verify-mounted-composables.test.ts",
   "scripts/check-css-token-aliases.mjs",
   "scripts/check-dev-dependencies.mjs",

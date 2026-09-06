@@ -7,27 +7,40 @@
 // .ts-Config zu importieren.
 import type { LeistungConfig, Rechenprobe } from "./types.js";
 
+// ⛔ WARUM `NonNullable<…>` UND NICHT NUR `LeistungConfig["x"]` (gemessen 2026-09-06, als `scripts/**`
+// zum ersten Mal von einer tsconfig gedeckt wurde):
+//
+//   datenanbindung?: LeistungConfig["datenanbindung"]     ⇒  `Datenanbindung[] | undefined` OPTIONAL
+//
+// Das Quellfeld ist selbst optional, der indizierte Zugriff traegt das `| undefined` also MIT — und unter
+// `exactOptionalPropertyTypes` (dieses Repo fuehrt es) ist `{ x?: T | undefined }` NICHT dasselbe wie
+// `{ x?: T }`. Der Snapshot war damit an keine `Pick<LeistungConfig, "x">`-Signatur uebergebbar.
+//
+// Sichtbar wurde es an EINER Stelle (`check-leistung-contract.mts:134` → `verifyDatenanbindung`), aber ALLE
+// ELF Felder dieser Form trugen den Defekt. Ein Einzelfix dort waere die Behandlung eines Symptoms gewesen.
+// Der Empfaenger behandelt Abwesenheit ausdruecklich (`datenanbindungen`: „defensiv: fehlt/kein Array → []") —
+// falsch war nie der Code, sondern was der Typ ueber ihn sagte.
 export interface LeistungContractSnapshot {
   id: string;
   label: string;
   kommune: string;
   rechtsgrundlagen: LeistungConfig["rechtsgrundlagen"];
-  fimLeistung?: LeistungConfig["fimLeistung"];
+  fimLeistung?: NonNullable<LeistungConfig["fimLeistung"]>;
   antrag: { steps: LeistungConfig["antrag"]["steps"]; einleitung?: string };
   /** Benannte Auswahl-Listen (schlank, value/label) — als echte Zeilen. */
-  datenlisten?: LeistungConfig["datenlisten"];
+  datenlisten?: NonNullable<LeistungConfig["datenlisten"]>;
   /** TARIF-/GEBÜHRENTABELLE als echte Staffel-Zeilen (statt „[function]"). */
-  tarif?: LeistungConfig["tarif"];
+  tarif?: NonNullable<LeistungConfig["tarif"]>;
   /** CODELISTEN mit Provenienz (Einträge + normRef/belege) als echte Zeilen. */
-  codelisten?: LeistungConfig["codelisten"];
+  codelisten?: NonNullable<LeistungConfig["codelisten"]>;
   /** REGISTER-REFERENZEN als echte Zeilen. */
-  registerRefs?: LeistungConfig["registerRefs"];
+  registerRefs?: NonNullable<LeistungConfig["registerRefs"]>;
   /** FIM-REFERENZEN als echte Zeilen. */
-  fimRefs?: LeistungConfig["fimRefs"];
+  fimRefs?: NonNullable<LeistungConfig["fimRefs"]>;
   /** FRISTEN-TYPEN als echte Zeilen. */
-  fristenTypen?: LeistungConfig["fristenTypen"];
+  fristenTypen?: NonNullable<LeistungConfig["fristenTypen"]>;
   /** GENERISCHE DATENANBINDUNG als echte Zeilen (Register/intern/extern, zweckgebunden + BSI-klassifiziert). */
-  datenanbindung?: LeistungConfig["datenanbindung"];
+  datenanbindung?: NonNullable<LeistungConfig["datenanbindung"]>;
   /**
    * DAS RECHTSBEHELFS-/BEKANNTGABE-REGIME als echte Zeilen — reine, JSON-sichere DATEN.
    *
@@ -41,14 +54,14 @@ export interface LeistungContractSnapshot {
    *
    * Rein additiv: eine Config ohne `zustellung` lässt das Feld weg (bestehende Snapshots bleiben gültig).
    */
-  zustellung?: LeistungConfig["zustellung"];
+  zustellung?: NonNullable<LeistungConfig["zustellung"]>;
   statusMachine: LeistungConfig["statusMachine"];
   register: LeistungConfig["register"];
   detailSektionen: LeistungConfig["detailSektionen"];
-  ki?: LeistungConfig["ki"];
+  ki?: NonNullable<LeistungConfig["ki"]>;
   /** WELLE 1c: die Zuständigkeiten (personas) mit ihren KI-Fähigkeiten je Zuständigkeit (faehigkeiten + AAL) — der
    *  Laufzeit-Spiegel der CHOS-governance.faehigkeiten; das nicht-JSON-fähige `icon` ist abgestreift. */
-  personas?: LeistungConfig["personas"];
+  personas?: NonNullable<LeistungConfig["personas"]>;
   /** ESCAPE-HATCH-Präsenz: nur gesetzt, wenn eine `berechne`-Funktion statt eines `tarif` genutzt wird. */
   berechne?: "[function]";
   /** RECHENPROBEN (Sollwert-Tabelle) als echte Zeilen — der maschinelle Beleg, dass der Tenor rechnerisch stimmt.

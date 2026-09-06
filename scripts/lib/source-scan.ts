@@ -49,19 +49,21 @@
 // descends — the concurrent-write race that could produce a mid-scan ENOENT is excluded by construction,
 // not by a catch. Sub-directories are therefore NOT optional: an ENOENT below a directory that readdir
 // just listed means the tree moved under a gate, and a gate that read a moving tree must say so.
+import type { Dirent } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   BUILT_IN_EXCLUSIONS,
   isNotSource,
   sourceExclusions,
-} from "./source-exclusion.mjs";
+} from "./source-exclusion.ts";
 
 /** A tree walk that could not see. Carries the path and the errno so the halt names a REMEDY, not just a
  *  symptom — «EACCES on apps/x» is actionable, «0 files» is not. */
 export class TreeScanError extends Error {
-  /** @param {string} path @param {NodeJS.ErrnoException} cause */
-  constructor(path, cause) {
+  readonly path: string;
+  readonly code: string | undefined;
+  constructor(path: string, cause: NodeJS.ErrnoException) {
     super(
       `cannot read ${path}: ${cause.code ?? cause.name} — a tree that cannot be read is a FAILURE, not an empty result. Fix the permissions or the path; do not silence this.`,
     );
@@ -80,20 +82,20 @@ export class TreeScanError extends Error {
  *   ONLY ENOENT is forgiven by it. Anything else still throws.
  * @returns {Promise<import("node:fs").Dirent[]>}
  */
-export async function readDirectoryEntries(directory, options = {}) {
+export async function readDirectoryEntries(
+  directory: string,
+  options: { optional?: boolean } = {},
+): Promise<Dirent[]> {
   try {
     return await readdir(directory, { withFileTypes: true });
   } catch (error) {
     if (
       options.optional &&
-      /** @type {NodeJS.ErrnoException} */ (error).code === "ENOENT"
+      (error as NodeJS.ErrnoException).code === "ENOENT"
     ) {
       return [];
     }
-    throw new TreeScanError(
-      directory,
-      /** @type {NodeJS.ErrnoException} */ (error),
-    );
+    throw new TreeScanError(directory, error as NodeJS.ErrnoException);
   }
 }
 
@@ -104,11 +106,11 @@ export async function readDirectoryEntries(directory, options = {}) {
  * @param {string} file
  * @returns {Promise<string>}
  */
-export async function readTextFile(file) {
+export async function readTextFile(file: string): Promise<string> {
   try {
     return await readFile(file, "utf8");
   } catch (error) {
-    throw new TreeScanError(file, /** @type {NodeJS.ErrnoException} */ (error));
+    throw new TreeScanError(file, error as NodeJS.ErrnoException);
   }
 }
 
@@ -122,16 +124,16 @@ export async function readTextFile(file) {
  * @param {string} root
  * @returns {Promise<Set<string>>}
  */
-export async function loadSourceExclusions(root) {
+export async function loadSourceExclusions(root: string): Promise<Set<string>> {
   try {
     return sourceExclusions(await readFile(join(root, ".gitignore"), "utf8"));
   } catch (error) {
-    if (/** @type {NodeJS.ErrnoException} */ (error).code === "ENOENT") {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       return new Set(BUILT_IN_EXCLUSIONS);
     }
     throw new TreeScanError(
       join(root, ".gitignore"),
-      /** @type {NodeJS.ErrnoException} */ (error),
+      error as NodeJS.ErrnoException,
     );
   }
 }
@@ -149,15 +151,21 @@ export async function loadSourceExclusions(root) {
  *   `optional` applies to `root` ONLY (see the header) — never to the directories found inside it.
  * @returns {Promise<string[]>}
  */
-export async function collectSourceFiles(root, options = {}) {
+export async function collectSourceFiles(
+  root: string,
+  options: {
+    extensions?: readonly string[];
+    exclusions?: ReadonlySet<string>;
+    optional?: boolean;
+    accept?: (path: string) => boolean;
+  } = {},
+): Promise<string[]> {
   const exclusions = options.exclusions ?? (await loadSourceExclusions(root));
   const extensions = options.extensions ?? [];
   const accept = options.accept;
-  /** @type {string[]} */
-  const files = [];
+  const files: string[] = [];
 
-  /** @param {string} directory @param {boolean} optional */
-  const walk = async (directory, optional) => {
+  const walk = async (directory: string, optional: boolean): Promise<void> => {
     for (const entry of await readDirectoryEntries(directory, { optional })) {
       if (isNotSource(entry.name, exclusions)) continue;
       const path = join(directory, entry.name);

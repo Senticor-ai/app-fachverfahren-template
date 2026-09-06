@@ -27,7 +27,7 @@
     "check:precommit": "pnpm run check:git-hygiene && pnpm run check:fast",
     "check:ci": "scripts/ci-validate.sh",
     "check:push": "pnpm run check:ci",
-    "typecheck": "tsc -b && pnpm --filter @senticor/fachverfahren typecheck",
+    "typecheck": "tsc -b && tsc --noEmit -p tsconfig.scripts.json && pnpm --filter @senticor/fachverfahren typecheck",
     "typecheck:all": "pnpm typecheck",
     "typecheck:storybook": "tsc --noEmit -p tsconfig.storybook.json",
     "lint": "eslint .",
