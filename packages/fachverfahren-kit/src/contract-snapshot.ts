@@ -55,6 +55,26 @@ export interface LeistungContractSnapshot {
    * Rein additiv: eine Config ohne `zustellung` lässt das Feld weg (bestehende Snapshots bleiben gültig).
    */
   zustellung?: NonNullable<LeistungConfig["zustellung"]>;
+  /**
+   * DIE VA-PFLICHTANGABEN als echte Zeilen — der ZWILLING von `zustellung`, ein Feld weiter.
+   *
+   * ⛔ LIVE GEMESSEN 2026-09-07 an einem ERZEUGTEN Verfahren (Lauf `done`, Test-Report PASSED, 0 offene Befunde): `leistung.config.ts` DEKLARIERT `verwaltungsaktInhalt` — und
+   * `leistung.contract.json` traegt den Schluessel NICHT (`'verwaltungsaktInhalt' in vertrag === false`).
+   *
+   * ⭐ UND DER SERVER LIEST IHN AUSDRUECKLICH. `verwaltungsaktInhaltAusVertrag` sagt in seinem eigenen
+   * Kommentar: «alles Uebrige nur, wenn der Vertrag es unter `verwaltungsaktInhalt` DEKLARIERT. Schweigt
+   * er, wird der Block ENTFERNT statt geerbt.» Der Vertrag schweigt IMMER — also entfernt der Server den
+   * Block bei JEDEM erzeugten Verfahren.
+   *
+   * ⇒ RECHTSFOLGE: ein Bescheid ohne Inhaltsadressat (§ 119 Abs. 1 AO · § 157 Abs. 1 S. 2 AO —
+   * Bestimmtheit, Nichtigkeitsrisiko § 125 AO) und ohne Leistungsgebot (§ 254 Abs. 1 AO — nicht
+   * vollstreckbar, keine Kasse, keine Faelligkeit). Die Heilung vom 2026-08-31 («der Bescheid forderte
+   * zur Zahlung an die Kasse einer FREMDEN Kommune») hat das ERBEN zu Recht abgeschaltet — und weil der
+   * Transport fehlte, blieb seither NICHTS uebrig. Ein geheilter Zwilling ist kein geheiltes Haus.
+   *
+   * Rein additiv: eine Config ohne das Feld laesst es weg (bestehende Snapshots bleiben gueltig).
+   */
+  verwaltungsaktInhalt?: NonNullable<LeistungConfig["verwaltungsaktInhalt"]>;
   statusMachine: LeistungConfig["statusMachine"];
   register: LeistungConfig["register"];
   detailSektionen: LeistungConfig["detailSektionen"];
@@ -115,6 +135,12 @@ export function toContractSnapshot<T = Record<string, unknown>>(
             config.zustellung,
           ),
         }
+      : {}),
+    // DER ZWILLING: ohne diese Zeile entfernt der Server die Pflichtangaben bei JEDEM Bescheid — er tut das
+    // zu Recht (lieber ein sichtbarer Mangel als der Zahlungsempfaenger einer fremden Kommune), aber er
+    // bekommt nie etwas zu behalten. Reine Daten, kein Laufzeit-Feld abzustreifen.
+    ...(config.verwaltungsaktInhalt
+      ? { verwaltungsaktInhalt: config.verwaltungsaktInhalt }
       : {}),
     statusMachine: config.statusMachine,
     register: config.register,
