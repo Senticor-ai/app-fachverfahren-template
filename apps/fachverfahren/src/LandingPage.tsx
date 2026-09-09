@@ -39,6 +39,22 @@ export function LandingPage(): React.ReactElement | null {
   const view = landingView(session);
   const [authMode, setAuthMode] = React.useState<"login" | "register">("login");
 
+  // ── DIE LANDING IST DIE EINZIGE SEITE OHNE `Shell` — UND DIE ERSTE, DIE JEMAND SIEHT ──────────────────
+  // Der Reiter-Titel wird in `Shell` gesetzt; diese Seite rendert keine. Ohne diese Zeile truege ausgerechnet
+  // der Einstieg weiter `Fachverfahren - Referenz-App` aus der unveraenderten Vorlage (WCAG 2.4.2, Stufe A).
+  //
+  // ⛔ SIE STEHT HIER OBEN, UND DAS IST DER GANZE PUNKT (gemessen 2026-09-08). Sie stand bis heute NACH dem
+  // fruehen `return null` unten. React zaehlt Hooks je Render: beim Uebergang `loading` -> geladen sprang die
+  // Zahl von 3 auf 4, React warf «Rendered more hooks than during the previous render», und die Fehlergrenze
+  // zeigte «Die App konnte nicht geladen werden» — auf der ERSTEN Seite, die ein Buerger sieht.
+  // Gemessen in DREI erzeugten Verfahren gleichzeitig (`_devserver.log`), und `.chos/preview-thumbnails/
+  // buerger.png` ist in allen dreien ein Foto genau dieser Fehlerseite — aufgenommen von der Preview-Phase,
+  // die den Lauf danach `done` und `appUsable: true` meldete. Kein Gate sah es: 0 Treffer fuer
+  // «more hooks» in builder-summary, evidence, run-errors und boot-smoke.
+  // ⭐ EIN HOOK GEHOERT VOR JEDEN BEDINGTEN AUSGANG — ausnahmslos. Das ist keine Stilfrage, sondern die
+  // Aufrufregel von React.
+  useDokumentTitel(store.config);
+
   // Kein Formular-Flackern, solange der Session-Zustand lädt.
   if (view === "loading") return null;
 
@@ -48,11 +64,6 @@ export function LandingPage(): React.ReactElement | null {
     );
     if (from) return <Navigate to={from} replace />;
   }
-
-  // ── DIE LANDING IST DIE EINZIGE SEITE OHNE `Shell` — UND DIE ERSTE, DIE JEMAND SIEHT ──────────────────
-  // Der Reiter-Titel wird in `Shell` gesetzt; diese Seite rendert keine. Ohne diese Zeile truege ausgerechnet
-  // der Einstieg weiter `Fachverfahren - Referenz-App` aus der unveraenderten Vorlage (WCAG 2.4.2, Stufe A).
-  useDokumentTitel(store.config);
 
   // Der abgewiesene Weg — aus DEMSELBEN `state.from`, das der Deep-Link-Restore ohnehin liest. Kein
   // zweiter Kanal, keine zweite Wahrheit; nur eine zweite FRAGE an denselben Wert.
