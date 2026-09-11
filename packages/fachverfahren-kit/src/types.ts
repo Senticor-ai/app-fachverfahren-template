@@ -57,6 +57,17 @@ export interface Berechnung {
    *  KI-Assistent hat den Wert vorgeschlagen/geschaetzt (spaetere Feature-Stufe) → als KI-Vorschlag kennzeichnen. Fehlt
    *  das Feld, gilt "deterministisch". Der Produzent/DAG setzt es; die Anzeige leitet die Kennzeichnung NUR daraus ab. */
   herkunft?: "deterministisch" | "ki";
+  /** ARE THE TARIFF VALUES BACKED? (additive, fail-open — if the field is missing, everything stays as before.)
+   *
+   *  ⛔ MEASURED 2026-09-09: `herkunft: "deterministisch"`, per its own comment above, carries TWO
+   *  statements — «no AI guessed» AND «§-belegt». The first always holds, the second only if the RATES
+   *  come from a backed source. A generated application therefore showed «VORLÄUFIG · §-BELEGT» above an
+   *  amount whose statute the same run listed as a knowledge gap and whose seam set `SAETZE_BELEGT = false`.
+   *  A citizen does not read the badge as a statement about the SCHEMA, but about the NUMBER next to it.
+   *
+   *  `false` = the application KNOWS its rates are assumptions ⇒ the badge no longer certifies.
+   *  `true`/missing = unchanged. The display derives from it (`resultBadge`); it decides nothing. */
+  saetzeBelegt?: boolean | undefined;
 }
 
 /**

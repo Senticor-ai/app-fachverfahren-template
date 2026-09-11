@@ -18,6 +18,8 @@ import {
 } from "../packages/fachverfahren-kit/src/contract-snapshot.ts";
 import { verifyDatenanbindung } from "../packages/fachverfahren-kit/src/lib/datenanbindung.ts";
 import {
+  checkApplicationForm,
+  checkStateMachine,
   pruefeForm,
   zuJsonSchema,
 } from "../packages/fachverfahren-kit/src/leistung-contract-form.ts";
@@ -73,61 +75,18 @@ if (committed && committed !== frisch) {
 // weil `schemas/leistung-config.schema.json` sonst eine ZWEITE Wahrheit ueber dieselbe Pflichtmenge
 // waere. Der Pruefer bleibt die Wahrheit — er FUEHRT die Konstante aus, das Schema PROJIZIERT sie nur.
 for (const verstoss of pruefeForm(snap)) fail(verstoss);
+// The cross-field APPLICATION invariants (step/field form + `konditionierendesFeld` in `steps[0]`).
+// They sit here for the same reason as the state-machine graph rules: a JSON Schema cannot carry a rule
+// that relates two places of the contract to each other. Each one RUNS out of its own record — see
+// `LEISTUNG_APPLICATION_INVARIANTS`; there is no rule here that is not in that list.
+for (const verstoss of checkApplicationForm(snap)) fail(verstoss);
 // Nur fuer die Erfolgsmeldung unten — die Pflicht `>= 1 Schritt` prueft bereits pruefeForm.
 const steps = snap.antrag?.steps ?? [];
 
-// Die graph-wertigen Zusicherungen bleiben HIER: ein JSON-Schema kann sie nicht tragen.
-const sm = snap.statusMachine;
-if (sm && Array.isArray(sm.states) && sm.states.length >= 1) {
-  // StatusMachine — widerspruchsfrei (nur wenn ueberhaupt Zustaende da sind).
-  const keys = new Set(sm.states.map((s) => s.key));
-  if (!sm.initial || !keys.has(sm.initial))
-    fail(
-      `contract.statusMachine.initial ("${sm.initial}") ist kein definierter Zustand.`,
-    );
-  const terminals = sm.states.filter((s) => s.terminal);
-  if (terminals.length < 1)
-    fail("contract.statusMachine hat keinen Endzustand (terminal: true).");
-
-  const transitions = Array.isArray(sm.transitions) ? sm.transitions : [];
-  for (const t of transitions) {
-    if (!keys.has(t.from))
-      fail(`Übergang referenziert unbekannten from-Zustand "${t.from}".`);
-    if (!keys.has(t.to))
-      fail(`Übergang referenziert unbekannten to-Zustand "${t.to}".`);
-    if (!Array.isArray(t.rollen) || t.rollen.length < 1)
-      fail(`Übergang ${t.from}→${t.to} trägt keine Rollen (rollen[]).`);
-  }
-  // Keine Sackgasse: jeder NICHT-terminale Zustand hat mind. einen ausgehenden Übergang.
-  const hatAusgang = new Set(transitions.map((t) => t.from));
-  for (const s of sm.states) {
-    if (!s.terminal && !hatAusgang.has(s.key))
-      fail(
-        `Zustand "${s.key}" ist nicht terminal, hat aber keinen ausgehenden Übergang (Sackgasse).`,
-      );
-  }
-  // Erreichbarkeit: alle Zustände vom Initial aus erreichbar (kein Orphan).
-  const adj = new Map<string, string[]>();
-  for (const t of transitions) {
-    if (!adj.has(t.from)) adj.set(t.from, []);
-    adj.get(t.from)!.push(t.to);
-  }
-  const gesehen = new Set<string>([sm.initial]);
-  const stapel = [sm.initial];
-  while (stapel.length) {
-    const cur = stapel.pop()!;
-    for (const nxt of adj.get(cur) ?? []) {
-      if (!gesehen.has(nxt)) {
-        gesehen.add(nxt);
-        stapel.push(nxt);
-      }
-    }
-  }
-  for (const s of sm.states) {
-    if (!gesehen.has(s.key))
-      fail(`Zustand "${s.key}" ist vom Initialzustand aus nicht erreichbar.`);
-  }
-}
+// The graph-valued state-machine assurances — a JSON Schema cannot carry them. Until 2026-09-09 they stood
+// HERE as code and were thus reachable by this one caller only; since the move into the form source
+// `seam check` runs them TOO, without copying them (no second notion of form).
+for (const verstoss of checkStateMachine(snap)) fail(verstoss);
 
 // DATENANBINDUNG (generische, sichere Naht): je deklarierte Anbindung Zweckbindung (Art. 5 DSGVO) + Verbindungsklasse
 // (BSI TR-03190 bei register/extern). Fehlt `datenanbindung` ganz → keine Mängel → kein Falsch-Block (additiv).

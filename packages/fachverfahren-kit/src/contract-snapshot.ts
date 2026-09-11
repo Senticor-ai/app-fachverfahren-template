@@ -26,7 +26,15 @@ export interface LeistungContractSnapshot {
   kommune: string;
   rechtsgrundlagen: LeistungConfig["rechtsgrundlagen"];
   fimLeistung?: NonNullable<LeistungConfig["fimLeistung"]>;
-  antrag: { steps: LeistungConfig["antrag"]["steps"]; einleitung?: string };
+  /** `konditionierendesFeld` TRAVELS WITH the snapshot (2026-09-09). It was missing here — and so the field
+   *  path that conditions the whole application was invisible to EVERY gate: the type demands it in `steps[0]`,
+   *  and nobody checked that, because the snapshot did not carry it in the first place. Optional/additive: a
+   *  seam without progressive disclosure produces the same snapshot as before. */
+  antrag: {
+    steps: LeistungConfig["antrag"]["steps"];
+    einleitung?: string;
+    konditionierendesFeld?: string;
+  };
   /** Benannte Auswahl-Listen (schlank, value/label) — als echte Zeilen. */
   datenlisten?: NonNullable<LeistungConfig["datenlisten"]>;
   /** TARIF-/GEBÜHRENTABELLE als echte Staffel-Zeilen (statt „[function]"). */
@@ -115,6 +123,9 @@ export function toContractSnapshot<T = Record<string, unknown>>(
       steps: config.antrag.steps,
       ...(config.antrag.einleitung
         ? { einleitung: config.antrag.einleitung }
+        : {}),
+      ...(config.antrag.konditionierendesFeld
+        ? { konditionierendesFeld: config.antrag.konditionierendesFeld }
         : {}),
     },
     // Business-Logik-DATEN als echte Zeilen (nur wenn deklariert — additiv, bestehende Snapshots bleiben gültig).

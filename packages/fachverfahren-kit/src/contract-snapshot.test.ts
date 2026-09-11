@@ -338,12 +338,26 @@ describe("toContractSnapshot — Rechtsbehelfs-/Bekanntgabe-Regime (W1)", () => 
 // ⭐ DAS IST WOERTLICH DIE KLASSE, DIE DER NACHBAR-BLOCK OBEN FUER `zustellung` GELOEST HAT, ein Feld weiter.
 // Ein geheilter Zwilling ist kein geheiltes Haus.
 describe("toContractSnapshot — die VA-Pflichtangaben reisen im Vertrag mit (Zwilling von W1)", () => {
+  // ⛔ UNTIL 2026-09-09 THIS PROBE CHECKED A FORM THE CONTRACT DOES NOT KNOW. It carried
+  // `inhaltsadressatPfad`, a top-level `zahlungsempfaenger` and `leistungsgebot: true` — THREE names that
+  // do not occur in `VerwaltungsaktInhaltConfig` (domain-kernel.ts:99): the addressee of the content is
+  // called `adressatNamePfad`, and `leistungsgebot` is an OBJECT that carries the payee. An `as` cast kept
+  // the surplus fields quiet; it broke on `boolean` against object (TS2352) — and because the package stood
+  // in NO tsconfig reference, the chain never saw the break. A probe with invented field names proves
+  // nothing about the transport of the REAL mandatory statements: it only shows that an object copied
+  // verbatim keeps arbitrary keys.
+  //
+  // ⭐ The form here is now the one of the LIVING procedure (`procedure.config.ts:122`) — no cast any more,
+  // so every future rename in the contract falls here instead of passing silently.
   const inhalt: NonNullable<LeistungConfig["verwaltungsaktInhalt"]> = {
-    inhaltsadressatPfad: "halter.name",
+    adressatNamePfad: "halter.name",
     zeitraumPfad: "veranlagungsjahr",
-    zahlungsempfaenger: "Stadtkasse Musterstadt",
-    leistungsgebot: true,
-  } as NonNullable<LeistungConfig["verwaltungsaktInhalt"]>;
+    leistungsgebot: {
+      betragPfad: "berechnung.betrag",
+      waehrung: "EUR",
+      zahlungsempfaenger: "Stadtkasse Musterstadt",
+    },
+  };
 
   it("transportiert die Pflichtangaben (sonst erlaesst der Server einen Bescheid ohne Inhaltsadressat und ohne Leistungsgebot)", () => {
     const snap = toContractSnapshot({ ...basis, verwaltungsaktInhalt: inhalt });
@@ -351,14 +365,20 @@ describe("toContractSnapshot — die VA-Pflichtangaben reisen im Vertrag mit (Zw
     expect("verwaltungsaktInhalt" in roh).toBe(true);
     expect(
       (roh["verwaltungsaktInhalt"] as Record<string, unknown>)[
-        "inhaltsadressatPfad"
+        "adressatNamePfad"
       ],
     ).toBe("halter.name");
+    // The payment demand is an OBJECT (§ 254 (1) AO: amount, currency, payee) — a `toBe(true)` would have
+    // reported that a field of that NAME arrives, never that its CONTENT arrives.
     expect(
       (roh["verwaltungsaktInhalt"] as Record<string, unknown>)[
         "leistungsgebot"
       ],
-    ).toBe(true);
+    ).toEqual({
+      betragPfad: "berechnung.betrag",
+      waehrung: "EUR",
+      zahlungsempfaenger: "Stadtkasse Musterstadt",
+    });
   });
 
   it("ÜBERBLOCKUNG: eine Config OHNE verwaltungsaktInhalt erzeugt kein leeres Feld (Bestandsverträge bleiben gültig)", () => {

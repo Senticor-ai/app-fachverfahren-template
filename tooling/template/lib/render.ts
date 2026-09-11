@@ -115,17 +115,41 @@ const textFileNames = new Set([
   "pre-push",
 ]);
 
-/** Is `dir` a LIVE/governed consumer project (not the pristine template)? Such a project carries CHOS-overlay markers:
- *  a `.chos/` directory OR `cognitive-hive.governance.yaml` (which, in a project, is a symlink into the shared source).
+/** A consumer arrives in this tree by exactly TWO routes, and each leaves its OWN marker. One list, so the two
+ *  questions below cannot drift apart:
+ *
+ *  · CHOS_OVERLAY — a CHOS-governed instance: a `.chos/` directory, or `cognitive-hive.governance.yaml`, which in a
+ *    project is a SYMLINK into the shared source governance. The CHOS builder copies the tree WITHOUT the scaffold
+ *    CLI, so such a project never gets `.template/lock.json` (Issue #13).
+ *  · RENDERED — an application produced by `template scaffold`: the render writes `.template/lock.json` next to
+ *    `answers.json` and `ownership.yaml`. No CHOS run has touched it, so it carries no overlay marker.
+ *
+ *  The pristine template ships NEITHER group. */
+const CHOS_OVERLAY_MARKERS = [".chos", "cognitive-hive.governance.yaml"];
+const RENDERED_CONSUMER_MARKERS = [".template/lock.json"];
+
+/** BOTH routes as ONE list — the only place the union is formed. `consumerMarkers` walks it, and a witness that
+ *  wants to re-measure the answer off disk reads it from here instead of re-typing the names. */
+export const CONSUMER_MARKERS: readonly string[] = [
+  ...CHOS_OVERLAY_MARKERS,
+  ...RENDERED_CONSUMER_MARKERS,
+];
+
+/** Is `dir` a LIVE/governed consumer project? Such a project carries CHOS-overlay markers: a `.chos/` directory OR
+ *  `cognitive-hive.governance.yaml` (which, in a project, is a symlink into the shared source).
  *  The domain-app scaffold must render from the pristine template only — scaffolding from a consumer would follow the
  *  cognitive-hive symlink and corrupt the shared source governance (CHOS-CODE#68). The pristine template ships neither.
  *
  *  EXPORTED since 2026-08-31, and for one reason: the witnesses of this engine need the SAME answer the guard uses.
  *  Measured against two fully built procedures, eight scaffold assertions were red in every generated application —
  *  not because the engine is broken, but because a governed consumer has no pristine source to render FROM. A witness
- *  that copied the detection would be the second truth about the same question. */
+ *  that copied the detection would be the second truth about the same question.
+ *
+ *  ⛔ THIS IS THE SYMLINK QUESTION, NOT THE PRISTINE QUESTION. It answers «would rendering FROM here follow a
+ *  cognitive-hive symlink into shared governance?». A CLI-rendered consumer has no such symlink and may legitimately
+ *  be rendered from — it is still NOT the pristine template. Whoever needs THAT answer asks `isConsumerProject`. */
 export async function isLiveConsumerProject(dir: string): Promise<boolean> {
-  for (const marker of [".chos", "cognitive-hive.governance.yaml"]) {
+  for (const marker of CHOS_OVERLAY_MARKERS) {
     try {
       await access(join(dir, marker));
       return true;
@@ -134,6 +158,47 @@ export async function isLiveConsumerProject(dir: string): Promise<boolean> {
     }
   }
   return false;
+}
+
+/** Is `dir` a consumer of this template by ANY route — CHOS-governed OR CLI-rendered? The complement is the one
+ *  question a tree-wide witness may ask: «am I the pristine template, whose complete file list must be classified?»
+ *
+ *  ── THE MEASUREMENT THAT CAUSED THIS FUNCTION (2026-09-09) ──────────────────────────────────────────────────────
+ *  `ownership-parity.test.ts` skipped its two tree assertions on `!(await isLiveConsumerProject(root))` and therefore
+ *  did NOT skip inside `test:generated-app-ci` — that harness scaffolds via the CLI into a temp directory, and such a
+ *  tree carries `.template/lock.json` but NO `.chos/`. The assertion then reported the render's OWN metadata as
+ *  unclassified: `.template/README.md`, `.template/answers.json`, `.template/lock.json`, `.template/ownership.yaml`.
+ *  Four files that cannot have an ownership entry, because the pristine template does not contain them. The same gate
+ *  tore open the «Scaffold Nightly» on `main` for three consecutive nights.
+ *
+ *  ⭐ AND THE PROPERTY WAS ALREADY WRITTEN DOWN, one file away: `scripts/test-generated-app-ci.sh` skips itself with
+ *  `if [ -f .template/lock.json ]` and names the reason in its own comment. The guard knew about the second route;
+ *  the predicate did not. This is one truth about markers now, asked two ways — NOT a path exception list: a list
+ *  only ever knows the names somebody wrote into it, and the next rendered file would be red again. */
+export async function isConsumerProject(dir: string): Promise<boolean> {
+  return (await consumerMarkers(dir)).length > 0;
+}
+
+/** WHICH consumer markers `dir` carries — empty for the pristine template.
+ *
+ *  A witness that skips must be able to NAME its reason. `isConsumerProject` alone would let a skip stand on a
+ *  predicate nobody can inspect afterwards; this returns the evidence, so the skipping witness can assert that the
+ *  marker it skipped on is really on disk instead of trusting a boolean.
+ *
+ *  The two questions therefore stay bound: `isConsumerProject` is `consumerMarkers(...).length > 0` and nothing else,
+ *  and the witness in `ownership-parity.test.ts` asserts that the evidence and the verdict agree with `CONSUMER_MARKERS`
+ *  as measured off disk. A boolean nobody can re-measure is how «green, because empty» gets in. */
+export async function consumerMarkers(dir: string): Promise<string[]> {
+  const found: string[] = [];
+  for (const marker of CONSUMER_MARKERS) {
+    try {
+      await access(join(dir, marker));
+      found.push(marker);
+    } catch {
+      /* marker absent — good */
+    }
+  }
+  return found;
 }
 
 export async function renderDomainApp(

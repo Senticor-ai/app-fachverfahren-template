@@ -1,3 +1,7 @@
+import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { runGit } from "./git.ts";
 import {
@@ -6,7 +10,12 @@ import {
   matchesOwnershipPattern,
 } from "./manifest.ts";
 import { managedCandidateFiles } from "./merge.ts";
-import { isLiveConsumerProject, isRenderedRepoPath } from "./render.ts";
+import {
+  CONSUMER_MARKERS,
+  consumerMarkers,
+  isConsumerProject,
+  isRenderedRepoPath,
+} from "./render.ts";
 
 // Ownership-/Scaffold-Paritäts-Ratsche: JEDE Datei, die der Scaffold in Konsumenten kopiert,
 // braucht eine EXPLIZITE Update-Entscheidung. `explainOwnership` fällt für ungelistete Pfade auf
@@ -166,6 +175,10 @@ const updateUnmanagedPaths: string[] = [
   "scripts/smoke-generated-app.sh",
   "scripts/test-generated-app-ci.guard.test.ts",
   "scripts/test-generated-app-ci.sh",
+  // Ratchet against «an extension without coverage is worthless»: it checks that the root tsconfig
+  // references EVERY composite package. A repo-maintainer gate of the same class as the two lines
+  // above — it judges the BUILD STRUCTURE OF THE TEMPLATE, not the foundation of a consumer.
+  "scripts/tsconfig-project-coverage.test.ts",
   // Flotten-Registry der Vorlagen-Maintainer.
   "template-consumers.yaml",
 ];
@@ -182,10 +195,23 @@ const root = process.cwd();
 // hielt sie also fuer die pristine Vorlage, liess die Baum-Pruefungen laufen und meldete die sechzehn Dateien
 // des governten Baus als unklassifiziert — in JEDEM erzeugten Verfahren.
 //
-// Gefragt wird jetzt nach der EIGENSCHAFT, und zwar mit DEMSELBEN Praedikat, das der Scaffold-Riegel benutzt
-// (`isLiveConsumerProject`, CHOS-CODE#68): traegt der Baum CHOS-Overlay-Marken (`.chos/`, `cognitive-hive.*`),
-// ist er ein governter Konsument. Ein Name kann mitwandern; diese Marken entstehen erst im Bau.
-const isPristineTemplate = !(await isLiveConsumerProject(root));
+// The question asked now is about the PROPERTY, not about a name: if the tree carries a consumer marker it is a
+// consumer. A name can travel along; these markers only come into being when a project is generated.
+//
+// ── AND THE FIRST VERSION ASKED ONLY HALF THE QUESTION (measured 2026-09-09) ──────────────────────────────
+// It used `isLiveConsumerProject` — the CHOS-overlay predicate of the scaffold guard. But a consumer comes into
+// being on TWO routes, and each leaves ITS own marker: the CHOS build copies the tree without the scaffold CLI
+// (`.chos/`, never `.template/lock.json`), the CLI renders (`.template/lock.json`, never `.chos/`).
+// `test:generated-app-ci` scaffolds via the CLI — that tree therefore carried none of the markers being asked
+// about, the skipIf did not hit, and the ratchet reported the RENDER'S OWN METADATA as unclassified:
+// `.template/README.md`, `.template/answers.json`, `.template/lock.json`, `.template/ownership.yaml`.
+// Four files that CANNOT have an ownership entry, because the pristine template does not know them.
+// The same gate tore open the «Scaffold Nightly» on `main` for three consecutive nights.
+//
+// ⭐ No path exception list for `.template/**`: it would only ever have known the four names known today and the
+// next rendered file would be red again. What is asked is the property «am I a consumer».
+const markers = await consumerMarkers(root);
+const isPristineTemplate = !(await isConsumerProject(root));
 
 async function listRenderedTrackedFiles(): Promise<string[]> {
   const result = await runGit(["ls-files", "-z"], { cwd: root });
@@ -202,6 +228,53 @@ function isExplicitlyClassified(path: string): boolean {
 }
 
 describe("ownership/scaffold parity", () => {
+  // ⛔ THIS ASSERTION ALWAYS RUNS — it is the price of letting the two tree checks below skip. «Green because
+  // empty» is the leading failure class of this house: a skipIf whose reason nobody can look up claims to have
+  // checked precisely where it matters most. So the reason is NAMED and PROVEN ON DISK.
+  //
+  // The proof is an INDEPENDENT measurement, not a restatement: `CONSUMER_MARKERS` is re-walked here with a
+  // synchronous `existsSync`, while `consumerMarkers` answers asynchronously via `access`. The two lists must
+  // agree in BOTH directions — a marker reported but absent, or present but unreported, breaks this. Only then
+  // does the skip verdict follow from something other than the variable it is derived from.
+  it("names whether this tree is the template OR a consumer — a skip needs a proven reason", async () => {
+    // POSITIVE AND NEGATIVE CONTROL ON A FABRICATED TREE FIRST. The repo root is the pristine template, so a
+    // root-only assertion would compare two empty lists and prove nothing — «green because empty» a second
+    // time. These two probes are what make the root measurement below mean something: each declared marker
+    // must be DETECTED on its own, and a tree without any must come back empty.
+    // (Both predicates only ask whether the path EXISTS, so a fabricated file stands in for `.chos/`, which is
+    // a directory in a real consumer — it is the same question.)
+    const emptyTree = await mkdtemp(join(tmpdir(), "consumer-probe-none-"));
+    expect(await consumerMarkers(emptyTree)).toEqual([]);
+    expect(await isConsumerProject(emptyTree)).toBe(false);
+    for (const marker of CONSUMER_MARKERS) {
+      const fabricated = await mkdtemp(join(tmpdir(), "consumer-probe-"));
+      await mkdir(dirname(join(fabricated, marker)), { recursive: true });
+      await writeFile(join(fabricated, marker), "");
+      expect(
+        await consumerMarkers(fabricated),
+        `the declared marker «${marker}» is not detected — a consumer carrying only this one would run the tree checks`,
+      ).toEqual([marker]);
+      expect(await isConsumerProject(fabricated)).toBe(true);
+    }
+
+    // AND NOW THIS TREE, measured INDEPENDENTLY: `CONSUMER_MARKERS` is re-walked with a synchronous
+    // `existsSync`, while `consumerMarkers` answered asynchronously via `access`. The two lists must agree in
+    // BOTH directions — a marker reported but absent, or present but unreported, breaks this.
+    const onDisk = CONSUMER_MARKERS.filter((marker) =>
+      existsSync(join(root, marker)),
+    );
+    expect(
+      [...markers].sort(),
+      "the markers reported by consumerMarkers disagree with the markers found on disk — then the skip verdict rests on nothing",
+    ).toEqual([...onDisk].sort());
+    // And the verdict follows from the disk, not from the same expression it is derived from: an empty disk
+    // measurement MUST mean «pristine template», and then the tree checks run. There may be no third outcome.
+    expect(
+      isPristineTemplate,
+      "isConsumerProject and the markers found on disk disagree about this tree",
+    ).toBe(onDisk.length === 0);
+  });
+
   it("resolves shared runtime packages to replace", () => {
     const sample = explainOwnership(
       defaultOwnership,
