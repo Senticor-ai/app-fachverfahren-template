@@ -12,10 +12,12 @@ import {
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import { getGitCommit, getGitDiffHash, getGitShortStatus } from "./git.ts";
 import {
+  baseIdentityOf,
   createAnswers,
   createLock,
   defaultOwnership,
   writeTemplateMetadata,
+  type BaseIdentity,
 } from "./manifest.ts";
 import { readJson, type PackageJson } from "./structured-edit.ts";
 // ONE TRUTH about what is build output (scripts/lib/source-exclusion.ts) and a tree walk that FAILS
@@ -256,7 +258,7 @@ export async function renderDomainApp(
   // könnte eine generierte App (apps/<domain>) sich selbst NICHT erneut scaffolden — die mitgelieferte
   // render.test.ts / `check:scaffold` würden dort `apps/fachverfahren` suchen und fehlschlagen. Der
   // CHOS-Durchstich fährt aber genau diesen `pnpm run test:template`-Gate in generierten Apps.
-  const base = await detectBaseIdentity(source);
+  const base = baseIdentityOf(source);
 
   const appSource = join(target, "apps", base.domain);
   const appTarget = join(target, "apps", answers.domain);
@@ -401,29 +403,8 @@ async function formatRewrittenFiles(root: string, files: string[]) {
 const KIT_GUARD = "@@senticor-kit-guard@@";
 const SKILL_GUARD = "@@fachverfahren-app-skill-guard@@";
 
-interface BaseIdentity {
-  domain: string;
-  displayName: string;
-}
-
-/** Identität der QUELL-App, aus der gerendert wird. Die pristine Vorlage kennzeichnet sich NICHT als
- *  Konsument (kein `.template/answers.json`) und ist per Definition `fachverfahren`/`Fachverfahren`.
- *  Ein bereits scaffoldeter Konsument trägt seine Domain in `.template/answers.json` — von dort lesen
- *  wir sie, damit apps/<domain>-Umbenennung und Textersetzung generisch (nicht auf `fachverfahren`
- *  festgenagelt) funktionieren und ein generierter App sich selbst erneut scaffolden kann. */
-async function detectBaseIdentity(source: string): Promise<BaseIdentity> {
-  try {
-    const answers = await readJson<Partial<BaseIdentity>>(
-      join(source, ".template", "answers.json"),
-    );
-    if (answers.domain && answers.displayName) {
-      return { domain: answers.domain, displayName: answers.displayName };
-    }
-  } catch {
-    /* pristine Vorlage: kein .template/answers.json — Fallback unten */
-  }
-  return { domain: "fachverfahren", displayName: "Fachverfahren" };
-}
+// The base identity of the SOURCE app is read by `baseIdentityOf` (manifest.ts) — the same rule the seam
+// tool uses, so a generated app can scaffold itself again and its seam is found in `apps/<domain>`.
 
 function createReplacements(
   base: BaseIdentity,

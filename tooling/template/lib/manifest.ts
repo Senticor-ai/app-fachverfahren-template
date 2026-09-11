@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { access, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -7,6 +8,45 @@ export const templateDirectory = ".template";
 export const templateSchemaVersion = 1;
 export const defaultTemplateSource = "senticor-app-fachverfahren-template";
 export const defaultTemplateVersion = "0.1.0-rc.1";
+
+/** The identity a checkout carries: its app folder (`apps/<domain>`) and its display name. */
+export interface BaseIdentity {
+  domain: string;
+  displayName: string;
+}
+
+/** The pristine template marks itself as no consumer (no `.template/answers.json`) and IS this identity. */
+export const templateIdentity: Readonly<BaseIdentity> = Object.freeze({
+  domain: "fachverfahren",
+  displayName: "Fachverfahren",
+});
+
+/**
+ * The base identity of the checkout at `root` — ONE rule for every reader. A scaffolded consumer carries
+ * its domain in `.template/answers.json`; the pristine template carries none and is `templateIdentity`.
+ * Only a COMPLETE answer (domain AND display name) counts, anything else falls back — the rule the scaffold
+ * kept to itself in `render.ts` until the seam tool needed it too (2026-09-11: `tooling/template/**` is
+ * excluded from the scaffold's rewrite, so a path written down there stayed `apps/fachverfahren` in every
+ * generated app). Synchronous because the seam tool resolves its seam at module load.
+ */
+export function baseIdentityOf(root: string): BaseIdentity {
+  try {
+    const answers = JSON.parse(
+      readFileSync(join(root, templateDirectory, "answers.json"), "utf8"),
+    ) as Partial<BaseIdentity>;
+    if (
+      typeof answers.domain === "string" &&
+      answers.domain.length > 0 &&
+      typeof answers.displayName === "string" &&
+      answers.displayName.length > 0
+    ) {
+      return { domain: answers.domain, displayName: answers.displayName };
+    }
+  } catch {
+    // The pristine template has no .template/answers.json — the fallback below is its identity.
+  }
+  return { ...templateIdentity };
+}
 
 export interface TemplateAnswers {
   domain: string;

@@ -18,11 +18,18 @@
 //     refuses is worse than one that advertises nothing. The assurance is DERIVED from the tool's own
 //     advertisement, so a ninth part cannot slip in unmeasured.
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { baseIdentityOf, templateIdentity } from "./lib/manifest.ts";
 
 const tool = fileURLToPath(new URL("./seam.ts", import.meta.url));
 
@@ -55,6 +62,15 @@ function seam(...args: string[]): Run {
 }
 
 const workDirectory = mkdtempSync(join(tmpdir(), "seam-witness-"));
+
+/** The repository this witness runs in — the pristine template or a generated app. */
+const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
+
+/** The seam the tool ADVERTISES for this checkout. The witness asks the tool instead of writing the path
+ *  down a second time: `apps/fachverfahren` is only right in the pristine template. */
+function advertisedSeam(): string {
+  return (JSON.parse(seam("shape").stdout) as { seam: string }).seam;
+}
 
 function asFile(name: string, value: unknown): string {
   const path = join(workDirectory, name);
@@ -298,6 +314,56 @@ describe("seam check — fail-closed on the measured break", () => {
   });
 });
 
+// ── THE SEAM IN A GENERATED APP — measured 2026-09-11 ───────────────────────────────────────────────
+// The scaffold renames `apps/fachverfahren` to `apps/<domain>` and rewrites every text file except
+// `tooling/template/**`, which keeps the pristine identity on purpose. The seam tool wrote the pristine
+// path down literally, so in every generated app `seam set` had no default seam and four assertions of
+// this witness died with ENOENT (generated-app CI, domain `beispiel`): the template was green, every app
+// it produces was red. The app folder now comes from the ONE rule the scaffold already used for its own
+// base identity: `.template/answers.json` when a consumer carries one, the template identity otherwise.
+describe("the seam follows the identity of the checkout", () => {
+  function checkoutWith(answers?: string): string {
+    const root = mkdtempSync(join(tmpdir(), "seam-identity-"));
+    if (answers !== undefined) {
+      mkdirSync(join(root, ".template"));
+      writeFileSync(join(root, ".template", "answers.json"), answers);
+    }
+    return root;
+  }
+
+  it("the pristine template (no answers.json) is the template identity", () => {
+    expect(baseIdentityOf(checkoutWith())).toEqual(templateIdentity);
+    expect(templateIdentity.domain).toBe("fachverfahren");
+  });
+
+  it("a generated app takes its domain from .template/answers.json", () => {
+    const answers = JSON.stringify({
+      domain: "beispiel",
+      displayName: "Beispiel",
+    });
+    expect(baseIdentityOf(checkoutWith(answers))).toEqual({
+      domain: "beispiel",
+      displayName: "Beispiel",
+    });
+  });
+
+  it("an incomplete or unreadable answers.json falls back — the scaffold's own rule, not a second one", () => {
+    const incomplete = JSON.stringify({ domain: "beispiel" });
+    expect(baseIdentityOf(checkoutWith(incomplete))).toEqual(templateIdentity);
+    expect(baseIdentityOf(checkoutWith("{ not json"))).toEqual(
+      templateIdentity,
+    );
+  });
+
+  it("shape advertises the seam of THIS checkout, and the advertised file exists", () => {
+    const advertised = advertisedSeam();
+    expect(advertised).toBe(
+      `apps/${baseIdentityOf(repoRoot).domain}/src/leistung.config.ts`,
+    );
+    expect(existsSync(join(repoRoot, advertised))).toBe(true);
+  });
+});
+
 // ── seam set — THE MEASURED LEVER ───────────────────────────────────────────────────────────────────
 // The three broken products of 2026-09-09 wrote twice and then EDITED 24 to 40 times — every edit needs
 // the exact old text, so 34 to 46 reads of a 29 KB file. This verb needs no old text. Two properties must
@@ -309,15 +375,7 @@ describe("seam set — partial, stateless, fail-closed", () => {
     const target = join(workDirectory, name);
     writeFileSync(
       target,
-      readFileSync(
-        fileURLToPath(
-          new URL(
-            "../../apps/fachverfahren/src/leistung.config.ts",
-            import.meta.url,
-          ),
-        ),
-        "utf8",
-      ),
+      readFileSync(join(repoRoot, advertisedSeam()), "utf8"),
     );
     return target;
   }

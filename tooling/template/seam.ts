@@ -40,6 +40,7 @@
 // the truth, this tool is the earliest warning.
 import { execFileSync } from "node:child_process";
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
+import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   LEISTUNG_APPLICATION_INVARIANTS,
@@ -52,8 +53,27 @@ import {
   type FormArt,
   type FormPflicht,
 } from "../../packages/fachverfahren-kit/src/leistung-contract-form.ts";
+import { baseIdentityOf } from "./lib/manifest.ts";
 
 const EXIT = { ok: 0, violation: 1, usage: 2 } as const;
+
+// WHERE THE SEAM IS. A generated app renames `apps/fachverfahren` to `apps/<domain>`, but the scaffold
+// leaves `tooling/template/**` untouched on purpose — so this tool may not write the path down. It resolves
+// it from the checkout's own identity (`baseIdentityOf`, the scaffold's rule). Measured 2026-09-11: with the
+// literal, every generated app had no default seam and the witness died with ENOENT.
+const REPO_ROOT = fileURLToPath(new URL("../../", import.meta.url));
+const APP_DOMAIN = baseIdentityOf(REPO_ROOT).domain;
+const DEFAULT_SEAM_PATH = join(
+  REPO_ROOT,
+  "apps",
+  APP_DOMAIN,
+  "src",
+  "leistung.config.ts",
+);
+/** The seam as a repository-relative path — what `shape` advertises. */
+const SEAM_RELATIVE = relative(REPO_ROOT, DEFAULT_SEAM_PATH)
+  .split(sep)
+  .join("/");
 
 /** The PARTS of the seam — DERIVED from the mandatory paths, not written down beside them. */
 function parts(): string[] {
@@ -131,7 +151,7 @@ function shape(): void {
       {
         source:
           "packages/fachverfahren-kit/src/leistung-contract-form.ts (die EINE Pflicht-Form; ausgefuehrt von scripts/check-leistung-contract.mts)",
-        seam: "apps/fachverfahren/src/leistung.config.ts",
+        seam: SEAM_RELATIVE,
         note: "Diese Form beschreibt, WELCHE Felder eine Naht tragen MUSS und WIE sie zueinander stehen. Sie enthaelt KEINEN fachlichen Inhalt: Schritte, Felder, Codelisten und Sektionen eines Verfahrens werden im Fachkonzept verfahrens-spezifisch erarbeitet.",
         parts: parts().map((part) => ({ part, shape: shapeOfPart(part) })),
         duties: LEISTUNG_CONTRACT_FORM.map((duty) => ({
@@ -154,7 +174,9 @@ function shape(): void {
         },
         schema: zuJsonSchema(),
         notCheckedBySeamCheck: [
-          "Frische des Vertrags-Snapshots gegen apps/fachverfahren/leistung.contract.json (setzt voraus, dass bereits geschrieben wurde) — dafuer `pnpm run check:leistung-contract`.",
+          "Frische des Vertrags-Snapshots gegen apps/" +
+            APP_DOMAIN +
+            "/leistung.contract.json (setzt voraus, dass bereits geschrieben wurde) — dafuer `pnpm run check:leistung-contract`.",
           "Zweckbindung und Verbindungsklasse der `datenanbindung` (Art. 5 DSGVO / BSI TR-03190) — ebenfalls `pnpm run check:leistung-contract`.",
         ],
       },
@@ -285,10 +307,6 @@ function check(args: string[]): number {
 //
 // FAIL-CLOSED IN THIS ORDER: check first, then write. A form error writes NOTHING — no half seam, no
 // "as far as possible".
-
-const DEFAULT_SEAM_PATH = fileURLToPath(
-  new URL("../../apps/fachverfahren/src/leistung.config.ts", import.meta.url),
-);
 
 /** The span of ONE top-level key in the object literal of the seam. */
 interface Span {
@@ -476,7 +494,7 @@ function set(args: string[]): number {
   try {
     execFileSync("npx", ["prettier", "--write", seamPath], {
       stdio: "ignore",
-      cwd: fileURLToPath(new URL("../../", import.meta.url)),
+      cwd: REPO_ROOT,
     });
   } catch {
     // Prettier is cosmetics, not truth. If it fails the seam still stands correctly and `pnpm run format`
