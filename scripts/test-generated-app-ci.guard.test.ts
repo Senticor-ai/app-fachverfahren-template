@@ -35,7 +35,7 @@ afterEach(async () => {
 async function runGuard(env: Record<string, string>) {
   return execFileAsync("sh", [script], {
     cwd: workdir,
-    env: { PATH: process.env.PATH ?? "", ...env },
+    env: { PATH: process.env["PATH"] ?? "", ...env },
   });
 }
 

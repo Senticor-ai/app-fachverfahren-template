@@ -1,21 +1,18 @@
-import { readdir, readFile } from "node:fs/promises";
-import { extname, join, relative } from "node:path";
-import { istDokumentationsNutzlast } from "./lib/doku-nutzlast.mjs";
+import { join, relative } from "node:path";
+import { istDokumentationsNutzlast } from "./lib/doku-nutzlast.ts";
+// The exclusion set and the tree walk are SHARED (scripts/lib/source-exclusion.ts,
+// scripts/lib/source-scan.ts): one truth about what is build output, derived from `.gitignore`,
+// and a walk that FAILS instead of reporting an empty tree. Do not re-declare either here.
+import {
+  collectSourceFiles,
+  loadSourceExclusions,
+  readTextFile,
+} from "./lib/source-scan.ts";
 
 const root = process.cwd();
 const sourceRoots = ["apps", "packages", "modules"];
-const ignoredDirectories = new Set([
-  ".git",
-  ".turbo",
-  ".vite",
-  "coverage",
-  "dist",
-  "dist-server",
-  "dist-types",
-  "node_modules",
-  "storybook-static",
-]);
-const scannedExtensions = new Set([".css", ".ts", ".tsx"]);
+const scannedExtensions = [".css", ".ts", ".tsx"];
+const exclusions = await loadSourceExclusions(root);
 const componentTokens = new Set([
   "background",
   "foreground",
@@ -43,41 +40,6 @@ const componentTokens = new Set([
   "sidebar-accent",
 ]);
 
-async function directoryExists(path) {
-  try {
-    await readdir(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function collectFiles(startDirectory) {
-  if (!(await directoryExists(startDirectory))) {
-    return [];
-  }
-
-  const entries = await readdir(startDirectory, { withFileTypes: true });
-  const files = [];
-
-  for (const entry of entries) {
-    const path = join(startDirectory, entry.name);
-
-    if (entry.isDirectory()) {
-      if (!ignoredDirectories.has(entry.name)) {
-        files.push(...(await collectFiles(path)));
-      }
-      continue;
-    }
-
-    if (scannedExtensions.has(extname(path))) {
-      files.push(path);
-    }
-  }
-
-  return files;
-}
-
 function display(path) {
   return relative(root, path);
 }
@@ -93,11 +55,15 @@ function isWrappedHslUse(line, token) {
 const violations = [];
 
 for (const sourceRoot of sourceRoots) {
-  const files = await collectFiles(join(root, sourceRoot));
+  const files = await collectSourceFiles(join(root, sourceRoot), {
+    extensions: scannedExtensions,
+    exclusions,
+    optional: true,
+  });
 
   for (const file of files) {
     const relativePath = display(file);
-    const lines = (await readFile(file, "utf8")).split(/\r?\n/);
+    const lines = (await readTextFile(file)).split(/\r?\n/);
 
     lines.forEach((line, index) => {
       if (isCustomPropertyDefinition(line) || istDokumentationsNutzlast(line)) {

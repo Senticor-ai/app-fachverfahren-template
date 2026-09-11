@@ -188,7 +188,13 @@ describe("loadMountedComposables — Auto-Mount der CHOS-Manifeste", () => {
     const load = loadMountedComposables(dir);
     expect(load.composables).toHaveLength(1);
     expect(load.composables[0]!.status).toBe("candidate");
-    expect(istEnabled(load.composables[0]!)).toBe(false);
+    // ⛔ 2026-09-03 — HIER STAND `istEnabled(...) === false`, und das war die Wirkung des
+    // ZERTIFIZIERUNGS-RIEGELS. Der ist per Nutzer-Direktive gefallen (Zertifizierung gehoert an die
+    // PRODUKTIVSCHALTUNG). Was BLEIBT und was dieser Zeuge wirklich meint: der ANSPRUCH wird gekappt.
+    // Die Stelle laeuft — sie behauptet nur nicht mehr, zertifiziert zu sein. Fail-closed wirkt damit
+    // genau dort, wo eine Falschbehauptung entstuende, und nicht als Betriebs-Sperre.
+    expect(istEnabled(load.composables[0]!)).toBe(true);
+    expect(load.composables[0]!.status).not.toBe("certified");
   });
 
   it("lässt certified MIT verdientem, frischem Verdikt bestehen (enabled)", () => {
@@ -227,7 +233,13 @@ describe("loadMountedComposables — Auto-Mount der CHOS-Manifeste", () => {
     const load = loadMountedComposables(dir);
     expect(load.composables).toHaveLength(1);
     expect(load.composables[0]!.status).toBe("candidate");
-    expect(istEnabled(load.composables[0]!)).toBe(false);
+    // ⛔ 2026-09-03 — HIER STAND `istEnabled(...) === false`, und das war die Wirkung des
+    // ZERTIFIZIERUNGS-RIEGELS. Der ist per Nutzer-Direktive gefallen (Zertifizierung gehoert an die
+    // PRODUKTIVSCHALTUNG). Was BLEIBT und was dieser Zeuge wirklich meint: der ANSPRUCH wird gekappt.
+    // Die Stelle laeuft — sie behauptet nur nicht mehr, zertifiziert zu sein. Fail-closed wirkt damit
+    // genau dort, wo eine Falschbehauptung entstuende, und nicht als Betriebs-Sperre.
+    expect(istEnabled(load.composables[0]!)).toBe(true);
+    expect(load.composables[0]!.status).not.toBe("certified");
   });
 
   it("kappt certified fail-closed, wenn KEIN vertrauenswürdiger Cert-Signing-Public-Key vorliegt (absent key)", () => {
@@ -240,7 +252,13 @@ describe("loadMountedComposables — Auto-Mount der CHOS-Manifeste", () => {
     const load = loadMountedComposables(dir);
     expect(load.composables).toHaveLength(1);
     expect(load.composables[0]!.status).toBe("candidate");
-    expect(istEnabled(load.composables[0]!)).toBe(false);
+    // ⛔ 2026-09-03 — HIER STAND `istEnabled(...) === false`, und das war die Wirkung des
+    // ZERTIFIZIERUNGS-RIEGELS. Der ist per Nutzer-Direktive gefallen (Zertifizierung gehoert an die
+    // PRODUKTIVSCHALTUNG). Was BLEIBT und was dieser Zeuge wirklich meint: der ANSPRUCH wird gekappt.
+    // Die Stelle laeuft — sie behauptet nur nicht mehr, zertifiziert zu sein. Fail-closed wirkt damit
+    // genau dort, wo eine Falschbehauptung entstuende, und nicht als Betriebs-Sperre.
+    expect(istEnabled(load.composables[0]!)).toBe(true);
+    expect(load.composables[0]!.status).not.toBe("certified");
   });
 
   it("überspringt ein über-autonomes rechtsnahes Manifest fail-closed (kein stilles Kappen)", () => {

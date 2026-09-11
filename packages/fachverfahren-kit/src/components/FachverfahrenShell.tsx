@@ -90,33 +90,63 @@ function brandInitials(label: string): string {
   return cleaned.slice(0, 2).toUpperCase();
 }
 
+/** Resolves ONE navigation word: the workspace's own word from the seam, else today's generic default.
+ *  Blank/whitespace counts as «not declared» — fail-open, so a half-filled seam can never empty the sidebar. */
+type NavWord = (key: string, fallback: string) => string;
+
+function navWordOf(descriptor: PersonaDescriptor | undefined): NavWord {
+  return (key, fallback) => {
+    const own = descriptor?.navLabels?.[key];
+    return typeof own === "string" && own.trim() ? own.trim() : fallback;
+  };
+}
+
 /**
- * Navigation je Rolle — ausschließlich aus dem Vertrag abgeleitet (keine Verfahrens-Literale):
- *  • buerger:          Start + (falls Antrag definiert) „Antrag stellen".
- *  • sachbearbeitung:  Eingangskorb + (falls Register-Mock vorhanden) „Register".
+ * Navigation per role — WHICH entries exist follows solely from the contract (no procedure literals):
+ *  • buerger:          Start + (if `antrag` is defined) „Antrag stellen".
+ *  • sachbearbeitung:  Eingangskorb + (if a `register` mock is present) „Register".
  *  • aufsicht:         Kennzahlen / Audit.
- * Labels sind generische Verwaltungs-Begriffe; das konkrete Verfahren steckt im Branding, nicht in der Nav.
+ *
+ * WHAT they are CALLED is for the seam to say (`PersonaDescriptor.navLabels`, see there) — the default stays the
+ * generic administrative term. A business process (internal purchasing, HR, operations) names them the way
+ * its users do; whoever declares nothing sees exactly what was there before. The route is always the
+ * contract's: a seam names routes, it never invents any.
  */
 function navFor<T>(
   persona: Persona | undefined,
   config: LeistungConfig<T>,
+  personas: readonly PersonaDescriptor[],
 ): ShellNavItem[] {
+  // ONE truth about the persona: the RESOLVED list (prop > config.personas, layered over the defaults —
+  // see mergePersonas). `config.personas` stays as a fallback so that the earlier lookup of the
+  // default branch (below) still holds unchanged in case the list does not carry a custom key.
+  const descriptor =
+    persona === undefined
+      ? undefined
+      : (personas.find((p) => p.key === persona) ??
+        config.personas?.find((p) => p.key === persona));
+  const word = navWordOf(descriptor);
   // Workspace-Modus (keine aktive Persona): nur der Team-Workspace-Einstieg — die
   // Persona-Sichten erreicht man über den Arbeitsbereichs-Wechsler.
   if (persona === undefined) {
-    return [boardsNavItem()];
+    return [boardsNavItem(word)];
   }
   switch (persona) {
     case "buerger": {
       const items: ShellNavItem[] = [
-        { key: "start", label: "Start", icon: Home, href: "/buerger" },
+        {
+          key: "start",
+          label: word("start", "Start"),
+          icon: Home,
+          href: "/buerger",
+        },
       ];
       // DEFENSIV: eine (agent-generierte) Config kann Felder vermissen/anders geformt sein. Ein fehlendes
       // antrag.steps darf NIE die ganze App weiß-screenen — optionale Verkettung + Default 0.
       if ((config.antrag?.steps?.length ?? 0) > 0) {
         items.push({
           key: "antrag",
-          label: "Antrag stellen",
+          label: word("antrag", "Antrag stellen"),
           // href MUSS auf eine ECHTE App-Route zeigen (App.tsx): sonst greift die *-Fallback → /buerger und das
           // Nav-Item ejectet den Nutzer (Audit D3-1: Shell-Nav ≠ App-Routen, 3/6 Items tot). Kanonisch: /buerger/anmelden.
           icon: FileText,
@@ -125,7 +155,7 @@ function navFor<T>(
         // „Meine Anträge": die eigenen, server-persistierten Vorgänge (echte Route /buerger/antraege).
         items.push({
           key: "antraege",
-          label: "Meine Anträge",
+          label: word("antraege", "Meine Anträge"),
           icon: ListChecks,
           href: "/buerger/antraege",
         });
@@ -134,25 +164,35 @@ function navFor<T>(
       // unabhängig von antrag.steps. Echte App-Route /buerger/postfach (Shell-Nav == App-Routen, Audit D3-1).
       items.push({
         key: "postfach",
-        label: "Postfach",
+        label: word("postfach", "Postfach"),
         icon: Mail,
         href: "/buerger/postfach",
       });
-      items.push(boardsNavItem());
+      items.push(boardsNavItem(word));
       return items;
     }
     case "sachbearbeitung": {
       const items: ShellNavItem[] = [
-        { key: "eingang", label: "Eingangskorb", icon: Inbox, href: "/amt" },
+        {
+          key: "eingang",
+          label: word("eingang", "Eingangskorb"),
+          icon: Inbox,
+          href: "/amt",
+        },
         // Fall-/Dossier-Akten (Case-Management): /amt/akten ist eine ECHTE App-Route (routes.tsx) und
         // listet mandanten-scoped die Akten der Behörde; für reine Antrags-Verfahren ohne Fälle zeigt sie
         // ihren Leerzustand. Kein toter Nav-Eintrag (Audit D3-1: Shell-Nav == App-Routen).
-        { key: "akten", label: "Akten", icon: FolderOpen, href: "/amt/akten" },
+        {
+          key: "akten",
+          label: word("akten", "Akten"),
+          icon: FolderOpen,
+          href: "/amt/akten",
+        },
       ];
       if ((config.register?.mock?.length ?? 0) > 0) {
         items.push({
           key: "register",
-          label: "Register",
+          label: word("register", "Register"),
           icon: Database,
           // Kein dediziertes Register-Route in der App-Shell → auf den Amt-Eingang zeigen (echte Route), statt
           // via *-Fallback den Nutzer aus der Amt-Persona zu werfen (Audit D3-1). App.tsx kann später /amt/register ergänzen.
@@ -165,25 +205,25 @@ function navFor<T>(
       if (config.ki?.chat) {
         items.push({
           key: "assistent",
-          label: "Assistent",
+          label: word("assistent", "Assistent"),
           icon: Bot,
           href: "/amt/assistent",
         });
       }
-      items.push(boardsNavItem());
+      items.push(boardsNavItem(word));
       return items;
     }
     case "aufsicht":
       return [
         {
           key: "kennzahlen",
-          label: "Kennzahlen / Audit",
+          label: word("kennzahlen", "Kennzahlen / Audit"),
           icon: LineChart,
           // Kanonische Aufsicht-Route (App.tsx + PERSONA_HOME.aufsicht) ist /aufsicht — /audit existierte NICHT und warf
           // die Aufsicht-Persona (ihr EINZIGES Nav-Item) via *-Fallback auf /buerger (Audit D3-1, schlimmster Fall).
           href: "/aufsicht",
         },
-        boardsNavItem(),
+        boardsNavItem(word),
       ];
     default: {
       // VERFAHRENS-EIGENE Persona (nicht die 3 Defaults): daten-getriebener Fallback statt leerer Sidebar —
@@ -195,11 +235,11 @@ function navFor<T>(
       if (home !== undefined)
         items.push({
           key: "home",
-          label: desc?.label ?? "Start",
+          label: word("home", desc?.label ?? "Start"),
           icon: Home,
           href: home,
         });
-      items.push(boardsNavItem());
+      items.push(boardsNavItem(word));
       return items;
     }
   }
@@ -208,8 +248,13 @@ function navFor<T>(
 /** Cross-cutting Workspace-Einstieg in JEDER Persona: /boards ist eine echte App-Route
  *  (Audit D3-1) und session-guarded — ohne Anmeldung landet man auf /login, was für
  *  Mitarbeitende genau der gewollte Einstieg in den Team-Workspace ist. */
-function boardsNavItem(): ShellNavItem {
-  return { key: "boards", label: "Boards", icon: LayoutGrid, href: "/boards" };
+function boardsNavItem(word: NavWord): ShellNavItem {
+  return {
+    key: "boards",
+    label: word("boards", "Boards"),
+    icon: LayoutGrid,
+    href: "/boards",
+  };
 }
 
 /** Überschrift/Badge-Text: das LABEL der aktiven Persona AUS DEN DATEN (Descriptor) — für beliebige
@@ -261,7 +306,7 @@ export function FachverfahrenShell<T = Record<string, unknown>>({
     )
       onPersonaChange(raw as Persona);
   }, []);
-  const nav = navFor(persona, config);
+  const nav = navFor(persona, config, personaList);
   const activeKey = activeNavKey ?? nav[0]?.key;
   const initials = brandInitials(config.label);
   // Kommunales Wappen (verifiziert, aus dem Fachkonzept via runtime-config → KommuneThemeProvider), wenn vorhanden.

@@ -9,7 +9,7 @@ import type {
   CaseCreateRequestDto,
   CaseDto,
   CaseTransitionRequestDto,
-  KiVermerkRequestDto,
+  AiVermerkRequestDto,
   TaskCreateRequestDto,
   TaskDto,
   TaskPatchRequestDto,
@@ -118,6 +118,34 @@ export interface TaskListQuery {
 
 /** Die Fall/Dossier-Naht der App (HTTP gegen die BFF-Routen). Dieselbe Rolle wie `BoardPort`
  *  für die Boards: die Sichten sprechen NUR diese Schnittstelle, nie `fetch` direkt. */
+/**
+ * DAS URTEIL UEBER DIE AUDIT-KETTE — es reiste bis 2026-09-07 auf der Leitung und starb am Client-Typ.
+ *
+ * ⛔ GEMESSEN: `GET /api/cases/:id/audit` sendet `{ events, chain: { ok, brokenAt?, reason? } }`
+ * (`packages/app-bff-fastify/src/routes/cases.ts` — `verifyAuditChain(full)`). Der Client typisierte die
+ * Antwort als `{ events }` und gab `body.events` zurueck; das Urteil war damit am Ziel nicht mehr
+ * vorhanden. Folge: bei GEBROCHENER Kette sah die Aufsicht exakt dieselbe, unauffaellige Timeline wie
+ * bei intakter — die teure Verifikation lief, und ihr Ergebnis verpuffte an der Naht.
+ *
+ * ⭐ Dieselbe Klasse wie «ein untererklaerter TYP macht das Feld unerreichbar»: am Bildschirm nicht zu
+ * unterscheiden von «der Server hat es nie geschickt».
+ */
+export interface AuditKettenUrteil {
+  /** `true` = die Hash-Kette traegt. `false` = sie ist gebrochen und die Akte ist NICHT mehr beweisend. */
+  ok: boolean;
+  /** Die Stelle des Bruchs, wenn der Server sie benennen konnte. */
+  brokenAt?: string;
+  /** Der Grund im Wortlaut des Servers — nie hier nachgebaut. */
+  reason?: string;
+}
+
+export interface AuditMitUrteil {
+  events: CaseAuditEvent[];
+  /** ⚠️ OPTIONAL, und das ist eine Aussage: eine aeltere Gegenstelle sendet es nicht. `undefined` heisst
+   *  «nicht geprueft» — die Flaeche darf daraus NICHT «in Ordnung» machen. */
+  chain?: AuditKettenUrteil;
+}
+
 export interface CasePort {
   listCases(query?: CaseListQuery): Promise<CaseSummary[]>;
   getCase(caseId: string): Promise<CaseSummary | undefined>;
@@ -126,7 +154,7 @@ export interface CasePort {
   listAudit(
     caseId: string,
     query?: { limit?: number },
-  ): Promise<CaseAuditEvent[]>;
+  ): Promise<AuditMitUrteil>;
   listAllowedActions(caseId: string): Promise<CaseAllowedActions>;
   listProcedures(): Promise<ProcedureSummary[]>;
   // Schreibpfade — Request-/Antwort-Formen aus den BFF-Wire-Verträgen. Nicht-2xx (400/403/404/409/503)
@@ -143,7 +171,7 @@ export interface CasePort {
   /** Einen KI-Aktenvermerk-ENTWURF anfordern (prüfpflichtig, ki-vorschlag). */
   createKiVermerk(
     caseId: string,
-    req: KiVermerkRequestDto,
+    req: AiVermerkRequestDto,
   ): Promise<VermerkDto>;
   /** Die Aktenvermerke eines Falls lesen (chronologisch, mit abgeleitetem Prüfstatus). */
   listVermerke(caseId: string): Promise<VermerkDto[]>;
@@ -258,10 +286,16 @@ export function createHttpCasePort(): CasePort {
 
     async listAudit(caseId, query) {
       const qs = queryString({ limit: query?.limit });
-      const body = await request<{ events: CaseAuditEvent[] }>(
+      // ⛔ DER TYP IST DIE NAHT. Solange er nur `{ events }` kannte, war das Ketten-Urteil am Ziel
+      // unerreichbar — nicht weggeworfen von einer Zeile, sondern von einer Deklaration.
+      const body = await request<AuditMitUrteil>(
         `/api/cases/${encodeURIComponent(caseId)}/audit${qs}`,
       );
-      return body.events;
+      return {
+        events: body.events,
+        // Kein `?? { ok: true }`: eine fehlende Pruefung ist NICHT dasselbe wie eine bestandene.
+        ...(body.chain ? { chain: body.chain } : {}),
+      };
     },
 
     async listAllowedActions(caseId) {

@@ -24,6 +24,27 @@
 // GENERISCH: kein Abgaben-, Orts- oder Behördenliteral. Ganzzahlige kleinste Einheit (Cent), rein, deterministisch.
 import { berechneTarif, type TarifTabelle } from "./tarif.js";
 
+/**
+ * THE DOMAIN CAPABILITY that CARRIES this procedure's rate — as a DECLARATION, not as an address.
+ *
+ * An agentic composable is the domain capability (calculating, subsuming, checking); the application is the
+ * human surface. Where the authoritative rate does not sit in the procedure as a tariff table but in a
+ * composable program, the procedure says so HERE — with the identifier of the composable and the identifier
+ * of the structured program (`AgenticComposable.strukturiert[].id`; the claim travels, never the body).
+ */
+export interface TenorProgramRef {
+  /** `AgenticComposable.id` of the office that answers for the rate. */
+  composableId: string;
+  /** Identifier of the structured capability at that office (e.g. a levy calculation). */
+  programm: string;
+}
+
+/** The program's STRUCTURED answer, as far as the recalculation needs it. */
+export interface TenorProgramResult {
+  /** The amount the program determined, in the smallest unit (cents) — computed on the server or publisher side. */
+  betragCent: number;
+}
+
 /** DATEN-Bindung der Nachrechnung: woher Kategorie und client-gerechneter Betrag in der Fallakte stehen. */
 export interface TenorNachrechnungConfig {
   /** Punkt-Pfad auf die vom Antragsteller GEWÄHLTE Kategorie. Die Wahl ist zulässige Eingabe — die Höhe nicht. */
@@ -32,6 +53,25 @@ export interface TenorNachrechnungConfig {
   betragPfad: string;
   /** Umrechnung der natürlichen Einheit des Clients in die kleinste Einheit des Tarifs. Default 100 (EUR→Cent). */
   centJeEinheit?: number;
+  /**
+   * Dot path to the DISPLAY STATUS of the client-computed calculation (`"provisional" | "final"`).
+   *
+   * DEFAULT (no declaration): the sibling field `status` next to `betragPfad`. That is not a guess but the
+   * shape of the ONE kit type `Berechnung`, which carries both fields side by side. Whoever stores the
+   * amount under `berechnung.betrag` stores the status under `berechnung.status`.
+   */
+  statusPfad?: string;
+  /**
+   * THE CALCULATION AUTHORITY LIES WITH THE COMPOSABLE, not with the procedure.
+   *
+   * Set ⇒ the authoritative rate does NOT sit in the procedure as a tariff table but in the named domain
+   * capability. The recalculation then expects that capability's structured result; if it does not come,
+   * the Bescheid is NOT issued (fail-closed). There is deliberately NO fallback here to the client-computed
+   * amount, and none to a local table: a procedure that hands over the authority must not quietly take it
+   * back as soon as the office falls silent. Exactly this silent fallback is the state that the measurement
+   * „RECHEN-HOHEIT AM FALSCHEN ORT" (calculation authority in the wrong place) describes.
+   */
+  programm?: TenorProgramRef;
 }
 
 /** Woher der autoritative Tarif kommt — oder warum er nicht feststeht. */
@@ -78,6 +118,9 @@ export function tarifDesVerfahrens(
 export interface TenorUrteil {
   /** Wurde überhaupt nachgerechnet? `false` ⇒ heutiges Verhalten, Herkunft bleibt „client-berechnet". */
   nachgerechnet: boolean;
+  /** AGAINST WHAT the amount was recalculated. `"composable"` means the domain capability answered for the
+   *  rate, not a table in the procedure. `null` when no recalculation took place. */
+  quelle: "tarif" | "composable" | null;
   /** Darf der Bescheid erlassen werden? Bei `false` nennt `grund` warum — fail-closed VOR dem Einfrieren. */
   ok: boolean;
   /** Der server-autoritative Betrag in kleinster Einheit. `null`, wenn nicht nachgerechnet. */
@@ -89,6 +132,21 @@ export interface TenorUrteil {
   /** War die gewählte Kategorie im Tarif hinterlegt? */
   kategorieBekannt: boolean;
   grund: string;
+}
+
+/**
+ * THE PATH TO THE DISPLAY STATUS of the client-computed calculation.
+ *
+ * Without a declaration of its own, the SIBLING field `status` next to `betragPfad`: the kit type
+ * `Berechnung` carries `betrag` and `status` side by side, so whoever stores the amount under
+ * `berechnung.betrag` stores the status under `berechnung.status`. That is the shape of the type, not a
+ * heuristic — and it heals existing procedures without a single config changing.
+ */
+export function statusPathOf(cfg: TenorNachrechnungConfig): string {
+  if (cfg.statusPfad) return cfg.statusPfad;
+  const segments = cfg.betragPfad.split(".");
+  segments[segments.length - 1] = "status";
+  return segments.join(".");
 }
 
 const nz = (v: unknown): number | null =>
@@ -109,10 +167,18 @@ const nz = (v: unknown): number | null =>
 export function pruefeTenor(
   cfg: TenorNachrechnungConfig | undefined,
   quelle: TarifQuelle,
-  werte: { kategorie: unknown; clientBetrag: unknown },
+  werte: {
+    kategorie: unknown;
+    clientBetrag: unknown;
+    /** The DISPLAY STATUS of the client-computed calculation, read under `statusPfad`. */
+    clientStatus?: unknown;
+    /** The structured result of the domain capability — only when `cfg.programm` names it. */
+    programmErgebnis?: TenorProgramResult | undefined;
+  },
 ): TenorUrteil {
   const aus = (grund: string): TenorUrteil => ({
     nachgerechnet: false,
+    quelle: null,
     ok: true,
     betragCent: null,
     clientCent: null,
@@ -124,6 +190,89 @@ export function pruefeTenor(
     return aus(
       "keine Nachrechnung deklariert — der Tenor bleibt client-berechnet (unverändertes Verhalten)",
     );
+
+  const rawFactor = nz(cfg.centJeEinheit) ?? 100;
+  const rawAmount = nz(werte.clientBetrag);
+  const rawClientCent =
+    rawAmount === null ? null : Math.round(rawAmount * rawFactor);
+
+  // ── A PREVIEW IS NOT A FESTSETZUNG ───────────────────────────────────────────────────────────────
+  // `Berechnung.status` says `"provisional"` while inputs the calculation needs are MISSING — it is
+  // explicitly a partial/preview result for the applicant. Until 2026-09-09 the server read this status
+  // nowhere (0 hits in SDK, BFF and server) and could therefore freeze a preview value as the Tenor. A
+  // frozen Verwaltungsakt over a preview value is substantively unlawful and yet EFFECTIVE — it takes
+  // real money.
+  // FAIL-CLOSED ONLY WHERE IT IS WARRANTED: blocking happens solely on an EXPLICIT `"provisional"`. A
+  // missing status is what existing data looks like, and it stays untouched (no false blocker).
+  if (werte.clientStatus === "provisional")
+    return {
+      nachgerechnet: false,
+      quelle: null,
+      ok: false,
+      betragCent: null,
+      clientCent: rawClientCent,
+      divergenz: null,
+      kategorieBekannt: false,
+      grund:
+        "die übermittelte Berechnung ist als VORSCHAU gekennzeichnet (status „provisional“) — ihr fehlen " +
+        "nach eigener Aussage Eingaben. Ein Vorschauwert trägt keine Festsetzung; der Bescheid wird nicht " +
+        "erlassen, bis die Berechnung „final“ ist.",
+    };
+
+  // ── THE DOMAIN CAPABILITY TAKES PRECEDENCE WHEN THE PROCEDURE DECLARES IT SO ─────────────────────
+  // If the procedure declares a composable program to be the authoritative source, the amount is NOT
+  // recalculated against a local table — and without that program's structured result, not at all. If
+  // the office stays silent, the rate is undetermined; falling back to the client-computed amount would
+  // be exactly the silent withdrawal of authority that this declaration rules out.
+  if (cfg.programm) {
+    const programResult = werte.programmErgebnis;
+    if (!programResult || nz(programResult.betragCent) === null)
+      return {
+        nachgerechnet: false,
+        quelle: null,
+        ok: false,
+        betragCent: null,
+        clientCent: rawClientCent,
+        divergenz: null,
+        kategorieBekannt: false,
+        grund:
+          `das Verfahren erklärt das Programm »${cfg.programm.programm}« der Stelle ` +
+          `»${cfg.programm.composableId}« zur autoritativen Quelle des Satzes; ein strukturiertes Ergebnis ` +
+          "liegt nicht vor. Es wird weder geraten noch auf den im Browser gerechneten Betrag zurückgefallen — " +
+          "der Bescheid wird nicht erlassen.",
+      };
+    if (rawClientCent === null)
+      return {
+        nachgerechnet: true,
+        quelle: "composable",
+        ok: false,
+        betragCent: programResult.betragCent,
+        clientCent: null,
+        divergenz: null,
+        kategorieBekannt: true,
+        grund:
+          `unter »${cfg.betragPfad}« steht kein Betrag als Zahl. Nichts zu vergleichen ist keine ` +
+          `Übereinstimmung; das Programm »${cfg.programm.programm}« ergab ${programResult.betragCent} (kleinste Einheit).`,
+      };
+    const deviation = rawClientCent - programResult.betragCent;
+    return {
+      nachgerechnet: true,
+      quelle: "composable",
+      ok: deviation === 0,
+      betragCent: programResult.betragCent,
+      clientCent: rawClientCent,
+      divergenz: deviation,
+      kategorieBekannt: true,
+      grund:
+        deviation === 0
+          ? `nachgerechnet gegen das Programm »${cfg.programm.programm}« der Stelle ` +
+            `»${cfg.programm.composableId}«: ${programResult.betragCent} (kleinste Einheit), übereinstimmend`
+          : `der übermittelte Betrag (${rawClientCent}) weicht vom Ergebnis des Programms ` +
+            `»${cfg.programm.programm}« (${programResult.betragCent}) um ${deviation} ab. Der Bescheid wird nicht ` +
+            "erlassen: das ist ein Befund über das Verfahren, keine stille Korrektur.",
+    };
+  }
+
   if (quelle.art === "keine")
     return aus(
       "kein Tarif im Verfahren deklariert — es gibt nichts, wogegen nachgerechnet werden könnte",
@@ -131,6 +280,7 @@ export function pruefeTenor(
   if (quelle.art === "mehrdeutig")
     return {
       nachgerechnet: false,
+      quelle: null,
       ok: false,
       betragCent: null,
       clientCent: null,
@@ -151,6 +301,7 @@ export function pruefeTenor(
   if (!erg.bekannt)
     return {
       nachgerechnet: true,
+      quelle: "tarif",
       ok: false,
       betragCent: null,
       clientCent,
@@ -163,6 +314,7 @@ export function pruefeTenor(
   if (clientCent === null)
     return {
       nachgerechnet: true,
+      quelle: "tarif",
       ok: false,
       betragCent: erg.betragCent,
       clientCent: null,
@@ -176,6 +328,7 @@ export function pruefeTenor(
   if (divergenz !== 0)
     return {
       nachgerechnet: true,
+      quelle: "tarif",
       ok: false,
       betragCent: erg.betragCent,
       clientCent,
@@ -188,6 +341,7 @@ export function pruefeTenor(
     };
   return {
     nachgerechnet: true,
+    quelle: "tarif",
     ok: true,
     betragCent: erg.betragCent,
     clientCent,

@@ -47,6 +47,19 @@ FROM registry.opencode.de/open-code/oci/nodejs:24@sha256:4f6d0ed8aeda0c7d83eee77
 ENV NODE_ENV=production
 ENV PORT=8080
 ENV INTERNAL_PORT=9090
+# HOST — DECLARED HERE ON PURPOSE, and this line is load-bearing.
+#
+# The runtime default is `127.0.0.1` (`packages/app-runtime-fastify/src/config.ts`), fail-closed: a
+# generated application that nobody configured must not answer the whole network. Measured 2026-09-11:
+# four generated administrative applications were reachable from the LAN for 1d18h because the default
+# was `0.0.0.0` and the builder's bind guard only ever protected the BUILDER, never its product.
+#
+# A CONTAINER is the case where wide binding is CORRECT — it is isolated by its network namespace, and
+# the port it publishes is the operator's explicit decision. So the container SAYS it, instead of
+# inheriting it silently. Remove this line and the image binds loopback internally and answers nothing
+# from outside; that failure is loud, which is the point. Helm states it a second time
+# (`apps/fachverfahren/deploy/helm/fachverfahren/templates/configmap.yaml`) for the same reason.
+ENV HOST=0.0.0.0
 ENV STATIC_DIR=/app/apps/fachverfahren/dist
 ENV APP_ENABLE_SERVICE_WORKER=false
 

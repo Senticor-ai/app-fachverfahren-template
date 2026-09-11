@@ -211,3 +211,45 @@ describe("case-client Schreibpfade", () => {
     await rejection.toMatchObject({ status: 409 });
   });
 });
+
+/**
+ * DAS URTEIL UEBER DIE AUDIT-KETTE — es reiste auf der Leitung und starb am Client-TYP.
+ *
+ * ⛔ GEMESSEN 2026-09-07: `GET /api/cases/:id/audit` sendet `{ events, chain: { ok, brokenAt?, reason? } }`
+ * (die Route rechnet `verifyAuditChain(full)`). Der Client typisierte die Antwort als `{ events }` und gab
+ * `body.events` zurueck — das Urteil war am Ziel nicht mehr vorhanden. Folge: bei GEBROCHENER Kette sah die
+ * Aufsicht exakt dieselbe unauffaellige Timeline wie bei intakter. Die teure Verifikation lief, ihr Ergebnis
+ * verpuffte.
+ *
+ * ⭐ Der Defekt war eine DEKLARATION, keine Zeile: ein untererklaerter Typ macht ein geliefertes Feld
+ * unerreichbar — am Bildschirm nicht zu unterscheiden von «der Server hat es nie geschickt».
+ */
+describe("Audit-Kette — das Urteil des Servers erreicht den Client", () => {
+  it("SCHARF: ein gebrochenes Ketten-Urteil kommt VOLLSTAENDIG an (ok, brokenAt, reason)", async () => {
+    stubFetchJson({
+      events: [],
+      chain: { ok: false, brokenAt: "evt-17", reason: "prevHash stimmt nicht" },
+    });
+    const port = createHttpCasePort();
+    const r = await port.listAudit("fall-1");
+    expect(r.chain?.ok).toBe(false);
+    expect(r.chain?.brokenAt).toBe("evt-17");
+    expect(r.chain?.reason).toBe("prevHash stimmt nicht");
+  });
+
+  it("die Ereignisse kommen unveraendert mit (der Zusatz verdraengt nichts)", async () => {
+    stubFetchJson({ events: [{ id: "a" }, { id: "b" }], chain: { ok: true } });
+    const r = await createHttpCasePort().listAudit("fall-1");
+    expect(r.events).toHaveLength(2);
+    expect(r.chain?.ok).toBe(true);
+  });
+
+  it("GEGENPROBE: eine Antwort OHNE `chain` wird NICHT zu «in Ordnung» gemacht", async () => {
+    // ⛔ DIE GEFAEHRLICHE RICHTUNG. Ein `?? { ok: true }` waere bequem und falsch: «nicht geprueft» als
+    // «bestanden» zu lesen ist genau die Klasse, gegen die dieser ganze Schnitt gebaut ist — und eine
+    // aeltere Gegenstelle sendet das Feld nicht.
+    stubFetchJson({ events: [{ id: "a" }] });
+    const r = await createHttpCasePort().listAudit("fall-1");
+    expect(r.chain).toBeUndefined();
+  });
+});

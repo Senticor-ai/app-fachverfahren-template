@@ -10,6 +10,7 @@
     { "path": "packages/provider-codesphere" },
     { "path": "packages/provider-dvc-generic" },
     { "path": "packages/conformance-kit" },
+    { "path": "packages/fachverfahren-kit" },
     { "path": "packages/migration-kit" },
     { "path": "packages/app-store-postgres" },
     { "path": "packages/app-runtime-fastify" },

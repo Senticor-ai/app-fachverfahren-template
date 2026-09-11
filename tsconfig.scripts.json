@@ -1,0 +1,43 @@
+{
+  // DIE DECKUNG FUER `scripts/**` — und sie schliesst dieselbe Luecke wie in CHOS-CODE und im Builder.
+  //
+  // GEMESSEN 2026-09-06: sieben `.mts`-Pruefer unter `scripts/` liefen produktiv (`check:leistung-contract`,
+  // `check:composables`, `emit-contract` sogar im pre-commit-Hook) — und standen in KEINER tsconfig.
+  // Node fuehrt sie mit `--experimental-strip-types` aus: die Typen werden ENTFERNT, nicht geprueft.
+  // Eine Endung `.mts`, die niemand prueft, ist eine Behauptung.
+  //
+  // ⭐ Und das Kit hat die Ratsche dagegen bereits — `check-typescript-policy.mjs` verbietet JavaScript
+  // in `apps/packages/jurisdictions/modules`. Nur decken ihre `implementationRoots` ausgerechnet
+  // `scripts/` und `tooling/` nicht ab: die Vollstrecker der Regel standen ausserhalb ihrer selbst.
+  //
+  // ⛔ `strict` und die scharfen Zusaetze kommen aus `tsconfig.base.json` und werden hier NICHT gesenkt.
+  // `allowImportingTsExtensions` ist noetig, weil die Pruefer einander mit `.ts`-Endung importieren
+  // (Node-Konvention dieses Baums); es verlangt `noEmit`, und das ist hier ohnehin der Zweck.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "types": ["node"],
+    "allowImportingTsExtensions": true,
+
+    // ⛔ ZWEI FLAGS SIND HIER AUS, UND DAS IST EINE BENANNTE SCHULD DES KITS — NICHT DER SKRIPTE.
+    //
+    // Die Pruefer importieren die QUELLEN von `packages/fachverfahren-kit/src/**` direkt per Pfad
+    // (`check-leistung-contract.mts:18`, `emit-leistung-schema.mts:14`), nicht ueber den Paketnamen.
+    // Damit zieht diese Uebersetzungs-Einheit sie mit — und beurteilt sie unter der Basis, die STRENGER
+    // ist als die eigene Konfiguration des Pakets (`packages/fachverfahren-kit/tsconfig.json` fuehrt
+    // `strict` und `exactOptionalPropertyTypes`, aber KEINES dieser beiden Flags).
+    //
+    // GEMESSEN 2026-09-06: mit ihnen meldet diese Einheit **16** Fehler, ALLE in `fachverfahren-kit/src/**`
+    // (`AuditTimeline`, `BundIDLoginForm`, `KommuneTheme`, `PersonaSwitcher`, `format.ts`,
+    // `use-step-machine.ts`, `antrag-felder.ts`) und KEINEN in `scripts/**`.
+    //
+    // ⭐ Der Befund gehoert dem Kit-Paket: seine Quellen halten den erklaerten Hausstandard heute nicht.
+    // Ihn hier zu erzwingen hiesse, eine fremde Schuld an einer Skript-Deckung faellig zu stellen — und
+    // die Deckung waere dauerhaft rot statt zu wirken. Beide Zeilen fallen, sobald das Paket die Flags
+    // uebernimmt; sie sind eine ADRESSE fuer diese Welle, keine Aufweichung fuer die Skripte.
+    "noUncheckedIndexedAccess": false,
+    "noPropertyAccessFromIndexSignature": false
+  },
+  "include": ["scripts/**/*.mts", "scripts/**/*.ts"]
+}

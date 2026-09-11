@@ -9,6 +9,29 @@
 // REIN: kein React/DOM/node/Date/Random — deterministisch aus den übergebenen Daten.
 
 /** Vergleichsoperator einer Feld-Bedingung. `gesetzt`/`nicht-gesetzt` prüfen nur Anwesenheit (ohne `wert`). */
+/** DIESELBE Menge als DATEN — der Wurf in `evalFeldBedingung` nennt sie im Klartext. Sie steht VOR der Union,
+ *  weil die Typ-Ebene unten sie in beide Richtungen gegen sie haelt. */
+export const BEDINGUNG_OPERATOREN = [
+  "==",
+  "!=",
+  ">",
+  ">=",
+  "<",
+  "<=",
+  "in",
+  "nicht-in",
+  "gesetzt",
+  "nicht-gesetzt",
+] as const;
+
+// ⚠️ DIE LITERAL-FORM BLEIBT — SIE IST DER GEGENSTAND EINER FREMDEN MESSUNG.
+// CHOS-CODE liest die geschlossenen Werte-Mengen dieses Projekts aus der QUELLE (`werte-unionen.ts`,
+// Muster: rechte Seite besteht ausschliesslich aus String-Literalen mit `|`) und schreibt sie dem
+// Bau-Agenten als "GESCHLOSSENE WERTE-MENGEN" in den Auftrag — und dem Compile-Befund als
+// "ERLAUBTE WERTE". Ein `(typeof BEDINGUNG_OPERATOREN)[number]` waere kuerzer und haette genau diese
+// beiden Saetze STILL geloescht: der Parser haette die Union nicht mehr erkannt, und der Agent bekaeme
+// die Menge, an der er sich zweimal gestossen hat, gar nicht mehr zu sehen.
+// Die Doppelung ist deshalb ABSICHT und wird bezeugt (`rules.test.ts`: Konstante ⇄ Union deckungsgleich).
 export type BedingungOperator =
   | "=="
   | "!="
@@ -20,6 +43,15 @@ export type BedingungOperator =
   | "nicht-in"
   | "gesetzt"
   | "nicht-gesetzt";
+
+// TYP-EBENE, BEIDE RICHTUNGEN: der Compiler haelt Konstante und Union deckungsgleich. Faellt ein Wert
+// aus der Liste, bricht (A); kommt einer in die Union, ohne in der Liste zu stehen, bricht (B).
+const _opWerteSindOperatoren: readonly BedingungOperator[] =
+  BEDINGUNG_OPERATOREN; // (A)
+const _opUnionIstAbgedeckt: readonly (typeof BEDINGUNG_OPERATOREN)[number][] =
+  [] as BedingungOperator[]; // (B)
+void _opWerteSindOperatoren;
+void _opUnionIstAbgedeckt;
 
 /** Prädikat über EIN Feld (Feldpfad wie "a.b" oder "posten[0].wert"). Tolerant ausgewertet (Zahl/String/Boolean-
  *  Koerzierung), sodass die Subsumtion — z. B. Schwelle `>= 3` — auch bei string-getippten Eingaben greift. */
@@ -151,7 +183,29 @@ function evalFeldBedingung(
     case "nicht-in":
       return !alsMenge(b.wert).some((z) => gleich(wert, z));
     default:
-      return false;
+      // ⛔ HIER STAND `return false` — UND DAS WAR EIN LAUTLOS FALSCHES ERGEBNIS.
+      //
+      // Gemessen am 2026-08-30/31 an drei generierten Verfahren: `op: "="` (8x) und `op: "eq"` (3x+3x).
+      // Beides ist KEIN `BedingungOperator`. Der Compiler faengt es (tsc2322) — aber `vite build` streicht
+      // Typen, statt sie zu pruefen: die Anwendung STARTET (rc=0, 480 ms) und wertet die Bedingung von da an
+      // AUF DAUER als `false`. Ein `sichtbarWenn` blendet dann ein Pflichtfeld dauerhaft aus, ein
+      // `pflichtWenn` fordert nie, ein Uebergangs-Guard sperrt lautlos. Nichts davon ist sichtbar.
+      //
+      // ES GIBT KEINE SICHERE SEITE, DIE MAN STILL WAEHLEN KOENNTE: fuer `sichtbarWenn` waere `true` sicherer
+      // (ein ueberfluessiges Feld schadet nicht, ein fehlendes verliert eine Erklaerung), fuer einen Guard
+      // waere `false` sicherer. EIN Vorgabewert kann beides nicht sein — genau die Klasse «falsche Koernung».
+      // Deshalb wird hier nicht geraten, sondern GESAGT, dass die Konfiguration nicht auswertbar ist.
+      //
+      // WEN TRIFFT DAS IM NORMALBETRIEB: niemanden. Ein Operator ausserhalb dieser Menge kann nur entstehen,
+      // wenn eine Konfiguration am Typpruefer vorbeigebaut wurde. Wer eine gueltige Config faehrt, erreicht
+      // diesen Zweig nie. Und der Wurf nennt Feld, geschriebenen Wert und die vollstaendige erlaubte Menge —
+      // er ist eine Anleitung, keine Sackgasse.
+      throw new Error(
+        `Bedingung nicht auswertbar: Feld "${b.feld}" traegt den Operator "${String((b as { op: unknown }).op)}", ` +
+          `den es nicht gibt. Erlaubt sind AUSSCHLIESSLICH ${BEDINGUNG_OPERATOREN.map((o) => `"${o}"`).join(" | ")}. ` +
+          `Ersetze ihn durch den fachlich gemeinten aus dieser Menge — ein unbekannter Operator wurde frueher ` +
+          `lautlos als "trifft nicht zu" gewertet und hat die Bedingung auf Dauer falsch gemacht.`,
+      );
   }
 }
 

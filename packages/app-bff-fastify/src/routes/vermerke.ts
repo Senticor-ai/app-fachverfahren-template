@@ -13,7 +13,7 @@ import type { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
 import {
   CaseIdParamsSchema,
   ErrorEnvelopeSchema,
-  KiVermerkRequestSchema,
+  AiVermerkRequestSchema,
   VermerkDtoSchema,
   VermerkIdParamsSchema,
   VermerkListDtoSchema,
@@ -297,7 +297,7 @@ export function registerVermerkRoutes(
         summary:
           "KI-Aktenvermerk-Entwurf erzeugen (prüfpflichtig, ki-vorschlag)",
         params: CaseIdParamsSchema,
-        body: KiVermerkRequestSchema,
+        body: AiVermerkRequestSchema,
         response: {
           201: VermerkDtoSchema,
           422: ErrorEnvelopeSchema,

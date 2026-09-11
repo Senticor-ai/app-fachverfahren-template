@@ -3,9 +3,27 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { renderDomainApp } from "./render.ts";
+import { assertRefusesToScaffold, canScaffoldFrom } from "./pristine-source.ts";
 
 describe("domain app rendering", () => {
   it("renders deterministic full-repo template provenance", async () => {
+    // ── NO PRISTINE SOURCE HERE? THEN THE GUARD IS WHAT GETS PROVEN ────────────────────────────────────
+    // This engine ships into every generated application, and a governed consumer has nothing pristine to
+    // render FROM (CHOS-CODE#68). Measured 2026-08-31 in two built procedures this assertion was red with the
+    // guard's own message — a witness without a subject, not a defect. Skipping quietly would claim a check
+    // that never happened, so the consumer branch asserts the refusal instead: the property matters most
+    // exactly where it fires.
+    if (!(await canScaffoldFrom(process.cwd()))) {
+      await assertRefusesToScaffold(() =>
+        renderDomainApp(process.cwd(), join(tmpdir(), "never-created"), {
+          domain: "demo-k8s",
+          displayName: "Demo",
+          force: true,
+          allowDirty: true,
+        }),
+      );
+      return;
+    }
     const root = await mkdtemp(join(tmpdir(), "template-render-test-"));
     try {
       const first = join(root, "first");

@@ -1,16 +1,19 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
-import { access, mkdir, readFile, readdir, stat } from "node:fs/promises";
-import {
-  dirname,
-  extname,
-  isAbsolute,
-  join,
-  relative,
-  resolve,
-} from "node:path";
+import { access, mkdir, readFile, stat } from "node:fs/promises";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { parse as parseYaml } from "yaml";
+// ONE TRUTH about what is build output, and a tree walk that FAILS instead of reporting an empty tree:
+// scripts/lib/source-exclusion.ts + scripts/lib/source-scan.ts. Kept in `scripts/lib` because the
+// plain-node `scripts/check-*.mjs` gates and eslint.config.js must import the SAME set — a gate list
+// that only tooling can read is how the seven copies drifted apart in the first place.
+import {
+  collectSourceFiles,
+  loadSourceExclusions,
+  readDirectoryEntries,
+  readTextFile,
+} from "../../../scripts/lib/source-scan.ts";
 import { getGitCommit, getGitShortStatus } from "./git.ts";
 import { readJson, writeFileAtomic } from "./structured-edit.ts";
 import type { PackageJson } from "./structured-edit.ts";
@@ -468,7 +471,13 @@ export async function validateModuleContracts(root: string) {
 
 export async function validateModuleBoundaries(root: string) {
   const failures: string[] = [];
-  const sourceFiles = await collectFiles(root, [".ts", ".tsx"]);
+  // ⛔ MEASURED 2026-09-01: the list this walk used to carry did not know `dist-types`, and
+  // `extname("index.d.ts") === ".ts"` — so 232 generated declaration files (1.4 MB) under
+  // packages/fachverfahren-kit/dist-types were read and pattern-matched AS SOURCE by a boundary gate.
+  // They are in `.gitignore`; the shared walk derives its exclusions from there instead of guessing.
+  const sourceFiles = await collectSourceFiles(root, {
+    extensions: [".ts", ".tsx"],
+  });
   const platformFiles = sourceFiles.filter((file) =>
     /\/(packages|apps|jurisdictions)\//.test(toPosix(file)),
   );
@@ -870,13 +879,10 @@ export async function fetchGovernedSource(
 
 async function moduleFileEntries(root: string, spec: AppSpec) {
   const directory = join(root, spec.module.destination);
-  const files = await collectFiles(directory, [
-    ".json",
-    ".sql",
-    ".ts",
-    ".tsx",
-    ".yaml",
-  ]);
+  const files = await collectSourceFiles(directory, {
+    extensions: [".json", ".sql", ".ts", ".tsx", ".yaml"],
+    optional: true,
+  });
   const entries = await Promise.all(
     files.map(async (file) => ({
       path: relative(root, file),
@@ -1326,7 +1332,10 @@ async function validateDomainLeakage(root: string) {
       (value): value is string => typeof value === "string" && value.length > 0,
     )
     .map((value) => value.toLowerCase());
-  const specFiles = await collectFiles(join(root, "docs/examples"), [".yaml"]);
+  const specFiles = await collectSourceFiles(join(root, "docs/examples"), {
+    extensions: [".yaml"],
+    optional: true,
+  });
   const specs = [];
   for (const file of specFiles.filter((path) =>
     path.endsWith("app.spec.yaml"),
@@ -1337,16 +1346,30 @@ async function validateDomainLeakage(root: string) {
     });
   }
   const forbiddenRoots = ["apps", "packages", "jurisdictions"];
+  // ── THE DECLARED DOMAIN SEAM IS NOT SHARED CODE ─────────────────────────────────────────────────────────────
+  // This gate protects SHARED code from hard-coded procedure vocabulary. One family of files is, by this kit's own
+  // documentation, the exact opposite: `leistung.config.ts` calls itself "DIE EINE Austausch-Naht dieser App — die
+  // `LeistungConfig`, aus der die gesamte App rendert", and three further files are generated FROM it. They live
+  // under `apps/` and they carry the procedure's vocabulary because that is their entire purpose.
+  //
+  // MEASURED 2026-08-31 in two fully built procedures: `agent:bootstrap` reported eighteen leakage blockers, and
+  // every one of them named one of these four files. Reporting the seam as leakage does not protect anything — it
+  // buries the leaks that would matter (a procedure term hard-coded into `packages/`) under the one file that is
+  // supposed to have them.
+  //
+  // The exemption is DECLARED, never guessed: the app names its own seam in `package.json` under `chos.seam.files`,
+  // relative to the app directory, so it survives the scaffold rename. No declaration => no exemption => the
+  // previous behaviour, byte for byte.
+  const exclusions = await loadSourceExclusions(root);
+  const seamFiles = await collectDeclaredSeam(root);
   const files = (
     await Promise.all(
       forbiddenRoots.map((entry) =>
-        collectFiles(join(root, entry), [
-          ".ts",
-          ".tsx",
-          ".md",
-          ".json",
-          ".yaml",
-        ]),
+        collectSourceFiles(join(root, entry), {
+          extensions: [".ts", ".tsx", ".md", ".json", ".yaml"],
+          exclusions,
+          optional: true,
+        }),
       ),
     )
   ).flat();
@@ -1360,13 +1383,18 @@ async function validateDomainLeakage(root: string) {
       if (rel.startsWith(spec.module.destination)) {
         continue;
       }
+      if (seamFiles.has(rel)) {
+        continue;
+      }
       // Das generierte Doc-Wiki-Manifest aggregiert Repo-Doku (inkl. Skills, die Beispiel-Verfahren wie
       // Hundesteuer NENNEN) — Dokumentation, kein Runtime-Domaenencode. Der Leckage-Gate schuetzt AUTHORED
       // Code vor hart kodiertem Domaenen-Vokabular; ein generiertes Doku-Aggregat ist bewusst ausgenommen.
       if (rel.endsWith("docs-manifest.generated.ts")) {
         continue;
       }
-      const text = await readFile(file, "utf8").catch(() => "");
+      // ⛔ NOT `.catch(() => "")`. An unreadable file would then contain no domain term and pass a
+      // LEAKAGE gate — the scanner would start approving exactly when it stopped being able to look.
+      const text = await readTextFile(file);
       for (const term of terms) {
         // Wortgenau (\b…\b): sonst matcht „Hund" innerhalb von „Hundesteuer" und meldet die App-
         // Identität fälschlich als Leckage.
@@ -1381,11 +1409,33 @@ async function validateDomainLeakage(root: string) {
   return failures;
 }
 
+/** The seam files an app DECLARES for itself (`package.json` -> `chos.seam.files`, relative to the app dir),
+ *  returned as repo-relative paths. Every app under `apps/` is asked; an app without the declaration contributes
+ *  nothing. A malformed entry is ignored rather than silently widening the exemption — an exemption that grows by
+ *  accident is worse than one that is missing. */
+async function collectDeclaredSeam(root: string): Promise<Set<string>> {
+  const seam = new Set<string>();
+  const apps = await readDirectoryEntries(join(root, "apps"), {
+    optional: true,
+  });
+  for (const app of apps) {
+    if (!app.isDirectory()) continue;
+    const pkg = await readJson<{
+      chos?: { seam?: { files?: unknown } };
+    }>(join(root, "apps", app.name, "package.json")).catch(() => null);
+    const files = pkg?.chos?.seam?.files;
+    if (!Array.isArray(files)) continue;
+    for (const entry of files) {
+      if (typeof entry !== "string" || !entry || entry.includes("..")) continue;
+      seam.add(join("apps", app.name, entry));
+    }
+  }
+  return seam;
+}
+
 async function listModuleDirectories(root: string) {
   const modulesRoot = join(root, "modules");
-  const entries = await readdir(modulesRoot, { withFileTypes: true }).catch(
-    () => [],
-  );
+  const entries = await readDirectoryEntries(modulesRoot, { optional: true });
   return entries
     .filter((entry) => entry.isDirectory())
     .map((entry) => join(modulesRoot, entry.name))
@@ -1393,7 +1443,7 @@ async function listModuleDirectories(root: string) {
 }
 
 async function listSkillNames(root: string) {
-  const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
+  const entries = await readDirectoryEntries(root, { optional: true });
   return entries
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
@@ -1952,30 +2002,6 @@ function screensTsx(spec: AppSpec) {
     "}",
     "",
   ].join("\n");
-}
-
-async function collectFiles(root: string, extensions: string[]) {
-  const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
-  const files: string[] = [];
-  for (const entry of entries) {
-    const path = join(root, entry.name);
-    if (
-      [".git", "node_modules", "dist", "storybook-static", ".agent"].includes(
-        entry.name,
-      )
-    ) {
-      continue;
-    }
-    if (entry.isDirectory()) {
-      files.push(...(await collectFiles(path, extensions)));
-    } else if (
-      extensions.length === 0 ||
-      extensions.includes(extname(entry.name))
-    ) {
-      files.push(path);
-    }
-  }
-  return files.sort();
 }
 
 async function readOptional(path: string) {

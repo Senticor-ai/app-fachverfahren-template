@@ -445,10 +445,34 @@ export function registerComposableRoutes(
         art: e.art,
         text: neutralisiereInjektion(e.text),
       }));
+      // ── DIE RECHTSGRUNDLAGEN DER STELLE — was sie SELBST als ihre Grundlage deklariert ──────────────
+      //
+      // ⛔ SIE ERREICHTEN DEN ASSISTENTEN BIS 2026-09-03 NICHT. Sie stehen im Mesh-Manifest jeder Stelle
+      // (`anspruch`, je 5 Eintraege MIT TITEL) und starben am Mount — `mapManifestToComposable` las sie
+      // nicht. Der Assistent einer rechtsnahen Stelle konnte damit nicht sagen, worauf seine eigene
+      // Stelle sich stuetzt, obwohl die Antwort auf dem Draht lag.
+      //
+      // ⛔ UND SIE HEBEN `geerdet` NICHT. Ein Titel NENNT eine Norm; er traegt sie nicht. Die Erdung
+      // bleibt an den kuratierten Wissenseintraegen — sonst waere «geerdet» wieder eine Aussage ueber
+      // die EXISTENZ statt ueber den GEHALT, und genau das ist die teuerste Lehre dieses Hauses.
+      const rechtsgrundlagen = found.spine.rechtsgrundlagen ?? [];
+
+      // ── WAS NICHT AUFGELOEST WERDEN KONNTE — benannt statt still verschluckt ────────────────────────
+      //
+      // ⛔ `knowledgeDomains` traegt ZWEI Arten von Wert: die Verfahrens-Domaene (aufloesbar ueber die
+      // procedureRegistry) UND die Wissens-Knoten des CHOS-Korpus (`seed-*`, hier nicht aufloesbar —
+      // dieses Verfahren traegt den Korpus nicht). Gemessen an einem emittierten Live-Mesh: 1 von 5
+      // Domaenen loeste auf, VIER fielen lautlos weg, und die Antwort meldete trotzdem `geerdet: true`.
+      // Eine Absenz, die wie ein Erfolg aussieht, ist die Klasse, die dieses Haus am haeufigsten bezahlt.
+      const domainsOffen = domains.filter(
+        (d) => !verfahren.some((p) => p.procedureId === d),
+      );
+
       // Zitierfähige Quellen leitet der SERVER ab (Evidence-Wahrheit) — nie aus der Modell-Antwort.
       const quellen = [
         ...wissen.map((e) => `wissen:${e.eintragId}`),
-        ...domains.map((d) => `domain:${d}`),
+        ...verfahren.map((p) => `domain:${p.procedureId}`),
+        ...rechtsgrundlagen.map((r) => `anspruch:${r.id}`),
       ];
 
       // ── Datei-IN: BlobStorage-Ablage; textartige Inhalte erden zusätzlich (neutralisiert, gedeckelt). ──
@@ -513,9 +537,20 @@ export function registerComposableRoutes(
         regeln: [
           "Antworte NUR geerdet auf die mitgegebenen Wissenseinträge (wissen[]) und Dateien.",
           "Zitiere Belege über ihre quelle (wissen:<eintragId>); erfinde NIE Normen oder Paragraphen.",
+          // ⛔ DIE GRENZE DER RECHTSGRUNDLAGEN, ausgeschrieben: sie NENNEN die Norm, sie tragen sie nicht.
+          // Ohne diesen Satz haette das Modell aus einem Titel einen Wortlaut gemacht — die Klasse
+          // «GEERDET beglaubigt die EXISTENZ der Norm, nie ihren GEHALT», nur eine Stufe frueher.
+          "rechtsgrundlagen[] NENNT die Grundlagen dieser Stelle — sie tragen KEINEN Normtext. Du darfst sie benennen und ihre Einschlägigkeit prüfen; ihren Wortlaut zitieren darfst du NUR aus wissen[].",
           "Du berätst nur (Advise) — du triffst keine Entscheidung.",
+          ...(domainsOffen.length > 0
+            ? [
+                `Für diese deklarierten Wissens-Domänen liegt HIER kein Wissen vor: ${domainsOffen.join(", ")}. Behandle Fragen, die daran hängen, als offen — behaupte nichts über sie.`,
+              ]
+            : []),
         ],
         wissen: wissenKontext,
+        ...(rechtsgrundlagen.length > 0 ? { rechtsgrundlagen } : {}),
+        ...(domainsOffen.length > 0 ? { domainsOhneWissen: domainsOffen } : {}),
         ...(dateiKontext.length > 0 ? { dateien: dateiKontext } : {}),
         ...(request.body.caseId ? { caseId: request.body.caseId } : {}),
       };
@@ -594,6 +629,10 @@ export function registerComposableRoutes(
             modelId: result.value.modelId,
             geerdet: String(geerdet),
             wissensEintraege: String(wissen.length),
+            rechtsgrundlagen: String(rechtsgrundlagen.length),
+            ...(domainsOffen.length > 0
+              ? { domainsOhneWissen: domainsOffen.join(",") }
+              : {}),
             ...(request.body.caseId ? { caseId: request.body.caseId } : {}),
             ...(dateienRein.length > 0
               ? {
@@ -618,6 +657,10 @@ export function registerComposableRoutes(
           geerdet,
           wissensEintraege: wissen.length,
           quellen,
+          // Die Stelle nennt ihre Grundlagen — GETRENNT von `geerdet` gezaehlt, weil sie keinen Normtext tragen.
+          rechtsgrundlagen,
+          // ⛔ BENANNTE ABSENZ statt stiller: welche deklarierte Wissens-Domäne HIER kein Wissen hat.
+          domainsOhneWissen: domainsOffen,
         },
         dateienRein: dateienRein.map(toDateiRef),
         ...(dateiRaus

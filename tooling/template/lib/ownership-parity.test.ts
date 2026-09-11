@@ -1,5 +1,7 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { runGit } from "./git.ts";
 import {
@@ -8,7 +10,12 @@ import {
   matchesOwnershipPattern,
 } from "./manifest.ts";
 import { managedCandidateFiles } from "./merge.ts";
-import { isRenderedRepoPath } from "./render.ts";
+import {
+  CONSUMER_MARKERS,
+  consumerMarkers,
+  isConsumerProject,
+  isRenderedRepoPath,
+} from "./render.ts";
 
 // Ownership-/Scaffold-Paritäts-Ratsche: JEDE Datei, die der Scaffold in Konsumenten kopiert,
 // braucht eine EXPLIZITE Update-Entscheidung. `explainOwnership` fällt für ungelistete Pfade auf
@@ -44,6 +51,9 @@ const updateUnmanagedPaths: string[] = [
   "mise.toml",
   "tsconfig.base.json",
   "tsconfig.json",
+  // NEU 2026-09-06: die Deckung fuer `scripts/**`. Sie gehoert in dieselbe Gruppe wie ihre vier
+  // Nachbarn — Werkzeug-Konfiguration der Vorlage, die ein erzeugtes Verfahren nicht erbt.
+  "tsconfig.scripts.json",
   "tsconfig.storybook.json",
   "tsconfig.strict.json",
   "vitest.browser.config.ts",
@@ -103,7 +113,8 @@ const updateUnmanagedPaths: string[] = [
   // waere ein Verzeichnis fremder Wahrheit ueber eigenem Bestand. Die Vorlage liefert ihn einmal als
   // Startpunkt; ab dann pflegt ihn, wem der Inhalt gehoert.
   "docs/README.md",
-  "docs/adr/**",
+  // `docs/adr/**` ist seit 2026-08-31 im Manifest als `consumer` gefuehrt — also explizit klassifiziert
+  // und hier tot. Die Liste schrumpft mit, genau wie ihr Kopf es vorsieht.
   "docs/architecture/**",
   "docs/compliance/**",
   "docs/contributing/**",
@@ -130,7 +141,7 @@ const updateUnmanagedPaths: string[] = [
   "scripts/lib/verify-mounted-composables.mts",
   // Geteilter Nutzlast-Filter der Quell-Gates (CSS-Token + Motion): Dokumentation ist kein Code. Gehoert zu
   // denselben Repo-Maintainer-Skripten wie die Gates, die ihn benutzen — kein Konsumenten-Fundament.
-  "scripts/lib/doku-nutzlast.mjs",
+  "scripts/lib/doku-nutzlast.ts",
   "scripts/verify-mounted-composables.test.ts",
   "scripts/check-css-token-aliases.mjs",
   "scripts/check-dev-dependencies.mjs",
@@ -138,6 +149,10 @@ const updateUnmanagedPaths: string[] = [
   "scripts/check-domain-contracts.mjs",
   "scripts/check-esm-policy.mjs",
   "scripts/check-leistung-contract.mts",
+  // Emit der Pflicht-Form nach schemas/leistung-config.schema.json. Gehoert derselben Klasse an wie
+  // check-leistung-contract.mts, dessen Frische-Gate ihn erzwingt: Repo-Maintainer-Skript, kein
+  // Konsumenten-Fundament. Sein ERZEUGNIS (schemas/**) ist dagegen `replace` und reist mit.
+  "scripts/emit-leistung-schema.mts",
   "scripts/check-motion-tokens.mjs",
   "scripts/check-procedure-contract.mts",
   "scripts/check-pwa-browser.mjs",
@@ -160,6 +175,10 @@ const updateUnmanagedPaths: string[] = [
   "scripts/smoke-generated-app.sh",
   "scripts/test-generated-app-ci.guard.test.ts",
   "scripts/test-generated-app-ci.sh",
+  // Ratchet against «an extension without coverage is worthless»: it checks that the root tsconfig
+  // references EVERY composite package. A repo-maintainer gate of the same class as the two lines
+  // above — it judges the BUILD STRUCTURE OF THE TEMPLATE, not the foundation of a consumer.
+  "scripts/tsconfig-project-coverage.test.ts",
   // Flotten-Registry der Vorlagen-Maintainer.
   "template-consumers.yaml",
 ];
@@ -168,13 +187,31 @@ const root = process.cwd();
 
 // Die Baum-Prüfungen gelten nur der PRISTINEN Vorlage: Konsumenten führen diese Tests über die
 // verbatim kopierte Engine ebenfalls aus, und deren Bäume enthalten legitim eigene Dateien.
-// Gleiches Selbsttest-Idiom wie die Engine (`sourcePackage.name.includes("fachverfahren-template")`).
-const rootPackage = JSON.parse(
-  await readFile(join(root, "package.json"), "utf8"),
-) as { name?: string };
-const isPristineTemplate = (rootPackage.name ?? "").includes(
-  "fachverfahren-template",
-);
+//
+// ── DER RIEGEL WAR RICHTIG UND FRAGTE DAS FALSCHE (gemessen 2026-08-31) ──────────────────────────────────
+// Er fragte nach dem PAKETNAMEN — `sourcePackage.name.includes("fachverfahren-template")`. Ein Konsument, der
+// die Vorlage klont, ohne sie umzubenennen, traegt diesen Namen weiter; gemessen an zwei fertig gebauten
+// Verfahren steht in beiden `senticor-app-fachverfahren-template` in der Wurzel-`package.json`. Der Riegel
+// hielt sie also fuer die pristine Vorlage, liess die Baum-Pruefungen laufen und meldete die sechzehn Dateien
+// des governten Baus als unklassifiziert — in JEDEM erzeugten Verfahren.
+//
+// The question asked now is about the PROPERTY, not about a name: if the tree carries a consumer marker it is a
+// consumer. A name can travel along; these markers only come into being when a project is generated.
+//
+// ── AND THE FIRST VERSION ASKED ONLY HALF THE QUESTION (measured 2026-09-09) ──────────────────────────────
+// It used `isLiveConsumerProject` — the CHOS-overlay predicate of the scaffold guard. But a consumer comes into
+// being on TWO routes, and each leaves ITS own marker: the CHOS build copies the tree without the scaffold CLI
+// (`.chos/`, never `.template/lock.json`), the CLI renders (`.template/lock.json`, never `.chos/`).
+// `test:generated-app-ci` scaffolds via the CLI — that tree therefore carried none of the markers being asked
+// about, the skipIf did not hit, and the ratchet reported the RENDER'S OWN METADATA as unclassified:
+// `.template/README.md`, `.template/answers.json`, `.template/lock.json`, `.template/ownership.yaml`.
+// Four files that CANNOT have an ownership entry, because the pristine template does not know them.
+// The same gate tore open the «Scaffold Nightly» on `main` for three consecutive nights.
+//
+// ⭐ No path exception list for `.template/**`: it would only ever have known the four names known today and the
+// next rendered file would be red again. What is asked is the property «am I a consumer».
+const markers = await consumerMarkers(root);
+const isPristineTemplate = !(await isConsumerProject(root));
 
 async function listRenderedTrackedFiles(): Promise<string[]> {
   const result = await runGit(["ls-files", "-z"], { cwd: root });
@@ -191,6 +228,53 @@ function isExplicitlyClassified(path: string): boolean {
 }
 
 describe("ownership/scaffold parity", () => {
+  // ⛔ THIS ASSERTION ALWAYS RUNS — it is the price of letting the two tree checks below skip. «Green because
+  // empty» is the leading failure class of this house: a skipIf whose reason nobody can look up claims to have
+  // checked precisely where it matters most. So the reason is NAMED and PROVEN ON DISK.
+  //
+  // The proof is an INDEPENDENT measurement, not a restatement: `CONSUMER_MARKERS` is re-walked here with a
+  // synchronous `existsSync`, while `consumerMarkers` answers asynchronously via `access`. The two lists must
+  // agree in BOTH directions — a marker reported but absent, or present but unreported, breaks this. Only then
+  // does the skip verdict follow from something other than the variable it is derived from.
+  it("names whether this tree is the template OR a consumer — a skip needs a proven reason", async () => {
+    // POSITIVE AND NEGATIVE CONTROL ON A FABRICATED TREE FIRST. The repo root is the pristine template, so a
+    // root-only assertion would compare two empty lists and prove nothing — «green because empty» a second
+    // time. These two probes are what make the root measurement below mean something: each declared marker
+    // must be DETECTED on its own, and a tree without any must come back empty.
+    // (Both predicates only ask whether the path EXISTS, so a fabricated file stands in for `.chos/`, which is
+    // a directory in a real consumer — it is the same question.)
+    const emptyTree = await mkdtemp(join(tmpdir(), "consumer-probe-none-"));
+    expect(await consumerMarkers(emptyTree)).toEqual([]);
+    expect(await isConsumerProject(emptyTree)).toBe(false);
+    for (const marker of CONSUMER_MARKERS) {
+      const fabricated = await mkdtemp(join(tmpdir(), "consumer-probe-"));
+      await mkdir(dirname(join(fabricated, marker)), { recursive: true });
+      await writeFile(join(fabricated, marker), "");
+      expect(
+        await consumerMarkers(fabricated),
+        `the declared marker «${marker}» is not detected — a consumer carrying only this one would run the tree checks`,
+      ).toEqual([marker]);
+      expect(await isConsumerProject(fabricated)).toBe(true);
+    }
+
+    // AND NOW THIS TREE, measured INDEPENDENTLY: `CONSUMER_MARKERS` is re-walked with a synchronous
+    // `existsSync`, while `consumerMarkers` answered asynchronously via `access`. The two lists must agree in
+    // BOTH directions — a marker reported but absent, or present but unreported, breaks this.
+    const onDisk = CONSUMER_MARKERS.filter((marker) =>
+      existsSync(join(root, marker)),
+    );
+    expect(
+      [...markers].sort(),
+      "the markers reported by consumerMarkers disagree with the markers found on disk — then the skip verdict rests on nothing",
+    ).toEqual([...onDisk].sort());
+    // And the verdict follows from the disk, not from the same expression it is derived from: an empty disk
+    // measurement MUST mean «pristine template», and then the tree checks run. There may be no third outcome.
+    expect(
+      isPristineTemplate,
+      "isConsumerProject and the markers found on disk disagree about this tree",
+    ).toBe(onDisk.length === 0);
+  });
+
   it("resolves shared runtime packages to replace", () => {
     const sample = explainOwnership(
       defaultOwnership,

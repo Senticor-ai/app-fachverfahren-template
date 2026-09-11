@@ -318,3 +318,80 @@ describe("toContractSnapshot — Rechtsbehelfs-/Bekanntgabe-Regime (W1)", () => 
     expect("zustellung" in snap).toBe(false);
   });
 });
+
+// ── DER ZWILLING EINEN SCHLUESSEL WEITER: DIE VA-PFLICHTANGABEN REISEN NICHT ─────────────────────────────────
+// ⛔ LIVE GEMESSEN 2026-09-07 an einem ERZEUGTEN Verfahren (Lauf `done`, Report PASSED):
+// `leistung.config.ts` DEKLARIERT `verwaltungsaktInhalt` (Inhaltsadressat, Zeitraum, Leistungsgebot,
+// Unterschrift) — und `leistung.contract.json` traegt den Schluessel NICHT. Nachgemessen:
+// `'verwaltungsaktInhalt' in vertrag === false`.
+//
+// ⭐ UND DER SERVER LIEST IHN AUSDRUECKLICH. `verwaltungsaktInhaltAusVertrag` (server/procedure.config.ts)
+// sagt in seinem eigenen Kommentar: «alles Uebrige nur, wenn der Vertrag es unter `verwaltungsaktInhalt`
+// DEKLARIERT. Schweigt er, wird der Block ENTFERNT statt geerbt.» Der Vertrag schweigt IMMER — also
+// entfernt der Server den Block bei JEDEM erzeugten Verfahren.
+//
+// ⇒ RECHTSFOLGE: ein Bescheid ohne Inhaltsadressat (§ 119 Abs. 1 AO · § 157 Abs. 1 S. 2 AO, Bestimmtheit;
+// Nichtigkeitsrisiko § 125 AO) und ohne Leistungsgebot (§ 254 Abs. 1 AO — nicht vollstreckbar, keine Kasse,
+// keine Faelligkeit). Die Heilung vom 2026-08-31 («der Bescheid forderte an die Kasse einer FREMDEN
+// Kommune») hat das ERBEN richtig abgeschaltet — und weil der Transport fehlt, bleibt seither NICHTS uebrig.
+//
+// ⭐ DAS IST WOERTLICH DIE KLASSE, DIE DER NACHBAR-BLOCK OBEN FUER `zustellung` GELOEST HAT, ein Feld weiter.
+// Ein geheilter Zwilling ist kein geheiltes Haus.
+describe("toContractSnapshot — die VA-Pflichtangaben reisen im Vertrag mit (Zwilling von W1)", () => {
+  // ⛔ UNTIL 2026-09-09 THIS PROBE CHECKED A FORM THE CONTRACT DOES NOT KNOW. It carried
+  // `inhaltsadressatPfad`, a top-level `zahlungsempfaenger` and `leistungsgebot: true` — THREE names that
+  // do not occur in `VerwaltungsaktInhaltConfig` (domain-kernel.ts:99): the addressee of the content is
+  // called `adressatNamePfad`, and `leistungsgebot` is an OBJECT that carries the payee. An `as` cast kept
+  // the surplus fields quiet; it broke on `boolean` against object (TS2352) — and because the package stood
+  // in NO tsconfig reference, the chain never saw the break. A probe with invented field names proves
+  // nothing about the transport of the REAL mandatory statements: it only shows that an object copied
+  // verbatim keeps arbitrary keys.
+  //
+  // ⭐ The form here is now the one of the LIVING procedure (`procedure.config.ts:122`) — no cast any more,
+  // so every future rename in the contract falls here instead of passing silently.
+  const inhalt: NonNullable<LeistungConfig["verwaltungsaktInhalt"]> = {
+    adressatNamePfad: "halter.name",
+    zeitraumPfad: "veranlagungsjahr",
+    leistungsgebot: {
+      betragPfad: "berechnung.betrag",
+      waehrung: "EUR",
+      zahlungsempfaenger: "Stadtkasse Musterstadt",
+    },
+  };
+
+  it("transportiert die Pflichtangaben (sonst erlaesst der Server einen Bescheid ohne Inhaltsadressat und ohne Leistungsgebot)", () => {
+    const snap = toContractSnapshot({ ...basis, verwaltungsaktInhalt: inhalt });
+    const roh = JSON.parse(JSON.stringify(snap)) as Record<string, unknown>;
+    expect("verwaltungsaktInhalt" in roh).toBe(true);
+    expect(
+      (roh["verwaltungsaktInhalt"] as Record<string, unknown>)[
+        "adressatNamePfad"
+      ],
+    ).toBe("halter.name");
+    // The payment demand is an OBJECT (§ 254 (1) AO: amount, currency, payee) — a `toBe(true)` would have
+    // reported that a field of that NAME arrives, never that its CONTENT arrives.
+    expect(
+      (roh["verwaltungsaktInhalt"] as Record<string, unknown>)[
+        "leistungsgebot"
+      ],
+    ).toEqual({
+      betragPfad: "berechnung.betrag",
+      waehrung: "EUR",
+      zahlungsempfaenger: "Stadtkasse Musterstadt",
+    });
+  });
+
+  it("ÜBERBLOCKUNG: eine Config OHNE verwaltungsaktInhalt erzeugt kein leeres Feld (Bestandsverträge bleiben gültig)", () => {
+    const snap = toContractSnapshot(basis);
+    expect("verwaltungsaktInhalt" in snap).toBe(false);
+  });
+
+  it("JSON-SICHER: der Vertrag ist reine Daten — kein Feld ueberlebt die Serialisierung nicht", () => {
+    const snap = toContractSnapshot({ ...basis, verwaltungsaktInhalt: inhalt });
+    // POSITIV-KONTROLLE der Probe selbst: ohne diese Zeile pruefte die Zusicherung oben eine Struktur,
+    // die im ECHTEN Vertrag (einer Datei) nie ankommt.
+    expect(JSON.parse(JSON.stringify(snap))["verwaltungsaktInhalt"]).toEqual(
+      JSON.parse(JSON.stringify(inhalt)),
+    );
+  });
+});

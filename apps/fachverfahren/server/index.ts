@@ -59,6 +59,7 @@ import { registerAuditRoutes } from "./audit/routes.js";
 import { createAiAssistPortFromEnv } from "./platform/ai-assist.js";
 import { autoBootstrapAdminFromEnv } from "./auth/auto-bootstrap.js";
 import { registerAuthPolicyGuard } from "./auth/authorization.js";
+import { registerSecurityHeaders } from "./security-header.js";
 import { registerAuthRoutes, type RegistrationMode } from "./auth/routes.js";
 import { oidcConfigFromEnv, type OidcConfig } from "./auth/oidc-routes.js";
 import { createCookieSessionResolver } from "./auth/session-resolver.js";
@@ -209,6 +210,10 @@ function registerAppRoutes(
   bff: BffWiring,
   env: NodeJS.ProcessEnv = process.env,
 ): void {
+  // ⛔ SICHERHEITS-HEADER ZUERST — vor jeder Route, damit auch die Antworten der Fehlerpfade sie tragen.
+  // Bis 2026-09-07 setzte dieser Server KEINEN einzigen (s. `security-header.ts`), obwohl der Golden
+  // `arch:golden-security-header` sie verlangt und die Verfassung sie als `hart-immer` blockend fuehrt.
+  registerSecurityHeaders(app);
   // K2: /auth-/api-Route ohne Autorisierungs-Policy = Boot-Fehler, nicht erst Test-Rot.
   registerAuthPolicyGuard(app);
   // Selbstauskunft über die vorprovisionierten TESTKONTEN — im Produktivbetrieb wird sie

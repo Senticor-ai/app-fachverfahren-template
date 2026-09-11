@@ -12,7 +12,23 @@
     "outDir": "dist-types",
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["react", "react-dom"]
+    // `node` BELONGS HERE because this package COMPILES Node tests along with the browser code: `include`
+    // covers `src/**/*.ts`, and below it sit `lauf-lebenszyklus-grenze.test.ts` and
+    // `leistung-contract-form.test.ts`, which use `node:fs`/`node:path`/`__dirname` (they read real files of
+    // the tree). Without this entry `tsc` reported five errors — not about the code, but about its own
+    // configuration.
+    //
+    // ⚠️ IT IS AMBIENT FOR THE WHOLE PACKAGE, and a per-file `/// <reference types="node" />` would NOT change
+    // that: a triple-slash reference injects its global declarations into the SAME program, it does not scope
+    // them to the file that carries it.
+    //
+    // MEASURED 2026-09-11 rather than argued. `node` was removed from `types` and the reference written into
+    // the two Node tests instead: `tsc --noEmit -p tsconfig.json` stayed green (0 errors) — AND a probe line
+    // reading `process.platform` in `src/format.ts`, a browser file carrying NO reference, compiled clean too.
+    // The globals reach every file of the program either way. The narrower-looking alternative therefore buys
+    // locality of the declaration, not isolation, and pays for it with a second place to keep in step. The
+    // entry stays here, where the reason can be read.
+    "types": ["react", "react-dom", "node"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["src/stories"]

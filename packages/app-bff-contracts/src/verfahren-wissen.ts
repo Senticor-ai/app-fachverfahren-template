@@ -23,7 +23,7 @@ export const WissenEintragRequestSchema = Type.Object(
 export type WissenEintragRequestDto = Static<typeof WissenEintragRequestSchema>;
 
 /** Einen KI-Wissens-Eintrag (ENTWURF) anfordern: die KI erzeugt Wissen aus Aufgabe + Kontext. */
-export const KiWissenRequestSchema = Type.Object(
+export const AiKnowledgeRequestSchema = Type.Object(
   {
     task: Type.String({ minLength: 1 }),
     input: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
@@ -31,7 +31,7 @@ export const KiWissenRequestSchema = Type.Object(
   },
   { additionalProperties: false },
 );
-export type KiWissenRequestDto = Static<typeof KiWissenRequestSchema>;
+export type AiKnowledgeRequestDto = Static<typeof AiKnowledgeRequestSchema>;
 
 /** Ein Wissens-Eintrag des Verfahrens (Ansicht). */
 export const WissenViewDtoSchema = Type.Object(

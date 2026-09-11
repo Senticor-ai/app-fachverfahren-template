@@ -27,6 +27,7 @@ import type {
 } from "../case-client.js";
 import { Shell } from "../app/shell.js";
 import { CaseAktionen } from "./case-aktionen.js";
+import type { AuditKettenUrteil } from "../case-client.js";
 import { toAkteProps, toVerlauf } from "./case-akte-view.js";
 import { VermerkAktionen } from "./vermerk-aktionen.js";
 
@@ -36,6 +37,9 @@ interface AkteDaten {
   tasks: CaseTask[];
   progress: CaseZielFortschritt[];
   audit: CaseAuditEvent[];
+  /** DAS URTEIL UEBER DIE AUDIT-KETTE. `undefined` = nicht geprueft (aeltere Gegenstelle) — und das ist
+   *  NICHT dasselbe wie «in Ordnung». Die Flaeche unterscheidet beides. */
+  auditKette?: AuditKettenUrteil;
   allowedActions: CaseAllowedActions;
   vermerke: VermerkDto[];
 }
@@ -67,7 +71,15 @@ export function AmtAktePage(): React.JSX.Element {
       ]);
     return {
       kind: "ready",
-      data: { caseSummary, tasks, progress, audit, allowedActions, vermerke },
+      data: {
+        caseSummary,
+        tasks,
+        progress,
+        audit: audit.events,
+        ...(audit.chain ? { auditKette: audit.chain } : {}),
+        allowedActions,
+        vermerke,
+      },
     };
   }, [id]);
 
@@ -203,6 +215,32 @@ export function AmtAktePage(): React.JSX.Element {
                 Verfahrens-Wiki öffnen →
               </Link>
             </div>
+            {/* ⛔ EINE GEBROCHENE KETTE ENTWERTET ALLES DARUNTER — deshalb steht das Urteil VOR der Akte
+                und nicht als Fussnote. Bis 2026-09-07 rechnete der Server es und der Client-Typ warf es
+                weg: bei gebrochener Kette sah die Aufsicht exakt dieselbe unauffaellige Timeline wie bei
+                intakter. ⚠️ Gezeigt wird NUR das ausdrueckliche `ok: false` — ein fehlendes Urteil
+                (aeltere Gegenstelle) behauptet hier nichts, in keine Richtung. */}
+            {state.data.auditKette?.ok === false && (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/60 bg-destructive/10 p-3 text-sm"
+              >
+                <strong className="text-destructive">
+                  Die Nachweiskette dieser Akte ist gebrochen.
+                </strong>{" "}
+                Der Verlauf unten ist damit{" "}
+                <strong>nicht mehr beweisend</strong> — er kann unvollstaendig
+                oder veraendert sein.
+                {state.data.auditKette.brokenAt
+                  ? ` Bruchstelle: ${state.data.auditKette.brokenAt}.`
+                  : ""}
+                {state.data.auditKette.reason
+                  ? ` Grund: ${state.data.auditKette.reason}.`
+                  : ""}{" "}
+                Diese Akte eignet sich nicht als Nachweis, bis der Bruch
+                geklaert ist.
+              </div>
+            )}
             <DossierAkte360
               {...toAkteProps(
                 state.data.caseSummary,

@@ -31,12 +31,29 @@ import { landingView, postLoginRedirect } from "./landing-state.js";
 import { personaBereiche, sichtbareBereiche } from "./personas.js";
 import { useSession } from "./session.js";
 import { store } from "./store.js";
+import { useDokumentTitel } from "./app/dokument-titel.js";
 
 export function LandingPage(): React.ReactElement | null {
   const session = useSession();
   const location = useLocation();
   const view = landingView(session);
   const [authMode, setAuthMode] = React.useState<"login" | "register">("login");
+
+  // ── DIE LANDING IST DIE EINZIGE SEITE OHNE `Shell` — UND DIE ERSTE, DIE JEMAND SIEHT ──────────────────
+  // Der Reiter-Titel wird in `Shell` gesetzt; diese Seite rendert keine. Ohne diese Zeile truege ausgerechnet
+  // der Einstieg weiter `Fachverfahren - Referenz-App` aus der unveraenderten Vorlage (WCAG 2.4.2, Stufe A).
+  //
+  // ⛔ SIE STEHT HIER OBEN, UND DAS IST DER GANZE PUNKT (gemessen 2026-09-08). Sie stand bis heute NACH dem
+  // fruehen `return null` unten. React zaehlt Hooks je Render: beim Uebergang `loading` -> geladen sprang die
+  // Zahl von 3 auf 4, React warf «Rendered more hooks than during the previous render», und die Fehlergrenze
+  // zeigte «Die App konnte nicht geladen werden» — auf der ERSTEN Seite, die ein Buerger sieht.
+  // Gemessen in DREI erzeugten Verfahren gleichzeitig (`_devserver.log`), und `.chos/preview-thumbnails/
+  // buerger.png` ist in allen dreien ein Foto genau dieser Fehlerseite — aufgenommen von der Preview-Phase,
+  // die den Lauf danach `done` und `appUsable: true` meldete. Kein Gate sah es: 0 Treffer fuer
+  // «more hooks» in builder-summary, evidence, run-errors und boot-smoke.
+  // ⭐ EIN HOOK GEHOERT VOR JEDEN BEDINGTEN AUSGANG — ausnahmslos. Das ist keine Stilfrage, sondern die
+  // Aufrufregel von React.
+  useDokumentTitel(store.config);
 
   // Kein Formular-Flackern, solange der Session-Zustand lädt.
   if (view === "loading") return null;
@@ -47,6 +64,12 @@ export function LandingPage(): React.ReactElement | null {
     );
     if (from) return <Navigate to={from} replace />;
   }
+
+  // Der abgewiesene Weg — aus DEMSELBEN `state.from`, das der Deep-Link-Restore ohnehin liest. Kein
+  // zweiter Kanal, keine zweite Wahrheit; nur eine zweite FRAGE an denselben Wert.
+  const abgewiesenerWeg = postLoginRedirect(
+    (location.state as { from?: unknown } | null)?.from,
+  );
 
   const registerOffen =
     view === "login" && session.registration === "open_unverified";
@@ -84,6 +107,23 @@ export function LandingPage(): React.ReactElement | null {
             {store.config.kommune}
           </p>
         </header>
+        {/* ── WHY THE CLICK CAME BACK HERE ──────────────────────────────────────────────────────────────
+            Unauthenticated, this page shows ALL area entry points, and a click on one of them bounced
+            wordlessly through the session gate right back to this same page. A first-time user pressed the
+            big "Bürger:in" card and stood in front of the identical screen with not one line of
+            explanation — the state that this house calls a dead end.
+            The guards already carried `state.from`; only nobody said it out loud. Reading it here costs one
+            sentence and no new mechanism. */}
+        {view !== "authenticated" && abgewiesenerWeg ? (
+          <p
+            className="rounded-md border border-border bg-background px-4 py-3 text-center text-sm text-muted-foreground"
+            role="status"
+          >
+            Für <strong>{abgewiesenerWeg}</strong> ist eine Anmeldung
+            erforderlich. Melden Sie sich an — danach geht es dort weiter, wo
+            Sie hinwollten.
+          </p>
+        ) : null}
         <div className="grid items-start gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>

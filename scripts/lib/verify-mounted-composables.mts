@@ -77,7 +77,7 @@ const verifyEd25519 = (
  *  Anker) → sonst die well-known Datei `cert-signing-key.pub` neben den Verdikten. Fehlt beides ⇒ null (Signatur
  *  bleibt ungeprüft; certified wird dann fail-closed gekappt). */
 function resolveTrustedCertKey(dir: string): string | null {
-  const env = process.env.CHOS_CERT_SIGNING_PUBKEY;
+  const env = process.env["CHOS_CERT_SIGNING_PUBKEY"];
   if (env && env.trim()) return env.trim();
   try {
     const s = readFileSync(path.join(dir, CERT_PUBKEY_FILE), "utf8").trim();

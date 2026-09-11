@@ -75,6 +75,7 @@ import { Textarea } from "../ui/textarea.js";
 import { Label } from "../ui/label.js";
 import { Checkbox } from "../ui/checkbox.js";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group.js";
+import { resultBadge } from "../ergebnis-plakette.js";
 import {
   Select,
   SelectContent,
@@ -1395,9 +1396,11 @@ function BerechnungKarte<T extends Antragsdaten>({
               ? live
                 ? "Live-Einschätzung · KI-Vorschlag (Mensch entscheidet)"
                 : "KI-Vorschlag · durch Mensch zu prüfen"
-              : live
-                ? "Live-Berechnung nach Prüfschema · aktueller Stand"
-                : "Ergebnis nach Prüfschema (§-belegt, deterministisch)"}
+              : resultBadge({
+                  aiSuggestion: false,
+                  provisional: !!live,
+                  ratesBacked: berechnung.saetzeBelegt,
+                }).heading}
           </div>
           <div className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
             {formatBetrag(berechnung)}{" "}
@@ -1417,9 +1420,15 @@ function BerechnungKarte<T extends Antragsdaten>({
           ) : (
             <>
               <ShieldCheck className="h-3 w-3" aria-hidden="true" />{" "}
-              {berechnung.status === "provisional"
-                ? "vorläufig · §-belegt"
-                : "§-belegt · Prüfschema"}
+              {/* ⛔ NO LONGER A HARD-CODED «§-belegt»: the badge certified what the run itself denies
+                    (measured 2026-09-09 — see ergebnis-plakette.ts). It is now DERIVED. */}
+              {
+                resultBadge({
+                  aiSuggestion: false,
+                  provisional: berechnung.status === "provisional",
+                  ratesBacked: berechnung.saetzeBelegt,
+                }).text
+              }
             </>
           )}
         </span>

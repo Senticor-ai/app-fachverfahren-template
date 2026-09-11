@@ -379,7 +379,7 @@ export function ReportingPanel<T = Record<string, unknown>>({
                       <span className="relative block h-2.5 overflow-hidden rounded-full bg-secondary">
                         <span
                           className={cn(
-                            "absolute inset-y-0 left-0 rounded-full motion-safe:transition-[width] motion-safe:duration-500",
+                            "absolute inset-y-0 left-0 rounded-full motion-safe:transition-[width] motion-safe:duration-(--fv-duration-reveal)",
                             toneClass[s.tone] ?? "bg-status-info",
                           )}
                           style={{ width: `${breite}%` }}
