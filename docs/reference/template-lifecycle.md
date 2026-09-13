@@ -17,6 +17,15 @@ darf nur nach bewusster Freigabe verwendet werden und schreibt Dirty-Provenienz
 in `.template/lock.json`. `--force` ersetzt ein Zielverzeichnis vollständig;
 für existierende leere Zielverzeichnisse `--allow-existing-empty` verwenden.
 
+### Full-Repo-Scaffold: wo die Naht danach liegt
+
+Der Scaffold benennt `apps/fachverfahren` nach `apps/<domain>` um, kopiert
+`tooling/template/**` aber UNVERÄNDERT. Werkzeuge dort dürfen den App-Pfad
+deshalb nicht als Literal tragen; sie lösen ihn über die Identität des
+Checkouts auf (`baseIdentityOf`, `tooling/template/lib/manifest.ts:32`). So
+findet `pnpm seam:shape` / `seam:check` / `seam:set` die Naht auch in jeder
+erzeugten App (Commit `c7432fa`).
+
 Der app-only Export bleibt separat:
 
 ```bash

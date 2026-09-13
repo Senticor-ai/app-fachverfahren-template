@@ -1,8 +1,17 @@
 # PostgreSQL App Store
 
-Dieses Paket stellt den kontrollierten Migrationspfad für die Vorlage bereit.
-Es ist der Standard für den `migrator`-Workload und nicht Teil des
-Browser-/BFF-Startpfads.
+Dieses Paket ist die **Store-Schicht des Servers** UND der **Migrator** für den
+`migrator`-Workload.
+
+Als Store-Schicht liefert es `PostgresAppStore`, `CaseStore`, `TaskStore`,
+`AuthStore`, `KanbanStore`, `WissenStore` und `EvidenceLedger` — jeweils in den
+Varianten Postgres, InMemory und Unavailable (fail-closed ohne DB) — plus die
+chos-Adapter (`src/chos-*.ts`) hinter denselben Verträgen, gewählt über
+`APP_STORE_MODE=chos`. `apps/fachverfahren/server/index.ts` konstruiert daraus
+die Stores des BFF.
+
+Als Migrator stellt es den kontrollierten Migrationspfad für die Vorlage bereit
+und ist der Standard für den `migrator`-Workload.
 
 ## Laufzeit
 
@@ -18,8 +27,9 @@ Regeln:
 - Bekannte PgBouncer-/Pooler-URLs werden ohne Direct-URL abgelehnt.
 - Migrationen sind timestamped, checksum-gesichert und laufen unter einem
   PostgreSQL Advisory Lock.
-- Fachmodule legen eigene Migrationen in `modules/<domain>/migrations/` ab; die
-  Paketmigrationen bleiben die administrative Basis.
+- Fachmodule legen eigene Migrationen in `modules/<domain>/migrations/` ab
+  (**PLAN** — die laufende App bindet Module nicht ein, siehe
+  `modules/README.md`); die Paketmigrationen bleiben die administrative Basis.
 
 ## PostgreSQL-Client
 

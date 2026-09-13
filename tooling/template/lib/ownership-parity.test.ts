@@ -117,7 +117,13 @@ const updateUnmanagedPaths: string[] = [
   // und hier tot. Die Liste schrumpft mit, genau wie ihr Kopf es vorsieht.
   "docs/architecture/**",
   "docs/compliance/**",
-  "docs/contributing/**",
+  // `docs/archive/**` ist der Ablageort der 2026-09-13 zurueckgezogenen Doku-Seiten: JEDE traegt in
+  // `archive/README.md` eine Zeile mit Grund und Nachfolger. Sie gehoert dem KONSUMENTEN — eine Vorlage,
+  // die fremde Archiv-Begruendungen ueberschriebe, loeschte den Grund der Ruecknahme mit.
+  // ⛔ `docs/contributing/**` ist im selben Zug GEFALLEN: `agent-configuration.md` wiederholte
+  //    `docs/agents/bootstrap.md` mit falschen Zahlen und ist archiviert. Der Ordner existiert nicht mehr,
+  //    also ist sein Muster hier tot — und ein totes Muster ist genau das, was (dead) unten verbietet.
+  "docs/archive/**",
   "docs/examples/**",
   "docs/migration/**",
   "docs/operations/**",

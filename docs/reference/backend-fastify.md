@@ -1,10 +1,10 @@
 # Backend mit Fastify
 
 > **Für Agenten: Quellen & Pflicht-Lektüre.**
-> Status: IST für die neutrale Web-Delivery-Runtime in
+> Status: IST — für die neutrale Web-Delivery-Runtime in
 > `packages/app-runtime-fastify` (komponiert unter
-> `apps/fachverfahren/server/`); fachliche API-, OpenAPI-, App-Daten- und
-> Postgres-E2E-Routen bleiben explizite Ausbauschritte.
+> `apps/fachverfahren/server/`) UND für den fachlichen BFF in
+> `packages/app-bff-fastify` (15 Routenmodule, interner OpenAPI-Snapshot).
 > Quellen: Architekturentscheidungen dieses Templates, `AGENTS.md`.
 > Pflicht-Lektüre vorher: `AGENTS.md`.
 
@@ -37,13 +37,29 @@ kritische Abhängigkeiten prüfen; Liveness darf das nicht.
 
 ### Fachliche BFF-Routen (`@senticor/app-bff-fastify`, public Port)
 
-- `GET /api/session` — SDK-RBAC-Sicht der Sitzung (`session.read`)
-- `GET /api/capabilities` — aufgelöste Permissions (`session.read`)
-- `GET /api/preferences` / `PUT /api/preferences` —
-  `preferences.read` / `preferences.write`
-- `GET /api/mailbox?box=inbox|outbox&scope=own|authority` —
-  `mailbox.own.read` bzw. `mailbox.authority.read`
-- `POST /api/mailbox` — `mailbox.own.write` bzw. `mailbox.authority.write`
+Fünfzehn Routenmodule unter `packages/app-bff-fastify/src/routes/`. Die
+**eine Wahrheit über die Pfade** ist der Snapshot
+`schemas/openapi.internal.json` — diese Liste ist die Übersicht nach Gruppen:
+
+| Gruppe            | Routen                                                                                                                                                                 |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sitzung/Konto     | `/api/session`, `/api/capabilities`, `/api/preferences`                                                                                                                |
+| Postfach          | `/api/mailbox` (`box=inbox\|outbox`, `scope=own\|authority`)                                                                                                           |
+| Fall/Dossier      | `/api/cases`, `/api/cases/:id` (+ `allowed-actions`, `transitions`, `approvals`, `audit`, `progress`, `tasks`, `legal-hold`, `loeschung`, `rechtsbehelf/entscheidung`) |
+| Vermerke          | `/api/cases/:id/vermerke` (+ `ki`, `export`, `:vermerkId/review`)                                                                                                      |
+| Aufgaben          | `/api/tasks/:id`                                                                                                                                                       |
+| Bürger            | `/api/buerger/antraege` (+ `:id`, `bescheid`, `bescheid.pdf`, `nachweise`, `widerspruch`, `rueckforderung/zahlung`)                                                    |
+| Composables       | `/api/composables` (+ `:id`, `:id/chat`, `:id/evidence`, `:id/spine/:aufgabe`)                                                                                         |
+| Zahlung           | `/api/payment`, `/api/payment/:paymentId`                                                                                                                              |
+| Identität         | `/api/identity`, `/api/identity/assurance`                                                                                                                             |
+| Register/Nachweis | `/api/register/evidence`                                                                                                                                               |
+| Zustellung        | `/api/zustellung`, `/api/zustellung/:deliveryId`                                                                                                                       |
+| Verfahrens-Wissen | `/api/verfahren/:procedureId/:version/wissen` (+ `ki`, `export`, `:eintragId/review`)                                                                                  |
+| KI-Assistenz      | `/api/ai/assist`                                                                                                                                                       |
+| Verfahren         | `/api/procedures`                                                                                                                                                      |
+
+Permissions je Route stehen am Route-Schema (z. B. `session.read`,
+`preferences.write`, `mailbox.own.read` / `mailbox.authority.read`).
 
 Verträge (TypeBox-DTOs, Fehler-Envelope `{ error, requestId? }`) liegen in
 `@senticor/app-bff-contracts`; Statuscodes: 401 ohne Sitzung, 403 bei
@@ -52,7 +68,11 @@ verweigerter Permission (beides mit `SecurityEvent` über die `AuditSink`),
 emittieren `AppDataAuditEvent`s. Das OpenAPI-Dokument wird auf dem public
 Server gesammelt (Collector VOR den BFF-Routen registrieren!) und NUR intern
 ausgeliefert; `scripts/check-openapi.mjs` hält den Snapshot
-(`schemas/openapi.internal.json`) im Gleichschritt.
+(`schemas/openapi.internal.json`) im Gleichschritt. Der Snapshot trägt auch die
+ERDUNGS-Felder, die der BFF bereits liefert: `rechtsgrundlagen`
+(`id`, `titel`, `ubiquitaer`) und `domainsOhneWissen`. Neu erzeugen mit
+`pnpm run check:openapi -- --update`; das Gate selbst läuft in
+`pnpm run check:ci`.
 
 ## Plattform- und Domain-Routen
 
@@ -89,6 +109,7 @@ Fastify validiert den Request-Body vor dem Route-Handler. Tests, die `401`
 erwarten, müssen deshalb einen schema-gültigen Body senden; ein ungültiger Body
 liefert zuerst `400`.
 
-Ein Script `test:e2e:postgres` ist weiterhin ein Ausbauschritt für fachliche
-App-Datenrouten gegen einen echten PostgreSQL-Dienst mit vorher ausgeführten
-Migrationen.
+Gegen ein ECHTES PostgreSQL läuft `pnpm run test:pg` (die Store-Tests von
+`@senticor/app-store-postgres`, testcontainers über `tests/pg/global-setup.ts`;
+ohne Docker überspringt der Lauf). Ein Script `test:e2e:postgres` existiert
+nicht.

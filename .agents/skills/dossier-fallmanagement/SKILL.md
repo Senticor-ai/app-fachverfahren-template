@@ -303,8 +303,9 @@ Fortschritt: `fortschrittProzent` falls gesetzt, sonst aus erledigten Schritten.
 den vollständigen **Standalone-/OSS-Betrieb ohne chos** (Postgres-Variante ist
 server-autoritativ, revisionssicher, mandanten-scoped, Optimistic-Locking). In
 Produktion sitzt chos hinter **derselben** Naht (`CaseStore`/`TaskStore`/
-`ProcedureRegistry` als Dependency-Injection über `BffDeps`) — der Adapter lebt
-im Deployment, NICHT im OSS-Template. Bewusste Stub-Grenzen: keine laufende
+`ProcedureRegistry` als Dependency-Injection über `BffDeps`). Die chos-Adapter
+liegen IM Template — `packages/app-store-postgres/src/chos-*.ts`, gewählt über
+`APP_STORE_MODE=chos`. Bewusste Stub-Grenzen: keine laufende
 BPMN-Engine (Timer/Fristen-Orchestrierung, Boundary-Events, Subprozesse,
 Gateway-Semantik XOR/AND) — das füllt der Provider hinter der Naht.
 

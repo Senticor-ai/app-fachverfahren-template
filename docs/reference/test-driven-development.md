@@ -2,9 +2,9 @@
 
 > **Für Agenten: Quellen & Pflicht-Lektüre.**
 > Status: IST für Vitest-Tests, Storybook, Screen Contracts,
-> Web-Delivery-/Fastify-Runtime-Tests und Kubernetes-/Evidence-Checks; PLAN für
-> fachliche Backend-API-, MSW- und E2E-Ebenen (die Scripts
-> `test:e2e`/`test:e2e:postgres` existieren noch nicht).
+> Web-Delivery-/Fastify-Runtime-Tests, Kubernetes-/Evidence-Checks UND für die
+> fachlichen BFF-`inject`-Tests, `test:e2e`, `test:pg`, `test:browser` (MSW)
+> und `test:storybook`.
 > Quellen: `package.json`-Scripts, `vitest.config.ts`, `AGENTS.md`.
 > Pflicht-Lektüre vorher: `AGENTS.md`.
 
@@ -24,17 +24,21 @@ Capabilities, API, UI, Accessibility und Evidence.
 
 - Domain-Kernel: reine Unit-Tests für Zustände, Fristen, Versionen,
   Retention-Regeln und Berechtigungsentscheidungen.
-- Naht-Berechnung: die `berechne`-Funktion der `LeistungConfig` ist rein und
-  deterministisch und wird gegen die Beispielwerte des Fachkonzepts getestet.
+- Naht-Berechnung: die `tarif`-DATEN der `LeistungConfig` (bzw. `berechne` als
+  Escape-Hatch) werden gegen die `rechenproben` der Naht getestet — die
+  Sollwerte stehen als DATEN, das ausführende Programm ist der Test.
 - Platform Contracts: Contract-Tests für Ports und Adapter.
 - Fastify-Runtime: `inject`-Tests für Delivery-Header, Health, Runtime-Config,
   interne Endpunkte und Shutdown-Semantik.
-- Fachliche Backend-API (PLAN): Fastify `inject`-Tests für Routen,
-  OpenAPI-Schemas, Fehlerpfade und Autorisierung.
-- E2E (PLAN): eine vertikale Strecke aus Login, Rollen,
-  Benutzereinstellungen, Posteingang/Ausgang und RBAC; die Scripts
-  `test:e2e`/`test:e2e:postgres` existieren noch nicht.
-- Mocking (PLAN): MSW-Handler, siehe `docs/reference/mock-data-msw.md`.
+- Fachliche BFF-API: 28 `inject`-Testdateien in
+  `packages/app-bff-fastify/src/routes/` (z. B. `cases-transitions.test.ts`) —
+  Routen, Schemas, Fehlerpfade und Autorisierung.
+- E2E: `pnpm run test:e2e` (`tests/e2e/personas.e2e.test.ts`) gegen das reale
+  Bundle.
+- Postgres: `pnpm run test:pg` gegen ein echtes PostgreSQL (testcontainers).
+- Browser/MSW: `pnpm run test:browser`
+  (`apps/fachverfahren/src/antrag-client.browser.test.tsx`).
+- Storybook: `pnpm run test:storybook`.
 - Datenbank: Migrationstests, Checksum-Drift, Rollback- und Restore-Szenarien
   (`packages/app-store-postgres`, `packages/migration-kit`).
 - UI: Component-Tests und Storybook-Stories für alle Screen States.
@@ -46,23 +50,10 @@ Capabilities, API, UI, Accessibility und Evidence.
 
 ## Domain-Modul-Struktur (PLAN)
 
-Gilt für Module aus dem Generator-Pfad (`app:new`, siehe
+Den Verzeichnisbaum eines Domain-Moduls trägt
+[`../architecture/domain-modules.md`](../architecture/domain-modules.md) — hier
+nicht wiederholt. Er gilt für Module aus dem Generator-Pfad (`app:new`, siehe
 `modules/README.md`); im Scaffold existiert keine Instanz.
-
-```text
-modules/<domain>/
-  domain.module.yaml
-  contracts/
-  server/
-  ui/
-  forms/
-  permissions/
-  events/
-  migrations/
-  i18n/
-  tests/
-  compliance/
-```
 
 Tests gehören in das Domain-Modul, wenn sie Fachlogik prüfen. Tests gehören in
 Plattformpakete, wenn sie wiederverwendbare Vertrage prüfen.

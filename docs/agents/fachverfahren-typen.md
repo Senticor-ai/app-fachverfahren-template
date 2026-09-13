@@ -50,6 +50,13 @@ spiegle `verwaltungsakt` + `erlaesstBescheid` in `procedure.config.ts` (Gate
 server-seitig EINGEFROREN (Hash im append-only Audit) und ist owner-scoped über
 `/buerger/bescheid/:id` abrufbar — Details in der Skill unter „Bescheid / Verwaltungsakt".
 
+**Vor dem Einfrieren rechnet die BEHÖRDE den Tenor nach**
+(`packages/public-sector-sdk/src/tenor-nachrechnung.ts`):
+`verwaltungsaktInhalt.tenorNachrechnung` deklariert den Status-Pfad (`statusPathOf`),
+`packages/app-bff-fastify/src/routes/cases.ts` liest ihn. Fehlt ein autoritatives
+Programmergebnis, wird die Festsetzung BLOCKIERT — es gibt keinen Rückfall auf den
+im Browser gerechneten Wert.
+
 ## Fall/Dossier/Case-Management → Skill `dossier-fallmanagement`
 
 Fülle GENAU die eine Naht `apps/fachverfahren/server/procedure.config.ts`
@@ -111,7 +118,6 @@ der Session, nie vom Client.
 - Es gibt noch KEINE eigene `case-management`-Capability in
   `platform/capabilities.json` — die Naht liegt heute unter
   `workflow`/`records-management`/`audit` (ADR-0004, Rule of Three).
-- Ein „Neue Akte anlegen"-Formular in der App fehlt (`createCase` existiert im Client).
 - **IST**: `app.spec.yaml` trägt jetzt einen OPTIONALEN `procedure`-Block (Fall/Dossier-
   Zustandsmaschine als DATEN); `app:new` validiert ihn (mind. 1 Rechtsgrundlage, Übergänge
   referenzieren deklarierte Zustände, eindeutige `(from,action)`, mind. 1 schließender Übergang,
@@ -127,6 +133,11 @@ den vollständigen Standalone-Betrieb ohne chos (Postgres-Variante:
 server-autoritativ, revisionssicher, mandanten-scoped, Optimistic-Locking). In
 Produktion sitzt chos hinter DERSELBEN Naht
 (`CaseStore`/`TaskStore`/`ProcedureRegistry` via Dependency-Injection über
-`BffDeps`) — der Adapter lebt im Deployment, nicht im OSS-Template. Bewusste
+`BffDeps`). Die chos-Adapter liegen IM Template — `ChosCaseStore`, `ChosTaskStore`,
+`ChosWissenStore`, `ChosAuthStore`, `ChosAuditStore`, `ChosAppStore`,
+`ChosKanbanStore` und `ChosEvidenceLedger` in
+`packages/app-store-postgres/src/chos-*.ts` — und werden über `APP_STORE_MODE=chos`
+plus `CHOS_API_URL` gewählt; Details in
+`docs/architecture/fall-dossier-workflow-ohne-chos.md`. Bewusste
 Stub-Grenzen (keine laufende BPMN-Engine: Timer/Fristen, Boundary-Events,
 Subprozesse, Gateway-Semantik) füllt der Provider hinter der Naht.

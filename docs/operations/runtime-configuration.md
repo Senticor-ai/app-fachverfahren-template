@@ -5,7 +5,10 @@ Anwendungsname, Behörde, Rechtsraum, Tenant-Hinweis, Lokalisierung,
 Feature-Hinweise und sichtbare Capability-Beschreibungen.
 
 Geheimnisse, interne Upstreams und Provider-Bindings bleiben serverseitig im
-`ServerRuntimeConfig`-Modell aus `@senticor/public-sector-sdk`.
+RuntimeConfig-Modell, das der Server beim Start liest (`readRuntimeConfig`,
+`packages/app-runtime-fastify/src/config.ts`). Das davon getrennte
+`ServerRuntimeConfig`-Modell aus `@senticor/public-sector-sdk`
+(`src/configuration.ts`) beschreibt den Konfigurations-VERTRAG.
 
 Regeln:
 
@@ -15,6 +18,11 @@ Regeln:
 - Feature Flags sind keine Autorisierung.
 - Umgebungsvariablen dürfen Konfiguration befüllen, sind aber nicht der
   öffentliche Vertrag.
+
+Bind-Adresse: `HOST`, Default `127.0.0.1` — fail-closed, für den öffentlichen
+UND den internen Port. Siehe
+[`../reference/kubernetes-delivery.md`](../reference/kubernetes-delivery.md),
+Abschnitt „Runtime-Schnittstellen".
 
 Operative Endpunkte:
 

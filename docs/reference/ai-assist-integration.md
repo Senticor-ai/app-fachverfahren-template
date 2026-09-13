@@ -20,6 +20,14 @@ Adapter-Schritt.
 
 ## 2. Die Ports (`lib/ai-assist.ts`, `lib/voice-input.ts`)
 
+> **Zwei Port-Familien, nicht eine.** Die hier beschriebenen `KiAssistPort` /
+> `KiChatPort` sind KLIENT-seitig: sie leben in
+> `packages/fachverfahren-kit/src/lib/ai-assist.ts` und werden in die UI
+> injiziert. Die gleichnamig klingende Plattform-Fähigkeit `AiAssistPort`
+> (`packages/platform-contracts/src/ports.ts`) ist etwas anderes: der
+> SERVER-seitige Anbieter-Port hinter `POST /api/ai/assist`. Siehe
+> [`../capabilities/ai-assist.md`](../capabilities/ai-assist.md).
+
 ```ts
 import {
   type KiAssistPort,

@@ -44,8 +44,9 @@ bzw. als Aufgaben/Vermerke. Personas = nur Navigation; Autorisierung = Server/RB
 
 ## Grenzen — wie beim Beschaffungs-Blueprint
 
-N-Augen ist inzwischen als engine-neutrales `CaseTransition.requiredApprovals` (Zahl,
-grafisch im BPMN via `senticor:requiredApprovals` konfigurierbar) modelliert; server-seitig
-erzwungen ist heute die 2-Augen-Untergrenze, die volle Zählung N>2 distinkter Freigebender
-ist Folge-Ausbau. Positions-/Wiederhol-Formularfelder (P1-6) bleiben Folge-Ausbau. Die
-Budget-Freigabe hier nutzt weiter `requiresFourEyes` (≡ `requiredApprovals: 2`).
+N-Augen ist als engine-neutrales `CaseTransition.requiredApprovals` (Zahl, grafisch im BPMN
+via `senticor:requiredApprovals` konfigurierbar) modelliert und server-seitig VOLL erzwungen:
+die 2-Augen-Separation und, ab `requiredApprovals > 2`, die Zählung distinkter Freigebender
+über `POST /api/cases/:id/approvals`. Positions-/Wiederhol-Formularfelder (P1-6) bleiben
+Folge-Ausbau — `FeldTyp` kennt bis heute keinen Listen-/Array-Typ. Die Budget-Freigabe hier
+nutzt weiter `requiresFourEyes` (≡ `requiredApprovals: 2`).

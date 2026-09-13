@@ -5,6 +5,25 @@
 > (ein Kit → alle Fachverfahren: Kommune · HR · Web), kein Domänen-Hardcode. Validierung ausschließlich
 > über die Builder-UI (DOM-Check + Screenshots + Vision-Judge auf dem gerenderten Ergebnis).
 
+> **STAND 2026-09-11 — gemessen gegen den Code**, nicht gegen diesen Plan. Ein Meilenstein gilt als
+> gebaut, wenn seine benannten Bausteine als QUELLE existieren
+> (`packages/fachverfahren-kit/src`, `packages/public-sector-ui/src`, `apps/fachverfahren/src`).
+>
+> - **GEBAUT: M0, M1, M3, M4, M5, M7** — `useViewState`, `StatusRegion`, `Skeleton`, `FormField`,
+>   `ErrorSummary`, `ErrorState`, `EmptyState`, `SaveIndicator`, `ConfirmDialog`,
+>   `SessionTimeoutDialog`, `useStepMachine`, `KommuneTheme`, `PdfViewer`, `NachweisBrowser`,
+>   `DateiUpload`, `OfficeDocViewer`, `DataTable`, `TerminFristPanel`, `EPaymentPanel`,
+>   `EntscheidungPanel`, `FourEyesReview`, `Postfach`, `AdressValidierung`, `AufsichtDashboard`,
+>   `ReportingPanel`, `LanguageSwitch`, `Barrierefreiheitserklaerung`.
+> - **TEILWEISE: M2** — der Zonen-Filter existiert (`apps/fachverfahren/src/app/zone.ts`), ein
+>   `AuthGate`-Baustein nicht. Die Routen-Autorisierung läuft stattdessen über
+>   `apps/fachverfahren/src/app/route-gates.ts`.
+> - **OFFEN: M6** — `KiPrefill`, `KiClassify`, `KiSummarize`, `KiExplainDiff`, `KiFilterSuggest` und
+>   `KiFristHint` haben KEINE Quelle (der einzige `KiPrefill`-Treffer ist ein Kommentar-Verweis in
+>   `AdressValidierung.tsx`). Gebaut sind stattdessen `KiAssistPanel` und `KiVorschlag`; die
+>   LLM-Firewall existiert als `packages/public-sector-sdk/src/injection-scan.ts`.
+> - **OFFEN: 2.12 `useOptimistic`** — keine Quelle.
+
 ## 1. Executive Summary
 
 **Ziel:** UX, Qualität der UX-Ausgaben und Build-Qualität gemeinsam maximieren — über EINEN schmalen,
@@ -48,7 +67,7 @@ Diese Primitive sind die EINZIGEN erlaubten Wege für ihren Belang; Ad-hoc-Lösu
 | 2.1  | **Design-Tokens (KERN-UX-Bridge)**                    | Eine getypte Token-Wahrheit (CSS-Custom-Properties + TS-Konstanten), themable ohne Komponenten-Eingriff.                 | statisch; Motion-Tokens mit reduced-motion-Varianten; Fokus-Ring 2px, AA-Kontraste; forced-colors                                                                | **P0** | M       |
 | 2.2  | **useViewState (erweiterter Zustands-Vertrag)**       | Getypte Maschine; jede Komponente leitet daraus ab, verdrahtet StatusRegion automatisch.                                 | `idle\|loading\|empty\|error\|ready\|success` + erweitert: `offline\|forbidden(403)\|sessionExpired\|partialSuccess\|conflict(409)\|readOnly`; generisch `<T,E>` | **P0** | M       |
 | 2.3  | **StatusRegion**                                      | Generische, gedrosselte EINE Ansage-Quelle.                                                                              | leer\|polite\|assertive\|busy; role=status/alert, aria-live, aria-busy                                                                                           | **P0** | S       |
-| 2.4  | **Skeleton / LoadingState**                           | FEHLT heute. Layout-treuer Platzhalter (kein CLS) + Spinner nur für kurze Aktionen.                                      | loading (aria-hidden+aria-busy, nicht fokussierbar) \| done (StatusRegion meldet „geladen")                                                                      | **P0** | S       |
+| 2.4  | **Skeleton / LoadingState**                           | UMGESETZT. Layout-treuer Platzhalter (kein CLS) + Spinner nur für kurze Aktionen.                                        | loading (aria-hidden+aria-busy, nicht fokussierbar) \| done (StatusRegion meldet „geladen")                                                                      | **P0** | S       |
 | 2.5  | **FormField (gekoppelte Inline-Validierung)**         | Label/Legend + Hint + Input-Slot + Inline-Fehler als EINE aria-korrekte Einheit; liefert Issue simultan an ErrorSummary. | pristine\|valid\|invalid\|disabled; aria-describedby, aria-invalid, novalidate                                                                                   | **P0** | M       |
 | 2.6  | **ErrorSummary (an FormField gekoppelt)**             | EINE Zusammenfassung oben mit Sprungankern, gleicher Wortlaut wie Inline.                                                | leer (verborgen) \| aktiv (1..n); erhält Fokus, `<title>`-Präfix „Fehler:", role=alert                                                                           | **P0** | S       |
 | 2.7  | **ErrorState (Pflicht-Recovery)**                     | error-Zustand mit ERZWUNGENER Recovery-Aktion; schließt Audit-Lücken (ImageCropper/CameraCapture/MermaidView).           | error (immer ≥1 Recovery); role=alert, echtes `<button>`, kein Stacktrace                                                                                        | **P0** | S       |

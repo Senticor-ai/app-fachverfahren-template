@@ -123,9 +123,10 @@ egal, z. B. `senticor:requiredApprovals="3"`) setzt
 `ProcedureVersion`, nicht in der BPMN-Engine) — ein späterer Camunda-/n8n-Adapter
 mappt sein Modell ebenso auf dasselbe Feld; hier ist sie grafisch im BPMN
 konfigurierbar. Ungültige Angaben (keine Zahl, < 2) werden ignoriert. ERZWUNGEN
-ist server-seitig heute die 2-Augen-Untergrenze für jeden Übergang mit
-`requiredApprovals >= 2` (dieselbe `403`-Separation); die volle Zählung N>2 ist
-Folge-Ausbau. Details: [[governance-vier-augen]].
+ist server-seitig die 2-Augen-Untergrenze für jeden Übergang mit
+`requiredApprovals >= 2` (dieselbe `403`-Separation) UND, ab
+`requiredApprovals > 2`, die Zählung distinkter Freigebender über
+`POST /api/cases/:id/approvals`. Details: [[governance-vier-augen]].
 
 ## closesCase-Konvention (Abschluss des Falls)
 

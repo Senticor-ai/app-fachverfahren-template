@@ -83,12 +83,14 @@ NICHT. Das Flag ist reine Modell-Daten, die Erzwingung ist BFF-seitig.
   ab — grafisch im BPMN konfigurierbar; ein späterer Camunda-/n8n-Adapter mappt
   SEIN Modell ebenso auf dasselbe Feld. So bleibt die Governance-Spezifikation
   über die Engine austauschbar.
-- ERZWUNGEN wird heute die **2-Augen-Untergrenze** für jeden Übergang mit
-  `requiredApprovalsOf >= 2` (auslösender ≠ letzter Bearbeiter). Die volle Zählung
-  N DISTINKTER Freigebender (N>2) ist bewusster Folge-Ausbau (Freigabe-Sammlung) —
-  bis dahin gilt: kein Scheinschutz (mind. 2 Augen), aber noch nicht die volle
-  konfigurierte Tiefe. Der Client-DTO (`GET /api/cases/:id`, `actions[].requiresFourEyes`)
-  spiegelt konsistent genau diese Untergrenze (`requiredApprovalsOf >= 2`).
+- ERZWUNGEN wird die **2-Augen-Untergrenze** für jeden Übergang mit
+  `requiredApprovalsOf >= 2` (auslösender ≠ letzter Bearbeiter) — UND, ab
+  `requiredApprovals > 2`, die Zählung N DISTINKTER Freigebender: der Server
+  sammelt sie über `POST /api/cases/:id/approvals` (Issue #56) und zählt im
+  aktuellen Zustands-Dwell letzten Bearbeiter + Freigaben zu DIESER Aktion +
+  auslösenden Akteur (`packages/app-bff-fastify/src/routes/cases.ts:856-875`).
+  Der Client-DTO (`GET /api/cases/:id`, `actions[].requiresFourEyes`) bleibt
+  die Untergrenze (`requiredApprovalsOf >= 2`).
 
 ## RBAC-Rechte
 

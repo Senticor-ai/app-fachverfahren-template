@@ -2,10 +2,10 @@
 
 > **Für Agenten: Quellen & Pflicht-Lektüre.**
 > Status: IST für den Migrator (`packages/app-store-postgres`,
-> `pnpm run db:migrate`, `dev/postgres.yaml`); PLAN für alles, was den
-> BFF/Server voraussetzt (`dev:postgres`, `dev:all`, `test:e2e:postgres`) —
-> diese Scripts existieren noch nicht, siehe
-> `docs/reference/backend-fastify.md`.
+> `pnpm run db:migrate`, `dev/postgres.yaml`), für den BFF
+> (`packages/app-bff-fastify`) und für die Testläufe `pnpm run test:pg` und
+> `pnpm run test:e2e`. Die Scripts `dev:postgres` und `dev:all` existieren
+> weiterhin NICHT, siehe `docs/reference/backend-fastify.md`.
 > Quellen: `packages/app-store-postgres`, `AGENTS.md`.
 > Pflicht-Lektüre vorher: `AGENTS.md`.
 
@@ -55,14 +55,24 @@ Plattformmigrationen bleiben nur die administrative Basis.
 
 ## Plattformdaten
 
-Die erste Plattformmigration liefert:
+**Die Wahrheit sind die 15 Plattformmigrationen unter
+`packages/app-store-postgres/migrations/`** — von `app_foundation`
+(2026-06-23) bis `evidence_ledger` (2026-07-28). Diese Liste nennt die
+Gruppen, nicht ihren Inhalt; wer Details braucht, liest das Verzeichnis:
 
-- `app_user_preferences`: Heller/Dunkler/System-Modus sowie
-  Barrierefreiheitspräferenzen je `tenant_id` und `actor_id`.
-- `app_rbac_roles`, `app_rbac_permissions`, `app_rbac_role_permissions` und
-  `app_actor_roles`: rollenbasierter Zugriff für `citizen` und `caseworker`.
-- `app_mailbox_messages`: fachneutraler Posteingang und Ausgang für Bürgerinnen
-  und Bürger sowie Sachbearbeitung.
+- **Fundament + Präferenzen + Postfach + RBAC**: `app_user_preferences`
+  (Heller/Dunkler/System-Modus, Barrierefreiheitspräferenzen je `tenant_id`
+  und `actor_id`), `app_rbac_*` (rollenbasierter Zugriff für `citizen` und
+  `caseworker`), `app_mailbox_messages` (fachneutraler Posteingang/Ausgang).
+- **Konten, lokale Anmeldung, Arbeitsbereiche**: `app_users`, `local_auth`,
+  `user_personas`, `personas_open`.
+- **Kanban-Boards** des Sachbearbeitungs-Workspace.
+- **Workspace-Fundament** (Workspace-Rollen `admin`/`member`).
+- **Aufgaben** (`app_tasks`).
+- **Audit** — append-only plus Hash-Kette.
+- **Falldaten und Eigentümerschaft** (`case_data`, `case_owner`).
+- **Verfahrens-Wissen** (append-only `app_verfahren_wissen`).
+- **Evidence-Ledger** (hash-verkettet).
 
 Produktionsbetrieb nutzt `PostgresAppStore` aus `@senticor/app-store-postgres`.
 Integrationstests nutzen `InMemoryAppStore`, damit dieselben API-Verträge ohne
@@ -79,9 +89,11 @@ Neue Tabellen müssen mandantenfähig bleiben: `tenant_id`, `authority_id` und
 `jurisdiction_id` sind getrennte Konzepte und dürfen nicht in einem losen
 Gemeindeschlüssel zusammenfallen.
 
-## PostgreSQL-E2E (PLAN)
+## PostgreSQL-Integration (IST)
 
-Zielbild: ein schneller E2E-Test mit `InMemoryAppStore` und ein
-servicebasierter E2E-Test (`test:e2e:postgres` mit `APP_E2E_PG_URL` und
-optional `APP_E2E_PG_DIRECT_URL`) gegen denselben Server-Pfad. Beides setzt
-die Backend-Stufe voraus und existiert im Scaffold noch nicht.
+`pnpm run test:pg` fährt die Store-Tests von `@senticor/app-store-postgres`
+gegen ein ECHTES PostgreSQL: `vitest.pg.config.ts` startet den Dienst über
+testcontainers (`tests/pg/global-setup.ts`). Ohne laufendes Docker überspringt
+der Lauf, statt rot zu werden. Der schnelle, hermetische Pfad bleibt
+`pnpm run test` (mit `InMemoryAppStore`) und `pnpm run test:e2e` (reales
+Bundle). Ein Script `test:e2e:postgres` existiert nicht.

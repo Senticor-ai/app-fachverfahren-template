@@ -1,3 +1,5 @@
+> **ARCHIVIERT 2026-09-11** — umgesetzt (Commit `a8e8420`). Nachfolger: die Implementierung mit ihren Zeugen `packages/public-sector-sdk/src/composable-faehigkeiten-quelle.test.ts` und `packages/app-bff-fastify/src/routes/composables-faehigkeiten-naht.test.ts` ([`docs/archive/README.md`](../../../README.md)).
+
 # S6 — Beide Fähigkeits-Seiten im erzeugten Fachverfahren
 
 **Stand 2026-07-27.** Teil des Umbaus, dessen Gesamtplan in CHOS-CODE liegt

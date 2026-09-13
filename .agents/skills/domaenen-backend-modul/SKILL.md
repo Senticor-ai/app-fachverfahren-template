@@ -147,7 +147,8 @@ Lokal vorwegnehmen, bis grün:
   Optimistic-Locking, Vier-Augen, `storeUnavailable`).
 - `pnpm run test:migration` — Store-Parität + additive, checksum-gelockte
   Migration (InMemory vs. Postgres).
-- `pnpm run check:schema-invariants` — Append-only-Riegel der Audit-Tabelle.
+- `packages/app-store-postgres/src/audit-append-only.test.ts` — der
+  Append-only-Riegel der Audit-Tabelle (läuft in `pnpm run test:pg`).
 - `pnpm run check:docs-language` — diese SKILL.md ist Deutsch mit echten
   Umlauten (ä/ö/ü/ß, nicht als ASCII-Ersatz in Prosa; die Frontmatter-
   `description` ist die Discovery-Auswahl).

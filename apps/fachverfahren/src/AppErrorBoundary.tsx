@@ -5,6 +5,7 @@
 // Build-Werkzeuge die generierte App reparieren können (statt eines stillen weißen Screens). Inline-Styles → rendert auch, wenn
 // das CSS/Theme selbst kaputt ist.
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { fehlerErklaerung } from "./app/fehler-ursache.js";
 
 interface State {
   error: Error | null;
@@ -75,38 +76,7 @@ export class AppErrorBoundary extends Component<
             color: "#475569",
           }}
         >
-          Ein Baustein ist beim Rendern auf einen Fehler gelaufen — häufig, weil
-          die generierte{" "}
-          <code
-            style={{
-              background: "#e2e8f0",
-              padding: "0 0.25rem",
-              borderRadius: 3,
-            }}
-          >
-            leistung.config.ts
-          </code>{" "}
-          nicht zum Kit-Vertrag passt (z. B. fehlt{" "}
-          <code
-            style={{
-              background: "#e2e8f0",
-              padding: "0 0.25rem",
-              borderRadius: 3,
-            }}
-          >
-            antrag.steps
-          </code>{" "}
-          oder{" "}
-          <code
-            style={{
-              background: "#e2e8f0",
-              padding: "0 0.25rem",
-              borderRadius: 3,
-            }}
-          >
-            register
-          </code>
-          ).
+          {fehlerErklaerung(error.message)}
         </div>
         <pre
           style={{

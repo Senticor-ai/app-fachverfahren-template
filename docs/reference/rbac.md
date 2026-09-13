@@ -47,11 +47,17 @@ Zuständigkeit und derselben Cookie-Session als Quelle:
   `auth/authorization.ts`): autorisieren `/auth/*` und `/api/v1/*`
   (Boards, Benutzerverwaltung, Audit, Export).
 - **SDK-RBAC** (`@senticor/public-sector-sdk`, Pipeline `bffRouteAuth` in
-  `@senticor/app-bff-fastify`): autorisiert die fachlichen BFF-Routen
-  `/api/session`, `/api/capabilities`, `/api/preferences`, `/api/mailbox`
-  (deny-by-default; Denials emittieren `SecurityEvent`s über die
-  `AuditSink`-Naht der Runtime — nicht zu verwechseln mit dem
-  Workspace-`AuditStore` in `@senticor/app-store-postgres`).
+  `@senticor/app-bff-fastify`): autorisiert **alle** fachlichen
+  `/api/*`-Routen des BFF — `session`, `capabilities`, `preferences`,
+  `mailbox`, `cases*` (inkl. `approvals`, `transitions`, `vermerke`,
+  `legal-hold`, `loeschung`, `rechtsbehelf`), `tasks`, `buerger/antraege*`
+  (inkl. `bescheid`, `nachweise`, `widerspruch`, `rueckforderung`),
+  `composables*` (inkl. `chat`, `evidence`, `spine`), `payment*`,
+  `identity*`, `register/evidence`, `ai/assist`, `procedures`. Die Wahrheit
+  über die Pfade ist `schemas/openapi.internal.json`. Deny-by-default;
+  Denials emittieren `SecurityEvent`s über die `AuditSink`-Naht der Runtime —
+  nicht zu verwechseln mit dem Workspace-`AuditStore` in
+  `@senticor/app-store-postgres`.
 
 Die Brücke ist der Cookie-SessionResolver
 (`apps/fachverfahren/server/auth/session-resolver.ts`): Session-Cookie →

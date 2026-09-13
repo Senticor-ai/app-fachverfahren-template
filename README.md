@@ -45,7 +45,15 @@ Capability-Ports modelliert.
 - `packages/fachverfahren-kit`: wiederverwendbare Fachverfahren-Bausteine
   auf Tailwind/shadcn-Basis; der Katalog für Build-Agenten steht in
   `docs/reference/fachverfahren-kit-components.md`.
-- `packages/provider-*`: lokale, Codesphere- und DVC-Providerprofile.
+- `packages/app-runtime-fastify`: die neutrale Fastify-Web-Runtime
+  (Delivery, Health, Security-Header, Metrics), komponiert in
+  `apps/fachverfahren/server/`.
+- `packages/app-bff-fastify` + `packages/app-bff-contracts`: die fachlichen
+  BFF-Routen (15 Module) und ihre TypeBox-DTOs.
+- `packages/workflow-bpmn-stub`: BPMN-Workflow-Stub hinter dem `WorkflowPort`.
+- `packages/provider-*`: lokale, Codesphere- und DVC-Providerprofile —
+  darunter `provider-local-auth` (lokale Konten, Server-Sessions) und
+  `provider-ai-ollama` (KI-Assistenz über Ollama).
 - `packages/conformance-kit`: Compliance-Profile und Evidence-Bundle-Planung.
 - `packages/migration-kit`: Migrationsprofile für Legacy-Fachverfahren.
 - `jurisdictions/*`: EU- und Deutschland-Packs ohne `country === "DE"`-Logik in
@@ -58,11 +66,11 @@ Capability-Ports modelliert.
   `fachverfahren-kit` und der Public-Sector-UI-Fassade.
 - Datenbank: PostgreSQL-Migrator und Plattformtabellen in
   `@senticor/app-store-postgres` (`pnpm run db:migrate`).
-- Backend/BFF: (IST) Fastify-Web-Delivery-Runtime unter
-  `apps/fachverfahren/server/` (Health, Security-Header, Metrics, Auth- und
-  Workspace-Routen), beschrieben in `docs/reference/backend-fastify.md`;
-  fachliche API-, OpenAPI- und Postgres-E2E-Routen sind explizite
-  Ausbauschritte.
+- Backend/BFF: Fastify-Web-Runtime (`packages/app-runtime-fastify`, komponiert
+  in `apps/fachverfahren/server/` — Health, Security-Header, Metrics) plus
+  fachlicher BFF (`packages/app-bff-fastify`, 15 Routenmodule; der
+  OpenAPI-Snapshot `schemas/openapi.internal.json` wird von `check:openapi`
+  gehalten) — beschrieben in `docs/reference/backend-fastify.md`.
 - Design/TDD: Storybook, Screen Contracts, semantische Tokens.
 
 ## Erste Schritte
@@ -81,8 +89,9 @@ Troubleshooting) in `CONTRIBUTING.md`.
 
 ### Lokal starten
 
-Die Web-App ist anmeldepflichtig: die Landing (`/`) ist die einzige Route ohne
-Anmeldung, alle Persona- und Workspace-Sichten liegen hinter dem Login. Für
+Die Web-App ist anmeldepflichtig: die Landing (`/`) und das Doku-Wiki
+(`/hilfe`) sind die einzigen Routen ohne Anmeldung, alle Persona- und
+Workspace-Sichten liegen hinter dem Login. Für
 den lokalen Start braucht es ein erreichbares Postgres — ein
 Kubernetes-Manifest liegt unter `dev/postgres.yaml` (funktioniert mit Rancher
 Desktop und Docker Desktop, wenn Kubernetes aktiviert ist):
@@ -133,8 +142,10 @@ Die **Agenten-CLI** lässt KI-Agenten (oder Menschen) das Mesh direkt steuern
 
 ```bash
 node apps/fachverfahren/dist-server/dev/mesh-cli.js vermerk list case.demo-0001
-node apps/fachverfahren/dist-server/dev/mesh-cli.js script --file plan.json   # Batch, stateful
+node apps/fachverfahren/dist-server/dev/mesh-cli.js script --file plan.json
 ```
+
+Der zweite Befehl (`script --file`) fährt einen Batch und ist stateful.
 
 Details in der Skill `.agents/skills/dossier-fallmanagement/SKILL.md`
 (Abschnitt „Agenten-CLI + Golden Fixture").
@@ -148,17 +159,19 @@ Die UX/UI-Regeln stehen in `docs/ux-ui/fachverfahren-ux-contract.md`, die
 TDD-Regeln in `docs/reference/test-driven-development.md` und die
 Storybook-Nutzung in `docs/reference/storybook.md`. Der wiederverwendbare
 Komponenten-Katalog für Coding Agents steht in
-`docs/reference/fachverfahren-kit-components.md`. Die geplante Mock-Schicht
-ist in `docs/reference/mock-data-msw.md` beschrieben (PLAN).
+`docs/reference/fachverfahren-kit-components.md`. MSW ist Test-Schicht
+(`pnpm run test:browser`); eine fachliche Mock-Schicht ist nicht Teil der App
+(`docs/reference/mock-data-msw.md`).
 
 Im Kubernetes-Profil liest die Web-App `APP_PG_URL` aus dem Secret
 `app-postgresql`, Migrationen nutzen `APP_PG_DIRECT_URL` im `migrator`-Job.
 
 Ein hermetischer E2E-Rauchtest existiert als `pnpm run test:e2e` (baut das
-echte Bundle und prüft die SPA-Auslieferung). Eine Postgres-E2E-Suite
-(`test:e2e:postgres`) und ein kombinierter Dev-Start (`dev:postgres`,
-`dev:all`) sind (PLAN) Teil der Backend-Zielarchitektur und existieren im
-Scaffold noch nicht.
+echte Bundle und prüft die SPA-Auslieferung). `pnpm run test:pg` fährt die
+Store-Tests von `@senticor/app-store-postgres` gegen ein ECHTES Postgres
+(testcontainers, `tests/pg/global-setup.ts`); ohne Docker überspringt der Lauf.
+Ein kombinierter Dev-Start (`dev:postgres`, `dev:all`) und eine
+`test:e2e:postgres`-Suite existieren nicht.
 
 Coding Agents nutzen `agent.discovery.json`, `docs/agents/bootstrap.md` und die
 repo-lokalen Skills unter `.agents/skills`. Die Agent-Readiness und der

@@ -52,9 +52,10 @@ nicht belegt sind, folgen der Annahme-DATEN-Konvention aus `AGENTS.md`.
   bestätigte Entscheidungen.
 
 Alle Werte, Fristen, Rechtsverweise, Rassen-/Gefährlichkeitsregeln und
-Berechnungen sind synthetisch und müssen als Daten in der Naht (benannte
-Konstanten, `berechne` als reine Funktion) liegen, nie in Kit- oder
-Plattformcode.
+Berechnungen sind synthetisch und müssen als DATEN in der Naht liegen, nie in
+Kit- oder Plattformcode: die Staffel als `tarif` (Tarif-Tabelle, vom reinen
+Interpreter ausgewertet). `berechne` ist nur der Escape-Hatch für
+nicht-tabellarische Logik.
 
 ## FIM-Bezug
 
@@ -94,9 +95,10 @@ bleiben separat zu validieren.
   `fimLeistung`, alle Antragsschritte mit validierten Pflichtfeldern und eine
   `statusMachine` mit `terminal`-Zuständen und `vierAugen`-Übergängen für
   Festsetzung, Befreiung und Ermäßigung.
-- `berechne` bildet jede Tarifstufe, Gefährlichkeits- und
-  Befreiungs-/Ermäßigungsregel als eigene prüfbare Verzweigung ab (ganze
-  Euro, `provisional`/`final`) und ist gegen die Beispielwerte getestet.
+- `tarif` trägt jede Tarifstufe, Gefährlichkeits-, Befreiungs- und
+  Ermäßigungsregel als Staffel-DATEN (ganze Euro, `provisional`/`final`).
+- Die Sollwerte des Fachkonzepts stehen als `rechenproben` — mit `herleitung`
+  und `quelle` — und werden vom Test gegen die Berechnung gehalten.
 - `pnpm --filter @senticor/fachverfahren emit:contract` wurde ausgeführt;
   `pnpm run typecheck` und `pnpm run test` sind grün; die drei Personas sind
   nach Anmeldung unter `/buerger`, `/amt` und `/aufsicht` klickbar.
