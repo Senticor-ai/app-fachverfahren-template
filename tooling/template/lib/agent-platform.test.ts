@@ -375,6 +375,140 @@ describe("agent platform contract", () => {
     expect(await validateSourceRegistry(root)).toEqual([]);
     expect(await validateAgentPreflight(root)).toEqual([]);
   });
+
+  // ── A GENERATED ARTEFACT IS NOT AUTHORED CODE (2026-09-14) ───────────────────────────────────────────────
+  //
+  // MEASURED on a real generated project (`hundesteuer`): the leakage gate reported FIVE hard findings —
+  //
+  //     apps/fachverfahren/deploy/k8s/service.yaml contains domain term Hundesteuer outside modules/hundesteuer
+  //
+  // — and they were that run's ONLY remaining blocker on the way to `fertig` (10/10 mandatory requirements,
+  // shipped tests PASSED 145/0). A k8s Service for the Hundesteuer deployment MUST be named after it: that is
+  // IDENTITY, not leakage. This gate already says so at its own exception: it protects AUTHORED code.
+  //
+  // The criterion therefore moves from a FILE NAME to a property the artefact carries itself. The generator
+  // side was fixed first (CHOS `deploy-emit` now stamps every manifest it writes at its one seam), so the
+  // property is actually readable — a gate cannot apply a rule it cannot see.
+  //
+  // ⚠️ THE RESIDUAL RISK IS NAMED, NOT WAVED AWAY: a header is a claim, and an agent could write one to slip
+  // domain vocabulary into shared code. Two things bound it. The marker must NAME ITS PRODUCER (both real
+  // generators do: "CHOS deploy-emit", "scripts/emit-docs-manifest.mts"), so a bare "// GENERATED" does not
+  // pass. And this gate is an advisory guard against ACCIDENTAL hardcoding, not an adversarial control — the
+  // measured cost of the false blocker (one run's whole path to done) exceeds the cost of that residue.
+  // What would make this wrong: a run that writes shared runtime code and stamps it as generated. If that is
+  // ever measured, the criterion must narrow to declared generator outputs, not widen further.
+  it("leakage gate: a file that declares itself generated is not authored code", async () => {
+    const temp = await mkdtemp(join(tmpdir(), "leak-generated-"));
+    try {
+      // ── WHAT THIS FIXTURE HAS TO CARRY, AND WHY — all four parts were MEASURED, not guessed ─────────────
+      //
+      // (a) NOT THE KIT ROOT. The pristine template declares no module and ships no `app.spec.yaml` under
+      //     `docs/examples`, so `specs` is empty and the loop body never runs. A test against the root would
+      //     be VACUOUSLY GREEN — which is exactly why the kit's own preflight passes while a generated
+      //     project reports five findings.
+      //
+      // (b) THE SPEC LIVES UNDER `docs/examples`. `validateDomainLeakage` collects its specs from
+      //     `docs/examples/**/app.spec.yaml` — a spec beside the app is not read. Placing it there was my
+      //     first fixture, and it produced a silently empty `specs` and a green positive control.
+      //
+      // (c) ⛔ AND A READABLE `agent.discovery.json`, WHICH IS A FINDING OF ITS OWN. The leakage gate is the
+      //     LAST statement of `validateAgentDiscovery`, behind its early `if (!discovery) return failures;`.
+      //     So a missing or unreadable discovery manifest silently switches the whole domain-leakage gate
+      //     (and the skill-shim gate) OFF, and the only symptom is one line about a different file. Measured:
+      //     without the manifest this fixture reports 3 findings and NONE of them is the leak; with it, 3
+      //     findings of which one IS. That is the house class «a failure became a statement: there is
+      //     nothing» — recorded here, cut separately, because it is a different gate's control flow.
+      //
+      // (d) The two remaining findings (`platform/capabilities.json`, `sources/registry.yaml`) are noise from
+      //     other validators. Every assertion below therefore names the FILE, never a finding count.
+      await mkdir(join(temp, "docs", "examples", "x"), { recursive: true });
+      await mkdir(join(temp, "modules", "hundesteuer"), { recursive: true });
+      const k8s = join(temp, "apps", "fachverfahren", "deploy", "k8s");
+      await mkdir(k8s, { recursive: true });
+      await writeFile(
+        join(temp, "docs", "examples", "x", "app.spec.yaml"),
+        "domainVocabulary:\n  - Hundesteuer\nmodule:\n  destination: modules/hundesteuer\n",
+        "utf8",
+      );
+      await writeFile(
+        join(temp, "agent.discovery.json"),
+        JSON.stringify({
+          $schema: "x",
+          schemaVersion: "1.0.0",
+          templateVersion: "1.0.0",
+        }),
+        "utf8",
+      );
+      await writeFile(
+        join(temp, "package.json"),
+        JSON.stringify({ name: "leak-fixture", scripts: {} }),
+        "utf8",
+      );
+
+      const meldet = async (inhalt: string) => {
+        await writeFile(join(k8s, "handwritten.yaml"), inhalt, "utf8");
+        const befunde = await validateAgentPreflight(temp);
+        return {
+          leck: befunde.some((f) => f.includes("handwritten.yaml")),
+          befunde,
+        };
+      };
+
+      // (0) POSITIVE CONTROL — without it, "no finding" is indistinguishable from "the gate never looked".
+      const unmarkiert = await meldet("name: hundesteuer-service\n");
+      expect(
+        unmarkiert.leck,
+        `the gate must report an UNMARKED file — got: ${JSON.stringify(unmarkiert.befunde).slice(0, 240)}`,
+      ).toBe(true);
+
+      // (1) THE SAME CONTENT, declaring its producer in its head: not authored code, not this gate's business.
+      expect(
+        (
+          await meldet(
+            "# GENERIERT (deterministisch, CHOS deploy-emit) — nicht von Hand pflegen.\nname: hundesteuer-service\n",
+          )
+        ).leck,
+      ).toBe(false);
+
+      // (1b) The comment syntax is the file's, not the rule's — `//` carries the same declaration as `#`.
+      expect(
+        (
+          await meldet(
+            '// GENERATED by scripts/emit-docs-manifest.mts\nexport const x = "Hundesteuer";\n',
+          )
+        ).leck,
+      ).toBe(false);
+
+      // (2) ⛔ A BARE WORD IS NOT A DECLARATION — the producer name is the whole difference, in both languages.
+      expect(
+        (await meldet("# GENERATED\nname: hundesteuer-service\n")).leck,
+        "a bare marker without a named producer must NOT exempt a file",
+      ).toBe(true);
+      expect(
+        (await meldet("# GENERIERT\nname: hundesteuer-service\n")).leck,
+      ).toBe(true);
+
+      // (3) ⛔ ONLY THE HEAD COUNTS. A marker further down is CONTENT — otherwise any file could exempt itself
+      //     by mentioning the word somewhere. Measured boundary: line 3 passes, line 4 does not.
+      expect(
+        (
+          await meldet(
+            "a: 1\nb: 2\n# GENERIERT von CHOS deploy-emit\nname: hundesteuer-service\n",
+          )
+        ).leck,
+      ).toBe(false);
+      expect(
+        (
+          await meldet(
+            "a: 1\nb: 2\nc: 3\n# GENERIERT von CHOS deploy-emit\nname: hundesteuer-service\n",
+          )
+        ).leck,
+        "a marker below the head is content, not a declaration",
+      ).toBe(true);
+    } finally {
+      await rm(temp, { recursive: true, force: true });
+    }
+  });
 });
 
 function validReportForSpec({
