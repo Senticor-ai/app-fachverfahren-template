@@ -149,6 +149,14 @@ const updateUnmanagedPaths: string[] = [
   // denselben Repo-Maintainer-Skripten wie die Gates, die ihn benutzen — kein Konsumenten-Fundament.
   "scripts/lib/doku-nutzlast.ts",
   "scripts/verify-mounted-composables.test.ts",
+  // Die zwei Tore, die den UMFANG eines Commits statt des ganzen Baums lesen, plus ihr geteiltes
+  // Umfangs-Modul. Repo-Maintainer-Werkzeug derselben Klasse wie die `check-*`-Gates daneben: sie
+  // urteilen ueber DIESES Repository, nicht ueber das Fundament, das ein Konsument erbt. Ein Konsument
+  // hat seinen eigenen Index und seine eigenen Nachbarn — er soll diese Dateien NICHT von der Vorlage
+  // aufgedraengt bekommen und auch nicht bei jedem `template:update` damit ueberschrieben werden.
+  "scripts/commit-umfang.ts",
+  "scripts/format-check.ts",
+  "scripts/lint-check.ts",
   "scripts/check-css-token-aliases.mjs",
   "scripts/check-dev-dependencies.mjs",
   "scripts/check-dockerfile-paths.mjs",
