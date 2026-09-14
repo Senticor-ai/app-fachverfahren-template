@@ -32,7 +32,10 @@ export interface NachweisPruefFehler {
 /** Baut das native `accept`-Attribut (kommagetrennt) aus `nachweis.akzeptierteTypen` — steuert im Datei-Dialog die
  *  vorausgewählten Typen. Fehlt die Liste (oder ist leer), gibt es kein `accept` (jeder Typ wählbar). */
 export function nachweisAcceptAttribut(nachweis: Nachweis): string | undefined {
-  const typen = nachweis.akzeptierteTypen?.map((t) => t.trim()).filter(Boolean);
+  // DIESELBE Normalform wie im Vergleich: ein `accept="pdf"` im DOM ignorieren Browser ebenso.
+  const typen = nachweis.akzeptierteTypen
+    ?.map((t) => normalisiereToken(t))
+    .filter(Boolean);
   return typen && typen.length > 0 ? typen.join(",") : undefined;
 }
 
@@ -71,9 +74,35 @@ function typLabel(token: string): string {
   return kern.toUpperCase();
 }
 
+/**
+ * EIN BLOSSER ENDUNGS-TOKEN IST KEIN accept-TOKEN — und er trifft NICHTS.
+ *
+ * ⛔ LIVE GEMESSEN (2026-09-14, erzeugtes Verfahren `schuelerfahrtkosten`, Buergerstrecke ueber die
+ * eigene Oberflaeche): die erzeugte `leistung.config.ts` deklariert `akzeptierteTypen: ['pdf']` — ohne
+ * Punkt. `tokenTrifft` faellt damit in den letzten Zweig und vergleicht `mime === "pdf"`; KEIN Browser
+ * meldet je diesen MIME-Typ. Folge: eine gueltige PDF wurde abgewiesen, die zwei ERFORDERLICHEN
+ * Nachweise (Schulbescheinigung · Fahrkarte) liessen sich nicht anhaengen, und der Antrag war
+ * strukturell nicht absendbar. Die Buergerstrecke endete an ihrem letzten Schritt.
+ *
+ * ⭐ UND DIE ZWEITE WAHRHEIT STAND IN DERSELBEN DATEI: `typLabel("pdf")` liefert "PDF" (kein "/", also
+ * gewinnt der ganze Token). Die Meldung lautete deshalb woertlich «Dieses Dateiformat ist nicht
+ * zulaessig. Erlaubt: PDF.» — ueber einer PDF. Ein Etikett, das den Token versteht, neben einem
+ * Vergleich, der ihn nicht versteht.
+ *
+ * ⚠️ DAS IST KEINE LOCKERUNG, sondern die Aufloesung dieser zwei Wahrheiten: der Token traf bisher die
+ * LEERE MENGE. Er kann also nur weiter werden — und er wird genau so weit, wie sein eigenes Etikett es
+ * seit jeher behauptet. Normalisiert wird ausschliesslich die reine Endungsform (`pdf`, `jpg`): kein
+ * Punkt, kein `/`, nur Buchstaben und Ziffern. Alles andere bleibt unberuehrt.
+ */
+function normalisiereToken(token: string): string {
+  const t = token.trim().toLowerCase();
+  if (!t || t.startsWith(".") || t.includes("/")) return t;
+  return /^[a-z0-9]+$/.test(t) ? `.${t}` : t;
+}
+
 /** Passt der MIME-Typ / die Endung der Datei zu EINEM accept-Token? (Standard-`accept`-Semantik). */
 function tokenTrifft(token: string, datei: NachweisDateiMeta): boolean {
-  const t = token.trim().toLowerCase();
+  const t = normalisiereToken(token);
   if (t === "") return true;
   const mime = (datei.typ ?? "").toLowerCase();
   const name = datei.name.toLowerCase();
