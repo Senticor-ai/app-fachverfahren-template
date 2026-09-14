@@ -165,6 +165,11 @@ const updateUnmanagedPaths: string[] = [
   "scripts/check-pwa-runtime.mjs",
   "scripts/check-storybook-coverage.mjs",
   "scripts/check-typescript-policy.mjs",
+  // Ratsche gegen «ein Tor, das NICHTS geprueft hat, klingt wie eine Zusicherung»: sie misst, dass
+  // `check-domain-contracts.mjs` seine GRUNDMENGE nennt (an der unberuehrten Vorlage sind das null
+  // Module). Ein Maintainer-Tor ueber die STRUKTUR DER VORLAGE — derselben Klasse wie
+  // `tsconfig-project-coverage.test.ts` weiter unten, kein Fundament eines Konsumenten.
+  "scripts/check-domain-contracts.test.ts",
   "scripts/ci-setup-node.sh",
   "scripts/ci-validate.sh",
   "scripts/codesphere-redeploy-demo.sh",

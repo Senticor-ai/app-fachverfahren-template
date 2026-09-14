@@ -45,7 +45,21 @@ const requiredScreenStates = ["loading", "empty", "error", "ready", "success"];
 
 const failures = [];
 
-for (const moduleName of await listDomainModuleNames()) {
+// ⛔ DIE MENGE, UEBER DIE GEPRUEFT WIRD, GEHOERT IN DEN BERICHT (gemessen 2026-09-14).
+// Dieses Tor lief hier jahrelang gruen — ueber NULL Modulen: die Vorlage traegt unter `modules/` nur
+// AGENTS.md und README.md, also KEIN Verzeichnis. `listDomainModuleNames()` liefert dann die leere Liste,
+// die Schleife laeuft nie, `failures` bleibt leer — und der Satz „Domain contract check passed." liest sich
+// wie eine Zusicherung ueber den Bestand. **Eine leere Menge besteht jede Pruefung ueber ihre Elemente.**
+// Was dahinter lag: sobald CHOS-CODE ein Verfahren erzeugt, traegt `modules/` GENAU EIN Modul — und dann
+// meldet dasselbe Tor 145 Befunde, in ZWEI unabhaengig gemessenen Verfahren identisch (9 fehlende
+// Pflicht-Verzeichnisse inkl. `domain.module.yaml` + je 34 je Screen-Vertrag). Die Vorlage und der
+// Erzeuger beschreiben denselben Gegenstand verschieden, und das Tor konnte es nicht sagen.
+// ⇒ KEIN Wurf bei null Modulen: das waere ein Tor, das jeden Commit an der Vorlage trifft, ohne dass
+// jemand es erfuellen koennte (die Vorlage SOLL kein Modul tragen). Stattdessen nennt der Bericht seine
+// Grundmenge — dann ist „gruen, weil geprueft" von „gruen, weil nichts da war" unterscheidbar.
+const moduleNames = await listDomainModuleNames();
+
+for (const moduleName of moduleNames) {
   const moduleDir = join(modulesRoot, moduleName);
   await checkModuleDirectories(moduleName, moduleDir);
   await checkDomainManifest(moduleName, moduleDir);
@@ -63,7 +77,14 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log("Domain contract check passed.");
+console.log(
+  moduleNames.length === 0
+    ? "Domain contract check passed — GEPRUEFT WURDEN 0 Module: unter modules/ liegt kein Verzeichnis. " +
+        "Das ist fuer die unberuehrte Vorlage der Normalfall und KEIN Fehler — aber es ist auch keine " +
+        "Aussage ueber ein Fachverfahren. Ein erzeugtes Verfahren traegt hier genau ein Modul; erst dann " +
+        "prueft dieses Tor etwas."
+    : `Domain contract check passed (${moduleNames.length} Modul(e) geprueft: ${moduleNames.join(", ")}).`,
+);
 
 async function listDomainModuleNames() {
   const entries = await safeReaddir(modulesRoot, { withFileTypes: true });
