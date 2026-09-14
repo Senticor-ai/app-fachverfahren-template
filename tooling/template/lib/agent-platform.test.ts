@@ -397,6 +397,69 @@ describe("agent platform contract", () => {
   // measured cost of the false blocker (one run's whole path to done) exceeds the cost of that residue.
   // What would make this wrong: a run that writes shared runtime code and stamps it as generated. If that is
   // ever measured, the criterion must narrow to declared generator outputs, not widen further.
+  // ── A GATE BEHIND ANOTHER GATE'S EARLY RETURN IS A GATE THAT SWITCHES ITSELF OFF (2026-09-14) ─────────
+  //
+  // `validateSkillShims` and `validateDomainLeakage` used to be the last two statements of
+  // `validateAgentDiscovery`, behind its `if (!discovery) return failures;`. Neither reads `discovery`.
+  // So a missing or unreadable `agent.discovery.json` silently switched BOTH off, and the only symptom was
+  // one line about a different file — the house class «a failure became a statement: there is nothing»,
+  // applied to a gate's own existence. Found while building the witness below: its fixture was green twice
+  // for the wrong reason before the manifest was added.
+  it("preflight: a broken discovery manifest does not switch the leakage gate off", async () => {
+    const temp = await mkdtemp(join(tmpdir(), "preflight-gate-off-"));
+    try {
+      await mkdir(join(temp, "docs", "examples", "x"), { recursive: true });
+      await mkdir(join(temp, "modules", "hundesteuer"), { recursive: true });
+      const k8s = join(temp, "apps", "fachverfahren", "deploy", "k8s");
+      await mkdir(k8s, { recursive: true });
+      await writeFile(
+        join(temp, "docs", "examples", "x", "app.spec.yaml"),
+        "domainVocabulary:\n  - Hundesteuer\nmodule:\n  destination: modules/hundesteuer\n",
+        "utf8",
+      );
+      await writeFile(
+        join(k8s, "leaks.yaml"),
+        "name: hundesteuer-service\n",
+        "utf8",
+      );
+      await writeFile(
+        join(temp, "package.json"),
+        JSON.stringify({ name: "gate-off-fixture", scripts: {} }),
+        "utf8",
+      );
+
+      // (a) THE MANIFEST IS ABSENT — which is exactly when the gate used to disappear.
+      const ohneManifest = await validateAgentPreflight(temp);
+      expect(
+        ohneManifest.some((f) => f.includes("cannot read")),
+        "POSITIVE CONTROL: the missing manifest must still be reported",
+      ).toBe(true);
+      expect(
+        ohneManifest.some((f) => f.includes("leaks.yaml")),
+        `the leak must be reported EVEN THOUGH the manifest is unreadable — got: ${JSON.stringify(ohneManifest).slice(0, 300)}`,
+      ).toBe(true);
+
+      // (b) AND WITH A READABLE MANIFEST NOTHING CHANGES ABOUT THE LEAK — the two are independent, which is
+      //     the whole reason the gate does not belong behind the other one's early return.
+      await writeFile(
+        join(temp, "agent.discovery.json"),
+        JSON.stringify({
+          $schema: "x",
+          schemaVersion: "1.0.0",
+          templateVersion: "1.0.0",
+        }),
+        "utf8",
+      );
+      const mitManifest = await validateAgentPreflight(temp);
+      expect(mitManifest.some((f) => f.includes("leaks.yaml"))).toBe(true);
+      expect(
+        mitManifest.some((f) => f.includes("cannot read agent.discovery.json")),
+      ).toBe(false);
+    } finally {
+      await rm(temp, { recursive: true, force: true });
+    }
+  });
+
   it("leakage gate: a file that declares itself generated is not authored code", async () => {
     const temp = await mkdtemp(join(tmpdir(), "leak-generated-"));
     try {

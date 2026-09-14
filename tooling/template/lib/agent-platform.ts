@@ -373,6 +373,27 @@ export function declaresItselfGenerated(text: string): boolean {
     );
 }
 
+/**
+ * ── A GATE BEHIND ANOTHER GATE'S EARLY RETURN IS A GATE THAT SWITCHES ITSELF OFF ─────────────────────────
+ *
+ * ⛔ MEASURED 2026-09-14 while building the leakage witness, and it cost the fixture two wrong attempts:
+ * `validateSkillShims` and `validateDomainLeakage` used to be the LAST two statements of
+ * `validateAgentDiscovery` — behind its `if (!discovery) return failures;`. Neither of them reads
+ * `discovery`; both take only `root`. They sat there by accident of growth, not by design.
+ *
+ * The consequence is the house's own worst class, one layer up: a MISSING OR UNREADABLE
+ * `agent.discovery.json` silently switched BOTH gates off, and the single symptom was one diagnostic line
+ * about a DIFFERENT file. A reader sees «cannot read agent.discovery.json», fixes that, and never learns
+ * that a leakage check and a skill-shim check did not run at all.
+ *
+ * Measured on a minimal fixture that leaks one domain term: WITHOUT the manifest 3 findings and NONE of
+ * them the leak; WITH it, 3 findings of which one IS. The leak was there the whole time.
+ *
+ * ⭐ THE CUT IS A MOVE, NOT A NEW RULE — the two run here now, as siblings of the five that never depended
+ * on each other either. It is a pure TIGHTENING: a project whose discovery manifest is broken now also
+ * learns what else is broken. It cannot produce a false blocker, because neither gate ever consulted the
+ * manifest it was hiding behind.
+ */
 export async function validateAgentPreflight(root: string) {
   const failures = [
     ...(await validateAgentDiscovery(root)),
@@ -380,6 +401,8 @@ export async function validateAgentPreflight(root: string) {
     ...(await validateModuleBoundaries(root)),
     ...(await validateCapabilityCatalog(root)),
     ...(await validateSourceRegistry(root)),
+    ...(await validateSkillShims(root)),
+    ...(await validateDomainLeakage(root)),
   ];
   return failures.sort();
 }
@@ -441,8 +464,6 @@ export async function validateAgentDiscovery(root: string) {
       failures.push(`package.json missing script ${command.script}`);
     }
   }
-  failures.push(...(await validateSkillShims(root)));
-  failures.push(...(await validateDomainLeakage(root)));
   return failures;
 }
 
