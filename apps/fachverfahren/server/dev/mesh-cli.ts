@@ -13,12 +13,12 @@ import { fileURLToPath } from "node:url";
 import type { ResolvedSession } from "@senticor/app-runtime-fastify";
 import type { ProcedureVersion } from "@senticor/public-sector-sdk";
 import type { FastifyInstance } from "fastify";
-import { antragProcedure, dossierProcedure } from "../procedure.config.js";
+import { antragProcedureJetzt, dossierProcedure } from "../procedure.config.js";
 import { buildSeededMeshApp } from "./mesh-harness.js";
 
 const PROCEDURES: readonly ProcedureVersion[] = [
   dossierProcedure,
-  antragProcedure,
+  antragProcedureJetzt(),
 ];
 
 export interface MeshCommandResult {

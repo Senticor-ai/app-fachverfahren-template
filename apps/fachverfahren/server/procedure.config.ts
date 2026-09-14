@@ -20,9 +20,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   builtInPermissions,
+  createInMemoryProcedureRegistry,
   statusMachineToProcedureVersion,
 } from "@senticor/public-sector-sdk";
 import type {
+  ProcedureRegistry,
   ProcedureVersion,
   StatusMachineSource,
   StatusMachineTransitionSource,
@@ -510,8 +512,81 @@ function antragQuelleAusVertrag(): StatusMachineSource | null {
   }
 }
 
-export const antragProcedure: ProcedureVersion =
-  statusMachineToProcedureVersion(antragQuelleAusVertrag() ?? MUSTER_ANTRAG);
+/** Pfad des Vertrags — EINMAL benannt, von der Ableitung UND der Frische-Probe gelesen. */
+const VERTRAG_PFAD = path.join(APP_DIR, "leistung.contract.json");
+
+/**
+ * Stempel des Vertrags (mtime + Groesse). LEER, wenn es ihn (noch) nicht gibt — eine fehlende Datei ist
+ * hier ein ZUSTAND, kein Fehler: der Vertrag entsteht erst, wenn die Bau-Phase ihn schreibt.
+ */
+function vertragsStempel(): string {
+  try {
+    const s = fs.statSync(VERTRAG_PFAD);
+    return `${s.mtimeMs}:${s.size}`;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Haelt eine teure Ableitung frisch: sie wird neu ausgewertet, sobald sich der STEMPEL aendert — sonst nie.
+ * Rein und injiziert, damit die Eigenschaft ohne Dateisystem bezeugbar ist.
+ */
+export function frischGehalten<T>(
+  stempel: () => string,
+  ableiten: () => T,
+): () => T {
+  let letzterStempel: string | null = null;
+  let letzterWert: T | null = null;
+  return (): T => {
+    const jetzt = stempel();
+    if (letzterWert === null || jetzt !== letzterStempel) {
+      letzterStempel = jetzt;
+      letzterWert = ableiten();
+    }
+    return letzterWert;
+  };
+}
+
+/**
+ * ⛔ WARUM DIESE ABLEITUNG NICHT EINMALIG SEIN DARF — live gemessen am 2026-09-14.
+ *
+ * Hier stand bis heute eine MODUL-KONSTANTE, also genau EINE Auswertung beim Import. Der Vertrag, aus dem
+ * sie sich ableitet, wird aber von einer SPAETEREN Bau-Phase geschrieben. Gemessen an einem echten Lauf:
+ * der Vorschau-Prozess startete um 01:00:36, `leistung.contract.json` entstand um 01:27:46 — 27 Minuten
+ * danach. Die Ableitung fiel deshalb auf MUSTER_ANTRAG zurueck (`procedureId: "musterantrag"`), waehrend
+ * der CLIENT laengst seine eigene Kennung sendete. Folge: JEDER Buerger-Antrag endete mit 422
+ * „Dieser Antrag kann derzeit nicht angenommen werden" — der Buergerpfad endete vor dem Amt.
+ *
+ * BELEG, beide Richtungen am laufenden Prozess: VOR dem Neustart antwortete die eigene Kennung mit 422 und
+ * `musterantrag` mit 201; NACH dem Neustart genau umgekehrt. Gleicher Code, gleicher Vertrag auf der
+ * Platte — allein die ZEIT des Imports unterschied sich.
+ *
+ * ⭐ Der Kommentar ueber `antragQuelleAusVertrag` nennt den Drift „STRUKTURELL unmoeglich". Das galt fuer
+ * den INHALT und nie fuer den ZEITPUNKT. Und der dortige Satz „FAIL-SAFE, nicht fail-open" traegt genau
+ * hier nicht: der Rueckfall auf die Muster-Maschine erhaelt die Antwortfaehigkeit des SERVERS und nimmt
+ * dem CLIENT jede — eine Route, die lebt und jeden Ruf durch sie ablehnt, ist keine sichere Rueckfallebene,
+ * sondern eine Sackgasse mit 200 auf dem Hinweg.
+ */
+export const antragProcedureJetzt: () => ProcedureVersion = frischGehalten(
+  vertragsStempel,
+  () =>
+    statusMachineToProcedureVersion(antragQuelleAusVertrag() ?? MUSTER_ANTRAG),
+);
+
+/**
+ * Die Verfahrens-Registry dieser Naht: das Dossier-Verfahren (fest) UND das Antrags-Verfahren (aus dem
+ * Vertrag, bei jeder Frage auf Frische geprueft). Sie ist bewusst KEIN Schnappschuss — nur so erreicht ein
+ * spaeter geschriebener Vertrag den laufenden Prozess ueberhaupt noch.
+ */
+export function procedureRegistryDerNaht(): ProcedureRegistry {
+  const aktuell = (): ProcedureRegistry =>
+    createInMemoryProcedureRegistry([dossierProcedure, antragProcedureJetzt()]);
+  return {
+    get: (procedureId, version) => aktuell().get(procedureId, version),
+    list: () => aktuell().list(),
+  };
+}
 
 /** Ein Ziel des Demo-Dossiers: Titel, optionale Frist/Kategorie/Status + Checklisten-Schritte. */
 export interface DossierDemoZiel {

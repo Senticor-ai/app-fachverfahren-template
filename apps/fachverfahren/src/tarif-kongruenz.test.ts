@@ -4,7 +4,7 @@
 //   1. `DEMO_TARIF` in leistung.config.ts — EURO. Speist `berechne()` und damit den BESCHEID-TENOR.
 //   2. die Auswahl-Labels desselben Formulars — »Standard (50 €)«, freier Text im Dropdown.
 //   3. `statusMachine.transitions[].stelltForderung.tarif` in DERSELBEN Datei — CENT. Speist die SOLLSTELLUNG.
-//   4. die Server-Sicht (`antragProcedure`) — ABGELEITET aus dem Client-Vertrag, mit `MUSTER_ANTRAG` in
+//   4. die Server-Sicht (`antragProcedureJetzt()`) — ABGELEITET aus dem Client-Vertrag, mit `MUSTER_ANTRAG` in
 //      procedure.config.ts als Rueckfall.
 //
 // Zwischen 3 und 4 ist der Drift bereits STRUKTURELL geloest: die Ableitung konsumiert den Vertrag. Offen sind
@@ -22,7 +22,7 @@
 import { describe, expect, it } from "vitest";
 import type { TarifTabelle } from "@senticor/public-sector-sdk";
 import { leistungConfig } from "./leistung.config.js";
-import { antragProcedure } from "../server/procedure.config.js";
+import { antragProcedureJetzt } from "../server/procedure.config.js";
 
 /** Cent je Einheit der natuerlichen Waehrungsangabe (EUR). Der Faktor ist die einzige erlaubte Uebersetzung. */
 const CENT_JE_EUR = 100;
@@ -53,8 +53,8 @@ function antragsTarif(): TarifTabelle {
 /** Der Tarif, wie der SERVER das Antrags-Verfahren sieht (Ort 4) — nach der Ableitung aus dem Client-Vertrag
  *  bzw. aus der Rueckfall-Maschine MUSTER_ANTRAG, wenn der Vertrag fehlt oder bricht. */
 function serverAntragsTarif(): TarifTabelle {
-  const t = antragProcedure.allowedTransitions
-    .map((u) => u.stelltForderung?.tarif)
+  const t = antragProcedureJetzt()
+    .allowedTransitions.map((u) => u.stelltForderung?.tarif)
     .find(Boolean);
   if (!t)
     throw new Error(

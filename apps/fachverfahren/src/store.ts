@@ -18,7 +18,7 @@ import { leistungConfig } from "./leistung.config";
 
 // PERSISTENZ: Bürger-Anträge gehen server-seitig an /api/buerger/antraege (owner-scoped, aus der
 // Sitzung). Damit überlebt ein Antrag den Reload — vorher lebte er nur im Browser. Die procedureId
-// entspricht leistungConfig.id; der Server kennt das Verfahren als antragProcedure (drift-gesichert
+// entspricht leistungConfig.id; der Server kennt das Verfahren als antragProcedureJetzt() (drift-gesichert
 // gegen genau diese Config). Der Config-`seed` bleibt der ANFANGSBESTAND (die SB-Arbeitsvorrat-Sicht
 // zeigt ihn, ohne zu hydrieren); `store.laden()` ersetzt ihn durch die eigenen Server-Anträge.
 export const store: FachverfahrenStore<Record<string, unknown>> =

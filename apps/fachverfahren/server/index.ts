@@ -67,7 +67,7 @@ import { seedReferenceDemo } from "./dev/reference-seed.js";
 import { registerTestzugangRoute } from "./dev/testzugang-route.js";
 import { seedGoldenMesh } from "./dev/golden-fixture.js";
 import { registerBoardRoutes } from "./kanban/routes.js";
-import { antragProcedure, dossierProcedure } from "./procedure.config.js";
+import { procedureRegistryDerNaht } from "./procedure.config.js";
 import { createComposableRegistry } from "./composables.config.js";
 import { registerUserRoutes } from "./users/routes.js";
 
@@ -373,10 +373,10 @@ export async function startRuntime(
     // Eine generierende App überschreibt procedure.config.ts; in PROD kann chos die Naht liefern.
     // BEIDE Verfahrens-Arten: das Dossier-Verfahren (Fall/Akte) UND das Antrags-Verfahren (aus
     // leistung.config abgeleitet, drift-gesichert) — sonst liefe ein Bürger-Antrag in „unknown procedure".
-    procedureRegistry: createInMemoryProcedureRegistry([
-      dossierProcedure,
-      antragProcedure,
-    ]),
+    // LAZY, nicht als Schnappschuss: der Vertrag wird von einer SPAETEREN Bau-Phase geschrieben — eine
+    // beim Import gebaute Registry kennt ihn dann nie (gemessen 2026-09-14: 27 Minuten Abstand, 422 auf
+    // JEDEN Buerger-Antrag). Die Naht prueft ihn bei jeder Frage auf Frische.
+    procedureRegistry: procedureRegistryDerNaht(),
     // Agentic Composables (Blueprint v5.0): die deklarierten Fähigkeitseinheiten mit Spine-Agent.
     composableRegistry: createComposableRegistry(),
     // Evidence-Ledger (Blueprint §15.3): hash-verketteter Nachweis der Spine-Handlungen — DAUERHAFT, wie

@@ -12,7 +12,11 @@
 // Läuft ohne Bundler via `node --experimental-strip-types`. leistung.config.ts importiert aus dem Kit NUR
 // Typen (import type) → sauber strip-bar; procedure.config.ts + die Ableitung kommen aus dem SDK.
 import { leistungConfig } from "../apps/fachverfahren/src/leistung.config.ts";
-import { antragProcedure } from "../apps/fachverfahren/server/procedure.config.ts";
+import { antragProcedureJetzt } from "../apps/fachverfahren/server/procedure.config.ts";
+
+// Die Ableitung wird bei jeder Frage auf Frische geprueft (ein NACH dem Import geschriebener
+// Vertrag muss ankommen) — dieses Gate fragt sie EINMAL und vergleicht diesen Stand.
+const antragProcedure = antragProcedureJetzt();
 import {
   statusMachineToProcedureVersion,
   type StatusMachineSource,

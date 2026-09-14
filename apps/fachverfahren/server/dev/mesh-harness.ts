@@ -23,7 +23,7 @@ import {
   DEFAULT_JURISDICTION_ID,
   DEFAULT_TENANT_ID,
 } from "../auth/bootstrap.js";
-import { antragProcedure, dossierProcedure } from "../procedure.config.js";
+import { antragProcedureJetzt, dossierProcedure } from "../procedure.config.js";
 import { createComposableRegistry } from "../composables.config.js";
 import { seedGoldenMesh } from "./golden-fixture.js";
 
@@ -80,7 +80,7 @@ export async function buildSeededMeshApp(
     wissenStore,
     procedureRegistry: createInMemoryProcedureRegistry([
       dossierProcedure,
-      antragProcedure,
+      antragProcedureJetzt(),
     ]),
     composableRegistry: createComposableRegistry(),
     evidenceLedger: new InMemoryEvidenceLedger(),
