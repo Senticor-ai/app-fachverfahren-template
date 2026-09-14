@@ -12,6 +12,7 @@ import {
   validateAgentPreflight,
   validateSourceRegistry,
   type AppSpec,
+  collectDeclaredSeam,
 } from "./agent-platform.ts";
 
 const root = process.cwd();
@@ -369,6 +370,42 @@ describe("agent platform contract", () => {
     } finally {
       await rm(temp, { recursive: true, force: true });
     }
+  });
+
+  // ── A DECLARED DIRECTORY SEAM, AND THE SEPARATOR THAT MADE IT INERT (2026-09-14) ──────────────────────
+  //
+  // The seam list is EXACT-MATCH, but deploy manifests are written under names no fixed list can know in
+  // advance: `deploy/k8s/deployment.yaml` for a monolith, and `deploy/k8s/<zone>/deployment.yaml`,
+  // `deploy/k8s/<unit>/service.yaml`, `deploy/k8s/datenfluss-<id>/cronjob.yaml` once the project declares
+  // zones or a deploy split. An incomplete list does not under-report here — it OVER-reports: every unlisted
+  // manifest becomes a false blocker, which is the exact failure this exemption exists to end (measured on
+  // `hundesteuer`: the leakage finding on `deploy/k8s/deployment.yaml` was that run's LAST blocker).
+  //
+  // ⚠️ THE FIRST CUT WAS WRITTEN, SHIPPED AND SILENTLY INERT. It assumed `join` strips a trailing slash and
+  // appended one, producing `deploy/k8s//` — a prefix that matches nothing. The gate behaved exactly as
+  // before and nothing went red. That is why this witness pins the SEPARATOR itself and not merely "a
+  // directory can be declared": the failure mode of this feature is silence, not noise.
+  it("a declared directory seam carries exactly one separator and matches what lives under it", async () => {
+    const seam = await collectDeclaredSeam(root);
+    const dir = "apps/fachverfahren/deploy/k8s/";
+    expect(seam.has(dir)).toBe(true);
+    expect([...seam].some((entry) => entry.includes("//"))).toBe(false);
+    // The call site matches with `startsWith` — so the stored form must actually match a real manifest path.
+    const manifest = "apps/fachverfahren/deploy/k8s/deployment.yaml";
+    expect(
+      [...seam].some(
+        (entry) => entry.endsWith("/") && manifest.startsWith(entry),
+      ),
+    ).toBe(true);
+    // NEGATIVE CONTROL: a sibling OUTSIDE the declared directory must NOT be covered.
+    const sibling = "apps/fachverfahren/deploy-notes.yaml";
+    expect(
+      [...seam].some(
+        (entry) => entry.endsWith("/") && sibling.startsWith(entry),
+      ),
+    ).toBe(false);
+    // The file entries keep working — a directory declaration must not swallow the exact-match ones.
+    expect(seam.has("apps/fachverfahren/src/leistung.config.ts")).toBe(true);
   });
 
   it("validates source registry and preflight contracts", async () => {

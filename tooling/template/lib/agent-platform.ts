@@ -1421,7 +1421,11 @@ async function validateDomainLeakage(root: string) {
       if (rel.startsWith(spec.module.destination)) {
         continue;
       }
-      if (seamFiles.has(rel)) {
+      // Exact file OR declared directory prefix — see `collectDeclaredSeam` for why a prefix is required.
+      if (
+        seamFiles.has(rel) ||
+        [...seamFiles].some((s) => s.endsWith("/") && rel.startsWith(s))
+      ) {
         continue;
       }
       // ⛔ NOT `.catch(() => "")`. An unreadable file would then contain no domain term and pass a
@@ -1479,7 +1483,7 @@ async function validateDomainLeakage(root: string) {
  *  returned as repo-relative paths. Every app under `apps/` is asked; an app without the declaration contributes
  *  nothing. A malformed entry is ignored rather than silently widening the exemption — an exemption that grows by
  *  accident is worse than one that is missing. */
-async function collectDeclaredSeam(root: string): Promise<Set<string>> {
+export async function collectDeclaredSeam(root: string): Promise<Set<string>> {
   const seam = new Set<string>();
   const apps = await readDirectoryEntries(join(root, "apps"), {
     optional: true,
@@ -1493,7 +1497,22 @@ async function collectDeclaredSeam(root: string): Promise<Set<string>> {
     if (!Array.isArray(files)) continue;
     for (const entry of files) {
       if (typeof entry !== "string" || !entry || entry.includes("..")) continue;
-      seam.add(join("apps", app.name, entry));
+      // A TRAILING SLASH DECLARES A DIRECTORY, NOT A FILE (2026-09-14).
+      //
+      // MEASURED on `hundesteuer`: the seam list is exact-match, and the deploy manifests are written under
+      // names this list cannot know in advance — `deploy/k8s/deployment.yaml` for a monolith, but
+      // `deploy/k8s/<zone>/deployment.yaml`, `deploy/k8s/<unit>/service.yaml` and
+      // `deploy/k8s/datenfluss-<id>/cronjob.yaml` once the project declares zones or a deploy split. A fixed
+      // file list is therefore not merely incomplete, it is SILENTLY incomplete — and a leakage gate that
+      // silently misses an entry does not under-report, it over-reports: every unlisted manifest becomes a
+      // false blocker. That is the failure this whole exception exists to end.
+      //
+      // ⚠️ MEASURED, not assumed: `join` PRESERVES a trailing slash (`join("apps","x","deploy/k8s/")` →
+      // `apps/x/deploy/k8s/`). Appending another one produced `deploy/k8s//`, which matches nothing — the
+      // exemption was written, shipped and silently inert. So the separator is normalised explicitly: strip
+      // whatever the join produced, then add exactly one back when the declaration asked for a directory.
+      const joined = join("apps", app.name, entry).replace(/\/+$/, "");
+      seam.add(entry.endsWith("/") ? joined + "/" : joined);
     }
   }
   return seam;
