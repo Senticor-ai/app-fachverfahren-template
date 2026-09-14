@@ -241,38 +241,51 @@ describe("the case mask on the template's REAL config path", () => {
 });
 
 describe("caseReviewContext — what the mask sends is PII-poor", () => {
-  it("no personal value of the applicant leaves; the declared fields travel as filled/empty only", async () => {
-    const store = createFachverfahrenStore(leistungConfig);
-    const personal = {
-      vorname: "Zelinda",
-      nachname: "Quargnolo",
-      plz: "98765",
-      ort: "Xyzstadt",
-    };
-    const freeText = "privater Freitext 4711";
-    const vorgang = await store.einreichen({
-      antragsteller: personal,
-      anliegen: { kategorie: "express", beschreibung: freeText },
+  // ⛔ BOUND TO THE DECLARATION, NOT TO THE DEMO (2026-09-14). This witness used to submit the Musterantrag's own
+  // data (`antragsteller.vorname`, `anliegen.kategorie: "express"`) and expected its six labels. Every generated
+  // procedure replaces the seam, so in a clone it read `[]` against six Musterantrag labels and turned the shipped
+  // `test` gate red — measured on a generated municipal tax procedure, 1 of 4 failures. The PROPERTY does not
+  // depend on the procedure: whatever the config DECLARES as detail fields travels as filled/empty, never as value.
+  it("no personal value of the applicant leaves; the declared fields travel as filled/empty only", () => {
+    const declared = leistungConfig.detailSektionen.flatMap(
+      (section) => section.felder,
+    );
+    // POSITIVE CONTROL: without declared fields this witness would measure nothing.
+    expect(declared.length).toBeGreaterThan(0);
+
+    // One unique sentinel per declared field, at its declared path — the value a real applicant would type there.
+    const antragsdaten: Record<string, unknown> = {};
+    const sentinels = declared.map((f, i) => {
+      const value = `pii-sentinel-${i}-zq`;
+      const keys = f.pfad.split(".");
+      let node = antragsdaten;
+      for (const key of keys.slice(0, -1))
+        node = (node[key] ??= {}) as Record<string, unknown>;
+      node[keys[keys.length - 1]!] = value;
+      return value;
     });
+    // The case is built directly: this witness judges what the MASK sends, not the calculation behind it.
+    const vorgang = {
+      id: "v-probe",
+      vorgangsnummer: "PROBE-1",
+      eingangIso: "2026-09-14T00:00:00.000Z",
+      antragsdaten,
+      status: leistungConfig.statusMachine.initial,
+      nachweise: [],
+      history: [],
+    } as never;
 
     const context = caseReviewContext(leistungConfig, vorgang);
     const sent = JSON.stringify(context);
-
-    for (const value of [...Object.values(personal), freeText])
+    for (const value of sentinels)
       expect(
         sent,
         `the personal value "${value}" must not leave`,
       ).not.toContain(value);
-    // POSITIVE CONTROL: the context is not empty — it names every declared field and knows it is filled.
+    // POSITIVE CONTROL: the context names every declared field and knows it is filled.
     const fields = (context as { fields: { field: string; filled: boolean }[] })
       .fields;
-    expect(fields.filter((f) => f.filled).map((f) => f.field)).toEqual([
-      "Vorname",
-      "Nachname",
-      "PLZ",
-      "Ort",
-      "Kategorie",
-      "Beschreibung",
-    ]);
+    expect(fields.map((f) => f.field)).toEqual(declared.map((f) => f.label));
+    expect(fields.every((f) => f.filled)).toBe(true);
   });
 });
