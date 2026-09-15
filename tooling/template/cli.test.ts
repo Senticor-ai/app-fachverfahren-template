@@ -14,12 +14,12 @@ const cliUrl = new URL("./cli.ts", import.meta.url);
 // re-parses this file's own ~1929 lines PLUS the ~1818-line
 // `lib/agent-platform.ts` (and the rest of `lib/`) from scratch every single
 // time. On an idle machine that's cheap (~2s for the heaviest commands); under
-// real CPU contention -- exactly what happens when CHOS-Code's Durchstich
+// real CPU contention -- exactly what happens when CHOS-Agents's Durchstich
 // pipeline runs a generated app's `pnpm run test:template` gate synchronously
-// inside the busy chos-code-runner pod -- it intermittently blows even a 20s
+// inside the busy chos-agents-runner pod -- it intermittently blows even a 20s
 // per-test budget (observed live: "sometimes 2, sometimes 6" of these 7 tests
 // timing out), which incorrectly BLOCKIERT/FEHLER's the whole governed run
-// (see CHOS-CODE-Innovation#62/#64).
+// (see CHOS-AGENTS-Innovation#62/#64).
 //
 // `runTemplate` below fixes the actual root cause for 6 of the 7 cases: it
 // invokes `cli.ts` IN-PROCESS via a cache-busted dynamic `import()` instead of
@@ -92,7 +92,7 @@ const repoRoot = process.cwd();
 
 // ── DOES THIS TREE STILL HAVE A PRISTINE TEMPLATE TO SCAFFOLD FROM? ─────────────────────────────────────────
 // The CLI ships into every generated application. A CHOS-governed consumer has no pristine source: `scaffold`
-// refuses (CHOS-CODE#68, exit 6) and the agent contracts describe the TEMPLATE, not the built procedure.
+// refuses (CHOS-AGENTS#68, exit 6) and the agent contracts describe the TEMPLATE, not the built procedure.
 // Measured 2026-08-31 in two fully built procedures, four assertions here were red for exactly that reason —
 // witnesses without a subject. Where the subject is missing the branch asserts what IS true there instead: the
 // CLI exits non-zero and NAMES why. A silent skip would claim a check that never happened.
@@ -170,7 +170,7 @@ describe("template CLI", () => {
           text = String((e as Error)?.message ?? e);
         }
         erklaertSichBeimVerweigern(code, text);
-        expect(text).toMatch(/live\/governed consumer project|CHOS-CODE#68/);
+        expect(text).toMatch(/live\/governed consumer project|CHOS-AGENTS#68/);
       } finally {
         await rm(root, { recursive: true, force: true });
       }
@@ -207,7 +207,7 @@ describe("template CLI", () => {
     { timeout: 300_000 },
     async () => {
       // Ohne pristine Quelle kann `template:update` nicht laufen — dieselbe Lage wie beim Scaffold darueber,
-      // und der Riegel dahinter ist derselbe (CHOS-CODE#68). Im governten Konsumenten wird deshalb die
+      // und der Riegel dahinter ist derselbe (CHOS-AGENTS#68). Im governten Konsumenten wird deshalb die
       // VERWEIGERUNG geprueft statt der Aktualisierung: die Eigenschaft schuetzt genau dort etwas.
       if (!PRISTINE) {
         const guard = await mkdtemp(
@@ -234,7 +234,9 @@ describe("template CLI", () => {
             text = String((e as Error)?.message ?? e);
           }
           erklaertSichBeimVerweigern(code, text);
-          expect(text).toMatch(/live\/governed consumer project|CHOS-CODE#68/);
+          expect(text).toMatch(
+            /live\/governed consumer project|CHOS-AGENTS#68/,
+          );
         } finally {
           await rm(guard, { recursive: true, force: true });
         }

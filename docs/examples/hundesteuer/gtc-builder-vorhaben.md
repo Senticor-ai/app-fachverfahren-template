@@ -12,7 +12,7 @@ Agenten geschrieben, der direkt im Root dieses Template-Repositories arbeitet
 (Package-Scripts `agent:discover`/`agent:context`, optional `app:new` für den
 Generator-Pfad, Ausgabe unter `modules/hundesteuer/` (PLAN — existiert erst nach einem
 Lauf von `app:new`, siehe `modules/README.md`)). GTC Builder (`Senticor-ai/gtc-builder`,
-betrieben über CHOS-CODE-Innovation) ist ein
+betrieben über CHOS-AGENTS-Innovation) ist ein
 anderes Werkzeug: es nimmt keinen mehrteiligen Spec/Prompt-Satz entgegen, sondern genau
 ein freitextliches **Vorhaben**-Feld beim Anlegen eines neuen Projekts, aus dem seine
 eigene governte Pipeline (Intake → Grounding → Fachkonzept → Build → …) das restliche

@@ -156,6 +156,10 @@ const updateUnmanagedPaths: string[] = [
   // aufgedraengt bekommen und auch nicht bei jedem `template:update` damit ueberschrieben werden.
   "scripts/commit-umfang.ts",
   "scripts/format-check.ts",
+  // Sein Zeuge gehoert derselben Klasse an: er misst das TOR dieses Repos, nicht das Fundament
+  // eines Konsumenten. (Er haelt fest, dass `getFileInfo` ohne `ignorePath` die `.prettierignore`
+  // NICHT liest — der Grund, aus dem der uebersprungen-Zweig bis 2026-09-15 fuer keine Datei feuerte.)
+  "scripts/format-check.test.ts",
   "scripts/lint-check.ts",
   "scripts/check-css-token-aliases.mjs",
   "scripts/check-dev-dependencies.mjs",

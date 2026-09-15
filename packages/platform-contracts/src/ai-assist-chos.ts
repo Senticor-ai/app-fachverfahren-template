@@ -1,4 +1,4 @@
-// ai-assist-chos — der PRODUKTIVE AiAssistPort-Adapter auf chos-code als Kernel für agentische KI (Cognitive
+// ai-assist-chos — der PRODUKTIVE AiAssistPort-Adapter auf chos-agents als Kernel für agentische KI (Cognitive
 // Hive OS Blueprint v5.0). Der Port ist die AGENTIC INTERFACE (§9) einer Composable auf Autonomie-Level
 // AAL-2 „Advise" (§7): die KI berät, entscheidet NIE rechtsnah autonom. Kommunikation läuft über ein
 // strukturiertes HANDOFF ENVELOPE (§10) — kein freier Prompt-Block —, jede Antwort trägt das Pflicht-

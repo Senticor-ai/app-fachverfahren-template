@@ -50,7 +50,7 @@ export const gestagteDateien = (): string[] => {
  * ⛔ Das ist der Unterschied zwischen «was committet wird» und «was gerade auf der Platte liegt». Eine
  * Datei kann gestagt UND im Arbeitsbaum weiter veraendert sein. Ein Tor, das eine Seite aus dem Index und
  * die andere aus dem Arbeitsbaum liest, urteilt ueber einen Baum, den es nicht gibt — diese Klasse ist im
- * CHOS-CODE gemessen und dort namentlich als bezahlter Vorfall gefuehrt.
+ * CHOS-AGENTS gemessen und dort namentlich als bezahlter Vorfall gefuehrt.
  *
  * `null` heisst NICHT «leer», sondern «nicht aus dem Index lesbar» — der Rufer muss beides unterscheiden.
  */

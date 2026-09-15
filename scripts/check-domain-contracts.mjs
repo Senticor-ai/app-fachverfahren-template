@@ -50,7 +50,7 @@ const failures = [];
 // AGENTS.md und README.md, also KEIN Verzeichnis. `listDomainModuleNames()` liefert dann die leere Liste,
 // die Schleife laeuft nie, `failures` bleibt leer — und der Satz „Domain contract check passed." liest sich
 // wie eine Zusicherung ueber den Bestand. **Eine leere Menge besteht jede Pruefung ueber ihre Elemente.**
-// Was dahinter lag: sobald CHOS-CODE ein Verfahren erzeugt, traegt `modules/` GENAU EIN Modul — und dann
+// Was dahinter lag: sobald CHOS-AGENTS ein Verfahren erzeugt, traegt `modules/` GENAU EIN Modul — und dann
 // meldet dasselbe Tor 145 Befunde, in ZWEI unabhaengig gemessenen Verfahren identisch (9 fehlende
 // Pflicht-Verzeichnisse inkl. `domain.module.yaml` + je 34 je Screen-Vertrag). Die Vorlage und der
 // Erzeuger beschreiben denselben Gegenstand verschieden, und das Tor konnte es nicht sagen.

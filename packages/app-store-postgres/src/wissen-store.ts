@@ -1,7 +1,7 @@
 // wissen-store — der VERFAHRENS-WISSENS-Store: das generelle, KI-gestützte Wiki EINES Fachverfahrens
 // (Normen-Auslegung, Arbeitshilfen, FAQ, Fähigkeiten), verfahrens-scoped statt fall-scoped. Er ist die
 // durable Ebene der Brücke Mensch↔KI-Agent↔Composable: Mensch UND Agent hinterlassen typisierte Wissens-
-// Einträge, die chos-code später in Skills + Kontext übersetzt. APPEND-ONLY (eine Korrektur ist ein neuer
+// Einträge, die chos-agents später in Skills + Kontext übersetzt. APPEND-ONLY (eine Korrektur ist ein neuer
 // Eintrag) und mandanten-/behörden-scoped — dieselbe Zellform wie der Fall-Aktenvermerk (Zwei-Ebenen-
 // Symmetrie), nur an der ProcedureVersion verankert.
 //

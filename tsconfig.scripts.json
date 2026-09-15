@@ -1,5 +1,5 @@
 {
-  // DIE DECKUNG FUER `scripts/**` — und sie schliesst dieselbe Luecke wie in CHOS-CODE und im Builder.
+  // DIE DECKUNG FUER `scripts/**` — und sie schliesst dieselbe Luecke wie in CHOS-AGENTS und im Builder.
   //
   // GEMESSEN 2026-09-06: sieben `.mts`-Pruefer unter `scripts/` liefen produktiv (`check:leistung-contract`,
   // `check:composables`, `emit-contract` sogar im pre-commit-Hook) — und standen in KEINER tsconfig.

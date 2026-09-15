@@ -25,7 +25,7 @@ export const BEDINGUNG_OPERATOREN = [
 ] as const;
 
 // ⚠️ DIE LITERAL-FORM BLEIBT — SIE IST DER GEGENSTAND EINER FREMDEN MESSUNG.
-// CHOS-CODE liest die geschlossenen Werte-Mengen dieses Projekts aus der QUELLE (`werte-unionen.ts`,
+// CHOS-AGENTS liest die geschlossenen Werte-Mengen dieses Projekts aus der QUELLE (`werte-unionen.ts`,
 // Muster: rechte Seite besteht ausschliesslich aus String-Literalen mit `|`) und schreibt sie dem
 // Bau-Agenten als "GESCHLOSSENE WERTE-MENGEN" in den Auftrag — und dem Compile-Befund als
 // "ERLAUBTE WERTE". Ein `(typeof BEDINGUNG_OPERATOREN)[number]` waere kuerzer und haette genau diese

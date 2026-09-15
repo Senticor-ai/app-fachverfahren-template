@@ -75,7 +75,7 @@ Was das Template davon HEUTE trägt (der OSS-Runtime-Anteil):
 
 **Ehrlich abgegrenzt:** das VOLLE Mesh (GraphStore-Substrat, Capability-Mesh mit
 `governedDispatch`, evaluiertes Qualitäts-Routing, das selbst-wachsende
-Skill-Learning, der offene Runtime-Kernel) lebt hinter der Naht in **chos-code**
+Skill-Learning, der offene Runtime-Kernel) lebt hinter der Naht in **chos-agents**
 (governter Build-/Runtime-Agent) und wird über dieselben Store-/Port-Verträge
 angebunden — das Template ist die **standalone-lauffähige OSS-Seite** (Open-Core:
 OPEN = Runtime/Verträge; PROPRIETÄR = kuratiertes Wissen + getunte Agenten/Evals).

@@ -8,7 +8,7 @@
 // Vier-Augen · Verlauf). Es sind bewusst KEINE echten Fachdaten: Zustände, Rechtsgrundlagen und Fristen eines
 // realen Verfahrens stehen NICHT hier — sie kommen aus dem FACHKONZEPT (bzw. der FIM/KGSt-BPMN).
 //
-// GENERIERT: ein generierender Build (Agent / chos-code governed build / gtc-builder) ÜBERSCHREIBT GENAU DIESE
+// GENERIERT: ein generierender Build (Agent / chos-agents governed build / gtc-builder) ÜBERSCHREIBT GENAU DIESE
 // DATEI mit der aus dem Fachkonzept (BPMN → `bpmnToProcedureVersion`) abgeleiteten `ProcedureVersion` des
 // jeweiligen Verfahrens. Dieselbe App, dieselben Bausteine, anderes Verfahren — ohne dass eine weitere Datei der
 // App sich ändert. Das ist die EINE Naht zwischen Generierung und laufender Fall-/Dossier-App.

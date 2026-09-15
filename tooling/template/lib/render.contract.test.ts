@@ -87,7 +87,7 @@ describe("domain app render contract", () => {
   it("leaves NO base-template identity residue after scaffold (RC1: text detection covers .mts/.env.example/.husky)", async () => {
     // ── NO PRISTINE SOURCE HERE? THEN THE GUARD IS WHAT GETS PROVEN ────────────────────────────────────
     // This engine ships into every generated application, and a governed consumer has nothing pristine to
-    // render FROM (CHOS-CODE#68). Measured 2026-08-31 in two built procedures this assertion was red with the
+    // render FROM (CHOS-AGENTS#68). Measured 2026-08-31 in two built procedures this assertion was red with the
     // guard's own message — a witness without a subject, not a defect. Skipping quietly would claim a check
     // that never happened, so the consumer branch asserts the refusal instead: the property matters most
     // exactly where it fires.
@@ -145,7 +145,7 @@ describe("domain app render contract", () => {
   it("re-scaffolds from an ALREADY-scaffolded consumer (RC2: render is domain-agnostic about its source app)", async () => {
     // ── NO PRISTINE SOURCE HERE? THEN THE GUARD IS WHAT GETS PROVEN ────────────────────────────────────
     // This engine ships into every generated application, and a governed consumer has nothing pristine to
-    // render FROM (CHOS-CODE#68). Measured 2026-08-31 in two built procedures this assertion was red with the
+    // render FROM (CHOS-AGENTS#68). Measured 2026-08-31 in two built procedures this assertion was red with the
     // guard's own message — a witness without a subject, not a defect. Skipping quietly would claim a check
     // that never happened, so the consumer branch asserts the refusal instead: the property matters most
     // exactly where it fires.
@@ -221,7 +221,7 @@ describe("domain app render contract", () => {
   it("copies the generic template engine VERBATIM (RC4: no self-substitution of tooling/template)", async () => {
     // ── NO PRISTINE SOURCE HERE? THEN THE GUARD IS WHAT GETS PROVEN ────────────────────────────────────
     // This engine ships into every generated application, and a governed consumer has nothing pristine to
-    // render FROM (CHOS-CODE#68). Measured 2026-08-31 in two built procedures this assertion was red with the
+    // render FROM (CHOS-AGENTS#68). Measured 2026-08-31 in two built procedures this assertion was red with the
     // guard's own message — a witness without a subject, not a defect. Skipping quietly would claim a check
     // that never happened, so the consumer branch asserts the refusal instead: the property matters most
     // exactly where it fires.

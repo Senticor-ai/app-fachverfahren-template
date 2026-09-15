@@ -1,6 +1,6 @@
 // /amt/verfahren/:procedureId/:version/wiki — das VERFAHRENS-WIKI: generelles Wissen + Fähigkeiten EINES
 // Fachverfahrens (verfahrens-scoped, behörden-scoped, append-only). Mensch UND KI-Agent hinterlassen hier
-// Wissen; chos-code liest es für die Weiterverarbeitung. Erreichbar aus der Akte (die caseId trägt das
+// Wissen; chos-agents liest es für die Weiterverarbeitung. Erreichbar aus der Akte (die caseId trägt das
 // Verfahren). Streng präsentierend über verfahren-wissen-client.
 import { useCallback, useEffect, useId, useState } from "react";
 import { Link, useParams } from "react-router-dom";

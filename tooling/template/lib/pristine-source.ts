@@ -3,7 +3,7 @@
 // ── THE MEASUREMENT THAT CAUSED THIS FILE (2026-08-31) ────────────────────────────────────────────────────────
 // The scaffold engine renders a domain app FROM the pristine template. A CHOS-governed consumer project is not
 // one — it carries `.chos/` and a `cognitive-hive.*` symlink into the shared source governance, and rendering
-// from it would follow that symlink and flip the shared source for every future build (CHOS-CODE#68). The guard
+// from it would follow that symlink and flip the shared source for every future build (CHOS-AGENTS#68). The guard
 // in `render.ts` refuses hard, and that refusal is correct.
 //
 // But this engine ships INTO every generated application, and so do its witnesses. Measured against two fully
@@ -20,7 +20,7 @@ import { isLiveConsumerProject } from "./render.js";
 
 /** The message fragments the guard is contractually bound to name. Kept next to the assertion, not copied into
  *  each witness: a reason that drifts silently would let a WEAKER refusal pass as the documented one. */
-export const REFUSAL_MARKERS = /live\/governed consumer project|CHOS-CODE#68/;
+export const REFUSAL_MARKERS = /live\/governed consumer project|CHOS-AGENTS#68/;
 
 /** Can a scaffold be rendered FROM `dir`? False in a governed consumer — there the guard refuses by design. */
 export async function canScaffoldFrom(dir: string): Promise<boolean> {
@@ -42,7 +42,7 @@ export async function assertRefusesToScaffold(
   }
   if (threw === undefined) {
     throw new Error(
-      "scaffolding from a governed consumer SUCCEEDED — the CHOS-CODE#68 guard did not fire. That is the " +
+      "scaffolding from a governed consumer SUCCEEDED — the CHOS-AGENTS#68 guard did not fire. That is the " +
         "cross-tenant corruption this guard exists to prevent, not a passing test.",
     );
   }

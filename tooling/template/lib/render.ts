@@ -140,7 +140,7 @@ export const CONSUMER_MARKERS: readonly string[] = [
 /** Is `dir` a LIVE/governed consumer project? Such a project carries CHOS-overlay markers: a `.chos/` directory OR
  *  `cognitive-hive.governance.yaml` (which, in a project, is a symlink into the shared source).
  *  The domain-app scaffold must render from the pristine template only — scaffolding from a consumer would follow the
- *  cognitive-hive symlink and corrupt the shared source governance (CHOS-CODE#68). The pristine template ships neither.
+ *  cognitive-hive symlink and corrupt the shared source governance (CHOS-AGENTS#68). The pristine template ships neither.
  *
  *  EXPORTED since 2026-08-31, and for one reason: the witnesses of this engine need the SAME answer the guard uses.
  *  Measured against two fully built procedures, eight scaffold assertions were red in every generated application —
@@ -218,14 +218,14 @@ export async function renderDomainApp(
     );
   }
 
-  // GUARD (CHOS-CODE#68): the domain-app scaffold renders FROM the pristine template — NEVER from a live/governed
+  // GUARD (CHOS-AGENTS#68): the domain-app scaffold renders FROM the pristine template — NEVER from a live/governed
   // consumer project. A governed instance carries CHOS-overlay markers (a `.chos/` dir and `cognitive-hive.*` which,
   // in a project, is a SYMLINK into the shared source governance). Copying + the in-place string-replace would follow
   // that symlink and flip the shared source (`apps/fachverfahren` -> `apps/<domain>`), corrupting it for every future
   // build (broke B2/origin/main; in multi-tenancy: cross-tenant corruption). One truth, no parallel path: refuse hard.
   if (await isLiveConsumerProject(source)) {
     throw new Error(
-      "refusing to scaffold FROM a live/governed consumer project (found .chos/ or cognitive-hive.* — a CHOS-governed instance, not the pristine template). Run the domain-app scaffold from the template source only (CHOS-CODE#68).",
+      "refusing to scaffold FROM a live/governed consumer project (found .chos/ or cognitive-hive.* — a CHOS-governed instance, not the pristine template). Run the domain-app scaffold from the template source only (CHOS-AGENTS#68).",
     );
   }
 

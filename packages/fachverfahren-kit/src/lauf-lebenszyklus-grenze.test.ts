@@ -8,7 +8,7 @@ import path from "node:path";
 //
 // GEMESSEN über die drei Repos: der LAUF-Lebenszyklus (`awaiting-prompt · queued · running · repairing · stopping ·
 // waiting · blocked · error · aborted · done · anchored` plus die Handlungs-Aussage `humanNeed`) lebt in der Fabrik —
-// Quelle `CHOS-CODE/packages/fachverfahren/run-status.ts`, ein abgeleiteter Spiegel im GTC Builder MIT Kongruenz-Test.
+// Quelle `CHOS-AGENTS/packages/fachverfahren/run-status.ts`, ein abgeleiteter Spiegel im GTC Builder MIT Kongruenz-Test.
 // Dieses KIT spiegelt davon NICHTS, und das ist richtig: der Lauf-Lebenszyklus beschreibt, wie ein BAU verläuft. Eine
 // erzeugte Fachanwendung weiß von Bauläufen nichts — sie führt VORGÄNGE.
 //
@@ -118,7 +118,7 @@ describe("Grenze: das KIT führt VORGÄNGE, nicht Bauläufe", () => {
       }
       expect(
         treffer,
-        `„${name}“ gehört dem LAUF-Lebenszyklus der Fabrik (CHOS-CODE packages/fachverfahren/run-status.ts). Eine ` +
+        `„${name}“ gehört dem LAUF-Lebenszyklus der Fabrik (CHOS-AGENTS packages/fachverfahren/run-status.ts). Eine ` +
           `Kopie hier wäre eine dritte Wahrheit ohne Quelle und ohne Kongruenz-Test — in einem Repo, das Bauläufe ` +
           `fachlich nicht kennt. Braucht die Anwendung wirklich einen Lauf-Zustand, kommt er über den Draht (die ` +
           `Fabrik projiziert ihn), nie über eine Tabelle hier. Gefunden in:\n  ${treffer.join("\n  ")}`,

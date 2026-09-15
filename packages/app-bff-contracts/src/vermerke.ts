@@ -163,7 +163,7 @@ export const VermerkListDtoSchema = Type.Object(
 export type VermerkListDto = Static<typeof VermerkListDtoSchema>;
 
 // ── Wissens-/Kontext-EXPORT — die BRÜCKE zwischen Mensch, KI-Agent und Composable ──────────────────────
-// Der stabile, agenten-konsumierbare Kontext-Bundle einer Akte: ein nachgelagerter KI-Agent (z.B. chos-code)
+// Der stabile, agenten-konsumierbare Kontext-Bundle einer Akte: ein nachgelagerter KI-Agent (z.B. chos-agents)
 // liest ihn und übersetzt ihn in Skills + Kontext für die Weiterverarbeitung. Nur PUBLIC-Zellen; der Text ist
 // injektions-NEUTRALISIERT (ein konsumierender Agent darf nicht über eine manipulierte Zelle gekapert werden).
 

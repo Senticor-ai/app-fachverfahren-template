@@ -4,7 +4,7 @@
 // „Domain contract check passed." — ueber NULL Modulen. Unter `modules/` liegt dort nur AGENTS.md und
 // README.md, also KEIN Verzeichnis; `listDomainModuleNames()` liefert die leere Liste, die Schleife laeuft
 // nie, `failures` bleibt leer. **Eine leere Menge besteht jede Pruefung ueber ihre Elemente.**
-// Sobald CHOS-CODE ein Verfahren erzeugt, traegt `modules/` genau EIN Modul — und dasselbe Tor meldet dann
+// Sobald CHOS-AGENTS ein Verfahren erzeugt, traegt `modules/` genau EIN Modul — und dasselbe Tor meldet dann
 // 145 Befunde, in zwei unabhaengig gemessenen Verfahren Zeichen fuer Zeichen gleich.
 //
 // Dieser Zeuge misst die Unterscheidbarkeit: der Bericht muss seine GRUNDMENGE nennen, damit

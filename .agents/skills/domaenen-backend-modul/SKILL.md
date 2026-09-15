@@ -71,7 +71,7 @@ gebaute Fall-/Dossier-Kern (ADR-0001) ist die lebende Blaupause — lies ihn.
    (`packages/fachverfahren-kit/src/components/DossierAkte360.tsx`) — aktuell
    Komponente + Story, noch KEINE App-Route (`/amt/akte/:id` ist **offen/geplant**).
 
-## Wie ein Build-Agent (chos-code/gtc-builder) es nutzt
+## Wie ein Build-Agent (chos-agents/gtc-builder) es nutzt
 
 1. **Vendor-neutraler Einstieg** (Task, Write-Boundaries, relevante Checks):
 

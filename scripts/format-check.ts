@@ -57,6 +57,10 @@ const schlecht: string[] = [];
 const uebersprungen: string[] = [];
 let geprueft = 0;
 
+/** Die EINE Ignoranz-Liste, die auch `pnpm exec prettier` liest — damit Tor und Werkzeug ueber
+ *  dieselbe Datei dasselbe sagen. Zwei Listen waeren zwei Wahrheiten ueber denselben Pfad. */
+const IGNORE_PFAD = ".prettierignore";
+
 for (const pfad of pfade) {
   // ⛔ DER INHALT KOMMT AUS DEM INDEX. Ein Pfad kann gestagt UND im Arbeitsbaum weiter veraendert sein;
   //    committet wird der Index-Stand, also urteilt das Tor ueber genau den.
@@ -65,7 +69,18 @@ for (const pfad of pfade) {
     uebersprungen.push(`${pfad} (nicht aus dem Index lesbar)`);
     continue;
   }
-  const info = await prettier.getFileInfo(pfad, { resolveConfig: true });
+  // ⛔ `ignorePath` IST PFLICHT, und sein Fehlen war ein Tor ohne Ausweg (gemessen 2026-09-15,
+  //    prettier 3.9.5): `getFileInfo` konsultiert `.prettierignore` NUR, wenn man den Pfad nennt.
+  //    Ohne ihn meldet es fuer `apps/fachverfahren/src/docs/docs-manifest.generated.ts`
+  //    `{ignored:false, inferredParser:"typescript"}` — der `uebersprungen`-Zweig darunter konnte
+  //    also fuer KEINE Datei feuern. Die Folge ist schlimmer als ein blosser Fehlalarm: die genannte
+  //    Abhilfe (`prettier --write <datei>`) tut fuer eine ignorierte Datei nachweislich NICHTS, und
+  //    ein GENERIERTES Artefakt laesst sich ohnehin nur durch seinen Erzeuger aendern. Ein Halt,
+  //    dessen Abhilfe keinen Ausfuehrer hat, ist die Klasse, die dieses Haus mehrfach bezahlt hat.
+  const info = await prettier.getFileInfo(pfad, {
+    resolveConfig: true,
+    ignorePath: IGNORE_PFAD,
+  });
   if (info.ignored || !info.inferredParser) {
     uebersprungen.push(
       `${pfad} (${info.ignored ? ".prettierignore" : "kein Parser"})`,
