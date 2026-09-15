@@ -16,15 +16,21 @@ pnpm run dev
 die Landing (`/`) und das Doku-Wiki (`/hilfe`) sind die einzigen Routen ohne
 Anmeldung, alle Persona- und Workspace-Sichten liegen hinter dem Session-Gate. Für die angemeldeten
 Sichten zusätzlich die App-Runtime starten — Voraussetzung ist ein
-erreichbares Postgres (Manifest: `dev/postgres.yaml`, übersteuerbar via
-`APP_PG_URL`):
+erreichbares Postgres — leichter Weg `docker compose up -d` (die
+`docker-compose.yml` im Wurzelverzeichnis), Cluster-naher Weg das Manifest
+`dev/postgres.yaml`; beide übersteuerbar via `APP_PG_URL`:
 
 ```bash
 pnpm run dev:api
 ```
 
 Beim ersten Start den Administrationszugang auf der Landing (`/`) mit dem
-Bootstrap-Token `dev-setup` einrichten (Default nur für lokale Entwicklung).
+Bootstrap-Token `dev-setup` einrichten. Das Token ist **an genau diesen
+Startweg gebunden**: `scripts/dev-api.mjs:31` setzt es, und nur wenn
+`BOOTSTRAP_TOKEN` undefiniert ist UND kein `AUTH_BOOTSTRAP_ADMIN_EMAIL`
+gesetzt ist. Bei jedem anderen Startweg ist Bootstrap ungesetzt = **aus**
+(`.env.example:49`) — dort `BOOTSTRAP_TOKEN` bzw. `AUTH_BOOTSTRAP_ADMIN_*`
+selbst setzen. Ausführlich im `README.md`, Abschnitt „Lokal starten".
 
 ## Entwicklungsregeln
 

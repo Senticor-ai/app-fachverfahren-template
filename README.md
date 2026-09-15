@@ -92,9 +92,24 @@ Troubleshooting) in `CONTRIBUTING.md`.
 Die Web-App ist anmeldepflichtig: die Landing (`/`) und das Doku-Wiki
 (`/hilfe`) sind die einzigen Routen ohne Anmeldung, alle Persona- und
 Workspace-Sichten liegen hinter dem Login. Für
-den lokalen Start braucht es ein erreichbares Postgres — ein
-Kubernetes-Manifest liegt unter `dev/postgres.yaml` (funktioniert mit Rancher
-Desktop und Docker Desktop, wenn Kubernetes aktiviert ist):
+den lokalen Start braucht es ein erreichbares Postgres — dafür gibt es zwei
+Wege, die dieselbe Datenbank unter derselben URL liefern; nur EINER wird
+gebraucht.
+
+**Leicht (empfohlen für reine lokale Entwicklung):** die `docker-compose.yml`
+im Wurzelverzeichnis startet genau das Postgres, das zum Default-`APP_PG_URL`
+(`postgres://app:app@127.0.0.1:5432/app`) passt:
+
+```bash
+docker compose up -d
+```
+
+**Cluster-nah:** ein Kubernetes-Manifest liegt unter `dev/postgres.yaml`
+(funktioniert mit Rancher Desktop und Docker Desktop, wenn Kubernetes
+aktiviert ist).
+
+Beides ist **nur für die Entwicklung** (Default-Zugangsdaten); Produktion
+läuft über helm gegen eine betriebene Cluster-Datenbank. Danach:
 
 ```bash
 mise install
@@ -111,7 +126,20 @@ pnpm run dev
 ```
 
 Beim ersten Start den Administrationszugang auf der Landing (`/`) mit dem
-Bootstrap-Token `dev-setup` einrichten (Default nur für lokale Entwicklung).
+Bootstrap-Token `dev-setup` einrichten.
+
+⚠️ **`dev-setup` ist KEIN Server-Default, sondern an `pnpm run dev:api`
+gebunden.** Gesetzt wird es ausschließlich von `scripts/dev-api.mjs:31`, und
+auch dort nur, wenn `BOOTSTRAP_TOKEN` **undefiniert** ist UND kein
+`AUTH_BOOTSTRAP_ADMIN_EMAIL` gesetzt ist (Auto-Bootstrap macht das Token
+überflüssig). Der Server selbst liest nur `process.env.BOOTSTRAP_TOKEN`
+(`apps/fachverfahren/server/index.ts:260`); ungesetzt heißt **Bootstrap aus**
+(`.env.example:49`). Wer anders startet als über `dev:api` — Container,
+`docker run`, helm, ein eigenes Start-Skript — bekommt also einen
+anmeldepflichtigen Server **ohne Weg hinein**, solange er nicht selbst
+`BOOTSTRAP_TOKEN=<wert>` oder `AUTH_BOOTSTRAP_ADMIN_EMAIL` +
+`AUTH_BOOTSTRAP_ADMIN_PASSWORD` setzt.
+
 Migrationen lassen sich separat fahren über:
 
 ```bash
@@ -241,6 +269,53 @@ jedes neue Verfahren orientiert. Der Domänen-Slug ist durchgehend `hundesteuer`
 (kanonisch, deutsch) — **niemals eine englische/erfundene Variante** wie
 `dog-tax`; abweichende Slugs driften den Build (die generierende Instanz muss
 GENAU diesen Slug für alle `modules/<domain>/`-Pfade verwenden).
+
+## Verwendung mit der CHOS-Fabrik
+
+Baut die CHOS-Fabrik (Repository `CHOS-AGENTS`) Apps aus diesem Kit, dann muss
+dieses Repository als **Geschwister-Ordner neben `CHOS-AGENTS` liegen und
+exakt `app-fachverfahren-template` heißen**:
+
+```text
+<irgendein Elternordner>/
+├── CHOS-AGENTS/                     ← die Fabrik
+└── app-fachverfahren-template/      ← dieses Repo, Ordnername ist bindend
+```
+
+**Warum der Ordnername bindend ist.** Die Fabrik leitet die lokale Kit-Wurzel
+aus ihrem eigenen Checkout ab: `impliedLocalKitRoot`
+(`CHOS-AGENTS/packages/journeys/template-loader.ts:260`) nimmt das
+Elternverzeichnis der Engine und prüft, ob dort **zu jeder** git-basierten
+Vorlage ein Zwilling liegt — ein Ordner, der wie das Repository der
+Vorlagen-URL heißt und ein `.git` trägt. Der Name kommt aus der git-URL der
+Vorlage (`https://github.com/Senticor-ai/app-fachverfahren-template.git` →
+`app-fachverfahren-template`, `template-loader.ts:122`/`:271`). Gerufen wird
+das beim Serverstart in
+`CHOS-AGENTS/packages/fachverfahren/flow-server.ts:795`.
+
+**Die Folge bei Abweichung.** Fehlt der Geschwister-Ordner oder heißt er
+anders, findet die Ableitung keinen vollständigen Zwillingssatz und gibt
+`null` zurück — die Fabrik fällt **still** auf die git-Quelle zurück und klont
+GitHub `main`. Jede lokale Änderung an diesem Kit wirkt dann **NIE** in einen
+Bau hinein, und ein bereits ausgelieferter Lauf kann durch die
+Provisionierungs-Heilung sogar auf den älteren Klon zurückgesetzt werden (so
+gemessen am 2026-09-12; der Kommentar an `impliedLocalKitRoot` hält den Vorfall
+fest). Es gibt **keine Fehlermeldung** — nur einen Bau, der die lokale Arbeit
+nicht kennt.
+
+**Übersteuern (beides schlägt die Ableitung):**
+
+- `CHOS_LOCAL_KIT_ROOT=<elternordner>` — die Kit-Wurzel ausdrücklich nennen.
+  Ein **leeres** `CHOS_LOCAL_KIT_ROOT=""` ist ebenfalls eine Aussage: «nimm die
+  git-Quellen». Ist die Wurzel gesetzt und der Spiegel fehlt, bricht die
+  Provisionierung **hart** ab (`template-missing`) statt still zu klonen.
+- `localKitRoot` in `templates.config.json` — schlägt jede Ableitung.
+- `CHOS_FACHVERFAHREN_TEMPLATE_PATH=<pfad>` — der Pfad nur für diese eine
+  Vorlage.
+
+Beim Start meldet die Fabrik die abgeleitete Wurzel:
+`[flow-server] kit root derived from the checkout: <pfad>`. Kommt diese Zeile
+nicht, arbeitet der Bau **nicht** gegen den lokalen Checkout.
 
 ## Projekt und Community
 
