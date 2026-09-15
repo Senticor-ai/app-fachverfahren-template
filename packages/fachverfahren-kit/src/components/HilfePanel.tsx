@@ -125,7 +125,7 @@ export function HilfePanel({
                     <span>{eintrag.frage}</span>
                     <ChevronDown
                       className={cn(
-                        "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none",
+                        "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-(--fv-duration-slow) motion-reduce:transition-none",
                         istOffen && "rotate-180",
                       )}
                       aria-hidden="true"
@@ -183,7 +183,7 @@ function SpracheUmschalter({
       >
         <span
           className={cn(
-            "inline-block h-4 w-4 transform rounded-full bg-card shadow transition-transform duration-200 motion-reduce:transition-none",
+            "inline-block h-4 w-4 transform rounded-full bg-card shadow transition-transform duration-(--fv-duration-slow) motion-reduce:transition-none",
             leicht ? "translate-x-6" : "translate-x-1",
           )}
           aria-hidden="true"

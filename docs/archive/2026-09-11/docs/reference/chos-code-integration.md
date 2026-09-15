@@ -1,3 +1,5 @@
+> **ARCHIVIERT 2026-09-11** — datierter Vorfallbericht an EINE benannte Fabrik. Nachfolger: [`docs/reference/governed-build-contract.md`](../../../../reference/governed-build-contract.md) (die eine Regel, vendor-neutral übernommen) + `modules/README.md` ([`docs/archive/README.md`](../../../README.md)).
+
 # What the template needs from chos-code (and any external app generator)
 
 > Audience: the chos-code / opencode build team. This is the contract an

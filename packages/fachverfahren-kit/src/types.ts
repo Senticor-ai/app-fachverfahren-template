@@ -57,6 +57,17 @@ export interface Berechnung {
    *  KI-Assistent hat den Wert vorgeschlagen/geschaetzt (spaetere Feature-Stufe) → als KI-Vorschlag kennzeichnen. Fehlt
    *  das Feld, gilt "deterministisch". Der Produzent/DAG setzt es; die Anzeige leitet die Kennzeichnung NUR daraus ab. */
   herkunft?: "deterministisch" | "ki";
+  /** ARE THE TARIFF VALUES BACKED? (additive, fail-open — if the field is missing, everything stays as before.)
+   *
+   *  ⛔ MEASURED 2026-09-09: `herkunft: "deterministisch"`, per its own comment above, carries TWO
+   *  statements — «no AI guessed» AND «§-belegt». The first always holds, the second only if the RATES
+   *  come from a backed source. A generated application therefore showed «VORLÄUFIG · §-BELEGT» above an
+   *  amount whose statute the same run listed as a knowledge gap and whose seam set `SAETZE_BELEGT = false`.
+   *  A citizen does not read the badge as a statement about the SCHEMA, but about the NUMBER next to it.
+   *
+   *  `false` = the application KNOWS its rates are assumptions ⇒ the badge no longer certifies.
+   *  `true`/missing = unchanged. The display derives from it (`resultBadge`); it decides nothing. */
+  saetzeBelegt?: boolean | undefined;
 }
 
 /**
@@ -473,6 +484,7 @@ import type {
   FeldBedingung,
   BedingungGruppe,
   Bedingung,
+  VerwaltungsaktInhaltConfig,
 } from "@senticor/public-sector-sdk";
 export type { BedingungOperator, FeldBedingung, BedingungGruppe, Bedingung };
 
@@ -817,6 +829,23 @@ export interface LeistungConfig<TAntragsdaten = Record<string, unknown>> {
   ePayment?: EPaymentConfig | undefined;
   /** Gesetzt ⇒ Bescheid-Tab (PdfViewer) im ReviewWorkspace + Bürger-Postfach (Zustellnachweis). */
   zustellung?: ZustellungConfig | undefined;
+  /**
+   * DIE PFLICHTANGABEN DES VERWALTUNGSAKTS — woher der erlassende Bescheid Inhaltsadressat, Zeitraum,
+   * Leistungsgebot und Unterschrift NIMMT (§ 119 Abs. 1 AO · § 254 Abs. 1 AO · § 119 Abs. 3 S. 2 AO).
+   *
+   * ── WARUM DIESES FELD HIER FEHLTE, UND WAS DAS KOSTETE (gemessen 2026-08-31) ──────────────────────────
+   * Die Naht trug es NICHT. `procedure.config.ts` konnte die Angaben deshalb nur aus seinem neutralen
+   * `MUSTER_ANTRAG` erben — samt dessen Demo-Datenpfaden und dessen `zahlungsempfaenger`. An zwei fertig
+   * gebauten Verfahren gemessen hiess das: der Bescheid der einen Gemeinde forderte zur Zahlung an die Kasse
+   * einer ANDEREN, und der Inhaltsadressat blieb leer, weil die geerbten Pfade auf Felder zeigen, die das
+   * Verfahren nicht fuehrt. Ein erzeugendes Verfahren hatte keinen Ort, an dem es das richtigstellen konnte.
+   *
+   * Es ist OPTIONAL und bleibt es: schweigt die Naht, ENTFERNT `procedure.config.ts` den Block, statt ihn zu
+   * erben — dieselbe fail-closed-Doktrin wie beim Rechtsbehelfs-Regime («lieber gar kein Bescheid als einer
+   * mit der Belehrung eines fremden Verfahrens»). Ein leeres Feld ist ein sichtbarer Mangel; ein Feld mit dem
+   * Wert eines fremden Verfahrens ist eine stille Falschaussage.
+   */
+  verwaltungsaktInhalt?: VerwaltungsaktInhaltConfig | undefined;
   /** Gesetzt ⇒ TerminFristPanel (Fristen-Überwachung + Terminbuchung) als Bürger-Route. */
   termin?: TerminConfig | undefined;
   /** `enabled` ⇒ AdressValidierung (deterministischer Registerabgleich) im Bürger-Antrag. */

@@ -5433,14 +5433,37 @@
                     "erdung": {
                       "additionalProperties": false,
                       "properties": {
+                        "domainsOhneWissen": {
+                          "items": { "type": "string" },
+                          "type": "array"
+                        },
                         "geerdet": { "type": "boolean" },
                         "quellen": {
                           "items": { "type": "string" },
                           "type": "array"
                         },
+                        "rechtsgrundlagen": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "id": { "minLength": 1, "type": "string" },
+                              "titel": { "minLength": 1, "type": "string" },
+                              "ubiquitaer": { "type": "boolean" }
+                            },
+                            "required": ["id", "titel"],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
                         "wissensEintraege": { "minimum": 0, "type": "integer" }
                       },
-                      "required": ["geerdet", "wissensEintraege", "quellen"],
+                      "required": [
+                        "geerdet",
+                        "wissensEintraege",
+                        "quellen",
+                        "rechtsgrundlagen",
+                        "domainsOhneWissen"
+                      ],
                       "type": "object"
                     },
                     "rechtsnah": { "type": "boolean" }

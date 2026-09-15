@@ -152,7 +152,7 @@ export {
   type EvidenceRecordDto,
 } from "./register.js";
 export {
-  KiVermerkRequestSchema,
+  AiVermerkRequestSchema,
   VermerkDtoSchema,
   VermerkIdParamsSchema,
   VermerkKindSchema,
@@ -165,7 +165,7 @@ export {
   VermerkSichtbarkeitSchema,
   WissenEintragDtoSchema,
   WissenExportDtoSchema,
-  type KiVermerkRequestDto,
+  type AiVermerkRequestDto,
   type VermerkDto,
   type VermerkIdParamsDto,
   type VermerkKind,
@@ -190,7 +190,7 @@ export {
   type NachweisUploadRequestDto,
 } from "./nachweise.js";
 export {
-  KiWissenRequestSchema,
+  AiKnowledgeRequestSchema,
   VerfahrenWissenEintragParamsSchema,
   VerfahrenWissenParamsSchema,
   WissenEintragRequestSchema,
@@ -199,7 +199,7 @@ export {
   WissenVerfahrenExportDtoSchema,
   WissenViewDtoSchema,
   WissenViewListDtoSchema,
-  type KiWissenRequestDto,
+  type AiKnowledgeRequestDto,
   type VerfahrenWissenEintragParamsDto,
   type VerfahrenWissenParamsDto,
   type WissenEintragRequestDto,
@@ -210,7 +210,7 @@ export {
   type WissenViewListDto,
 } from "./verfahren-wissen.js";
 export {
-  ComposableHerkunftQuelleDtoSchema,
+  ComposableProvenanceSourceDtoSchema,
   ComposableHerkunftDtoSchema,
   ComposableSummaryDtoSchema,
   ComposableListDtoSchema,
@@ -226,7 +226,7 @@ export {
   ComposableChatDateiRefDtoSchema,
   ComposableChatRequestSchema,
   ComposableChatReplyDtoSchema,
-  type ComposableHerkunftQuelleDto,
+  type ComposableProvenanceSourceDto,
   type ComposableHerkunftDto,
   type ComposableSummaryDto,
   type ComposableListDto,

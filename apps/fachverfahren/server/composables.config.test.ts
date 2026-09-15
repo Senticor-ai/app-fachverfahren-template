@@ -14,6 +14,7 @@ import {
   createComposableRegistry,
   musterverfahrenComposable,
 } from "./composables.config.js";
+import { enabledEqualsProductive } from "./composable-subject.js";
 
 describe("composables.config — deklarierte Composables dieses Fachverfahrens", () => {
   it("alle deklarierten Composables sind wohlgeformt (inkl. Spine-Governance)", () => {
@@ -22,13 +23,23 @@ describe("composables.config — deklarierte Composables dieses Fachverfahrens",
     }
   });
 
-  it("die Registry baut ohne Fehler + findet das Musterverfahren-Composable", () => {
+  // ── THE SUBJECT COMES FROM THE REGISTRY, NOT FROM A NAME ────────────────────────────────────────────────
+  // This used to read `reg.get("musterverfahren")` and `listEnabled() === ["musterverfahren"]`. Both held ONLY
+  // in this template: in a built procedure `createComposableRegistry` MOUNTS the emitted places and states about
+  // itself that the generated truth REPLACES the demo patterns. So the witness contradicted the documented intent
+  // of the file it tests — and was red in EVERY generated procedure (measured 2026-08-31 against two independent
+  // procedures, identical in both).
+  // The property at stake is twofold: the registry BUILDS (assertComposable would throw while building), and
+  // `enabled` is EXACTLY the productively usable set — not a copied list of names.
+  it("the registry builds without error and carries at least one place", () => {
     const reg = createComposableRegistry();
-    expect(reg.get("musterverfahren")?.displayName).toContain(
-      "Musterverfahren",
-    );
-    // Nur das certified Musterverfahren ist enabled; der candidate Antrag nicht.
-    expect(reg.listEnabled().map((c) => c.id)).toEqual(["musterverfahren"]);
+    // POSITIVE CONTROL: without it, "the property holds" would be indistinguishable from "the registry is empty"
+    // — an empty set satisfies every universal claim below it.
+    expect(reg.list().length).toBeGreaterThan(0);
+  });
+
+  it("`enabled` is EXACTLY the productively usable set (certified/active) — not a copied list", () => {
+    expect(enabledEqualsProductive(createComposableRegistry())).toBe(true);
   });
 
   it("das Musterverfahren-Composable ist zertifizierungsreif (alle Ebenen vollständig)", () => {

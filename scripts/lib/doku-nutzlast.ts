@@ -25,7 +25,7 @@
  * @param {string} line
  * @returns {boolean}
  */
-export function istDokumentationsNutzlast(line) {
+export function istDokumentationsNutzlast(line: string): boolean {
   return /^\s*"content":\s*"/.test(line);
 }
 
@@ -38,7 +38,7 @@ export function istDokumentationsNutzlast(line) {
  * @param {string} text
  * @returns {string}
  */
-export function ohneDokumentationsNutzlast(text) {
+export function ohneDokumentationsNutzlast(text: string): string {
   return text
     .split(/\r?\n/)
     .map((line) => (istDokumentationsNutzlast(line) ? "" : line))

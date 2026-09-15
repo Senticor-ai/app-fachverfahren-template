@@ -45,7 +45,15 @@ Capability-Ports modelliert.
 - `packages/fachverfahren-kit`: wiederverwendbare Fachverfahren-Bausteine
   auf Tailwind/shadcn-Basis; der Katalog für Build-Agenten steht in
   `docs/reference/fachverfahren-kit-components.md`.
-- `packages/provider-*`: lokale, Codesphere- und DVC-Providerprofile.
+- `packages/app-runtime-fastify`: die neutrale Fastify-Web-Runtime
+  (Delivery, Health, Security-Header, Metrics), komponiert in
+  `apps/fachverfahren/server/`.
+- `packages/app-bff-fastify` + `packages/app-bff-contracts`: die fachlichen
+  BFF-Routen (15 Module) und ihre TypeBox-DTOs.
+- `packages/workflow-bpmn-stub`: BPMN-Workflow-Stub hinter dem `WorkflowPort`.
+- `packages/provider-*`: lokale, Codesphere- und DVC-Providerprofile —
+  darunter `provider-local-auth` (lokale Konten, Server-Sessions) und
+  `provider-ai-ollama` (KI-Assistenz über Ollama).
 - `packages/conformance-kit`: Compliance-Profile und Evidence-Bundle-Planung.
 - `packages/migration-kit`: Migrationsprofile für Legacy-Fachverfahren.
 - `jurisdictions/*`: EU- und Deutschland-Packs ohne `country === "DE"`-Logik in
@@ -58,11 +66,11 @@ Capability-Ports modelliert.
   `fachverfahren-kit` und der Public-Sector-UI-Fassade.
 - Datenbank: PostgreSQL-Migrator und Plattformtabellen in
   `@senticor/app-store-postgres` (`pnpm run db:migrate`).
-- Backend/BFF: (IST) Fastify-Web-Delivery-Runtime unter
-  `apps/fachverfahren/server/` (Health, Security-Header, Metrics, Auth- und
-  Workspace-Routen), beschrieben in `docs/reference/backend-fastify.md`;
-  fachliche API-, OpenAPI- und Postgres-E2E-Routen sind explizite
-  Ausbauschritte.
+- Backend/BFF: Fastify-Web-Runtime (`packages/app-runtime-fastify`, komponiert
+  in `apps/fachverfahren/server/` — Health, Security-Header, Metrics) plus
+  fachlicher BFF (`packages/app-bff-fastify`, 15 Routenmodule; der
+  OpenAPI-Snapshot `schemas/openapi.internal.json` wird von `check:openapi`
+  gehalten) — beschrieben in `docs/reference/backend-fastify.md`.
 - Design/TDD: Storybook, Screen Contracts, semantische Tokens.
 
 ## Erste Schritte
@@ -81,11 +89,27 @@ Troubleshooting) in `CONTRIBUTING.md`.
 
 ### Lokal starten
 
-Die Web-App ist anmeldepflichtig: die Landing (`/`) ist die einzige Route ohne
-Anmeldung, alle Persona- und Workspace-Sichten liegen hinter dem Login. Für
-den lokalen Start braucht es ein erreichbares Postgres — ein
-Kubernetes-Manifest liegt unter `dev/postgres.yaml` (funktioniert mit Rancher
-Desktop und Docker Desktop, wenn Kubernetes aktiviert ist):
+Die Web-App ist anmeldepflichtig: die Landing (`/`) und das Doku-Wiki
+(`/hilfe`) sind die einzigen Routen ohne Anmeldung, alle Persona- und
+Workspace-Sichten liegen hinter dem Login. Für
+den lokalen Start braucht es ein erreichbares Postgres — dafür gibt es zwei
+Wege, die dieselbe Datenbank unter derselben URL liefern; nur EINER wird
+gebraucht.
+
+**Leicht (empfohlen für reine lokale Entwicklung):** die `docker-compose.yml`
+im Wurzelverzeichnis startet genau das Postgres, das zum Default-`APP_PG_URL`
+(`postgres://app:app@127.0.0.1:5432/app`) passt:
+
+```bash
+docker compose up -d
+```
+
+**Cluster-nah:** ein Kubernetes-Manifest liegt unter `dev/postgres.yaml`
+(funktioniert mit Rancher Desktop und Docker Desktop, wenn Kubernetes
+aktiviert ist).
+
+Beides ist **nur für die Entwicklung** (Default-Zugangsdaten); Produktion
+läuft über helm gegen eine betriebene Cluster-Datenbank. Danach:
 
 ```bash
 mise install
@@ -102,7 +126,20 @@ pnpm run dev
 ```
 
 Beim ersten Start den Administrationszugang auf der Landing (`/`) mit dem
-Bootstrap-Token `dev-setup` einrichten (Default nur für lokale Entwicklung).
+Bootstrap-Token `dev-setup` einrichten.
+
+⚠️ **`dev-setup` ist KEIN Server-Default, sondern an `pnpm run dev:api`
+gebunden.** Gesetzt wird es ausschließlich von `scripts/dev-api.mjs:31`, und
+auch dort nur, wenn `BOOTSTRAP_TOKEN` **undefiniert** ist UND kein
+`AUTH_BOOTSTRAP_ADMIN_EMAIL` gesetzt ist (Auto-Bootstrap macht das Token
+überflüssig). Der Server selbst liest nur `process.env.BOOTSTRAP_TOKEN`
+(`apps/fachverfahren/server/index.ts:260`); ungesetzt heißt **Bootstrap aus**
+(`.env.example:49`). Wer anders startet als über `dev:api` — Container,
+`docker run`, helm, ein eigenes Start-Skript — bekommt also einen
+anmeldepflichtigen Server **ohne Weg hinein**, solange er nicht selbst
+`BOOTSTRAP_TOKEN=<wert>` oder `AUTH_BOOTSTRAP_ADMIN_EMAIL` +
+`AUTH_BOOTSTRAP_ADMIN_PASSWORD` setzt.
+
 Migrationen lassen sich separat fahren über:
 
 ```bash
@@ -133,8 +170,10 @@ Die **Agenten-CLI** lässt KI-Agenten (oder Menschen) das Mesh direkt steuern
 
 ```bash
 node apps/fachverfahren/dist-server/dev/mesh-cli.js vermerk list case.demo-0001
-node apps/fachverfahren/dist-server/dev/mesh-cli.js script --file plan.json   # Batch, stateful
+node apps/fachverfahren/dist-server/dev/mesh-cli.js script --file plan.json
 ```
+
+Der zweite Befehl (`script --file`) fährt einen Batch und ist stateful.
 
 Details in der Skill `.agents/skills/dossier-fallmanagement/SKILL.md`
 (Abschnitt „Agenten-CLI + Golden Fixture").
@@ -148,17 +187,19 @@ Die UX/UI-Regeln stehen in `docs/ux-ui/fachverfahren-ux-contract.md`, die
 TDD-Regeln in `docs/reference/test-driven-development.md` und die
 Storybook-Nutzung in `docs/reference/storybook.md`. Der wiederverwendbare
 Komponenten-Katalog für Coding Agents steht in
-`docs/reference/fachverfahren-kit-components.md`. Die geplante Mock-Schicht
-ist in `docs/reference/mock-data-msw.md` beschrieben (PLAN).
+`docs/reference/fachverfahren-kit-components.md`. MSW ist Test-Schicht
+(`pnpm run test:browser`); eine fachliche Mock-Schicht ist nicht Teil der App
+(`docs/reference/mock-data-msw.md`).
 
 Im Kubernetes-Profil liest die Web-App `APP_PG_URL` aus dem Secret
 `app-postgresql`, Migrationen nutzen `APP_PG_DIRECT_URL` im `migrator`-Job.
 
 Ein hermetischer E2E-Rauchtest existiert als `pnpm run test:e2e` (baut das
-echte Bundle und prüft die SPA-Auslieferung). Eine Postgres-E2E-Suite
-(`test:e2e:postgres`) und ein kombinierter Dev-Start (`dev:postgres`,
-`dev:all`) sind (PLAN) Teil der Backend-Zielarchitektur und existieren im
-Scaffold noch nicht.
+echte Bundle und prüft die SPA-Auslieferung). `pnpm run test:pg` fährt die
+Store-Tests von `@senticor/app-store-postgres` gegen ein ECHTES Postgres
+(testcontainers, `tests/pg/global-setup.ts`); ohne Docker überspringt der Lauf.
+Ein kombinierter Dev-Start (`dev:postgres`, `dev:all`) und eine
+`test:e2e:postgres`-Suite existieren nicht.
 
 Coding Agents nutzen `agent.discovery.json`, `docs/agents/bootstrap.md` und die
 repo-lokalen Skills unter `.agents/skills`. Die Agent-Readiness und der
@@ -228,6 +269,53 @@ jedes neue Verfahren orientiert. Der Domänen-Slug ist durchgehend `hundesteuer`
 (kanonisch, deutsch) — **niemals eine englische/erfundene Variante** wie
 `dog-tax`; abweichende Slugs driften den Build (die generierende Instanz muss
 GENAU diesen Slug für alle `modules/<domain>/`-Pfade verwenden).
+
+## Verwendung mit der CHOS-Fabrik
+
+Baut die CHOS-Fabrik (Repository `CHOS-AGENTS`) Apps aus diesem Kit, dann muss
+dieses Repository als **Geschwister-Ordner neben `CHOS-AGENTS` liegen und
+exakt `app-fachverfahren-template` heißen**:
+
+```text
+<irgendein Elternordner>/
+├── CHOS-AGENTS/                     ← die Fabrik
+└── app-fachverfahren-template/      ← dieses Repo, Ordnername ist bindend
+```
+
+**Warum der Ordnername bindend ist.** Die Fabrik leitet die lokale Kit-Wurzel
+aus ihrem eigenen Checkout ab: `impliedLocalKitRoot`
+(`CHOS-AGENTS/packages/journeys/template-loader.ts:260`) nimmt das
+Elternverzeichnis der Engine und prüft, ob dort **zu jeder** git-basierten
+Vorlage ein Zwilling liegt — ein Ordner, der wie das Repository der
+Vorlagen-URL heißt und ein `.git` trägt. Der Name kommt aus der git-URL der
+Vorlage (`https://github.com/Senticor-ai/app-fachverfahren-template.git` →
+`app-fachverfahren-template`, `template-loader.ts:122`/`:271`). Gerufen wird
+das beim Serverstart in
+`CHOS-AGENTS/packages/fachverfahren/flow-server.ts:795`.
+
+**Die Folge bei Abweichung.** Fehlt der Geschwister-Ordner oder heißt er
+anders, findet die Ableitung keinen vollständigen Zwillingssatz und gibt
+`null` zurück — die Fabrik fällt **still** auf die git-Quelle zurück und klont
+GitHub `main`. Jede lokale Änderung an diesem Kit wirkt dann **NIE** in einen
+Bau hinein, und ein bereits ausgelieferter Lauf kann durch die
+Provisionierungs-Heilung sogar auf den älteren Klon zurückgesetzt werden (so
+gemessen am 2026-09-12; der Kommentar an `impliedLocalKitRoot` hält den Vorfall
+fest). Es gibt **keine Fehlermeldung** — nur einen Bau, der die lokale Arbeit
+nicht kennt.
+
+**Übersteuern (beides schlägt die Ableitung):**
+
+- `CHOS_LOCAL_KIT_ROOT=<elternordner>` — die Kit-Wurzel ausdrücklich nennen.
+  Ein **leeres** `CHOS_LOCAL_KIT_ROOT=""` ist ebenfalls eine Aussage: «nimm die
+  git-Quellen». Ist die Wurzel gesetzt und der Spiegel fehlt, bricht die
+  Provisionierung **hart** ab (`template-missing`) statt still zu klonen.
+- `localKitRoot` in `templates.config.json` — schlägt jede Ableitung.
+- `CHOS_FACHVERFAHREN_TEMPLATE_PATH=<pfad>` — der Pfad nur für diese eine
+  Vorlage.
+
+Beim Start meldet die Fabrik die abgeleitete Wurzel:
+`[flow-server] kit root derived from the checkout: <pfad>`. Kommt diese Zeile
+nicht, arbeitet der Bau **nicht** gegen den lokalen Checkout.
 
 ## Projekt und Community
 

@@ -57,6 +57,14 @@ not carry copied component templates.
 - `BescheidView`
 - `HilfePanel`
 - `InstallPrompt`
+- `BetragEingabe` — de-DE amount input, parses and normalises before it validates.
+- `ValidiertesFeld` — a field whose validation is driven by data, not by hand-written checks.
+- `Stepper` — the generic step indicator behind multi-step intake.
+- `SummaryList` — the „check your answers" list before submission.
+- `DescriptionList` — term/description pairs for read-only detail views.
+- `GebuehrenAnzeige` — the fee, shown with its derivation.
+- `SprachvariantenText` — one text in several language variants (incl. Leichte Sprache).
+- `VoiceInput` — on-device, consent-gated speech input over `VoicePort`.
 
 ### Caseworker And Audit Workspaces
 
@@ -87,6 +95,16 @@ not carry copied component templates.
 - `AuditTimeline`
 - `ReportingPanel`
 - `TerminFristPanel`
+- `DossierAkte360` — the 360° case view over case, tasks, notes and audit.
+- `FristenKalender` — deadlines as a calendar, derived from `fristenTypen`.
+- `VertretungPanel` — deputising: who acts for whom, and until when.
+- `VergleichsAnsicht` — side-by-side comparison of two versions or variants.
+- `WorkflowDiagramm` — the state machine as a diagram, rendered from the contract.
+- `Timeline` — the generic chronological rail the specialised timelines build on.
+- `NachweisAutorisierung` — authorising access to an item of evidence.
+- `KanbanBoard` — the caseworker workspace board, with `KanbanColumn`, `KanbanCard`,
+  `BoardList`, `BoardCardDetail`, `CreateBoardDialog`, `MoveCardMenu` and
+  `ArchivedCardsPanel` as its family.
 
 `Arbeitsvorrat` rendert Desktop als sortierbare Tabelle mit sticky Header und
 auf Mobil als touchfähige Kartenliste mit eigener Sortierkontrolle. Die
@@ -115,6 +133,8 @@ und deaktivierte Bulk-Actions ohne Auswahl.
 - `MermaidView`
 - `RichTextEditor`
 - `FileBrowser`
+- `DruckAnsicht` — the print view of a document, separate from the screen layout.
+- `ExportDialog` — choosing format and scope for an export.
 
 ### AI, Status And Feedback
 
@@ -141,6 +161,16 @@ und deaktivierte Bulk-Actions ohne Auswahl.
 - `Banner`
 - `StatCard`
 - `FilterBar`
+- `AgentStatusIndicator` — what the agent is doing right now, visible at a glance.
+- `AgentTrace` — the agent's steps, readable after the fact.
+- `AssistentPanel` — the chat surface over `KiChatPort`.
+- `StreamingText` — incremental model output without layout shift.
+- `ToolCallCard` — one tool call with its arguments and result.
+- `KiSteuerung` — the AI controls; human oversight cannot be switched off.
+- `NotificationCenter` — collected notifications with read state.
+- `Callout` — a highlighted note inside running content.
+- `ConfirmDialog` — confirmation before a consequential action.
+- `ThemeToggle` — light/dark/system, on top of the token layer.
 
 ### Media And Interaction Helpers
 

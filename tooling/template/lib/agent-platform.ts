@@ -1,16 +1,19 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
-import { access, mkdir, readFile, readdir, stat } from "node:fs/promises";
-import {
-  dirname,
-  extname,
-  isAbsolute,
-  join,
-  relative,
-  resolve,
-} from "node:path";
+import { access, mkdir, readFile, stat } from "node:fs/promises";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { parse as parseYaml } from "yaml";
+// ONE TRUTH about what is build output, and a tree walk that FAILS instead of reporting an empty tree:
+// scripts/lib/source-exclusion.ts + scripts/lib/source-scan.ts. Kept in `scripts/lib` because the
+// plain-node `scripts/check-*.mjs` gates and eslint.config.js must import the SAME set — a gate list
+// that only tooling can read is how the seven copies drifted apart in the first place.
+import {
+  collectSourceFiles,
+  loadSourceExclusions,
+  readDirectoryEntries,
+  readTextFile,
+} from "../../../scripts/lib/source-scan.ts";
 import { getGitCommit, getGitShortStatus } from "./git.ts";
 import { readJson, writeFileAtomic } from "./structured-edit.ts";
 import type { PackageJson } from "./structured-edit.ts";
@@ -353,6 +356,44 @@ export async function buildAgentContext(
   });
 }
 
+/**
+ * Does this file say, in its own head, that a named producer generated it?
+ *
+ * ONLY the first three lines count — a mention further down is content, not a statement about the file. And the
+ * marker must NAME ITS PRODUCER: both real generators in this house do ("CHOS deploy-emit",
+ * "scripts/emit-docs-manifest.mts"), so a bare "// GENERATED" is not a pass. That is the whole difference between
+ * a declaration and a word.
+ */
+export function declaresItselfGenerated(text: string): boolean {
+  return text
+    .split("\n")
+    .slice(0, 3)
+    .some((line) =>
+      /^\s*(\/\/|#|\/\*)\s*\**\s*(GENERIERT|GENERATED)\b.*\S{3,}/u.test(line),
+    );
+}
+
+/**
+ * ── A GATE BEHIND ANOTHER GATE'S EARLY RETURN IS A GATE THAT SWITCHES ITSELF OFF ─────────────────────────
+ *
+ * ⛔ MEASURED 2026-09-14 while building the leakage witness, and it cost the fixture two wrong attempts:
+ * `validateSkillShims` and `validateDomainLeakage` used to be the LAST two statements of
+ * `validateAgentDiscovery` — behind its `if (!discovery) return failures;`. Neither of them reads
+ * `discovery`; both take only `root`. They sat there by accident of growth, not by design.
+ *
+ * The consequence is the house's own worst class, one layer up: a MISSING OR UNREADABLE
+ * `agent.discovery.json` silently switched BOTH gates off, and the single symptom was one diagnostic line
+ * about a DIFFERENT file. A reader sees «cannot read agent.discovery.json», fixes that, and never learns
+ * that a leakage check and a skill-shim check did not run at all.
+ *
+ * Measured on a minimal fixture that leaks one domain term: WITHOUT the manifest 3 findings and NONE of
+ * them the leak; WITH it, 3 findings of which one IS. The leak was there the whole time.
+ *
+ * ⭐ THE CUT IS A MOVE, NOT A NEW RULE — the two run here now, as siblings of the five that never depended
+ * on each other either. It is a pure TIGHTENING: a project whose discovery manifest is broken now also
+ * learns what else is broken. It cannot produce a false blocker, because neither gate ever consulted the
+ * manifest it was hiding behind.
+ */
 export async function validateAgentPreflight(root: string) {
   const failures = [
     ...(await validateAgentDiscovery(root)),
@@ -360,6 +401,8 @@ export async function validateAgentPreflight(root: string) {
     ...(await validateModuleBoundaries(root)),
     ...(await validateCapabilityCatalog(root)),
     ...(await validateSourceRegistry(root)),
+    ...(await validateSkillShims(root)),
+    ...(await validateDomainLeakage(root)),
   ];
   return failures.sort();
 }
@@ -421,8 +464,6 @@ export async function validateAgentDiscovery(root: string) {
       failures.push(`package.json missing script ${command.script}`);
     }
   }
-  failures.push(...(await validateSkillShims(root)));
-  failures.push(...(await validateDomainLeakage(root)));
   return failures;
 }
 
@@ -468,7 +509,13 @@ export async function validateModuleContracts(root: string) {
 
 export async function validateModuleBoundaries(root: string) {
   const failures: string[] = [];
-  const sourceFiles = await collectFiles(root, [".ts", ".tsx"]);
+  // ⛔ MEASURED 2026-09-01: the list this walk used to carry did not know `dist-types`, and
+  // `extname("index.d.ts") === ".ts"` — so 232 generated declaration files (1.4 MB) under
+  // packages/fachverfahren-kit/dist-types were read and pattern-matched AS SOURCE by a boundary gate.
+  // They are in `.gitignore`; the shared walk derives its exclusions from there instead of guessing.
+  const sourceFiles = await collectSourceFiles(root, {
+    extensions: [".ts", ".tsx"],
+  });
   const platformFiles = sourceFiles.filter((file) =>
     /\/(packages|apps|jurisdictions)\//.test(toPosix(file)),
   );
@@ -870,13 +917,10 @@ export async function fetchGovernedSource(
 
 async function moduleFileEntries(root: string, spec: AppSpec) {
   const directory = join(root, spec.module.destination);
-  const files = await collectFiles(directory, [
-    ".json",
-    ".sql",
-    ".ts",
-    ".tsx",
-    ".yaml",
-  ]);
+  const files = await collectSourceFiles(directory, {
+    extensions: [".json", ".sql", ".ts", ".tsx", ".yaml"],
+    optional: true,
+  });
   const entries = await Promise.all(
     files.map(async (file) => ({
       path: relative(root, file),
@@ -1326,7 +1370,10 @@ async function validateDomainLeakage(root: string) {
       (value): value is string => typeof value === "string" && value.length > 0,
     )
     .map((value) => value.toLowerCase());
-  const specFiles = await collectFiles(join(root, "docs/examples"), [".yaml"]);
+  const specFiles = await collectSourceFiles(join(root, "docs/examples"), {
+    extensions: [".yaml"],
+    optional: true,
+  });
   const specs = [];
   for (const file of specFiles.filter((path) =>
     path.endsWith("app.spec.yaml"),
@@ -1337,16 +1384,30 @@ async function validateDomainLeakage(root: string) {
     });
   }
   const forbiddenRoots = ["apps", "packages", "jurisdictions"];
+  // ── THE DECLARED DOMAIN SEAM IS NOT SHARED CODE ─────────────────────────────────────────────────────────────
+  // This gate protects SHARED code from hard-coded procedure vocabulary. One family of files is, by this kit's own
+  // documentation, the exact opposite: `leistung.config.ts` calls itself "DIE EINE Austausch-Naht dieser App — die
+  // `LeistungConfig`, aus der die gesamte App rendert", and three further files are generated FROM it. They live
+  // under `apps/` and they carry the procedure's vocabulary because that is their entire purpose.
+  //
+  // MEASURED 2026-08-31 in two fully built procedures: `agent:bootstrap` reported eighteen leakage blockers, and
+  // every one of them named one of these four files. Reporting the seam as leakage does not protect anything — it
+  // buries the leaks that would matter (a procedure term hard-coded into `packages/`) under the one file that is
+  // supposed to have them.
+  //
+  // The exemption is DECLARED, never guessed: the app names its own seam in `package.json` under `chos.seam.files`,
+  // relative to the app directory, so it survives the scaffold rename. No declaration => no exemption => the
+  // previous behaviour, byte for byte.
+  const exclusions = await loadSourceExclusions(root);
+  const seamFiles = await collectDeclaredSeam(root);
   const files = (
     await Promise.all(
       forbiddenRoots.map((entry) =>
-        collectFiles(join(root, entry), [
-          ".ts",
-          ".tsx",
-          ".md",
-          ".json",
-          ".yaml",
-        ]),
+        collectSourceFiles(join(root, entry), {
+          extensions: [".ts", ".tsx", ".md", ".json", ".yaml"],
+          exclusions,
+          optional: true,
+        }),
       ),
     )
   ).flat();
@@ -1360,13 +1421,50 @@ async function validateDomainLeakage(root: string) {
       if (rel.startsWith(spec.module.destination)) {
         continue;
       }
-      // Das generierte Doc-Wiki-Manifest aggregiert Repo-Doku (inkl. Skills, die Beispiel-Verfahren wie
-      // Hundesteuer NENNEN) — Dokumentation, kein Runtime-Domaenencode. Der Leckage-Gate schuetzt AUTHORED
-      // Code vor hart kodiertem Domaenen-Vokabular; ein generiertes Doku-Aggregat ist bewusst ausgenommen.
-      if (rel.endsWith("docs-manifest.generated.ts")) {
+      // Exact file OR declared directory prefix — see `collectDeclaredSeam` for why a prefix is required.
+      if (
+        seamFiles.has(rel) ||
+        [...seamFiles].some((s) => s.endsWith("/") && rel.startsWith(s))
+      ) {
         continue;
       }
-      const text = await readFile(file, "utf8").catch(() => "");
+      // ⛔ NOT `.catch(() => "")`. An unreadable file would then contain no domain term and pass a
+      // LEAKAGE gate — the scanner would start approving exactly when it stopped being able to look.
+      const text = await readTextFile(file);
+      // ── A GENERATED ARTEFACT IS NOT AUTHORED CODE ───────────────────────────────────────────────────────────
+      //
+      // This gate protects AUTHORED code from hard-coded procedure vocabulary. A generated artefact carries that
+      // vocabulary because generating it is the point. Here stood ONE hand-written exception for
+      // `docs-manifest.generated.ts`, with exactly that reasoning — and a second family then walked into the gate.
+      //
+      // MEASURED 2026-09-14 on a fully built procedure (`hundesteuer`): FIVE hard findings of the form
+      //
+      //     apps/fachverfahren/deploy/k8s/service.yaml contains domain term Hundesteuer outside modules/hundesteuer
+      //
+      // and they were that run's ONLY remaining blocker on the way to done — 10/10 mandatory requirements met,
+      // shipped tests PASSED 145/0. A k8s Service for the Hundesteuer deployment MUST be named after it: that is
+      // IDENTITY, not leakage. Reporting it protects nothing and buries the leaks that would matter, which is
+      // word for word the reasoning that already exempted the declared seam twenty lines above.
+      //
+      // ⭐ SO THE CRITERION MOVES FROM A FILE NAME TO A DECLARATION — and the hand-written exception above is gone,
+      // because this covers it (`docs-manifest.generated.ts` names its producer in its own first line).
+      //
+      // ⚠️ AND THE HOUSE RULE NEXT DOOR SAYS «The exemption is DECLARED, never guessed» — it is obeyed, not
+      // sidestepped. The seam is declared in `package.json` because a PATH must survive the scaffold rename. A
+      // generated file needs no path: it declares itself, at the top, naming ITS PRODUCER. That travels with the
+      // artefact through any rename, and it is readable by anyone opening the file — a stronger form of the same
+      // principle, not a weaker one. The producer name is required precisely so a bare "// GENERATED" is not a
+      // pass. The generator side was fixed first (CHOS `deploy-emit` stamps every manifest at its one write seam),
+      // because a gate cannot apply a rule the artefacts do not carry.
+      //
+      // ⚠️ RESIDUAL RISK, NAMED: a header is a claim, and an agent could write one to slip vocabulary into shared
+      // code. This gate is an advisory guard against ACCIDENTAL hard-coding, not an adversarial control, and the
+      // measured cost of the false blocker (one run's entire path to done) exceeds that residue. What would make
+      // this wrong: a run that writes SHARED RUNTIME code and stamps it as generated. If that is ever measured,
+      // the criterion narrows to declared generator outputs — it must not widen further.
+      if (declaresItselfGenerated(text)) {
+        continue;
+      }
       for (const term of terms) {
         // Wortgenau (\b…\b): sonst matcht „Hund" innerhalb von „Hundesteuer" und meldet die App-
         // Identität fälschlich als Leckage.
@@ -1381,11 +1479,48 @@ async function validateDomainLeakage(root: string) {
   return failures;
 }
 
+/** The seam files an app DECLARES for itself (`package.json` -> `chos.seam.files`, relative to the app dir),
+ *  returned as repo-relative paths. Every app under `apps/` is asked; an app without the declaration contributes
+ *  nothing. A malformed entry is ignored rather than silently widening the exemption — an exemption that grows by
+ *  accident is worse than one that is missing. */
+export async function collectDeclaredSeam(root: string): Promise<Set<string>> {
+  const seam = new Set<string>();
+  const apps = await readDirectoryEntries(join(root, "apps"), {
+    optional: true,
+  });
+  for (const app of apps) {
+    if (!app.isDirectory()) continue;
+    const pkg = await readJson<{
+      chos?: { seam?: { files?: unknown } };
+    }>(join(root, "apps", app.name, "package.json")).catch(() => null);
+    const files = pkg?.chos?.seam?.files;
+    if (!Array.isArray(files)) continue;
+    for (const entry of files) {
+      if (typeof entry !== "string" || !entry || entry.includes("..")) continue;
+      // A TRAILING SLASH DECLARES A DIRECTORY, NOT A FILE (2026-09-14).
+      //
+      // MEASURED on `hundesteuer`: the seam list is exact-match, and the deploy manifests are written under
+      // names this list cannot know in advance — `deploy/k8s/deployment.yaml` for a monolith, but
+      // `deploy/k8s/<zone>/deployment.yaml`, `deploy/k8s/<unit>/service.yaml` and
+      // `deploy/k8s/datenfluss-<id>/cronjob.yaml` once the project declares zones or a deploy split. A fixed
+      // file list is therefore not merely incomplete, it is SILENTLY incomplete — and a leakage gate that
+      // silently misses an entry does not under-report, it over-reports: every unlisted manifest becomes a
+      // false blocker. That is the failure this whole exception exists to end.
+      //
+      // ⚠️ MEASURED, not assumed: `join` PRESERVES a trailing slash (`join("apps","x","deploy/k8s/")` →
+      // `apps/x/deploy/k8s/`). Appending another one produced `deploy/k8s//`, which matches nothing — the
+      // exemption was written, shipped and silently inert. So the separator is normalised explicitly: strip
+      // whatever the join produced, then add exactly one back when the declaration asked for a directory.
+      const joined = join("apps", app.name, entry).replace(/\/+$/, "");
+      seam.add(entry.endsWith("/") ? joined + "/" : joined);
+    }
+  }
+  return seam;
+}
+
 async function listModuleDirectories(root: string) {
   const modulesRoot = join(root, "modules");
-  const entries = await readdir(modulesRoot, { withFileTypes: true }).catch(
-    () => [],
-  );
+  const entries = await readDirectoryEntries(modulesRoot, { optional: true });
   return entries
     .filter((entry) => entry.isDirectory())
     .map((entry) => join(modulesRoot, entry.name))
@@ -1393,7 +1528,7 @@ async function listModuleDirectories(root: string) {
 }
 
 async function listSkillNames(root: string) {
-  const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
+  const entries = await readDirectoryEntries(root, { optional: true });
   return entries
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
@@ -1952,30 +2087,6 @@ function screensTsx(spec: AppSpec) {
     "}",
     "",
   ].join("\n");
-}
-
-async function collectFiles(root: string, extensions: string[]) {
-  const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
-  const files: string[] = [];
-  for (const entry of entries) {
-    const path = join(root, entry.name);
-    if (
-      [".git", "node_modules", "dist", "storybook-static", ".agent"].includes(
-        entry.name,
-      )
-    ) {
-      continue;
-    }
-    if (entry.isDirectory()) {
-      files.push(...(await collectFiles(path, extensions)));
-    } else if (
-      extensions.length === 0 ||
-      extensions.includes(extname(entry.name))
-    ) {
-      files.push(path);
-    }
-  }
-  return files.sort();
 }
 
 async function readOptional(path: string) {

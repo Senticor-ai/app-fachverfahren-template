@@ -22,7 +22,12 @@ import {
 } from "../ui/resizable.js";
 import { StatusPill } from "./StatusPill.js";
 import { EvidenceCard } from "./EvidenceCard.js";
-import { VorgangDetail, formatWert, getPfad } from "./VorgangDetail.js";
+import {
+  VorgangDetail,
+  formatWert,
+  getPfad,
+  type CaseReviewer,
+} from "./VorgangDetail.js";
 import { EntscheidungPanel } from "./EntscheidungPanel.js";
 import { NachweisBrowser, type NachweisEintrag } from "./NachweisBrowser.js";
 import { PdfViewer } from "./PdfViewer.js";
@@ -46,6 +51,9 @@ export interface ReviewWorkspaceProps<T = Record<string, unknown>> {
    *  bleibt es (abwärtskompatibel) beim History-Vermerk ohne erzwungene Vier-Augen-Prüfung. Die App-Shell liefert
    *  idealerweise die angemeldete Person. */
   akteur?: string;
+  /** The reviewer behind the mask — handed to the case detail, which renders it (VorgangDetail `CaseReviewer`).
+   *  Omitted ⇒ the mask as before. */
+  reviewer?: CaseReviewer;
   className?: string;
 }
 
@@ -67,6 +75,7 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
   onClose,
   flagLabel,
   akteur,
+  reviewer,
   className,
 }: ReviewWorkspaceProps<T>) {
   const vorgang = port.get(vorgangId);
@@ -207,6 +216,7 @@ export function ReviewWorkspace<T = Record<string, unknown>>({
               config={config}
               vorgang={vorgang}
               {...(flagLabel ? { flagLabel } : {})}
+              {...(reviewer ? { reviewer } : {})}
               zeigeUebergabe={false}
             />
           </div>

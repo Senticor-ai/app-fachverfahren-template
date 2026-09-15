@@ -5,7 +5,13 @@ import { readRuntimeConfig, redactedConfigSummary } from "./config.js";
 describe("readRuntimeConfig", () => {
   it("liefert neutrale Defaults ohne Env und ohne Overrides", () => {
     const config = readRuntimeConfig({});
-    expect(config.host).toBe("0.0.0.0");
+    // FAIL-CLOSED BIND DEFAULT. Until 2026-09-11 this line read `"0.0.0.0"` and was the ONLY assertion in
+    // either tree that said anything about where a generated application binds — so the single witness on
+    // the subject actively guaranteed the wide bind. Measured on that day: four generated administrative
+    // applications had been reachable from the LAN for 1d18h (HTTP 200 on /auth/status). Loopback is the
+    // fail-closed direction; the capability to bind wide is not removed, it is moved into the open (see the
+    // explicit-HOST test below).
+    expect(config.host).toBe("127.0.0.1");
     expect(config.port).toBe(8080);
     expect(config.internalPort).toBe(9090);
     expect(config.staticDir).toBe(path.join(process.cwd(), "dist"));
@@ -34,6 +40,17 @@ describe("readRuntimeConfig", () => {
     expect(
       (config.publicRuntimeConfig as { zone?: unknown }).zone,
     ).toBeUndefined();
+  });
+
+  it("an explicit HOST is still honoured — the wide bind is a declaration, not a removed capability", () => {
+    // THE POINT OF THE PREVIOUS TEST IS ONLY HALF THE TRUTH WITHOUT THIS ONE. Turning the default to
+    // loopback would be a REMOVED capability if an operator could no longer ask for a wide bind. This
+    // asserts the stated wish still wins: the cut closes a silent default, it does not close the door.
+    // The Helm path already declares it (`deploy/.../configmap.yaml:8`) — the root `Dockerfile` does NOT,
+    // and needs `ENV HOST=0.0.0.0` added; see the measurement in `config.ts` beside the default.
+    expect(readRuntimeConfig({ HOST: "0.0.0.0" }).host).toBe("0.0.0.0");
+    expect(readRuntimeConfig({ HOST: "::" }).host).toBe("::");
+    expect(readRuntimeConfig({ HOST: "10.1.2.3" }).host).toBe("10.1.2.3");
   });
 
   it("ZONE + ZONE_SURFACES ⇒ Zonen-Flächen in publicRuntimeConfig (Frontend-Filter-Quelle)", () => {
@@ -198,5 +215,13 @@ describe("redactedConfigSummary", () => {
     expect(summary.publicBaseUrl).toBe("");
     expect(summary.cspMode).toBe("enforce");
     expect(Object.keys(summary)).not.toContain("buildInfo");
+    // THE START LOG MUST NAME THE BIND ADDRESS. `runtime.started` logs this summary, and until 2026-09-11 it
+    // carried port and internalPort but not `host` — so a running application never said which interfaces it
+    // was listening on, and the 1d18h LAN exposure was invisible in its own log. A bind address is not a
+    // secret; withholding it only hides the exposure from the operator.
+    expect(summary.host).toBe("127.0.0.1");
+    expect(
+      redactedConfigSummary(readRuntimeConfig({ HOST: "0.0.0.0" })).host,
+    ).toBe("0.0.0.0");
   });
 });

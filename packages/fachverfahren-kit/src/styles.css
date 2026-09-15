@@ -114,6 +114,14 @@
   --fv-duration-fast: 100ms;
   --fv-duration-base: 150ms;
   --fv-duration-slow: 200ms;
+  /* SURFACE AND REVEAL — the scale above tops out at 200ms because interface feedback should be immediate.
+     Large surfaces are a different case, and it is motion principle rather than laxity: more travel needs more
+     time. Without these two steps the only tokenised option was to crush a sheet slide to 200ms, which reads as
+     a jump rather than a movement — so the literals stayed, and a magic number is worse than a long duration.
+     ASYMMETRIC ON PURPOSE: entering is a reveal and may take its time; leaving is a dismissal and should not.
+     Every use of these two is `motion-safe:`-guarded or driven by data-state, so `prefers-reduced-motion` wins. */
+  --fv-duration-surface: 300ms;
+  --fv-duration-reveal: 500ms;
   --fv-ease-out: cubic-bezier(0, 0, 0.2, 1);
 
   /* Neutraler Hintergrund + Tinte */

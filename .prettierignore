@@ -14,4 +14,8 @@ pnpm-lock.yaml
 **/procedure.contract.json
 # GENERIERT via `pnpm --filter @senticor/fachverfahren emit:docs` — komplette Repo-Doku, Format ist der emit-Output
 **/docs-manifest.generated.ts
+# GENERIERT via `node --experimental-strip-types scripts/emit-leistung-schema.mts` aus der EINEN Pflicht-Form
+# (packages/fachverfahren-kit/src/leistung-contract-form.ts) — Format ist der emit-Output, nie Prettier.
+# Wuerde Prettier hier umbrechen, schluege das Frische-Gate in check-leistung-contract.mts dauerhaft fehl.
+schemas/leistung-config.schema.json
 **/deploy/helm/**/templates/**

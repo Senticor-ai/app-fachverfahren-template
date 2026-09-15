@@ -8,6 +8,8 @@ import { formatBetragStatus } from "@senticor/fachverfahren-kit";
 import { Shell } from "../app/shell.js";
 import { useStoreVersion } from "../app/use-store-version.js";
 import { store } from "../store.js";
+import { grundVon, statusVon } from "../app/ladelage.js";
+import { FehlerFlaeche } from "../app/fehler-flaeche.js";
 
 export function BuergerBestaetigungPage(): React.JSX.Element {
   useStoreVersion();
@@ -18,12 +20,22 @@ export function BuergerBestaetigungPage(): React.JSX.Element {
   // Snapshot durch die eigenen Anträge — danach findet store.get(id) den Vorgang. `laedt` unterscheidet
   // „wird noch geladen" von „gibt es wirklich nicht", damit kein falsches „nicht gefunden" aufblitzt.
   const [laedt, setLaedt] = useState(!v && store.laden !== undefined);
+  const [fehler, setFehler] = useState<{
+    grund: string;
+    status: number | null;
+  } | null>(null);
+  const [versuch, setVersuch] = useState(0);
   useEffect(() => {
     if (v || store.laden === undefined) return;
     let abgebrochen = false;
+    setFehler(null);
     store
       .laden()
-      .catch(() => undefined)
+      .catch((e: unknown) => {
+        // A failed hydration is not "Vorgang nicht gefunden" — see app/ladelage.ts for the measurement.
+        if (!abgebrochen)
+          setFehler({ grund: grundVon(e), status: statusVon(e) });
+      })
       .finally(() => {
         if (!abgebrochen) setLaedt(false);
       });
@@ -31,7 +43,7 @@ export function BuergerBestaetigungPage(): React.JSX.Element {
       abgebrochen = true;
     };
     // Bewusst leere Deps: nur EINMAL beim Mounten hydrieren, nicht bei jeder v-Änderung.
-  }, []);
+  }, [versuch, v]);
   return (
     <Shell persona="buerger" activeNavKey="start">
       <div className="mx-auto max-w-2xl p-4 md:p-8">
@@ -109,6 +121,14 @@ export function BuergerBestaetigungPage(): React.JSX.Element {
           <p className="text-sm text-muted-foreground" aria-busy="true">
             Ihr Vorgang wird geladen …
           </p>
+        ) : fehler ? (
+          <FehlerFlaeche
+            titel="Ihr Vorgang konnte gerade nicht geladen werden."
+            klarstellung="Das heißt NICHT, dass es ihn nicht gibt — wir konnten es nur nicht feststellen."
+            grund={fehler.grund}
+            status={fehler.status}
+            erneut={() => setVersuch((n) => n + 1)}
+          />
         ) : (
           <p className="text-sm text-muted-foreground">
             Vorgang nicht gefunden.

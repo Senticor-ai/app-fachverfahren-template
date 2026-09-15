@@ -13,18 +13,24 @@ pnpm run dev
 ```
 
 `pnpm run dev` allein zeigt nur die Landing mit „Server nicht erreichbar":
-die Landing (`/`) ist die einzige Route ohne Anmeldung, alle Persona- und
-Workspace-Sichten liegen hinter dem Session-Gate. Für die angemeldeten
+die Landing (`/`) und das Doku-Wiki (`/hilfe`) sind die einzigen Routen ohne
+Anmeldung, alle Persona- und Workspace-Sichten liegen hinter dem Session-Gate. Für die angemeldeten
 Sichten zusätzlich die App-Runtime starten — Voraussetzung ist ein
-erreichbares Postgres (Manifest: `dev/postgres.yaml`, übersteuerbar via
-`APP_PG_URL`):
+erreichbares Postgres — leichter Weg `docker compose up -d` (die
+`docker-compose.yml` im Wurzelverzeichnis), Cluster-naher Weg das Manifest
+`dev/postgres.yaml`; beide übersteuerbar via `APP_PG_URL`:
 
 ```bash
 pnpm run dev:api
 ```
 
 Beim ersten Start den Administrationszugang auf der Landing (`/`) mit dem
-Bootstrap-Token `dev-setup` einrichten (Default nur für lokale Entwicklung).
+Bootstrap-Token `dev-setup` einrichten. Das Token ist **an genau diesen
+Startweg gebunden**: `scripts/dev-api.mjs:31` setzt es, und nur wenn
+`BOOTSTRAP_TOKEN` undefiniert ist UND kein `AUTH_BOOTSTRAP_ADMIN_EMAIL`
+gesetzt ist. Bei jedem anderen Startweg ist Bootstrap ungesetzt = **aus**
+(`.env.example:49`) — dort `BOOTSTRAP_TOKEN` bzw. `AUTH_BOOTSTRAP_ADMIN_*`
+selbst setzen. Ausführlich im `README.md`, Abschnitt „Lokal starten".
 
 ## Entwicklungsregeln
 
@@ -58,13 +64,17 @@ pnpm run test:k8s:render
 pnpm run evidence:build
 ```
 
-Husky richtet beim Installieren einen Pre-Commit-Hook ein. Der Hook ruft
-`pnpm run precommit:check` auf. Details und Bypass-Regeln stehen in
-`docs/reference/precommit-hooks.md`.
+Husky richtet beim Installieren einen Pre-Commit-Hook ein. Der Hook prüft
+zuerst, ob `apps/fachverfahren/leistung.contract.json` zum **gestagten** Stand
+passt — er zieht die Emit-Closure per `git show :<pfad>` aus dem INDEX in ein
+Temp-Verzeichnis und emittiert dort, ohne Worktree oder Index anzufassen. Danach
+ruft er `pnpm run check:precommit` auf (= `check:git-hygiene` + `check:fast`, der
+nebenläufige Runner über die `precommit:check`-Kette). Details und Bypass-Regeln
+stehen in `docs/reference/precommit-hooks.md`.
 
-Demo- und Registerdaten leben deterministisch in der `LeistungConfig`-Naht;
-eine MSW-Mock-Schicht ist (PLAN) in `docs/reference/mock-data-msw.md`
-beschrieben.
+Demo- und Registerdaten leben deterministisch in der `LeistungConfig`-Naht.
+MSW ist Test-Schicht (`pnpm run test:browser`); eine fachliche Mock-Schicht ist
+nicht Teil der App (`docs/reference/mock-data-msw.md`).
 
 Wenn eine Änderung ein neues Domain-Modul einführt (Generator-Pfad, PLAN),
 muss sie das Manifest, Rechte, Events, Datenkategorien, Retention und

@@ -111,6 +111,61 @@ function auswahlFelder(): { name: string; werte: unknown[] }[] {
 const zahl = (v: unknown): number | undefined =>
   typeof v === "number" && Number.isFinite(v) ? v : undefined;
 
+// ── POSITIVE CONTROL: IS ANYTHING MEASURED HERE AT ALL? ─────────────────────────────────────────────
+//
+// ── THE MEASUREMENT THAT FORCED THIS BLOCK (2026-09-09) ─────────────────────────────────────────────
+// Three generated procedures from the same build path shipped `antrag.steps: []` and `rechenproben: []`.
+// This file ran GREEN for all three — 117 passing witnesses over an application without a single
+// input field, and without a single amount ever being asserted: EVERY loop body below iterated a
+// set that was empty. A head of office reads "passed" on top of it.
+//
+// This is the leading defect class of this house — "witnesses that stand green and check nothing". The
+// remedy is the pattern ALREADY IN USE HERE (`security-header.test.ts`: "POSITIVE CONTROL: the list is
+// not empty, otherwise everything below checks nothing"), not a new one: an assertion BEFORE the loops
+// that makes "0 cases passed" distinguishable from "all cases passed".
+//
+// ⛔ THIS BLOCK INVENTS NO CASES. It names the emptiness, it does not fill it. What a procedure
+// collects and which amounts it knows is worked out procedure-specifically in the Fachkonzept; a
+// substitute example shipped here would be a false statement about a Fachverfahren.
+describe("POSITIVE CONTROL — does this file measure anything at all?", () => {
+  it("the procedure collects at least ONE field (otherwise every loop below runs zero times)", () => {
+    const fields = (cfg.antrag?.steps ?? []).flatMap((s) => s.felder ?? []);
+    expect(
+      fields.length,
+      "This procedure declares NOT A SINGLE application field (antrag.steps is empty or has no fields). " +
+        "Every assertion in this file therefore iterates an empty set and stands green without checking " +
+        "anything — and the shipped application has no input form. That is not a passed test but one " +
+        "that was never carried out.",
+    ).toBeGreaterThan(0);
+  });
+
+  it("the procedure declares at least ONE entry in rechenproben (otherwise no amount is machine-checked)", () => {
+    expect(
+      (cfg.rechenproben ?? []).length,
+      "This procedure declares no rechenproben — NO amount is machine-checked. The three invariants " +
+        "below only check the internal consistency of the calculation (sum, effect, cent format); whether " +
+        "the amount is the RIGHT one is said only by an expected value with derivation and source from " +
+        "the Fachkonzept. A Bescheid with a wrong amount is a materially unlawful but EFFECTIVE " +
+        "Verwaltungsakt.",
+    ).toBeGreaterThan(0);
+  });
+
+  it("the seam's seed examples are real inputs, not an empty fallback", () => {
+    // `seedEingaben()` falls back to `[{}]` when the seam brings no seed cases. The invariants below
+    // then run over ONE empty object — formally green, blind in substance.
+    const inputs = seedEingaben();
+    const genuine = inputs.filter(
+      (e) => e && typeof e === "object" && Object.keys(e).length > 0,
+    );
+    expect(
+      genuine.length,
+      "The seam delivers no seed inputs (leistungConfig.seed is missing or carries no antragsdaten). " +
+        "The sum/effect/format invariants therefore run over an empty object and do not measure " +
+        "this procedure's calculation.",
+    ).toBeGreaterThan(0);
+  });
+});
+
 describe("Berechnung — Naht-Vertrag (leistungConfig.berechne)", () => {
   it("berechne() ist eine aufrufbare Funktion", () => {
     expect(typeof cfg.berechne).toBe("function");

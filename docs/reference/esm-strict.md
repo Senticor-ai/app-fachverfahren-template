@@ -10,6 +10,8 @@ Dieses Repository ist strict ESM.
 - TypeScript: `module` und `moduleResolution` sind `NodeNext`
 - Keine CommonJS-Syntax in Quellcode
 - Keine `.cjs`- oder `.cts`-Quellen
+- Jedes `composite`-TypeScript-Paket ist im Root-`tsconfig.json` referenziert,
+  damit `tsc -b` es deckt — Ratsche: `scripts/tsconfig-project-coverage.test.ts`
 - Implementierungscode unter `apps/`, `packages/`, `jurisdictions/` und
   `modules/` ist TypeScript-only: `.ts` oder `.tsx`. `.js`, `.jsx`, `.cjs` und
   `.mjs` sind dort nicht erlaubt. Ausnahmen sind explizit erlaubte

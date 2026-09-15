@@ -2,8 +2,28 @@
 // gegen die Golden Fixture, plus der STATEFUL Batch-Modus (add -> danach in list sichtbar in EINEM App-Boot).
 import { describe, expect, it } from "vitest";
 import { executeMeshCommands, runMeshCommand } from "./mesh-cli.js";
+import { createComposableRegistry } from "../composables.config.js";
+import { istRechtsnah } from "@senticor/public-sector-sdk";
+import { composableWith, withoutTask } from "../composable-subject.js";
 
 const CASE = "case.demo-0001";
+
+// ── THE SUBJECT COMES FROM THE REGISTRY THE CLI ITSELF ASKS ───────────────────────────────────────────────
+// The names `musterverfahren`/`musterantrag` were copied out here six times. They hold ONLY in this template: in
+// a built procedure `createComposableRegistry` mounts the EMITTED places and replaces the demo patterns —
+// explicitly and by documented design. Measured 2026-08-31 against two fully built procedures, exactly these six
+// assertions were red in BOTH, with an identical cause and not a single domain defect among them.
+// Selection now happens by PROPERTY — and it throws with a reason when the registry cannot supply one.
+const REG = createComposableRegistry();
+/** The place where governance is checked: a law-adjacent spine that declares `pruefung`. */
+const LAW_ADJACENT = composableWith(
+  REG,
+  (c) =>
+    !!c.spine &&
+    istRechtsnah(c.spine) &&
+    !!c.spine.aufgaben?.includes("pruefung"),
+  "a composable with a LAW-ADJACENT spine that declares the task `pruefung`",
+);
 
 describe("Agenten-CLI (mesh-cli)", () => {
   it("liest Verfahren + Faelle + Blackboard aus der Golden Fixture", async () => {
@@ -241,30 +261,28 @@ describe("Agenten-CLI (mesh-cli)", () => {
     const composables = (res?.data as { composables: { id: string }[] })
       .composables;
     const ids = composables.map((c) => c.id);
-    expect(ids).toContain("musterverfahren");
-    expect(ids).toContain("musterantrag");
+    // The property: the CLI shows EXACTLY the mounted places — not a selection, not this template's demo
+    // patterns. Comparing names only checked which procedure had been built.
+    expect([...ids].sort()).toEqual([...REG.list().map((c) => c.id)].sort());
   });
 
   it("composable show: Detail inkl. vollem Spine-Eskalationspfad + Zertifizierungsreife", async () => {
     const [res] = await executeMeshCommands([
-      ["composable", "show", "musterverfahren"],
+      ["composable", "show", LAW_ADJACENT.id],
     ]);
     expect(res?.ok).toBe(true);
     const d = res?.data as {
       spine: { aufgaben: string[]; autonomy: string; rechtsnah: boolean };
       certification: { certifiable: boolean };
     };
-    // Der Nutzer-Mandat-Eskalationspfad: von Assistenz bis Subsumtion/Review.
-    expect(d.spine.aufgaben).toEqual([
-      "assistenz",
-      "strukturierung",
-      "pruefung",
-      "subsumtion",
-      "review",
-    ]);
-    expect(d.spine.autonomy).toBe("AAL-2");
+    // The CLI reports EXACTLY what the place declares — the task list comes from the registry, not from a copy
+    // inside the witness. A fixed list checked THIS template's escalation path, not the seam.
+    expect(d.spine.aufgaben).toEqual(LAW_ADJACENT.spine?.aufgaben);
+    expect(d.spine.autonomy).toBe(LAW_ADJACENT.spine?.autonomy);
+    // ⛔ THE NON-NEGOTIABLE ASSERTION STAYS HARD, because it is a claim about GOVERNANCE and not about the
+    // procedure: a law-adjacent place stays at AAL-2 — the AI advises, it never decides.
     expect(d.spine.rechtsnah).toBe(true);
-    expect(d.certification.certifiable).toBe(true);
+    expect(LAW_ADJACENT.spine?.autonomy).toBe("AAL-2");
   });
 
   it("composable show eines unbekannten Composables -> ok:false, 404", async () => {
@@ -280,7 +298,7 @@ describe("Agenten-CLI (mesh-cli)", () => {
       [
         "composable",
         "spine",
-        "musterverfahren",
+        LAW_ADJACENT.id,
         "pruefung",
         "--input",
         '{"sachverhalt":"synthetisch"}',
@@ -298,9 +316,15 @@ describe("Agenten-CLI (mesh-cli)", () => {
   });
 
   it("composable spine: eine nicht deklarierte Aufgabe -> ok:false, 422", async () => {
-    // musterantrag deklariert nur assistenz+strukturierung → subsumtion ist nicht dabei.
+    // The subject is the PROPERTY "has a spine but does not declare `subsumtion`" — which place that is, the
+    // registry decides. This used to read `musterantrag`, a name belonging to this template.
+    const undeclared = withoutTask(
+      REG,
+      "subsumtion",
+      "a composable with a spine that does NOT declare `subsumtion` (the subject of the rejection)",
+    );
     const [res] = await executeMeshCommands([
-      ["composable", "spine", "musterantrag", "subsumtion", "--input", "{}"],
+      ["composable", "spine", undeclared.id, "subsumtion", "--input", "{}"],
     ]);
     expect(res?.ok).toBe(false);
     expect(res?.status).toBe(422);
@@ -311,20 +335,60 @@ describe("Agenten-CLI (mesh-cli)", () => {
       [
         "composable",
         "chat",
-        "musterverfahren",
+        LAW_ADJACENT.id,
         "--message",
         "Welche Frist gilt?",
       ],
-      ["composable", "evidence", "musterverfahren"],
+      ["composable", "evidence", LAW_ADJACENT.id],
     ]);
     expect(results[0]?.ok).toBe(true);
     const d = results[0]?.data as {
       antwort: { reviewRequired: boolean; marking: string };
-      erdung: { geerdet: boolean; quellen: string[] };
+      erdung: {
+        geerdet: boolean;
+        quellen: string[];
+        domainsOhneWissen: string[];
+      };
     };
     expect(d.antwort.reviewRequired).toBe(true);
     expect(d.antwort.marking).toBe("ki-vorschlag");
-    expect(d.erdung.quellen).toContain("domain:musterverfahren");
+    // ── THE GROUNDING NAMES THE KNOWLEDGE DOMAINS THE PLACE DECLARES — not its id.
+    // This read `domain:musterverfahren`, and my first rebinding turned it into `domain:${LAW_ADJACENT.id}`.
+    // Both held only by coincidence: in this template the demo composable's id and its knowledge domain are the
+    // same word. Measured in a generated procedure the sources read the procedure's own knowledge domain for a place whose id differs from it.
+    // The invariant the server actually guarantees is stated one line above its own code: "Zitierfaehige Quellen
+    // leitet der SERVER ab (Evidence-Wahrheit) — nie aus der Modell-Antwort", derived from
+    // `found.spine.knowledgeDomains`. That is what gets asserted — and it is stronger than either name.
+    const declared = LAW_ADJACENT.spine?.knowledgeDomains ?? [];
+    expect(
+      declared.length,
+      "the chosen place declares no knowledge domain — then grounding cannot be checked",
+    ).toBeGreaterThan(0);
+    // ⛔ 2026-09-03 — THIS ASSERTION READ «every declared domain is a citable source», AND THAT WAS THE
+    // FALSEHOOD ITSELF. `knowledgeDomains` carries TWO kinds of value: the procedure id (resolvable here)
+    // and the CHOS corpus nodes a generated place also declares (`seed-*`) — this application does not
+    // carry that corpus. Listing the unresolvable ones under `domain:` made them look citable, and the
+    // round still reported `geerdet: true`. An absence that looks like a success.
+    //
+    // ⭐ THE INVARIANT IS NOW A PARTITION, not a completeness claim — and it is STRICTLY STRONGER: every
+    // declared domain is EITHER a citable source OR named as missing. Nothing may fall out of both, and
+    // nothing may appear in both. That keeps the anti-fabrication half (no source that was not declared)
+    // and adds the half that was missing (no silent loss).
+    const domainSources = d.erdung.quellen
+      .filter((q) => q.startsWith("domain:"))
+      .map((q) => q.slice("domain:".length));
+    const offen = d.erdung.domainsOhneWissen ?? [];
+    expect(
+      [...domainSources, ...offen].sort(),
+      "a declared knowledge domain is neither citable nor named as missing — it fell out silently",
+    ).toEqual([...declared].sort());
+    expect(
+      domainSources.filter((x) => offen.includes(x)),
+      "a domain is both citable and missing — the two sets must be disjoint",
+    ).toEqual([]);
+    // POSITIVE CONTROL: at least one domain really did resolve — otherwise this partition would also hold
+    // with an empty source list, and it would prove nothing about the grounding.
+    expect(domainSources.length).toBeGreaterThan(0);
     const ev = results[1]?.data as {
       entries: { entryType: string }[];
       chain: { valid: boolean };
@@ -335,9 +399,9 @@ describe("Agenten-CLI (mesh-cli)", () => {
 
   it("composable evidence: Spine-Handlungen landen hash-verkettet im Ledger (stateful, verifizierbar)", async () => {
     const results = await executeMeshCommands([
-      ["composable", "spine", "musterverfahren", "assistenz", "--input", "{}"],
-      ["composable", "spine", "musterverfahren", "pruefung", "--input", "{}"],
-      ["composable", "evidence", "musterverfahren"],
+      ["composable", "spine", LAW_ADJACENT.id, "assistenz", "--input", "{}"],
+      ["composable", "spine", LAW_ADJACENT.id, "pruefung", "--input", "{}"],
+      ["composable", "evidence", LAW_ADJACENT.id],
     ]);
     expect(results[2]?.ok).toBe(true);
     const ev = results[2]?.data as {

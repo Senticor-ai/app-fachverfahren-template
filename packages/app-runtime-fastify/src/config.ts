@@ -76,7 +76,34 @@ export function readRuntimeConfig(
   };
   return {
     staticDir,
-    host: env["HOST"] ?? "0.0.0.0",
+    // THE BIND ADDRESS DEFAULTS TO LOOPBACK — fail-closed, because the wide bind must be SAID, not inherited.
+    //
+    // ⛔ MEASURED 2026-09-11: this line read `?? "0.0.0.0"`, and four generated administrative applications
+    // had been reachable from the LAN for 1d18h (HTTP 200 on /auth/status). One default bound TWO ports:
+    // `runtime.ts` passes this same `config.host` to `publicServer.listen` AND `internalServer.listen`, so
+    // the internal port went out with the public one. `registration: "disabled"` made them exposed, not open
+    // — an exposure nobody chose, because nobody had to choose anything.
+    //
+    // ⭐ THE CAPABILITY REMAINS — it just has to be SAID. `HOST` still wins over this default (asserted in
+    // `config.test.ts`), so any deployment that wants a wide bind gets one by declaring it. What changes is
+    // only the SILENT case: a start that forgets to say where it binds now binds where it can do no harm.
+    // The CHOS core decided the same question the same way (`agent-core/kern-arbeiter.ts`: *"a default of
+    // 0.0.0.0 would be the softening. So: none. Whoever binds, says to what."*).
+    //
+    // ⛔ MEASURED, NOT ASSUMED — AND THE TWO DEPLOYMENT PATHS DISAGREE. The brief for this cut said "container
+    // and Helm set HOST=0.0.0.0 explicitly anyway". Checked against the tree, that is true of ONE of them:
+    //   · `apps/fachverfahren/deploy/helm/.../templates/configmap.yaml:8` → `HOST: "0.0.0.0"`, reaching the
+    //     pod via `deployment.yaml` `envFrom.configMapRef`. The Helm path is unaffected by this change. ✓
+    //   · `.env.example:38` → `HOST=0.0.0.0`, but that is a developer template; no container reads it. ✓
+    //   · ⚠️ THE ROOT `Dockerfile` SETS `PORT`, `INTERNAL_PORT` AND `EXPOSE`s BOTH — BUT NEVER `HOST`. Its
+    //     `CMD` runs `apps/fachverfahren/dist-server/index.js`, which wraps this very function, so a plain
+    //     `docker run -p 8080:8080 <image>` (without the Helm ConfigMap) now binds loopback INSIDE the
+    //     container and answers nothing from outside.
+    // That gap is the declaration this cut asks for and does not itself write: the Dockerfile was out of the
+    // change's scope. The fix is one line — `ENV HOST=0.0.0.0` beside the existing `ENV PORT=8080` — and it
+    // is exactly the point of the cut: an image that intends to be reachable says so, instead of inheriting
+    // reachability from a default that also reached four LAN-exposed applications.
+    host: env["HOST"] ?? "127.0.0.1",
     port: parsePort(env["PORT"], 8080),
     internalPort: parsePort(env["INTERNAL_PORT"], 9090),
     ...(publicBaseUrl ? { publicBaseUrl } : {}),
@@ -161,6 +188,11 @@ function buildPublicRuntimeConfig(
 export function redactedConfigSummary(config: RuntimeConfig) {
   return {
     staticDir: config.staticDir,
+    // THE START LOG NAMES THE BIND ADDRESS. `runtime.started` logs this summary; until 2026-09-11 it listed
+    // both ports but not the interface they were opened on, so a wide-bound application never said so in its
+    // own log and the exposure could only be found from outside, with a port scan. A bind address carries no
+    // secret — omitting it hid the one fact an operator needs to judge reachability.
+    host: config.host,
     port: config.port,
     internalPort: config.internalPort,
     publicBaseUrl: config.publicBaseUrl ?? "",

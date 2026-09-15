@@ -5,6 +5,7 @@
 // Build-Werkzeuge die generierte App reparieren können (statt eines stillen weißen Screens). Inline-Styles → rendert auch, wenn
 // das CSS/Theme selbst kaputt ist.
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { fehlerErklaerung } from "./app/fehler-ursache.js";
 
 interface State {
   error: Error | null;
@@ -75,38 +76,7 @@ export class AppErrorBoundary extends Component<
             color: "#475569",
           }}
         >
-          Ein Baustein ist beim Rendern auf einen Fehler gelaufen — häufig, weil
-          die generierte{" "}
-          <code
-            style={{
-              background: "#e2e8f0",
-              padding: "0 0.25rem",
-              borderRadius: 3,
-            }}
-          >
-            leistung.config.ts
-          </code>{" "}
-          nicht zum Kit-Vertrag passt (z. B. fehlt{" "}
-          <code
-            style={{
-              background: "#e2e8f0",
-              padding: "0 0.25rem",
-              borderRadius: 3,
-            }}
-          >
-            antrag.steps
-          </code>{" "}
-          oder{" "}
-          <code
-            style={{
-              background: "#e2e8f0",
-              padding: "0 0.25rem",
-              borderRadius: 3,
-            }}
-          >
-            register
-          </code>
-          ).
+          {fehlerErklaerung(error.message)}
         </div>
         <pre
           style={{
@@ -124,9 +94,48 @@ export class AppErrorBoundary extends Component<
         >
           {error.message}
         </pre>
+        {/* ── THE CRASH SCREEN HAD NO CONTROLS AND SPOKE TO THE WRONG AUDIENCE ──────────────────────────
+            The rendered tree contained no <button>, no <a>, no link — only text, the raw error message and
+            an instruction that presupposed a "Builder-Konsole" the person in front of this screen may never
+            have seen. It was, literally, a dead end: no reload, no way back, nothing to press.
+            The two controls below need no infrastructure and work in any deployment; the note about the
+            builder console stays, but as the SECOND sentence, for the audience that has one. */}
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{
+              borderRadius: 6,
+              border: "1px solid #cbd5e1",
+              background: "#0f172a",
+              color: "#f8fafc",
+              padding: "0.5rem 1rem",
+              fontSize: "0.8125rem",
+              cursor: "pointer",
+            }}
+          >
+            Seite neu laden
+          </button>
+          <button
+            type="button"
+            onClick={() => window.location.assign("/")}
+            style={{
+              borderRadius: 6,
+              border: "1px solid #cbd5e1",
+              background: "#ffffff",
+              color: "#0f172a",
+              padding: "0.5rem 1rem",
+              fontSize: "0.8125rem",
+              cursor: "pointer",
+            }}
+          >
+            Zur Startseite
+          </button>
+        </div>
         <div style={{ fontSize: "0.8125rem", color: "#475569" }}>
-          In der Builder-Konsole „Problem melden" wählen → die Agenten beheben
-          die generierte App.
+          Ihre Daten sind davon nicht betroffen — sie liegen auf dem Server.
+          Bleibt der Fehler bestehen: in der Builder-Konsole „Problem melden"
+          wählen → die Agenten beheben die generierte App.
         </div>
       </div>
     );

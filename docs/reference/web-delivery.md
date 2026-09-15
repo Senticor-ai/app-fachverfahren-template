@@ -17,13 +17,34 @@ Regeln verschärfen, aber die App-Runtime muss sichere Defaults selbst setzen.
 
 ## Security Header
 
-Die Fastify-Runtime setzt standardmäßig:
+Es sind ZWEI Schichten, und die zweite übersteuert die erste.
 
-- `Content-Security-Policy` oder im Rollout `Content-Security-Policy-Report-Only`
-- `Strict-Transport-Security` in Produktion
+**Schicht 1 — die Runtime** (`onRequest`-Hook,
+`packages/app-runtime-fastify/src/security-headers.ts`, registriert über
+`hooks.ts:40`):
+
+- `Content-Security-Policy` bzw. `Content-Security-Policy-Report-Only`
+  (abhängig von `cspMode`)
+- `Strict-Transport-Security`, wenn `enableHsts` gesetzt ist
 - `X-Content-Type-Options: nosniff`
 - `Referrer-Policy: strict-origin-when-cross-origin`
-- restriktive `Permissions-Policy`
+- `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()`
+
+**Schicht 2 — die App** (`onSend`-Hook,
+`apps/fachverfahren/server/security-header.ts`, registriert in
+`server/index.ts:216`). `onSend` statt `onRequest`, damit auch die Antworten der
+FEHLERPFADE sie tragen — eine 500 ist genauso einbettbar wie eine 200:
+
+- `X-Frame-Options: DENY`
+- `Referrer-Policy: no-referrer` (strenger als Schicht 1)
+- `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+- `X-Content-Type-Options: nosniff`
+- `Strict-Transport-Security`, sobald `request.protocol === "https"` ist
+
+**Wirksam auf dem komponierten Server** ist also: die CSP aus der Runtime, dazu
+die strengere `Referrer-Policy`/`Permissions-Policy` und `X-Frame-Options` der
+App. Gemessen wird das von `apps/fachverfahren/server/index.test.ts` und
+`scripts/check-web-delivery.mjs` (läuft in `check:ci`).
 
 Inline-Skripte sind nicht Teil des App-Shell-Vertrags. Der Preview-Reporter
 liegt deshalb als externe Datei unter `/preview-reporter.js`. Inline-Styles

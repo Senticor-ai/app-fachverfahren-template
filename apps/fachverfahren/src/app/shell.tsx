@@ -15,6 +15,7 @@ import {
 } from "../personas.js";
 import { useSession } from "../session.js";
 import { store } from "../store.js";
+import { useDokumentTitel } from "./dokument-titel.js";
 
 /** Eine Shell-Hülle um jede Route: Branding + Persona-Nav aus der Config, Persona-Wechsel + Nav-Klicks → Router. */
 export function Shell({
@@ -28,6 +29,9 @@ export function Shell({
 }): React.JSX.Element {
   const navigate = useNavigate();
   const { principal, capabilities } = useSession();
+  // The tab names the SERVICE, not the template — derived from the configuration, so a generated application
+  // names itself without anyone editing HTML (WCAG 2.4.2, level A). See `app/dokument-titel.ts`.
+  useDokumentTitel(store.config, activeNavKey);
   // Ziel des Wechsels aus DERSELBEN Wahrheit wie die Landing-Einstiege (config.personas → home),
   // mit der App-Routen-Konvention als Fallback.
   const onPersonaChange = (next: Persona) =>

@@ -41,6 +41,7 @@ import {
   aufbewahrungsende,
   berechneTarif,
   pruefeTenor,
+  statusPathOf,
   tarifDesVerfahrens,
   builtInPermissions,
   createFachlicheAuditEvent,
@@ -972,6 +973,17 @@ export function registerCaseRoutes(app: FastifyInstance, deps: BffDeps): void {
                 appCase.data,
                 procedure.verwaltungsaktInhalt.tenorNachrechnung.betragPfad,
               ),
+              // The DISPLAY STATUS of the calculation. Unless declared separately, the sibling field `status`
+              // next to the amount — the shape of the ONE kit type `Berechnung`, not a guess.
+              clientStatus: leseDatenPfad(
+                appCase.data,
+                statusPathOf(procedure.verwaltungsaktInhalt.tenorNachrechnung),
+              ),
+              // If the procedure declares a domain capability to be the authoritative source of the rate, its
+              // structured result belongs HERE. As long as that call is not wired up, the value stays
+              // `undefined` — and `pruefeTenor` blocks the Festsetzung fail-closed instead of silently
+              // falling back to the amount calculated in the browser.
+              programmErgebnis: undefined,
             }
           : { kategorie: undefined, clientBetrag: undefined },
       );

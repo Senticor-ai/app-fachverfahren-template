@@ -3,7 +3,7 @@
 // rendert ihn über BescheidView. Der Tenor und die Rechtsbehelfsbelehrung kommen AUSSCHLIESSLICH aus
 // dem gefrorenen Snapshot (nicht aus der lebenden Config) — so ändert eine spätere Tarif-/Regime-
 // Umstellung den bereits erlassenen Bescheid NICHT.
-import { useEffect, useId, useState } from "react";
+import { useCallback, useId, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   BescheidView,
@@ -11,6 +11,8 @@ import {
   type Vorgang,
 } from "@senticor/fachverfahren-kit";
 import { Shell } from "../app/shell.js";
+import { useLadelage } from "../app/ladelage.js";
+import { FehlerFlaeche } from "../app/fehler-flaeche.js";
 import { store } from "../store.js";
 import { CaseRequestError } from "../case-client.js";
 import {
@@ -142,25 +144,24 @@ function toVorgang(va: VerwaltungsaktDto): Vorgang {
   return basis;
 }
 
+// ── A FAILED LOAD IS NOT "THERE IS NO NOTICE" ──────────────────────────────────────────────────────────────
+// `ladeBescheid` deliberately separates the two cases: 404 => `null` ("no notice issued yet"), EVERY other
+// failure => throw. This page used to discard that with `.catch(() => undefined)`, so a network drop, a 500, a
+// 403 or an expired session all landed in the 404 branch and the citizen read "Für diesen Antrag liegt noch
+// kein Bescheid vor."
+//
+// That is not a missing error message, it is a FALSE STATEMENT OF FACT — and it stands on the one page where
+// the appeal period hangs: fetching one's own notice IS the disclosure (`case.disclosed`) the server anchors
+// the deadline on. A citizen who reads "there is no notice" does not file an appeal.
+//
+// Measured 2026-08-31 in two independently built procedures, identically in both — and in four sibling pages.
+// The shared shape lives in `app/ladelage.ts`; a private copy here would be the second truth.
 export function BuergerBescheidPage(): React.JSX.Element {
   const { id = "" } = useParams();
-  const [va, setVa] = useState<VerwaltungsaktDto | null>(null);
-  const [laedt, setLaedt] = useState(true);
-
-  useEffect(() => {
-    let abgebrochen = false;
-    ladeBescheid(id)
-      .then((dto) => {
-        if (!abgebrochen) setVa(dto);
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (!abgebrochen) setLaedt(false);
-      });
-    return () => {
-      abgebrochen = true;
-    };
-  }, [id]);
+  const laden = useCallback(() => ladeBescheid(id), [id]);
+  const { lage, erneut } = useLadelage(laden);
+  const va = lage.art === "geladen" ? lage.wert : null;
+  const laedt = lage.art === "laedt";
 
   return (
     <Shell persona="buerger" activeNavKey="antraege">
@@ -205,6 +206,15 @@ export function BuergerBescheidPage(): React.JSX.Element {
             {/* Die HANDLUNG zur Belehrung: den Rechtsbehelf tatsächlich einlegen (Art aus dem Regime). */}
             <WiderspruchAktion antragId={id} art={va.rechtsbehelf.art} />
           </div>
+        ) : lage.art === "fehler" ? (
+          <FehlerFlaeche
+            className="mt-6"
+            titel="Ihr Bescheid konnte gerade nicht geladen werden."
+            klarstellung="Das heißt NICHT, dass kein Bescheid vorliegt — wir konnten es nur nicht feststellen. Eine laufende Rechtsbehelfsfrist läuft weiter. Bitte versuchen Sie es erneut; bleibt es dabei, wenden Sie sich an die im Bescheid genannte Stelle."
+            grund={lage.grund}
+            status={lage.status}
+            erneut={erneut}
+          />
         ) : (
           <p className="mt-6 text-sm text-muted-foreground">
             Für diesen Antrag liegt noch kein Bescheid vor.

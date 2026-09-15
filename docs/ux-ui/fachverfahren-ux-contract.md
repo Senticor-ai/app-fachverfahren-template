@@ -76,7 +76,9 @@ Persona-Dichte:
 
 ## Design-System-Regeln
 
-- `packages/public-sector-ui` ist der öffentliche UI-Vertrag.
+- Bausteine entstehen zuerst in `packages/fachverfahren-kit` (Katalog:
+  [`../reference/fachverfahren-kit-components.md`](../reference/fachverfahren-kit-components.md));
+  `packages/public-sector-ui` ist die darunterliegende Public-Sector-Fassade.
 - ShadCN-Primitives sind Implementierungsdetail.
 - Tailwind v4 und CSS-first Tokens sind Standard.
 - Semantische Tokens sind Pflicht; keine Rohfarben in Komponenten.
@@ -104,8 +106,10 @@ Token-Familien:
   `--color-primary-fg`, `--color-sidebar`, `--color-sidebar-fg`,
   `--color-sidebar-accent`, `--color-status-*`.
 
-Komponenten entstehen zuerst in `packages/public-sector-ui` oder nutzen dessen
-Vertrag. ShadCN-Primitives bleiben austauschbares Implementierungsdetail.
+Komponenten entstehen zuerst in `packages/fachverfahren-kit` (Katalog:
+[`../reference/fachverfahren-kit-components.md`](../reference/fachverfahren-kit-components.md))
+und greifen auf die Public-Sector-Fassade `packages/public-sector-ui` zurück.
+ShadCN-Primitives bleiben austauschbares Implementierungsdetail.
 
 ## Formulare
 
@@ -120,8 +124,10 @@ Vertrag. ShadCN-Primitives bleiben austauschbares Implementierungsdetail.
   Generator-Pfad (PLAN, siehe `modules/README.md`).
 - Clientseitige Formular-UI leitet unterstützte Constraints aus dieser Quelle
   ab und zeigt Inline-Fehler mit Korrekturpfad vor dem Absenden.
-  Serverseitige Route-Schemas bleiben die verbindliche Prüfung (PLAN,
-  Backend-Zielarchitektur).
+  Serverseitige Route-Schemas sind die verbindliche Prüfung — TypeBox-DTOs in
+  `@senticor/app-bff-contracts`, am Route-Schema befestigt (z. B.
+  `AntragEinreichenRequestSchema` in
+  `packages/app-bff-fastify/src/routes/buerger.ts`).
 - Nicht unterstützte Schema-Regeln werden im Screen Contract als
   Validierungslücke oder bewusste serverseitige Prüfung benannt.
 - Validierung trennt `err`, `warn` und `ok`; nur `err` blockiert.

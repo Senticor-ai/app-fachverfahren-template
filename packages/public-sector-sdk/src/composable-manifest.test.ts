@@ -167,7 +167,14 @@ describe("Anspruch ∧ Beleg — Status-Durchsetzung", () => {
     expect(effectiveComposableStatus(m)).toBe("candidate");
     const { composable, provenance } = mapManifestWithProvenance(m);
     expect(composable.status).toBe("candidate");
-    expect(istEnabled(composable)).toBe(false);
+    // ⛔ 2026-09-03 — HIER STAND `expect(istEnabled(composable)).toBe(false)`. Das war die Wirkung des
+    // ZERTIFIZIERUNGS-RIEGELS, und der ist per Nutzer-Direktive gefallen: Zertifizierung gehoert an die
+    // PRODUKTIVSCHALTUNG, nicht an den Bau. Der ANTI-UEBER-CLAIM bleibt und ist die eigentliche Sache
+    // dieses Zeugen — er wirkt jetzt praezise dort, wo er hingehoert: auf den ANSPRUCH, nicht auf die
+    // Verfuegbarkeit. Die Stelle LAEUFT (sonst liefe keine erzeugte Stelle je), aber sie BEHAUPTET nicht
+    // mehr, zertifiziert zu sein — und die Provenienz nennt den Ueberclaim beim Namen.
+    expect(istEnabled(composable)).toBe(true);
+    expect(composable.status).not.toBe("certified");
     expect(provenance.deklarierterStatus).toBe("certified");
     expect(provenance.beleg).toBe("deklariert");
     expect(provenance.ueberclaim).toBe(true);

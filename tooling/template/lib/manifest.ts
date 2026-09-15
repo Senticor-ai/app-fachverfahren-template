@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { access, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -7,6 +8,45 @@ export const templateDirectory = ".template";
 export const templateSchemaVersion = 1;
 export const defaultTemplateSource = "senticor-app-fachverfahren-template";
 export const defaultTemplateVersion = "0.1.0-rc.1";
+
+/** The identity a checkout carries: its app folder (`apps/<domain>`) and its display name. */
+export interface BaseIdentity {
+  domain: string;
+  displayName: string;
+}
+
+/** The pristine template marks itself as no consumer (no `.template/answers.json`) and IS this identity. */
+export const templateIdentity: Readonly<BaseIdentity> = Object.freeze({
+  domain: "fachverfahren",
+  displayName: "Fachverfahren",
+});
+
+/**
+ * The base identity of the checkout at `root` — ONE rule for every reader. A scaffolded consumer carries
+ * its domain in `.template/answers.json`; the pristine template carries none and is `templateIdentity`.
+ * Only a COMPLETE answer (domain AND display name) counts, anything else falls back — the rule the scaffold
+ * kept to itself in `render.ts` until the seam tool needed it too (2026-09-11: `tooling/template/**` is
+ * excluded from the scaffold's rewrite, so a path written down there stayed `apps/fachverfahren` in every
+ * generated app). Synchronous because the seam tool resolves its seam at module load.
+ */
+export function baseIdentityOf(root: string): BaseIdentity {
+  try {
+    const answers = JSON.parse(
+      readFileSync(join(root, templateDirectory, "answers.json"), "utf8"),
+    ) as Partial<BaseIdentity>;
+    if (
+      typeof answers.domain === "string" &&
+      answers.domain.length > 0 &&
+      typeof answers.displayName === "string" &&
+      answers.displayName.length > 0
+    ) {
+      return { domain: answers.domain, displayName: answers.displayName };
+    }
+  } catch {
+    // The pristine template has no .template/answers.json — the fallback below is its identity.
+  }
+  return { ...templateIdentity };
+}
 
 export interface TemplateAnswers {
   domain: string;
@@ -50,6 +90,17 @@ export const defaultOwnership: TemplateOwnership = {
     "pnpm-workspace.yaml": "structured-merge",
     "agent.discovery.json": "replace",
     ".agents/skills/**": "replace",
+    // ── DER INHALT DES GOVERNTEN BAUS GEHOERT DEM KONSUMENTEN ───────────────────────────────────────────
+    // Das Fachkonzept IST das fachliche Erzeugnis des Verfahrens, die ADRs sind seine Architektur-
+    // Entscheidungen, `platform/govtech.yaml` seine Betriebswahl. Ohne Eintrag fielen sie auf `(default)
+    // merge` — und ein merge-Pfad ausserhalb der kuratierten Kandidatenliste wird von `template:update` fuer
+    // immer stillschweigend uebersprungen. Das war bis 2026-08-31 der Zustand, gemessen an zwei fertig
+    // gebauten Verfahren: sechzehn Dateien ohne jede Update-Entscheidung.
+    // `consumer` sagt es ausdruecklich: die Vorlage fasst diese Pfade NIE an. Ein Upgrade darf nicht in das
+    // Fachkonzept eines laufenden Verfahrens schreiben.
+    "docs/fachkonzept/**": "consumer",
+    "docs/adr/**": "consumer",
+    "platform/govtech.yaml": "consumer",
     "docs/agents/**": "replace",
     "docs/assets/**": "replace",
     "docs/reference/**": "replace",
@@ -59,6 +110,9 @@ export const defaultOwnership: TemplateOwnership = {
     "docs/capabilities/**": "replace",
     "sources/registry.yaml": "replace",
     "sources/source-lock.json": "structured-merge",
+    // The check runner is template infrastructure, not consumer code: a consumer that forked it
+    // would silently drift away from the chain the template guarantees. Same class as tooling/template.
+    "tooling/check/**": "replace",
     "tooling/template/**": "replace",
     "scripts/check-template-*.mjs": "replace",
     "scripts/check-openapi.mjs": "replace",
@@ -67,6 +121,23 @@ export const defaultOwnership: TemplateOwnership = {
     "scripts/check-k8s-delivery.mjs": "replace",
     "scripts/check-supply-chain.sh": "replace",
     "scripts/validate-k8s-render.sh": "replace",
+    // DIE EINE QUELLEN-WAHRHEIT REIST MIT UND GEHOERT DER VORLAGE (2026-09-01).
+    //
+    // `scripts/lib/source-exclusion.ts` beantwortet «ist das eine Quelle?» fuer die vier `check-*.mjs`,
+    // fuer `eslint.config.js` und fuer das Tooling. Sie stand vorher ZEHNMAL als Literal im Baum, mit drei
+    // gemessenen Drifts — und eine davon liess `validateModuleBoundaries` 232 erzeugte Deklarationen
+    // (1,4 MB `dist-types`) als QUELLE lesen.
+    //
+    // ⛔ `replace`, nicht `merge`: duerfte ein Konsument diese Datei forken, entstuende genau die Drift
+    // wieder, die dieser Schnitt beseitigt hat — nur diesmal je erzeugter Anwendung einmal. Und sie MUSS
+    // mitreisen: ihre Importeure tun es, und ein Klon mit `check-esm-policy.mjs` ohne diese Datei stuerbe
+    // beim ersten `check:fast` an einem fehlenden Import.
+    // ⚠️ ENG AUF `source-*`, NICHT `scripts/lib/**`: unter `scripts/lib/` liegen bereits
+    // `verify-mounted-composables.mts` und `doku-nutzlast.ts`, und die stehen mit Grund als
+    // Konsumenten-Hoheit in der Opt-out-Liste. Ein Glob ueber das ganze Verzeichnis haette sie
+    // STILL zu Vorlagen-Eigentum gemacht — eine Umklassifizierung als Nebenwirkung, und genau die
+    // Klasse, gegen die die Ratsche ueber tote Opt-out-Eintraege gebaut ist. Sie hat es gefangen.
+    "scripts/lib/source-*": "replace",
     "scripts/scaffold-*.mjs": "replace",
     "apps/*/deploy/helm/**": "replace",
     "apps/*/public/**": "replace",

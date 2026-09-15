@@ -12,6 +12,14 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+// ONE TRUTH about what is build output, and a tree walk that FAILS instead of reporting an empty tree:
+// scripts/lib/source-exclusion.ts + scripts/lib/source-scan.ts. Kept in `scripts/lib` because the
+// plain-node `scripts/check-*.mjs` gates and eslint.config.js must import the SAME set — a gate list
+// that only tooling can read is how the seven copies drifted apart in the first place.
+import {
+  collectSourceFiles,
+  readTextFile,
+} from "../../scripts/lib/source-scan.ts";
 import { assertCleanWorktree, getGitShortStatus } from "./lib/git.ts";
 import {
   appNew,
@@ -960,7 +968,9 @@ async function checkMigrationCoverage() {
 }
 
 async function checkRunbookCommands() {
-  const files = await collectFiles(process.cwd(), [".md"]);
+  const files = await collectSourceFiles(process.cwd(), {
+    extensions: [".md"],
+  });
   const failures = [];
   for (const file of files) {
     const text = await readFile(file, "utf8");
@@ -990,7 +1000,9 @@ async function checkRunbookCommands() {
 }
 
 async function checkDocsLanguage() {
-  const files = await collectFiles(process.cwd(), [".md"]);
+  const files = await collectSourceFiles(process.cwd(), {
+    extensions: [".md"],
+  });
   const patterns = [
     /\bfuer\b/g,
     /\bueber\b/g,
@@ -1839,14 +1851,16 @@ async function compareDirectories(first, second) {
   return compareSnapshots(firstSnapshot, secondSnapshot);
 }
 
+/** ⛔ NO `catch(() => "")` HERE, AND THAT IS THE WHOLE POINT. This snapshot is one half of the
+ *  REPRODUCIBILITY judgment (`check:scaffold-reproducible`): two snapshots are compared for byte
+ *  equality. With an error mapped to the empty string, two UNREADABLE files compare EQUAL — the verdict
+ *  "byte-identical" would then rest on two failures. `readTextFile` throws instead, so an unreadable
+ *  tree ends the run with the path and the errno. */
 async function snapshotDirectory(root) {
-  const files = await collectFiles(root, []);
+  const files = await collectSourceFiles(root);
   const snapshot = new Map();
   for (const file of files) {
-    snapshot.set(
-      relative(root, file),
-      await readFile(file, "utf8").catch(() => ""),
-    );
+    snapshot.set(relative(root, file), await readTextFile(file));
   }
   return snapshot;
 }
@@ -1860,28 +1874,6 @@ function compareSnapshots(first, second) {
     }
   }
   return differences;
-}
-
-async function collectFiles(root, extensions) {
-  const entries = await readdir(root, { withFileTypes: true }).catch(() => []);
-  const files = [];
-  for (const entry of entries) {
-    const path = join(root, entry.name);
-    if (
-      [".git", "node_modules", "dist", "storybook-static"].includes(entry.name)
-    ) {
-      continue;
-    }
-    if (entry.isDirectory()) {
-      files.push(...(await collectFiles(path, extensions)));
-    } else if (
-      extensions.length === 0 ||
-      extensions.some((extension) => entry.name.endsWith(extension))
-    ) {
-      files.push(path);
-    }
-  }
-  return files;
 }
 
 function stripCodeFences(text) {

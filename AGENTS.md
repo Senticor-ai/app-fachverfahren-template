@@ -18,9 +18,11 @@ Plattformpakete:
   (AntragStepper, Arbeitsvorrat, ReviewWorkspace, AufsichtDashboard, …) und den
   Typ `LeistungConfig`, aus dem die App rendert.
 - Weitere Pakete (`platform-contracts`, `public-sector-sdk`,
-  `public-sector-ui`, `provider-*`, `conformance-kit`, `migration-kit`,
-  `app-store-postgres`, `jurisdictions/*`) sind die wiederverwendbare
-  Plattformbasis.
+  `public-sector-ui`, `app-runtime-fastify` (neutrale Web-Runtime),
+  `app-bff-fastify` (fachliche BFF-Routen) + `app-bff-contracts`
+  (TypeBox-DTOs), `app-store-postgres`, `workflow-bpmn-stub`, `provider-*`,
+  `conformance-kit`, `migration-kit`, `jurisdictions/*`) sind die
+  wiederverwendbare Plattformbasis.
 
 Das Template baut ohne jedes externe Werkzeug; die klickbaren Sichten sind
 seit dem Session-Gate anmeldepflichtig:
@@ -73,7 +75,7 @@ Was das Template davon HEUTE trägt (der OSS-Runtime-Anteil):
 
 **Ehrlich abgegrenzt:** das VOLLE Mesh (GraphStore-Substrat, Capability-Mesh mit
 `governedDispatch`, evaluiertes Qualitäts-Routing, das selbst-wachsende
-Skill-Learning, der offene Runtime-Kernel) lebt hinter der Naht in **chos-code**
+Skill-Learning, der offene Runtime-Kernel) lebt hinter der Naht in **chos-agents**
 (governter Build-/Runtime-Agent) und wird über dieselben Store-/Port-Verträge
 angebunden — das Template ist die **standalone-lauffähige OSS-Seite** (Open-Core:
 OPEN = Runtime/Verträge; PROPRIETÄR = kuratiertes Wissen + getunte Agenten/Evals).
@@ -89,16 +91,23 @@ Scaffolds. Geplante Zielarchitektur ist ausdrücklich mit `(PLAN)` markiert.
 
 Aktuell gilt insbesondere:
 
-- Es existiert eine neutrale Fastify-Web-Runtime unter
-  `apps/fachverfahren/server/` für SPA-Auslieferung, Runtime-Konfiguration,
-  Security-/Cache-Header, Health, Metrics und Build-Info.
-- Fachliche API-, OpenAPI-, Postgres-E2E- und Domain-Route-Schichten sind
-  weiterhin Ausbauschritte; Zielarchitektur:
+- Es existiert eine neutrale Fastify-Web-Runtime (`packages/app-runtime-fastify`,
+  komponiert in `apps/fachverfahren/server/`) für SPA-Auslieferung,
+  Runtime-Konfiguration, Security-/Cache-Header, Health, Metrics und Build-Info.
+- Die fachliche API existiert: `packages/app-bff-fastify` trägt 15 Routenmodule
+  (`session`, `capabilities`, `preferences`, `mailbox`, `cases`, `tasks`,
+  `buerger`, `composables`, `identity`, `payment`, `register`, `vermerke`,
+  `zustellung`, `verfahren-wissen`, `ai-assist`). Details:
   `docs/reference/backend-fastify.md`.
-- Es existiert KEIN MSW-Mocking: `docs/reference/mock-data-msw.md` (PLAN).
-- Es existiert ein hermetischer E2E-Rauchtest (`pnpm run test:e2e`,
-  `tests/e2e/`); KEINE Scripts `test:e2e:postgres`, `dev:postgres`,
-  `dev:all`.
+- Der OpenAPI-Snapshot `schemas/openapi.internal.json` ist die Wahrheit über die
+  Pfade und wird von `check:openapi` gehalten — ein Gate in `check:ci`.
+- MSW ist ausschließlich TEST-Schicht
+  (`apps/fachverfahren/src/antrag-client.browser.test.tsx`, `pnpm run test:browser`);
+  eine fachliche Mock-Schicht der App gibt es nicht
+  (`docs/reference/mock-data-msw.md`).
+- Es existieren `pnpm run test:e2e` (hermetischer Rauchtest, `tests/e2e/`) und
+  `pnpm run test:pg` (Store-Tests gegen echtes Postgres, testcontainers);
+  KEINE Scripts `test:e2e:postgres`, `dev:postgres`, `dev:all`.
 - `modules/` enthält KEINE Instanz (nur Dokumentation). Der Generator-Pfad
   `app:new` kann dort ein Modul-Gerüst erzeugen, aber die laufende App bindet
   Module NICHT ein (kein Modul-Mount). Details: `modules/README.md`.
@@ -106,29 +115,65 @@ Aktuell gilt insbesondere:
 Wer eines dieser Themen umsetzt, entfernt die `(PLAN)`-Markierung im selben
 Change und verdrahtet die zugehörigen Scripts real.
 
-## DIE EINE Austausch-Naht
+## DIE EINE Austausch-Naht — je Verfahrenstyp
 
-`apps/fachverfahren/src/leistung.config.ts` ist der einzige Austausch-Punkt
-der App. Die exportierte `leistungConfig: LeistungConfig` (Typ:
+Es gibt **zwei** Nähte, eine je Verfahrenstyp — welcher Typ wann gilt, steht in
+`docs/agents/fachverfahren-typen.md` und wird hier nicht wiederholt:
+
+| Naht                                            | Typ            | Vertrag                          |
+| ----------------------------------------------- | -------------- | -------------------------------- |
+| `apps/fachverfahren/src/leistung.config.ts`     | Antrag/Vorgang | `leistungConfig: LeistungConfig` |
+| `apps/fachverfahren/server/procedure.config.ts` | Fall/Dossier   | die Verfahrens-/Dossier-Naht     |
+
+In einer **erzeugten** App heißt der Antragspfad
+`apps/<domain>/src/leistung.config.ts` — der Scaffold benennt das
+App-Verzeichnis um, nicht die Naht.
+
+Die exportierte `leistungConfig: LeistungConfig` (Typ:
 `packages/fachverfahren-kit/src/types.ts`) treibt die komplette 3-Personen-UX.
-Ein Fachverfahren-Build ändert ausschließlich diese Datei.
+Ein Antrags-Build ändert ausschließlich diese Datei.
+
+**Pflichtform als Werkzeug** — die Form kommt zum Agenten, statt dass der Agent
+sie sich aus 57 KB Typgraph liest. Quelle jeder Regel ist
+`packages/fachverfahren-kit/src/leistung-contract-form.ts`:
+
+```bash
+pnpm seam:shape
+pnpm seam:check --from <datei|->
+pnpm seam:set --from <datei|-> --part <teil>
+```
+
+`seam:check --from <datei|-> [--part <teil>]` prüft VOR dem Schreiben, `seam:set`
+schreibt einen Teil. `seam:check` ist eine echte **Teilmenge** von
+`check:leistung-contract` — keine Snapshot-Frische, kein `verifyDatenanbindung`.
+Das Gate bleibt die Wahrheit.
 
 Der Vertrag der `LeistungConfig` (Pflichtfelder zuerst; `?` = im Typ
-optional):
+optional). **Pflichtfelder** = die 8 Pflichten der `LEISTUNG_CONTRACT_FORM`
+(`id`, `label`, `kommune`, `rechtsgrundlagen`, `antrag.steps`,
+`statusMachine.states`, `detailSektionen`, `register.suchfelder`);
+`pnpm seam:shape` druckt sie:
 
-| Feld               | Vertrag                                                                                                                                                                                                                                                               |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`, `label`      | Slug und Anzeigename der Leistung                                                                                                                                                                                                                                     |
-| `kommune`          | Trägerin / erlassende Stelle der Leistung — Kommune ODER Behörde ODER interne Stelle, z. B. `"Stadt Musterstadt"`, `"Bundesamt für …"`, `"Zentrale Vergabe"`                                                                                                          |
-| `rechtsgrundlagen` | Liste `{ norm, titel, satzung? }` — nur belegte Normen, nie erfunden                                                                                                                                                                                                  |
-| `antrag.steps`     | Schritte mit Feldern (`FeldDef`: `name/label/typ/required/pattern/onceOnly/…`); jedes Pflichtfeld mit passender Validierung                                                                                                                                           |
-| `statusMachine`    | `initial` + `states` (Endzustände mit `terminal: true`) + `transitions` (`rollen`, kritische Entscheidungen mit `vierAugen: true`, `detailPflicht`)                                                                                                                   |
-| `berechne`         | REINE, deterministische Funktion (kein Datum, kein Zufall). Beträge in GANZEN EURO (natürliche Einheit, `120` = 120,00 €), `status` `provisional`/`final`, `begruendung` als belegte Herleitung, jede Tarifstufe/Befreiung/Ermäßigung als eigene prüfbare Verzweigung |
-| `register`         | Once-Only-Register: `suchfelder` + deterministische `mock`-Daten                                                                                                                                                                                                      |
-| `detailSektionen`  | Anzeige-Mapping der Antragsdaten für die Sachbearbeitung                                                                                                                                                                                                              |
-| `ki?`              | `schwelleAutonom` + optional transparenter `vorschlag` (KI assistiert, Mensch entscheidet); im Typ optional, im Template-Default gesetzt                                                                                                                              |
-| `seed?`            | Deterministische Demo-Vorgänge, damit die Sachbearbeitungs-Sicht sofort arbeitet; im Typ optional, im Template-Default gesetzt                                                                                                                                        |
-| optional           | `fimLeistung`, `nachweise`, `ePayment`, `zustellung`, `termin`, `adressValidierung`, `personas` — NUR setzen, wenn das Fachkonzept es vorsieht                                                                                                                        |
+| Feld                                                               | Vertrag                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`, `label`                                                      | Slug und Anzeigename der Leistung                                                                                                                                                                                                                                                                       |
+| `kommune`                                                          | Trägerin / erlassende Stelle der Leistung — Kommune ODER Behörde ODER interne Stelle, z. B. `"Stadt Musterstadt"`, `"Bundesamt für …"`, `"Zentrale Vergabe"`                                                                                                                                            |
+| `rechtsgrundlagen`                                                 | Liste `{ norm, titel, satzung? }` — nur belegte Normen, nie erfunden                                                                                                                                                                                                                                    |
+| `antrag.steps`                                                     | Schritte mit Feldern (`FeldDef`: `name/label/typ/required/pattern/onceOnly/…`); jedes Pflichtfeld mit passender Validierung                                                                                                                                                                             |
+| `antrag.konditionierendesFeld?`                                    | Feldpfad der Vorgangsart, der den Rest des Antrags konditioniert — MUSS ein Feld aus `steps[0]` sein (Invariante von `check:leistung-contract`); fehlt es, gibt es keine progressive Disclosure                                                                                                         |
+| `statusMachine`                                                    | `initial` + `states` (Endzustände mit `terminal: true`) + `transitions` (`rollen`, kritische Entscheidungen mit `vierAugen: true`, `detailPflicht`)                                                                                                                                                     |
+| `tarif?`                                                           | Gebühren-/Tariftabelle als DATEN (Staffeln statt `const`+`switch`) — der **Default**: fehlt `berechne`, wertet der reine Interpreter (`lib/interpreter`) diesen Tarif zur `Berechnung` aus                                                                                                              |
+| `berechne?`                                                        | OPTIONAL — der Escape-Hatch für **nicht-tabellarische** Subsumtion; gesetzt hat er Vorrang vor `tarif`. REINE, deterministische Funktion (kein Datum, kein Zufall). Beträge in GANZEN EURO (natürliche Einheit, `120` = 120,00 €), `status` `provisional`/`final`, `begruendung` als belegte Herleitung |
+| `rechenproben?`                                                    | Die SOLLWERT-Tabelle der Berechnung als DATEN (je Fallgruppe eine Probe, mit `herleitung` und `quelle` aus dem Fachkonzept). Das AUSFÜHRENDE Programm ist der Test — niemand rechnet im Kopf                                                                                                            |
+| `codelisten?` · `datenlisten?`                                     | Wiederverwendbare Auswahl-Listen als DATEN, über `FeldDef.optionsRef` referenziert. `codelisten` sind geerdet (`normRef`/`belege` je Eintrag) und leiten daraus die erforderlichen Nachweise ab                                                                                                         |
+| `registerRefs?` · `fimRefs?` · `fristenTypen?` · `datenanbindung?` | Register-/FIM-Referenzen, Fristen-Typen und die generische, zweckgebundene Datenanbindung — alles als DATEN. `datenanbindung` verallgemeinert die anderen zu EINER Sicht                                                                                                                                |
+| `register`                                                         | Once-Only-Register: `suchfelder` + deterministische `mock`-Daten                                                                                                                                                                                                                                        |
+| `detailSektionen`                                                  | Anzeige-Mapping der Antragsdaten für die Sachbearbeitung                                                                                                                                                                                                                                                |
+| `verwaltungsaktInhalt?`                                            | Die Pflichtinhalte des Verwaltungsakts. `tenorNachrechnung` deklariert den Status-Pfad, über den die Behörde den Tenor VOR dem Einfrieren nachrechnet (`statusPathOf`); schweigt die Naht, entfällt der Block, statt geerbt zu werden                                                                   |
+| `ki?`                                                              | `schwelleAutonom` + optional transparenter `vorschlag` (KI assistiert, Mensch entscheidet); im Typ optional, im Template-Default gesetzt                                                                                                                                                                |
+| `seed?`                                                            | Deterministische Demo-Vorgänge, damit die Sachbearbeitungs-Sicht sofort arbeitet; im Typ optional, im Template-Default gesetzt                                                                                                                                                                          |
+| `personas?`                                                        | `PersonaDescriptor[]`. `navLabels` benennt die Navigations-WÖRTER je Arbeitsbereich (`FachverfahrenShell`/`PersonaSwitcher` lesen sie); WELCHE Einträge überhaupt erscheinen, entscheidet der Vertrag, nicht diese Liste                                                                                |
+| optional                                                           | `fimLeistung`, `nachweise`, `ePayment`, `zustellung`, `termin`, `adressValidierung` — NUR setzen, wenn das Fachkonzept es vorsieht                                                                                                                                                                      |
 
 `FeldDef.leichteSprache`/`hintEinfach` (DIN SPEC 33429, additiv zu
 `label`/`hint`) gehören zum selben Naht-Write wie der Rest des Feldes — nie
@@ -147,20 +192,28 @@ pnpm --filter @senticor/fachverfahren emit:contract
 Der Snapshot `apps/fachverfahren/leistung.contract.json` ist GENERIERT und
 wird nie von Hand editiert.
 
-Die realen Routen der App (`apps/fachverfahren/src/App.tsx`). `/` ist die
-Landing mit der Anmeldung für alle Rollen und die EINZIGE unauthentifizierte
-Route (`/login` bleibt nur als Alias auf `/`; `/auth/register` existiert nur
-bei `AUTH_REGISTRATION_MODE=open_unverified`). Alle Persona- und
-Workspace-Routen sind session-pflichtig; Persona-Routen setzen zusätzlich den
-ZUGEWIESENEN Arbeitsbereich voraus (`RequirePersonaExperience` — Navigation,
-keine Autorisierung), `/boards*` verlangt die Permission `boards.collaborate`
-(Details: `docs/reference/rbac.md`):
+Die realen Routen der App. Die QUELLE ist
+`apps/fachverfahren/src/app/route-gates.ts` (Pfad → Gate) plus
+`apps/fachverfahren/src/app/routes.tsx` (Pfad → Sicht) — eine neue Route
+entsteht in diesen beiden Dateien, sonst nirgends. Ohne Anmeldung sind GENAU
+ZWEI Routen erreichbar: `/` (Landing/Anmeldung) und `/hilfe` (das Doku-Wiki;
+Doku ist nicht sensibel, und ein Agent soll sie lesen können). `/login` bleibt
+nur Alias auf `/`; `/auth/register` existiert nur bei
+`AUTH_REGISTRATION_MODE=open_unverified`. Alle Persona- und Workspace-Routen
+sind session-pflichtig; Persona-Routen setzen zusätzlich den ZUGEWIESENEN
+Arbeitsbereich voraus (Navigation, keine Autorisierung), `/boards*` verlangt die
+Permission `boards.collaborate` (Details: `docs/reference/rbac.md`):
 
 ```text
-/  (Landing/Anmeldung)
-/buerger · /buerger/anmelden · /buerger/bestaetigung/:id   (Arbeitsbereich buerger)
-/amt · /amt/vorgang/:id                                    (Arbeitsbereich sachbearbeitung)
-/aufsicht                                                  (Arbeitsbereich aufsicht)
+/ · /login · /hilfe   (ohne Anmeldung)
+/buerger · /buerger/anmelden · /buerger/bestaetigung/:id    (Arbeitsbereich buerger)
+/buerger/antraege · /buerger/antrag/:id                     (Arbeitsbereich buerger)
+/buerger/bescheid/:id · /buerger/postfach                   (Arbeitsbereich buerger)
+/amt · /amt/vorgang/:id                                     (Arbeitsbereich sachbearbeitung)
+/amt/akten · /amt/akte/:id                                  (Arbeitsbereich sachbearbeitung)
+/amt/verfahren/:procedureId/:version/wiki                   (Arbeitsbereich sachbearbeitung)
+/amt/assistent                                              (Arbeitsbereich sachbearbeitung)
+/aufsicht                                                   (Arbeitsbereich aufsicht)
 /boards · /boards/:boardId   (Permission boards.collaborate)
 /admin/users   (Permission users.manage) · /konto/passwort
 ```
@@ -201,6 +254,10 @@ werden NIE als Fakt behauptet. Konvention:
    unbelegtes `fimLeistung` trägt `status: "annahme-zu-validieren"`; unbelegte
    Rechtsgrundlagen entfallen (Einträge haben KEIN Status-Feld) und werden im
    Abschlussbericht als offene Validierungsfrage gemeldet.
+4. Beruhen die Sätze auf Annahmen, setzt die Berechnung
+   `Berechnung.saetzeBelegt = false` — die Ergebnis-Plakette
+   (`packages/fachverfahren-kit/src/ergebnis-plakette.ts`) zeigt dann kein
+   „§-BELEGT" mehr, sondern was tatsächlich gilt.
 
 ## Kanonische Pfad-Karte
 
@@ -218,7 +275,11 @@ Jede Zeile beschreibt den IST-Stand. Zeilen mit `(PLAN)` existieren noch nicht.
 | `packages/public-sector-ui/src/`                                  | Public-Sector-UI-Fassade + Stories                       | UI-Vertrag; ShadCN bleibt Implementierungsdetail   |
 | `packages/platform-contracts/`                                    | Capability-Ports                                         | Fachlogik nutzt Ports, nie Provider direkt         |
 | `packages/public-sector-sdk/`                                     | Authorization, RBAC, Audit, Domain-Kernel                | Rollen über RBAC-Registry erweitern                |
-| `packages/app-store-postgres/`                                    | PostgreSQL-Migrator + Plattformtabellen                  | Migrationen über `db:migrate`                      |
+| `packages/app-store-postgres/`                                    | Store-Schicht + PostgreSQL-Migrator                      | Migrationen über `db:migrate`                      |
+| `packages/app-runtime-fastify/`                                   | Neutrale Fastify-Web-Runtime                             | Delivery/Health; keine Fachlogik                   |
+| `packages/app-bff-fastify/`                                       | Fachliche BFF-Routen (15 Module)                         | Autorisierung serverseitig, nie in der UI          |
+| `packages/app-bff-contracts/`                                     | TypeBox-DTOs der BFF-Routen                              | Route-Schema ist die verbindliche Prüfung          |
+| `packages/workflow-bpmn-stub/`                                    | BPMN-Workflow-Stub (`WorkflowPort`)                      | Über den Port nutzen, nie direkt                   |
 | `jurisdictions/de`, `jurisdictions/eu`                            | Rechtsraum-Packs                                         | Keine `country === "DE"`-Logik in der App          |
 | `modules/`                                                        | Leerer Zielort des Generator-Pfads                       | `modules/README.md` lesen; keine Instanz (PLAN)    |
 | `docs/examples/hundesteuer/`                                      | Externes Beispiel (Spec + Prompt)                        | Nie in Runtime-Code kopieren                       |
@@ -226,12 +287,17 @@ Jede Zeile beschreibt den IST-Stand. Zeilen mit `(PLAN)` existieren noch nicht.
 | `scripts/`                                                        | Deterministische Checks und Werkzeuge                    | Checks sind die Wahrheit, kein LLM-Urteil          |
 | `schemas/`, `platform/capabilities.json`, `sources/registry.yaml` | Maschinenlesbare Verträge und Kataloge                   | Über `check:*`-Scripts validiert                   |
 | `agent.discovery.json`                                            | Öffentliche Discovery-API für Agenten                    | Muss `check:agent-discovery` bestehen              |
-| `apps/fachverfahren/server/`                                      | Fastify-Web-Runtime                                      | Plattform-/Delivery-Arbeit; keine Fachlogik direkt |
+| `apps/fachverfahren/server/`                                      | Server-Komposition (Runtime + BFF)                       | Plattform-/Delivery-Arbeit; keine Fachlogik direkt |
+| `apps/fachverfahren/server/procedure.config.ts`                   | Die Dossier-Naht (Fall/Akte)                             | Nur via `emit:procedure-contract` snapshotten      |
+| `apps/fachverfahren/src/app/route-gates.ts`                       | Pfad → Gate, die Routen-Wahrheit                         | Neue Route hier UND in `routes.tsx`                |
 
 ## Sprache und Benennung
 
 - User-facing Dokumentation und UI-Texte: Deutsch mit echten Umlauten.
-- Code, Typen, Variablen, Package-Namen, Env-Keys: Englisch.
+- Code, Typen, Variablen, Package-Namen, Env-Keys: Englisch. Eigener Code ist
+  seit 2026-09 englisch (z. B. `statusPathOf`).
+- OFFEN: ob Rechts-/Fachbegriffe (Bescheid, Vermerk, Widerspruch …) in
+  Bezeichnern deutsch bleiben. Bis zur Entscheidung NICHT umbenennen.
 - Keine Hundesteuer- oder sonstigen Fachinhalte im Template-Runtime-Code.
   Fachliches lebt in der Naht eines konkreten Builds oder unter
   `docs/examples/<instanz>/`.
@@ -265,6 +331,8 @@ Screen-Contract-Änderungen gilt zusätzlich `.agents/skills/ux-ui/SKILL.md`.
   Default, Loading, Empty, Error und relevante Accessibility-Varianten.
 - React-Hilfskomponenten stehen auf Modulebene; lokale Render-Helfer werden als
   Funktionsaufruf wie `{renderStep()}` verwendet, nicht als JSX-Komponente.
+- Kein React-Hook steht nach einem bedingten `return` (Ratsche
+  `apps/fachverfahren/tests/hooks-vor-jedem-ausgang.test.ts`).
 - Neue Exports aus `public-sector-ui` müssen in Storybook sichtbar sein und
   `pnpm run check:storybook` bestehen.
 
@@ -365,8 +433,10 @@ pnpm --filter "./packages/**" run --if-present build
 
 Rollen in der UI sind keine Autorisierung. Entscheidungen gehören serverseitig
 in Policy-Checks; kritische Übergänge tragen `vierAugen: true` in der
-`statusMachine` und werden in der Zielarchitektur serverseitig erzwungen
-(PLAN). Fachliche Audit-Historie (`Vorgang.history`) ist append-only.
+`statusMachine` und werden SERVERSEITIG erzwungen: ab
+`requiredApprovalsOf(transition) >= 2` verlangt der Server die
+Personen-Separation, und ab `> 2` zählt er die DISTINKTEN Freigebenden, die über
+`POST /api/cases/:id/approvals` gesammelt wurden. Fachliche Audit-Historie (`Vorgang.history`) ist append-only.
 Eingebaute Rollen sind `citizen` und `caseworker`; neue Rollen laufen über die
 RBAC-Registry in `@senticor/public-sector-sdk`, nicht über verstreute
 UI-Bedingungen.

@@ -8,7 +8,7 @@
 // Vier-Augen · Verlauf). Es sind bewusst KEINE echten Fachdaten: Zustände, Rechtsgrundlagen und Fristen eines
 // realen Verfahrens stehen NICHT hier — sie kommen aus dem FACHKONZEPT (bzw. der FIM/KGSt-BPMN).
 //
-// GENERIERT: ein generierender Build (Agent / chos-code governed build / gtc-builder) ÜBERSCHREIBT GENAU DIESE
+// GENERIERT: ein generierender Build (Agent / chos-agents governed build / gtc-builder) ÜBERSCHREIBT GENAU DIESE
 // DATEI mit der aus dem Fachkonzept (BPMN → `bpmnToProcedureVersion`) abgeleiteten `ProcedureVersion` des
 // jeweiligen Verfahrens. Dieselbe App, dieselben Bausteine, anderes Verfahren — ohne dass eine weitere Datei der
 // App sich ändert. Das ist die EINE Naht zwischen Generierung und laufender Fall-/Dossier-App.
@@ -20,9 +20,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   builtInPermissions,
+  createInMemoryProcedureRegistry,
   statusMachineToProcedureVersion,
 } from "@senticor/public-sector-sdk";
 import type {
+  ProcedureRegistry,
   ProcedureVersion,
   StatusMachineSource,
   StatusMachineTransitionSource,
@@ -365,12 +367,69 @@ interface VertragsStatusMaschine {
   }[];
 }
 
+/** DIE PFLICHTANGABEN DES VERWALTUNGSAKTS AUS DEM VERTRAG — und, wo er schweigt, LIEBER KEINE.
+ *
+ * ── GEMESSEN 2026-08-31 an zwei fertig gebauten Verfahren ────────────────────────────────────────────────
+ * `antragQuelleAusVertrag` spreizt `...basisOhneRegime` und erbte damit `verwaltungsaktInhalt` WOERTLICH aus
+ * `MUSTER_ANTRAG` — samt der Demo-Datenpfade (`antragsteller.vorname`, die es im erzeugten Verfahren nicht
+ * gibt) und samt `zahlungsempfaenger: "Stadtkasse Musterstadt"`. Der Bescheid der Gemeinde Musterhausen
+ * forderte also zur Zahlung an die Kasse einer FREMDEN Kommune, und der Inhaltsadressat blieb leer, weil die
+ * geerbten Pfade auf Felder zeigen, die dieses Verfahren nicht fuehrt (§ 119 Abs. 1 AO · § 254 Abs. 1 AO).
+ *
+ * Das ist exakt die Klasse, die diese Datei fuer `verwaltungsakt` bereits geloest hat, mit ihrer eigenen
+ * Begruendung: «lieber gar kein Bescheid (fail-closed am Erlass) als ein Bescheid mit der Belehrung eines
+ * fremden Verfahrens». Fuer die Pflichtangaben gilt dasselbe Wort fuer Wort.
+ *
+ * ABGELEITET WIRD NUR, WAS DER VERTRAG WIRKLICH SAGT:
+ *   `zahlungsempfaenger`  aus `kommune` — die erlassende Behoerde IST die Kasse; das ist keine Vermutung.
+ *   alles Uebrige         nur, wenn der Vertrag es unter `verwaltungsaktInhalt` DEKLARIERT.
+ * Schweigt er, wird der Block ENTFERNT statt geerbt. Ein leeres Feld ist ein sichtbarer Mangel; ein Feld mit
+ * dem Wert eines fremden Verfahrens ist eine stille Falschaussage. */
+function verwaltungsaktInhaltAusVertrag(roh: {
+  kommune?: unknown;
+  verwaltungsaktInhalt?: unknown;
+}): StatusMachineSource["verwaltungsaktInhalt"] | undefined {
+  const deklariert =
+    roh.verwaltungsaktInhalt && typeof roh.verwaltungsaktInhalt === "object"
+      ? (roh.verwaltungsaktInhalt as NonNullable<
+          StatusMachineSource["verwaltungsaktInhalt"]
+        >)
+      : undefined;
+  const kommune =
+    typeof roh.kommune === "string" && roh.kommune.trim()
+      ? roh.kommune.trim()
+      : undefined;
+  if (!deklariert && !kommune) return undefined;
+  const basis =
+    deklariert ??
+    ({} as NonNullable<StatusMachineSource["verwaltungsaktInhalt"]>);
+  // Der Zahlungsempfaenger folgt der erlassenden Behoerde, es sei denn der Vertrag nennt ausdruecklich einen
+  // anderen (Kassenzeichen einer gemeinsamen Kasse) — deklariert schlaegt abgeleitet.
+  const lg = basis.leistungsgebot;
+  const leistungsgebot =
+    lg && typeof lg === "object"
+      ? {
+          ...lg,
+          ...(lg.zahlungsempfaenger || !kommune
+            ? {}
+            : { zahlungsempfaenger: kommune }),
+        }
+      : undefined;
+  const raus = {
+    ...basis,
+    ...(leistungsgebot ? { leistungsgebot } : {}),
+  };
+  return Object.keys(raus).length > 0 ? raus : undefined;
+}
+
 function antragQuelleAusVertrag(): StatusMachineSource | null {
   try {
     const roh = JSON.parse(
       fs.readFileSync(path.join(APP_DIR, "leistung.contract.json"), "utf8"),
     ) as {
       id?: unknown;
+      kommune?: unknown;
+      verwaltungsaktInhalt?: unknown;
       rechtsgrundlagen?: { norm?: unknown }[];
       statusMachine?: VertragsStatusMaschine;
       zustellung?: VertragsZustellung;
@@ -432,12 +491,19 @@ function antragQuelleAusVertrag(): StatusMachineSource | null {
     // Regime, wird `verwaltungsakt` bewusst ENTFERNT statt geerbt: lieber gar kein Bescheid (fail-closed am
     // Erlass) als ein Bescheid mit der Belehrung eines fremden Verfahrens.
     const verwaltungsakt = verwaltungsaktAusVertrag(roh.zustellung);
-    const { verwaltungsakt: _musterRegime, ...basisOhneRegime } = MUSTER_ANTRAG;
+    const verwaltungsaktInhalt = verwaltungsaktInhaltAusVertrag(roh);
+    // DIE PFLICHTANGABEN WERDEN EBENSO WENIG GEERBT WIE DAS REGIME — s. `verwaltungsaktInhaltAusVertrag`.
+    const {
+      verwaltungsakt: _musterRegime,
+      verwaltungsaktInhalt: _musterInhalt,
+      ...basisOhneRegime
+    } = MUSTER_ANTRAG;
     return {
       ...basisOhneRegime,
       procedureId: id,
       ...(legalBasisIds.length > 0 ? { legalBasisIds } : {}),
       ...(verwaltungsakt ? { verwaltungsakt } : {}),
+      ...(verwaltungsaktInhalt ? { verwaltungsaktInhalt } : {}),
       states,
       transitions,
     };
@@ -446,8 +512,81 @@ function antragQuelleAusVertrag(): StatusMachineSource | null {
   }
 }
 
-export const antragProcedure: ProcedureVersion =
-  statusMachineToProcedureVersion(antragQuelleAusVertrag() ?? MUSTER_ANTRAG);
+/** Pfad des Vertrags — EINMAL benannt, von der Ableitung UND der Frische-Probe gelesen. */
+const VERTRAG_PFAD = path.join(APP_DIR, "leistung.contract.json");
+
+/**
+ * Stempel des Vertrags (mtime + Groesse). LEER, wenn es ihn (noch) nicht gibt — eine fehlende Datei ist
+ * hier ein ZUSTAND, kein Fehler: der Vertrag entsteht erst, wenn die Bau-Phase ihn schreibt.
+ */
+function vertragsStempel(): string {
+  try {
+    const s = fs.statSync(VERTRAG_PFAD);
+    return `${s.mtimeMs}:${s.size}`;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Haelt eine teure Ableitung frisch: sie wird neu ausgewertet, sobald sich der STEMPEL aendert — sonst nie.
+ * Rein und injiziert, damit die Eigenschaft ohne Dateisystem bezeugbar ist.
+ */
+export function frischGehalten<T>(
+  stempel: () => string,
+  ableiten: () => T,
+): () => T {
+  let letzterStempel: string | null = null;
+  let letzterWert: T | null = null;
+  return (): T => {
+    const jetzt = stempel();
+    if (letzterWert === null || jetzt !== letzterStempel) {
+      letzterStempel = jetzt;
+      letzterWert = ableiten();
+    }
+    return letzterWert;
+  };
+}
+
+/**
+ * ⛔ WARUM DIESE ABLEITUNG NICHT EINMALIG SEIN DARF — live gemessen am 2026-09-14.
+ *
+ * Hier stand bis heute eine MODUL-KONSTANTE, also genau EINE Auswertung beim Import. Der Vertrag, aus dem
+ * sie sich ableitet, wird aber von einer SPAETEREN Bau-Phase geschrieben. Gemessen an einem echten Lauf:
+ * der Vorschau-Prozess startete um 01:00:36, `leistung.contract.json` entstand um 01:27:46 — 27 Minuten
+ * danach. Die Ableitung fiel deshalb auf MUSTER_ANTRAG zurueck (`procedureId: "musterantrag"`), waehrend
+ * der CLIENT laengst seine eigene Kennung sendete. Folge: JEDER Buerger-Antrag endete mit 422
+ * „Dieser Antrag kann derzeit nicht angenommen werden" — der Buergerpfad endete vor dem Amt.
+ *
+ * BELEG, beide Richtungen am laufenden Prozess: VOR dem Neustart antwortete die eigene Kennung mit 422 und
+ * `musterantrag` mit 201; NACH dem Neustart genau umgekehrt. Gleicher Code, gleicher Vertrag auf der
+ * Platte — allein die ZEIT des Imports unterschied sich.
+ *
+ * ⭐ Der Kommentar ueber `antragQuelleAusVertrag` nennt den Drift „STRUKTURELL unmoeglich". Das galt fuer
+ * den INHALT und nie fuer den ZEITPUNKT. Und der dortige Satz „FAIL-SAFE, nicht fail-open" traegt genau
+ * hier nicht: der Rueckfall auf die Muster-Maschine erhaelt die Antwortfaehigkeit des SERVERS und nimmt
+ * dem CLIENT jede — eine Route, die lebt und jeden Ruf durch sie ablehnt, ist keine sichere Rueckfallebene,
+ * sondern eine Sackgasse mit 200 auf dem Hinweg.
+ */
+export const antragProcedureJetzt: () => ProcedureVersion = frischGehalten(
+  vertragsStempel,
+  () =>
+    statusMachineToProcedureVersion(antragQuelleAusVertrag() ?? MUSTER_ANTRAG),
+);
+
+/**
+ * Die Verfahrens-Registry dieser Naht: das Dossier-Verfahren (fest) UND das Antrags-Verfahren (aus dem
+ * Vertrag, bei jeder Frage auf Frische geprueft). Sie ist bewusst KEIN Schnappschuss — nur so erreicht ein
+ * spaeter geschriebener Vertrag den laufenden Prozess ueberhaupt noch.
+ */
+export function procedureRegistryDerNaht(): ProcedureRegistry {
+  const aktuell = (): ProcedureRegistry =>
+    createInMemoryProcedureRegistry([dossierProcedure, antragProcedureJetzt()]);
+  return {
+    get: (procedureId, version) => aktuell().get(procedureId, version),
+    list: () => aktuell().list(),
+  };
+}
 
 /** Ein Ziel des Demo-Dossiers: Titel, optionale Frist/Kategorie/Status + Checklisten-Schritte. */
 export interface DossierDemoZiel {

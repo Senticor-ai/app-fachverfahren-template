@@ -3,6 +3,7 @@
 // gesteuert: NUR ein Alt-Server ohne userPersonas-Capability bekommt „alle drei";
 // meldet der Server die Capability und liefert trotzdem keine personas, gilt fail
 // closed LEER (ein Server-Bug darf nicht alle Sichten aufreißen).
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import type { LeistungConfig } from "@senticor/fachverfahren-kit";
@@ -293,5 +294,48 @@ describe("verfahrens-eigene Personas (P0-1: Beschaffung/HR)", () => {
 
   it("personaHome fuehrt zur ersten zugewiesenen eigenen Persona", () => {
     expect(personaHome(["einkauf"], [], beschaffung)).toBe("/einkauf");
+  });
+});
+
+/**
+ * DIE AUFSICHT MISST DEN ECHTEN BESTAND — nicht den Demo-Seed des Bürger-Stores.
+ *
+ * ⛔ GEMESSEN 2026-09-07: `/aufsicht` übergab `port={store}` — den BÜRGER-Store, dessen Config-`seed`
+ * der Anfangsbestand bleibt. `laden()` wurde auf dieser Route NIE gerufen; und selbst ein Ruf lüde
+ * owner-scoped die eigenen Anträge, nicht den Behörden-Bestand. Die Sicht zeigte «Vorgänge gesamt: 3»
+ * und eine EUR-Summe erfundener Beträge — unter «Zahlen aus dem aktuellen Vorgangsbestand».
+ *
+ * ⭐ Die Doktrin dagegen stand zwei Dateien weiter ausgeschrieben (`store.ts`, am `amtStore`):
+ * «KEIN DEMO-SEED … ein Demo-Bestand, der aussieht wie echte Arbeit, ist die schlimmere Lüge als ein
+ * ehrlich leerer Eingangskorb.» Der Defekt war nicht, dass niemand es wusste — sondern dass nichts es
+ * durchsetzte.
+ */
+describe("Aufsicht — der Bestand ist echt, nicht gestellt", () => {
+  const quelle = readFileSync(
+    new URL("../src/pages/aufsicht.tsx", import.meta.url),
+    "utf8",
+  );
+
+  it("POSITIV-KONTROLLE: die Seite ist gefunden und rendert das Dashboard", () => {
+    expect(quelle).toContain("AufsichtDashboard");
+  });
+
+  it("SCHARF: sie speist sich aus dem behörden-scoped Store, nicht aus dem Bürger-Store", () => {
+    expect(quelle).toMatch(/port=\{amtStore\}/);
+    // ⛔ Der Bürger-Store darf hier nicht einmal importiert sein — ein Import ist die halbe Rückkehr.
+    expect(quelle).not.toMatch(
+      /\bimport\s*\{[^}]*\bstore\b[^}]*\}\s*from\s*"\.\.\/store\.js"/,
+    );
+  });
+
+  it("SCHARF: sie HYDRIERT — ohne `laden()` zeigte auch der richtige Store nur seinen Anfangszustand", () => {
+    expect(quelle).toMatch(/amtStore\s*\n?\s*\.laden\?\.\(\)/);
+  });
+
+  it("GEGENPROBE: ein LADEFEHLER ist von einem leeren Bestand unterscheidbar", () => {
+    // Bei einer Aufsicht ist genau diese Verwechslung teurer als anderswo: sie schließt aus Abwesenheit
+    // von Auffälligkeiten auf Ordnung.
+    expect(quelle).toContain("ErrorState");
+    expect(quelle).toContain("Das heißt NICHT, dass keine Vorgänge vorliegen");
   });
 });

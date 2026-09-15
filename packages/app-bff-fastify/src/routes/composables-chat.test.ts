@@ -434,4 +434,154 @@ describe("BFF Composable-Chat POST /api/composables/:id/chat", () => {
     expect(body.erdung.wissensEintraege).toBe(0);
     await app.close();
   });
+  // ── DIE STELLE KENNT IHRE EIGENEN RECHTSGRUNDLAGEN — und was sie NICHT kennt, sagt sie ────────────
+  //
+  // ⛔ GEMESSEN 2026-09-03 an einem emittierten Live-Mesh: jede Stelle fuehrt FUENF
+  // Anspruchsgrundlagen MIT TITEL (Landesabgabenrecht · Erhebung · Autoritaetsfamilie · E-Government · Onlinezugang)
+  // und VIER Wissens-Knoten (`seed-*`). Beides erreichte den Assistenten nicht:
+  //   `anspruch` starb am MOUNT — `mapManifestToComposable` las das Feld in keiner Zeile.
+  //   `wissen` erreichte `knowledgeDomains`, wurde dort aber von einem Filter gelesen, der NUR
+  //   procedureIds versteht — vier von fuenf Domaenen fielen LAUTLOS weg, und die Antwort meldete
+  //   trotzdem `geerdet: true`. Eine Absenz, die wie ein Erfolg aussieht.
+  const mitAnspruch = () =>
+    composable({
+      spine: {
+        role: "musterverfahren-spine",
+        autonomy: "AAL-2",
+        aufgaben: ["assistenz", "pruefung"],
+        skills: ["vollstaendigkeitspruefung"],
+        // EINE aufloesbare Domaene (die Verfahrens-Id) + ZWEI Korpus-Knoten, die dieses Verfahren nicht traegt.
+        knowledgeDomains: [
+          "musterverfahren",
+          "seed-de-verwaltung",
+          "seed-business-rules",
+        ],
+        rechtsgrundlagen: [
+          { id: "recht:kag", titel: "Kommunalabgabengesetz (KAG)" },
+          {
+            id: "recht:ozg",
+            titel: "Onlinezugangsgesetz (OZG)",
+            ubiquitaer: true,
+          },
+        ],
+      },
+    });
+
+  it("ANSPRUCH: die deklarierten Rechtsgrundlagen erreichen den Port UND die Quellen — heben `geerdet` aber NICHT", async () => {
+    let gesehen: AiConverseRequest | undefined;
+    const port: AiAssistPort = {
+      ...createLocalAiAssistPort(),
+      async converse(_context, request) {
+        gesehen = request;
+        return capabilityOk({
+          value: "Antwort",
+          confidence: 0.5,
+          modelId: "test:converse",
+          rationale: "Test",
+          sources: ["test"],
+          marking: "ki-vorschlag",
+          euAiActClass: "limited-risk",
+          reviewRequired: true,
+        } satisfies AiSuggestion);
+      },
+    };
+    // OHNE kuratiertes Wissen — genau so ist der Fall trennscharf: waeren die Grundlagen eine Erdung,
+    // stuende hier `geerdet: true`.
+    const { app } = await chatApp({
+      aiAssist: port,
+      composables: [mitAnspruch()],
+    });
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/composables/musterverfahren/chat",
+      payload: { nachricht: "Worauf stuetzt sich diese Stelle?" },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+
+    // (a) SIE KOMMEN AN — im Port-Input und in den server-abgeleiteten Quellen.
+    expect(gesehen?.input["rechtsgrundlagen"]).toEqual([
+      { id: "recht:kag", titel: "Kommunalabgabengesetz (KAG)" },
+      { id: "recht:ozg", titel: "Onlinezugangsgesetz (OZG)", ubiquitaer: true },
+    ]);
+    expect(body.erdung.quellen).toContain("anspruch:recht:kag");
+    expect(body.erdung.rechtsgrundlagen).toHaveLength(2);
+
+    // (b) UND SIE HEBEN `geerdet` NICHT. Ein Titel NENNT eine Norm; er traegt sie nicht.
+    // «GEERDET beglaubigt die EXISTENZ der Norm, nie ihren GEHALT» — ein Titel als Beleg waere ihr Rueckfall.
+    expect(body.erdung.geerdet).toBe(false);
+    expect(body.erdung.wissensEintraege).toBe(0);
+
+    // (c) DIE GRENZE STEHT IM AUFTRAG, nicht nur in der Absicht — sonst macht das Modell aus einem
+    //     Titel einen Wortlaut.
+    const regeln = (gesehen?.input["regeln"] ?? []) as string[];
+    expect(
+      regeln.some((r) => /rechtsgrundlagen\[\].*KEINEN Normtext/i.test(r)),
+    ).toBe(true);
+    await app.close();
+  });
+
+  it("BENANNTE ABSENZ: eine deklarierte Wissens-Domaene ohne Wissen faellt nicht mehr lautlos weg", async () => {
+    let gesehen: AiConverseRequest | undefined;
+    const port: AiAssistPort = {
+      ...createLocalAiAssistPort(),
+      async converse(_context, request) {
+        gesehen = request;
+        return capabilityOk({
+          value: "Antwort",
+          confidence: 0.5,
+          modelId: "test:converse",
+          rationale: "Test",
+          sources: ["test"],
+          marking: "ki-vorschlag",
+          euAiActClass: "limited-risk",
+          reviewRequired: true,
+        } satisfies AiSuggestion);
+      },
+    };
+    const { store } = await wissenStoreMit(["Fristwissen."]);
+    const { app } = await chatApp({
+      aiAssist: port,
+      wissenStore: store,
+      composables: [mitAnspruch()],
+    });
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/composables/musterverfahren/chat",
+      payload: { nachricht: "Welche Frist gilt?" },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+
+    // Die EINE aufloesbare Domaene erdet — die beiden Korpus-Knoten werden BENANNT statt verschluckt.
+    expect(body.erdung.geerdet).toBe(true);
+    expect(body.erdung.domainsOhneWissen).toEqual([
+      "seed-de-verwaltung",
+      "seed-business-rules",
+    ]);
+    // ANTI-LOCKERUNG: `domain:`-Quellen nennen NUR, was wirklich aufgeloest wurde. Vorher stand dort
+    // JEDE deklarierte Domaene — eine zitierfaehige Quelle fuer Wissen, das gar nicht vorlag.
+    expect(body.erdung.quellen).toContain("domain:musterverfahren");
+    expect(body.erdung.quellen).not.toContain("domain:seed-de-verwaltung");
+    // Und das Modell wird darauf hingewiesen, statt die Luecke fuer Vollstaendigkeit zu halten.
+    const regeln = (gesehen?.input["regeln"] ?? []) as string[];
+    expect(regeln.some((r) => r.includes("seed-de-verwaltung"))).toBe(true);
+    await app.close();
+  });
+
+  it("POSITIV-KONTROLLE: loesen ALLE Domaenen auf, ist die Absenz-Liste leer (kein Dauer-Rauschen)", async () => {
+    const { store } = await wissenStoreMit(["Fristwissen."]);
+    const { app } = await chatApp({ wissenStore: store });
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/composables/musterverfahren/chat",
+      payload: { nachricht: "Welche Frist gilt?" },
+    });
+    const body = res.json();
+    expect(body.erdung.domainsOhneWissen).toEqual([]);
+    // Und ohne deklarierte Grundlagen bleibt die Liste leer statt undefined — ein Feld, das mal fehlt
+    // und mal da ist, zwingt jeden Leser zu einer Fallunterscheidung.
+    expect(body.erdung.rechtsgrundlagen).toEqual([]);
+    await app.close();
+  });
 });

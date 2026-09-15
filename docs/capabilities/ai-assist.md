@@ -7,6 +7,12 @@ Konfidenz, Begründung, Quellen) und `reviewRequired:true`; die Entscheidung
 bleibt menschlich (serverseitig, Vier-Augen). EU-AI-Act: Assistenz ist
 `limited-risk`, `high-risk` wird abgelehnt.
 
+> **Nicht zu verwechseln** mit den KLIENT-seitigen Ports `KiAssistPort` /
+> `KiChatPort` des Kits (`packages/fachverfahren-kit/src/lib/ai-assist.ts`), die
+> in die UI injiziert werden. `AiAssistPort` hier ist der SERVER-seitige
+> Anbieter-Port hinter `POST /api/ai/assist`. Siehe
+> [`../reference/ai-assist-integration.md`](../reference/ai-assist-integration.md).
+
 ## Austauschbare Anbieter (OSS-first)
 
 Das Modell kommt aus dem Provider, nie als Inline-Key. Zwei mitgelieferte,

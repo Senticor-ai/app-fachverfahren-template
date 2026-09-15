@@ -26,7 +26,14 @@ ausgeschlossen.
 
 ## Runtime-Anwendung
 
-- Login ist Pflicht; die Mock-Nutzer trennen Bürgerin und Sachbearbeitung.
+- Login ist Pflicht. Die Konten sind LOKAL (`packages/provider-local-auth`,
+  Server-Sessions), mit den Arbeitsbereichen
+  `buerger | sachbearbeitung | aufsicht` — siehe
+  [`../reference/rbac.md`](../reference/rbac.md) (Abschnitt „Arbeitsbereiche")
+  und
+  [`../capabilities/identity-and-trust.md`](../capabilities/identity-and-trust.md).
+- Bürger- und Sachbearbeitungs-Sichten rendern config-getrieben aus der Naht
+  (`apps/fachverfahren/src/app/routes.tsx`).
 - Bürgerin-Erfahrung nutzt generische Vorgänge, Posteingang und Ausgang.
 - Sachbearbeitung nutzt Eingang, Zugewiesen, Fristen, Entscheidungen und Suche
   mit denselben fachneutralen Vorgängen.

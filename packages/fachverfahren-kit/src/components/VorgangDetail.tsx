@@ -3,12 +3,17 @@
 // strukturierte Datensektionen, Audit-Trail. ABER streng config-getrieben: die Sektionen kommen aus `config.detailSektionen`
 // (verschachtelte Pfade in `vorgang.antragsdaten`), nicht aus Domänen-Literalen. Ein zweites Verfahren
 // rendert unverändert.
-import { Database, FileText, Sparkles } from "lucide-react";
+import { useId } from "react";
+import { Database, FileText, ShieldCheck, Sparkles } from "lucide-react";
 import type { DetailSektion, LeistungConfig, Vorgang } from "../types.js";
+import type { KiAssistPort } from "../lib/ai-assist.js";
+import { useAiAssist } from "../hooks/use-ai-assist.js";
 import { cn } from "../lib/cn.js";
 import { formatBetrag as formatBetragKit } from "../format.js";
+import { Button } from "../ui/button.js";
+import { ErrorState } from "./ErrorState.js";
 import { KiVorschlag } from "./KiVorschlag.js";
-import { KiAssistPanel } from "./KiAssistPanel.js";
+import { KiAssistPanel, type KiRisikoklasse } from "./KiAssistPanel.js";
 
 /** Liest einen verschachtelten Pfad ("a.b.c") aus einem Objekt — defensiv, ohne Annahmen über die Form. */
 export function getPfad(obj: unknown, pfad: string): unknown {
@@ -24,9 +29,15 @@ export function getPfad(obj: unknown, pfad: string): unknown {
   }, obj);
 }
 
+/** Does a field carry a value? The ONE emptiness rule: `formatWert` renders "—" by it, the detail sections hide
+ *  empty fields by it, and the case reviewer learns filled/empty by it. */
+function isFilled(value: unknown): boolean {
+  return value !== undefined && value !== null && value !== "";
+}
+
 /** Formatiert einen unbekannten Wert lesbar (Boolean → Ja/Nein, leer → „—") — generisch, keine Domänen-Logik. */
 export function formatWert(value: unknown): string {
-  if (value === undefined || value === null || value === "") return "—";
+  if (!isFilled(value)) return "—";
   if (typeof value === "boolean") return value ? "Ja" : "Nein";
   if (typeof value === "number")
     return new Intl.NumberFormat("de-DE").format(value);
@@ -59,10 +70,10 @@ function Sektion<T>({
   sektion: DetailSektion;
   antragsdaten: T;
 }) {
-  // Felder ohne Wert ausblenden, damit optionale Angaben (z.B. fehlende Chip-Nr.) die Sicht nicht aufblähen.
+  // Hide fields without a value, so optional entries (e.g. a missing chip number) do not bloat the view.
   const felder = sektion.felder
     .map((f) => ({ ...f, wert: getPfad(antragsdaten, f.pfad) }))
-    .filter((f) => f.wert !== undefined && f.wert !== null && f.wert !== "");
+    .filter((f) => isFilled(f.wert));
   if (felder.length === 0) return null;
 
   return (
@@ -218,6 +229,171 @@ function StrukturierteUebergabe({ vorgang }: { vorgang: Vorgang }) {
   );
 }
 
+// ── THE REVIEWER BEHIND THE MASK (Z3) ────────────────────────────────────────────────────────────────
+// The composable used to be reachable only on a chat page of its own; the mask — where the caseworker decides —
+// named none. The reviewer now sits here: it checks THIS case on request and answers with ONE transparent
+// suggestion. The decision stays in the EntscheidungPanel; the kit only renders what a port returns.
+
+/** A reviewer the case detail can ask — a named, responsible body behind a KiAssistPort. */
+export interface CaseReviewer {
+  /** The reviewing body's display name — the suggestion is attributed to a named body, not to "the AI". */
+  label: string;
+  /** Risk class of what this reviewer can return. Its caller knows the backend's cap; the kit does not guess it. */
+  riskClass: KiRisikoklasse;
+  /** Runs one review per request; the result carries `reviewErforderlich: true` (HITL in the type). */
+  port: KiAssistPort;
+}
+
+/**
+ * The signals a reviewer receives for one case — PII-poor by construction. The applicant's VALUES stay in the
+ * browser: names, addresses and free text are personal data, and a reviewer backend may hand its input to a model
+ * as it is. What travels is what the config DECLARES plus the case's own state: which declared fields are filled,
+ * which evidence is required and submitted, what the rules computed, which steps the state machine offers from
+ * here, and the procedure's legal bases.
+ */
+export function caseReviewContext<T>(
+  config: LeistungConfig<T>,
+  vorgang: Vorgang<T>,
+): Record<string, unknown> {
+  const state = config.statusMachine.states.find(
+    (s) => s.key === vorgang.status,
+  );
+  const calculation = vorgang.berechnung;
+  return {
+    status: state?.label ?? vorgang.status,
+    nextSteps: config.statusMachine.transitions
+      .filter((t) => t.from === vorgang.status)
+      .map((t) => t.label),
+    fields: config.detailSektionen.flatMap((section) =>
+      section.felder.map((f) => ({
+        section: section.titel,
+        field: f.label,
+        filled: isFilled(getPfad(vorgang.antragsdaten, f.pfad)),
+      })),
+    ),
+    evidence: vorgang.nachweise.map((n) => ({
+      document: n.label,
+      required: n.erforderlich === true,
+      submitted: n.hochgeladen === true,
+    })),
+    ...(calculation
+      ? {
+          calculation: {
+            result: calculation.label,
+            amount: calculation.betrag,
+            unit: calculation.einheit,
+            status: calculation.status,
+            derivation: calculation.begruendung,
+          },
+        }
+      : {}),
+    legalBases: config.rechtsgrundlagen.map((r) => ({
+      norm: r.norm,
+      title: r.titel,
+    })),
+  };
+}
+
+/** The technical cause of a failed review, when the port's error carries one — shown behind a disclosure. */
+function causeOf(error: unknown): string | undefined {
+  const message = (error as { message?: unknown } | null | undefined)?.message;
+  return typeof message === "string" && message.trim() ? message : undefined;
+}
+
+/** The reviewer's section in the mask: request → ONE transparent suggestion → the human decides. */
+function CaseReviewSection<T>({
+  reviewer,
+  config,
+  vorgang,
+}: {
+  reviewer: CaseReviewer;
+  config: LeistungConfig<T>;
+  vorgang: Vorgang<T>;
+}) {
+  const headingId = useId();
+  const busyText = `${reviewer.label} prüft den Vorgang …`;
+  const review = useAiAssist(reviewer.port, {
+    ladeMeldung: busyText,
+    erfolgMeldung: "Prüfvorschlag verfügbar.",
+  });
+  const requestReview = () => {
+    void review.anfragen({
+      text: config.label,
+      kontext: caseReviewContext(config, vorgang),
+    });
+  };
+  // A failed review is a NAMED situation with a retry — never a silence that reads like "nothing to object".
+  const failed =
+    !review.laedt && !review.vorschlag && review.state.error !== undefined;
+  const cause = causeOf(review.state.error);
+
+  return (
+    <section
+      aria-labelledby={headingId}
+      className="rounded-md border border-border bg-card p-5"
+    >
+      <div className="flex items-center gap-2">
+        <ShieldCheck className="h-4 w-4 text-status-info" aria-hidden="true" />
+        <h2 id={headingId} className="text-sm font-semibold text-foreground">
+          {`Prüfung durch ${reviewer.label}`}
+        </h2>
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Die zuständige Stelle prüft diesen Vorgang auf Vollständigkeit und
+        Stimmigkeit. Ihr Ergebnis ist ein Vorschlag — entscheiden können nur
+        Sie.
+      </p>
+      {review.vorschlag ? (
+        <KiAssistPanel
+          className="mt-3"
+          vorschlag={{
+            wert: review.vorschlag.wert,
+            quelle: review.vorschlag.quelle,
+            konfidenz: review.vorschlag.konfidenz,
+            begruendung: review.vorschlag.begruendung,
+          }}
+          risikoklasse={reviewer.riskClass}
+          funktionsName="Prüfung des Vorgangs"
+          onVerwerfen={review.zuruecksetzen}
+        />
+      ) : failed ? (
+        <ErrorState
+          inline
+          className="mt-3"
+          title="Die Prüfung konnte gerade nicht erstellt werden."
+          description={
+            <>
+              <p>
+                {`${review.state.message ?? ""} Das heißt nicht, dass es nichts zu beanstanden gibt.`.trim()}
+              </p>
+              {cause ? (
+                <details className="mt-1 text-xs">
+                  <summary className="cursor-pointer">
+                    Technische Ursache
+                  </summary>
+                  <p className="mt-1">{cause}</p>
+                </details>
+              ) : null}
+            </>
+          }
+          onRetry={requestReview}
+        />
+      ) : (
+        <Button
+          type="button"
+          size="sm"
+          className="mt-3"
+          onClick={requestReview}
+          disabled={review.laedt}
+          aria-busy={review.laedt}
+        >
+          {review.laedt ? busyText : "Prüfung anfordern"}
+        </Button>
+      )}
+    </section>
+  );
+}
+
 export interface VorgangDetailProps<T = Record<string, unknown>> {
   /** Die Leistungs-Config — liefert `detailSektionen`, KI-Schwelle, Status-Definitionen. */
   config: LeistungConfig<T>;
@@ -227,6 +403,8 @@ export interface VorgangDetailProps<T = Record<string, unknown>> {
   flagLabel?: (flag: string) => string;
   /** Strukturierte Übergabe (Schema-Vorschau) anzeigen. Default: true. */
   zeigeUebergabe?: boolean;
+  /** The reviewer behind the mask (see `CaseReviewer`). Omitted ⇒ no reviewer section — the mask as before. */
+  reviewer?: CaseReviewer;
   className?: string;
 }
 
@@ -236,6 +414,7 @@ export function VorgangDetail<T = Record<string, unknown>>({
   vorgang,
   flagLabel,
   zeigeUebergabe = true,
+  reviewer,
   className,
 }: VorgangDetailProps<T>) {
   // Optionaler transparenter KI-Vorschlag (KiAssistPanel) — NUR wenn die Config das Signal trägt.
@@ -262,6 +441,17 @@ export function VorgangDetail<T = Record<string, unknown>>({
         {...(config.ki ? { schwelleAutonom: config.ki.schwelleAutonom } : {})}
         {...(flagLabel ? { flagLabel } : {})}
       />
+
+      {/* The reviewer's check sits right under the rule-based proposal it may question. Keyed by the case: a
+          suggestion belongs to ONE case and must not survive a switch to the next. */}
+      {reviewer ? (
+        <CaseReviewSection
+          key={vorgang.id}
+          reviewer={reviewer}
+          config={config}
+          vorgang={vorgang}
+        />
+      ) : null}
 
       {config.detailSektionen.map((sektion, i) => (
         <Sektion

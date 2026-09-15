@@ -5,6 +5,11 @@ Die kanonische Deploy-Form generierter Apps ist ein Helm-Chart unter
 
 ## Runtime-Schnittstellen
 
+- Bind-Adresse: `HOST`, Default `127.0.0.1` — fail-closed für den public UND
+  den internen Port (`packages/app-runtime-fastify/src/config.ts:106`).
+  Container und Helm setzen `HOST=0.0.0.0` EXPLIZIT (`Dockerfile:62`;
+  `apps/fachverfahren/deploy/helm/fachverfahren/templates/configmap.yaml:8`) —
+  ein Bild, das erreichbar sein will, sagt es, statt es zu erben.
 - Public Port: `PORT`, Default `8080`
 - Internal Port: `INTERNAL_PORT`, Default `9090`
 - Public Endpunkte: `/`, SPA-Routen, `/runtime-config.json`, `/livez`,

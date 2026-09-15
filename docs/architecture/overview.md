@@ -23,10 +23,12 @@ Generator-Pfad (PLAN für die App-Einbindung, siehe `modules/README.md`).
 
 **Public-sector capability contracts**
 
-Sind stabile Ports für wiederverwendbare Verwaltungsfähigkeiten:
+Sind stabile Ports für wiederverwendbare Verwaltungsfähigkeiten — alle 13:
 Identität und Vertrauen, Datenaustausch, Nachweisabruf, Zahlung, Postfach,
 Signatur/Siegel, Behördenverzeichnis, Records Management, Benachrichtigung,
-Workflow und Audit.
+Workflow, Audit, KI-Assistenz (`ai-assist`) und Blob-Storage (`blob-storage`).
+Je Port ein Vertrag unter [`../capabilities/`](../capabilities/); die
+maschinenlesbare Liste ist `platform/capabilities.json`.
 
 **Jurisdiction/provider adapters**
 

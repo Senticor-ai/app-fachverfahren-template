@@ -18,7 +18,7 @@ import { createOllamaAiAssistPortFromEnv } from "@senticor/provider-ai-ollama";
  * Wählt die AiAssistPort-Impl aus der Umgebung:
  *  - `AI_ASSIST_PROVIDER=local` (Default): deterministischer local-fake, kein Netz.
  *  - `AI_ASSIST_PROVIDER=ollama`: echter Ollama-Adapter (OLLAMA_BASE_URL/OLLAMA_MODEL).
- *  - `AI_ASSIST_PROVIDER=chos`: chos-code als Kernel für agentische KI (Cognitive Hive OS, AAL-2 Advise über
+ *  - `AI_ASSIST_PROVIDER=chos`: chos-agents als Kernel für agentische KI (Cognitive Hive OS, AAL-2 Advise über
  *    Handoff Envelope) — braucht `CHOS_AGENT_URL` (bzw. `CHOS_API_URL`), sonst Fehler (fail-closed).
  *  - `AI_ASSIST_PROVIDER=composable-container`: eine als CONTAINER ausgerollte, zertifizierte Composable-Stelle
  *    (Ziel-1 S6/S7) — der Container exponiert seine opencode-Engine (`COMPOSABLE_ENGINE_URL` +

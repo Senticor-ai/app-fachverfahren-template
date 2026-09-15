@@ -136,29 +136,41 @@ describe("assertComposable", () => {
 });
 
 describe("ComposableRegistry", () => {
-  it("findet nach id[@version], listet, und filtert enabled (certified/active)", () => {
+  it("findet nach id[@version], listet, und filtert enabled (alles ausser deprecated/retired)", () => {
     const reg = createInMemoryComposableRegistry([
       composable({ id: "a", version: "1.0.0", status: "certified" }),
       composable({ id: "a", version: "2.0.0", status: "candidate" }),
       composable({ id: "b", version: "1.0.0", status: "active" }),
+      composable({ id: "c", version: "1.0.0", status: "deprecated" }),
     ]);
     expect(reg.get("a", "1.0.0")?.status).toBe("certified");
     expect(reg.get("a")?.version).toBe("2.0.0"); // zuletzt registrierte gewinnt
-    expect(reg.list()).toHaveLength(3);
-    // Nur certified/active sind enabled — das candidate a@2 fällt raus.
+    expect(reg.list()).toHaveLength(4);
+    // ⛔ 2026-09-03 — HIER STAND «nur certified/active sind enabled — das candidate a@2 faellt raus».
+    // Der Zertifizierungs-Riegel ist per Nutzer-Direktive GEFALLEN (Zertifizierung gehoert an die
+    // PRODUKTIVSCHALTUNG, nicht an den Bau). Gemessen war seine Wirkung: 8 von 8 Stellen gemountet,
+    // NULL laufzeit-waehlbar — jede erzeugte Stelle steht im Lebenszyklus auf `incubated`/`candidate`.
+    // Der Zeuge zieht mit; ein zurueckgelassener Zeuge haette den Riegel unter anderem Namen behalten.
     expect(
       reg
         .listEnabled()
         .map((c) => `${c.id}@${c.version}`)
         .sort(),
-    ).toEqual(["a@1.0.0", "b@1.0.0"]);
+    ).toEqual(["a@1.0.0", "a@2.0.0", "b@1.0.0"]);
   });
 
-  it("istEnabled: nur certified/active", () => {
-    expect(istEnabled(composable({ status: "certified" }))).toBe(true);
-    expect(istEnabled(composable({ status: "active" }))).toBe(true);
-    expect(istEnabled(composable({ status: "candidate" }))).toBe(false);
-    expect(istEnabled(composable({ status: "deprecated" }))).toBe(false);
+  it("istEnabled: alles ausser deprecated/retired — ein Lebenszyklus ist keine Zertifizierung", () => {
+    // WAS LAEUFT: jede Stufe, die nichts beansprucht und nichts sperrt.
+    for (const status of [
+      "certified",
+      "active",
+      "candidate",
+      "incubated",
+    ] as const)
+      expect(istEnabled(composable({ status })), status).toBe(true);
+    // WAS NICHT LAEUFT — und das ist die einzige verbliebene Sperre: ausdruecklich Abgekuendigtes.
+    for (const status of ["deprecated", "retired"] as const)
+      expect(istEnabled(composable({ status })), status).toBe(false);
   });
 
   it("weist ein kaputtes Composable schon beim Registrieren ab (assertComposable)", () => {

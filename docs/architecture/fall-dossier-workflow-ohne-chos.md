@@ -53,9 +53,10 @@ Adapter da — Postgres bleibt der **OSS-Default**, chos ist per Umschalter wäh
   auf Postgres/InMemory — genau wie alle anderen Stores.
 - **VOLLSTÄNDIG „chos für alle Datenspeicherungen":** zusätzlich `ChosAuditStore` (Sicherheits-Audit,
   append-only), `ChosAppStore` (Präferenzen + Postfach) und `ChosKanbanStore` (SB-Workspace-Boards mit
-  Spalten/Karten/Checklisten/Referenzen, versioniert). Damit haben ALLE sieben Stores von
-  `@senticor/app-store-postgres` (Case/Task/Wissen/Auth/Audit/App/Kanban) einen chos-Adapter hinter
-  ihrem Port — jeder mit dedizierten Fake-Graph-Tests (ohne laufendes chos).
+  Spalten/Karten/Checklisten/Referenzen, versioniert) und `ChosEvidenceLedger`
+  (`src/chos-evidence-ledger.ts`, hash-verkettet). Damit haben ALLE acht Stores von
+  `@senticor/app-store-postgres` (Case/Task/Wissen/Auth/Audit/App/Kanban/EvidenceLedger) einen
+  chos-Adapter hinter ihrem Port — jeder mit dedizierten Fake-Graph-Tests (ohne laufendes chos).
 - **Kein Hart-Bezug auf chos-IP:** die Adapter sprechen nur gegen die OSS-eigene Naht `ChosClient`
   (`src/chos-client.ts`, chos-Vokabular: Entities + Lineage-Ereignisse). `InMemoryChosClient` macht
   sie OHNE laufendes chos testbar (sie durchlaufen denselben Store-Vertrag wie InMemory/Postgres);
@@ -105,8 +106,7 @@ nie aus dem BPMN und nie erfunden.
 
 Der Vertrag ist **bereits vollständig** durch die Typen `CaseStore`, `TaskStore`,
 `ProcedureRegistry` (und den Capability-Port `WorkflowPort` in
-`@senticor/platform-contracts`) gegeben. Es gibt daher **keinen zusätzlichen Adapter-Code im
-Template** — die Naht ist Dependency-Injection über `BffDeps`:
+`@senticor/platform-contracts`) gegeben. Die Naht ist Dependency-Injection über `BffDeps`:
 
 ```ts
 // packages/app-bff-fastify/src/deps.ts (Auszug)
@@ -119,34 +119,34 @@ export interface BffDeps {
 ```
 
 Der Einhängepunkt ist die Store-Konstruktion in der App-Komposition
-(`apps/fachverfahren/server/index.ts`): die `createXFromEnv`-Defaults werden durch eine
-chos-gebundene Implementierung **ersetzt**, die dieselben Interfaces erfüllt.
+(`apps/fachverfahren/server/index.ts`). Die App ruft dort unverändert die
+`createXFromEnv`-Fabriken auf; die WAHL trifft die Fabrik selbst anhand von
+`APP_STORE_MODE` (`packages/app-store-postgres/src/case-store.ts`):
 
 ```ts
-// Standalone (heute, Default): Template-Stub gegen die eigene DB.
+// Die App-Komposition bleibt gleich — die Fabrik entscheidet.
 const bff = {
   caseStore: createCaseStoreFromEnv(env),
   taskStore: createTaskStoreFromEnv(env),
   procedureRegistry: createInMemoryProcedureRegistry([]),
   // ...
 };
-
-// Produktion mit chos (Skizze des Einhängepunkts — Adapter lebt im Deployment,
-// NICHT im OSS-Template): ein chos-Adapter implementiert exakt CaseStore/TaskStore/
-// ProcedureRegistry und spricht die chos-API. Kein App-/Config-Umbau nötig.
-const bff = {
-  caseStore: createChosCaseStore(chosClient), // erfüllt CaseStore
-  taskStore: createChosTaskStore(chosClient), // erfüllt TaskStore
-  procedureRegistry: createChosProcedureRegistry(chosClient), // erfüllt ProcedureRegistry
-  // ...
-};
 ```
+
+`APP_STORE_MODE=chos` (plus `CHOS_API_URL`) lässt die Fabrik statt der Postgres-Variante die
+`Chos*`-Klasse hinter DEMSELBEN Interface zurückgeben — `ChosCaseStore`, `ChosTaskStore`,
+`ChosWissenStore`, `ChosAuthStore`, `ChosAuditStore`, `ChosAppStore`, `ChosKanbanStore`,
+`ChosEvidenceLedger`. Es gibt keine `createChosCaseStore`-Funktion: die Klasse wird in der Fabrik
+konstruiert, nicht vom Aufrufer.
+
+**Ausnahme `procedureRegistry`:** dafür existiert KEIN chos-Adapter. Sie bleibt
+`createInMemoryProcedureRegistry` (`apps/fachverfahren/server/index.ts`).
 
 Das ist dasselbe Adapter-Muster wie `AiAssistPort → chos` (siehe `AiAssistPort` in
 `packages/platform-contracts/src/ports.ts`) und `WorkflowPort → chos` (siehe
 `@senticor/workflow-bpmn-stub`): der Port ist die eine Wahrheit, der Provider (Stub oder chos)
-ist austauschbar. Der chos-Adapter gehört ins **Deployment/den Provider-Pack**, nicht ins
-OSS-Template — so bleibt chos-IP hinter der chos-API und das Template frei von Anbieter-Interna.
+ist austauschbar — so bleibt chos-IP hinter der chos-API und das Template frei von
+Anbieter-Interna.
 
 ## Ehrlich: Stub vs. chos in Produktion
 

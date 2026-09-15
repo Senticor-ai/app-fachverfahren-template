@@ -12,6 +12,7 @@
 // KONSUMENTEN-HOHEIT (wie procedure.config): template:update überschreibt diese Datei NICHT.
 import {
   createInMemoryComposableRegistry,
+  istEnabled,
   type ComposableRegistry,
 } from "@senticor/public-sector-sdk";
 import {
@@ -74,20 +75,25 @@ export function createComposableRegistry(
     // UND DIE VIERTE ZAHL, die bisher fehlte: GEMOUNTET ist nicht WAEHLBAR.
     //
     // GEMESSEN (2026-07-30, drei erzeugte Verfahren): 6/6, 8/8 und 9/9 Manifeste gemountet, 0 uebersprungen — und
-    // `registry.listEnabled()` = 0 an ALLEN dreien. Die Laufzeit-Auswahl geht ueber `istEnabled` (status ∈
-    // certified|active); die generierten Stellen stehen im Lebenszyklus auf `incubated`/`candidate`. Drei
+    // `registry.listEnabled()` = 0 an ALLEN dreien. Die Laufzeit-Auswahl ging DAMALS ueber `istEnabled` mit
+    // status ∈ certified|active (der Zertifizierungs-Riegel, 2026-09-03 gefallen); die generierten Stellen stehen im Lebenszyklus auf `incubated`/`candidate`. Drei
     // uebereinstimmende Mount-Zahlen koennen also vollstaendig taeuschen, weil der Konsument nach einem VIERTEN
     // Kriterium auswaehlt. Diese Zeile ist der Ort, an dem ein Betrieb das sieht.
-    const waehlbar = mounted.filter(
-      (c) => c.status === "certified" || c.status === "active",
-    );
+    //
+    // ⛔ 2026-09-03 — THIS LINE LIED, AND IT LIED IN THE ONE PLACE AN OPERATOR LOOKS.
+    // The certification lock was removed from `istEnabled` (user directive: certification belongs to the
+    // production cut-over, not to the build). This counter kept its OWN `certified || active` filter and
+    // therefore reported `0 laufzeit-waehlbar` while the registry handed out all 8 mounted stellen.
+    // That is the house class "two producers of one statement" — and the second producer was the one a
+    // human reads at startup. It now asks the SAME predicate the consumer asks; there is no second answer.
+    const waehlbar = mounted.filter(istEnabled);
     const stati = [
       ...new Set(mounted.map((c) => String(c.status ?? "(ohne status)"))),
     ].sort();
     log(
       `[composables] ${mounted.length} generierte Stelle(n) gemountet aus ${dir}: ${mounted.map((c) => c.id).join(", ")}` +
         ` — davon ${waehlbar.length} laufzeit-waehlbar (status: ${stati.join("/")}` +
-        `${waehlbar.length === 0 ? "; waehlbar wird eine Stelle mit certified/active, also ueber eine Zertifizierung — nicht ueber ein Flag" : ""}).`,
+        `${waehlbar.length === 0 ? "; NICHT waehlbar ist nur, was deprecated/retired ist — jeder andere Lebenszyklus laeuft" : ""}).`,
     );
   }
   // ARCHETYP-BRUCH benennen — unabhängig davon, ob gemountet oder zurückgefallen wurde.

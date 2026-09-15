@@ -78,7 +78,8 @@ oder erfundene Variante (`dog-tax` o. Ä.); ein abweichender Slug driftet den Bu
    pnpm run dev
    ```
 
-   Die Landing (`/`) ist die einzige Route ohne Anmeldung; alle Persona-
+   Die Landing (`/`) und das Doku-Wiki (`/hilfe`) sind die einzigen Routen
+   ohne Anmeldung; alle Persona-
    und Workspace-Sichten (`/buerger*`, `/amt*`, `/aufsicht`, `/boards`,
    Benutzerverwaltung) liegen hinter dem Session-Gate und brauchen die
    lokale App-Runtime — der Vite-Dev-Server proxied `/auth` + `/api` an sie

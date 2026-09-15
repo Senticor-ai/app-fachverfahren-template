@@ -1,9 +1,1 @@
-{
-  "packages/fachverfahren-kit/src/components/HilfePanel.tsx": 2,
-  "packages/fachverfahren-kit/src/components/KommandoPalette.tsx": 1,
-  "packages/fachverfahren-kit/src/components/ReportingPanel.tsx": 1,
-  "packages/fachverfahren-kit/src/ui/alert-dialog.tsx": 1,
-  "packages/fachverfahren-kit/src/ui/dialog.tsx": 1,
-  "packages/fachverfahren-kit/src/ui/sheet.tsx": 2,
-  "packages/fachverfahren-kit/src/ui/sidebar.tsx": 3
-}
+{}

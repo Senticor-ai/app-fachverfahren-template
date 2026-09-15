@@ -61,6 +61,8 @@ pnpm run check:leistung-contract
 
 ## Grenzen
 
-Fachliche API-, OpenAPI- und Postgres-E2E-Routen (`test:e2e:postgres`) bleiben
-explizite Ausbauschritte — hier keine Domänenlogik erfinden, sondern als
-Fastify-Route mit Permissions/Events/Compliance im Domain-Manifest ergänzen.
+Fachliche Routen liegen in `@senticor/app-bff-fastify` (15 Routenmodule), der
+OpenAPI-Snapshot wird über `check:openapi` gehalten, und die
+Postgres-Integration läuft als `pnpm run test:pg`. Hier keine Domänenlogik
+erfinden, sondern als Fastify-Route mit Permissions/Events/Compliance im
+Domain-Manifest ergänzen.

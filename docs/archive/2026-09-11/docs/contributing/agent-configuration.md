@@ -1,3 +1,5 @@
+> **ARCHIVIERT 2026-09-11** — Wiederholung mit falschen Zahlen. Nachfolger: [`docs/agents/bootstrap.md`](../../../../agents/bootstrap.md) + [`AGENTS.md`](../../../../../AGENTS.md) ([`docs/archive/README.md`](../../../README.md)).
+
 # Agent-Konfiguration
 
 Coding Agents nutzen `AGENTS.md` als kanonische Arbeitsanweisung. Zusätzliche

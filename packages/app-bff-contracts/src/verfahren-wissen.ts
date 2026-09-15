@@ -23,7 +23,7 @@ export const WissenEintragRequestSchema = Type.Object(
 export type WissenEintragRequestDto = Static<typeof WissenEintragRequestSchema>;
 
 /** Einen KI-Wissens-Eintrag (ENTWURF) anfordern: die KI erzeugt Wissen aus Aufgabe + Kontext. */
-export const KiWissenRequestSchema = Type.Object(
+export const AiKnowledgeRequestSchema = Type.Object(
   {
     task: Type.String({ minLength: 1 }),
     input: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
@@ -31,7 +31,7 @@ export const KiWissenRequestSchema = Type.Object(
   },
   { additionalProperties: false },
 );
-export type KiWissenRequestDto = Static<typeof KiWissenRequestSchema>;
+export type AiKnowledgeRequestDto = Static<typeof AiKnowledgeRequestSchema>;
 
 /** Ein Wissens-Eintrag des Verfahrens (Ansicht). */
 export const WissenViewDtoSchema = Type.Object(
@@ -63,7 +63,7 @@ export const WissenViewListDtoSchema = Type.Object(
 export type WissenViewListDto = Static<typeof WissenViewListDtoSchema>;
 
 // ── Verfahrens-Wissens-EXPORT — die Brücke fürs verfahrens-weite Wiki (Symmetrie zum Fall-Export) ──────
-// Der stabile, agenten-konsumierbare Kontext-Bundle EINES Verfahrens: chos-code liest ihn und übersetzt das
+// Der stabile, agenten-konsumierbare Kontext-Bundle EINES Verfahrens: chos-agents liest ihn und übersetzt das
 // generelle Wissen + die Fähigkeiten in Skills + Kontext. Der Text ist injektions-NEUTRALISIERT.
 export const WissenExportEintragSchema = Type.Object(
   {

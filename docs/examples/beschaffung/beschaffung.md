@@ -28,6 +28,7 @@ personas: [
     label: "Freigabe",
     home: "/freigabe",
     routePrefix: "/freigabe",
+    navLabels: { kennzahlen: "Vergabe-Kennzahlen" },
   },
   {
     key: "einkauf",
@@ -46,6 +47,11 @@ personas: [
 
 Sidebar, Landing-Einstiege, URL↔Persona-Zuordnung und die Admin-Zuweisung leiten sich
 daraus ab (siehe `apps/fachverfahren/tests/personas.test.ts`, Abschnitt Beschaffung).
+
+`navLabels` ist die Stelle, an der die Naht die Navigations-WÖRTER eines
+Arbeitsbereichs benennt („Kennzahlen" heißt hier „Vergabe-Kennzahlen"). WELCHE
+Einträge überhaupt erscheinen, entscheidet weiterhin der Vertrag — die Naht
+benennt sie nur um.
 
 ## 2. Verfahren (die Naht `procedure.config.ts` → `ProcedureVersion`)
 
@@ -83,7 +89,9 @@ Server bewahrt auf, stempelt Identität/Zeit und auditiert.
 - **N-Augen** (3+ Freigeber): modelliert als engine-neutrales
   `CaseTransition.requiredApprovals` (Zahl, grafisch im BPMN via
   `senticor:requiredApprovals` konfigurierbar; `requiresFourEyes` ≡ `requiredApprovals: 2`).
-  Server-seitig erzwungen ist heute die 2-Augen-Untergrenze; die volle Zählung N>2
-  distinkter Freigebender und **wertgrenzen-gestaffelte** Ketten (P1-4) sind Folge-Arbeit.
+  **Server-seitig erzwungen** sind BEIDE Stufen: die 2-Augen-Separation und — bei
+  `requiredApprovals > 2` — die Zählung DISTINKTER Freigebender, gesammelt über
+  `POST /api/cases/:id/approvals` (Issue #56). Offen bleiben allein die
+  **wertgrenzen-gestaffelten** Ketten (P1-4).
 - **Positions-Formularfelder**: `FeldTyp` hat (noch) keine Wiederhol-/Array-Felder für
   eine Positionstabelle im Antrag; Dossier-Verfahren nutzen `data`/Aufgaben (P1-6).

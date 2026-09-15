@@ -62,9 +62,3 @@ Beispielwerte (Keycloak): `issuerUrl = https://id.example.org/realms/verwaltung`
 https://login.microsoftonline.com/<tenant>/v2.0`. Identitäten werden pro
 Tenant über die Benutzerverwaltung bzw. Provisioning explizit verlinkt
 (`linkIdentity`).
-
-Beispielwerte (Keycloak): `issuerUrl = https://id.example.org/realms/verwaltung`,
-`clientId = fachverfahren`. Entra ID: `issuerUrl =
-https://login.microsoftonline.com/<tenant>/v2.0`. Identitäten werden pro
-Tenant über die Benutzerverwaltung bzw. Provisioning explizit verlinkt
-(`linkIdentity`).

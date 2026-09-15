@@ -14,12 +14,12 @@ const cliUrl = new URL("./cli.ts", import.meta.url);
 // re-parses this file's own ~1929 lines PLUS the ~1818-line
 // `lib/agent-platform.ts` (and the rest of `lib/`) from scratch every single
 // time. On an idle machine that's cheap (~2s for the heaviest commands); under
-// real CPU contention -- exactly what happens when CHOS-Code's Durchstich
+// real CPU contention -- exactly what happens when CHOS-Agents's Durchstich
 // pipeline runs a generated app's `pnpm run test:template` gate synchronously
-// inside the busy chos-code-runner pod -- it intermittently blows even a 20s
+// inside the busy chos-agents-runner pod -- it intermittently blows even a 20s
 // per-test budget (observed live: "sometimes 2, sometimes 6" of these 7 tests
 // timing out), which incorrectly BLOCKIERT/FEHLER's the whole governed run
-// (see CHOS-CODE-Innovation#62/#64).
+// (see CHOS-AGENTS-Innovation#62/#64).
 //
 // `runTemplate` below fixes the actual root cause for 6 of the 7 cases: it
 // invokes `cli.ts` IN-PROCESS via a cache-busted dynamic `import()` instead of
@@ -86,7 +86,29 @@ async function runTemplate(args: string[]): Promise<string> {
   return `${lines.join("\n")}\n`;
 }
 
+import { canScaffoldFrom } from "./lib/pristine-source.ts";
+
 const repoRoot = process.cwd();
+
+// ── DOES THIS TREE STILL HAVE A PRISTINE TEMPLATE TO SCAFFOLD FROM? ─────────────────────────────────────────
+// The CLI ships into every generated application. A CHOS-governed consumer has no pristine source: `scaffold`
+// refuses (CHOS-AGENTS#68, exit 6) and the agent contracts describe the TEMPLATE, not the built procedure.
+// Measured 2026-08-31 in two fully built procedures, four assertions here were red for exactly that reason —
+// witnesses without a subject. Where the subject is missing the branch asserts what IS true there instead: the
+// CLI exits non-zero and NAMES why. A silent skip would claim a check that never happened.
+const PRISTINE = await canScaffoldFrom(repoRoot);
+
+/** The refusal must be legible: a non-zero exit AND a stated reason. An exit code alone is a dead end. */
+function erklaertSichBeimVerweigern(exitCode: number, text: string): void {
+  expect(
+    exitCode,
+    "the CLI succeeded in a governed consumer — the guard did not fire",
+  ).not.toBe(0);
+  expect(
+    text.length,
+    "the CLI refused WITHOUT saying anything — a refusal without a reason is a dead end",
+  ).toBeGreaterThan(0);
+}
 
 afterEach(() => {
   // Belt-and-suspenders: runTemplate always restores this itself, but a
@@ -125,6 +147,35 @@ describe("template CLI", () => {
   });
 
   it("scaffolds a repository with deterministic provenance", async () => {
+    if (!PRISTINE) {
+      const root = await mkdtemp(join(tmpdir(), "template-cli-guard-"));
+      try {
+        let text = "";
+        let code = 0;
+        try {
+          await runTemplate([
+            "scaffold",
+            "--domain",
+            "x",
+            "--display-name",
+            "X",
+            "--target",
+            join(root, "app"),
+            "--allow-existing-empty",
+            "--allow-dirty",
+            "--json",
+          ]);
+        } catch (e) {
+          code = 1;
+          text = String((e as Error)?.message ?? e);
+        }
+        erklaertSichBeimVerweigern(code, text);
+        expect(text).toMatch(/live\/governed consumer project|CHOS-AGENTS#68/);
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+      return;
+    }
     const root = await mkdtemp(join(tmpdir(), "template-cli-test-"));
     try {
       const target = join(root, "app");
@@ -155,6 +206,42 @@ describe("template CLI", () => {
     "merges new default ownership entries during template:update",
     { timeout: 300_000 },
     async () => {
+      // Ohne pristine Quelle kann `template:update` nicht laufen — dieselbe Lage wie beim Scaffold darueber,
+      // und der Riegel dahinter ist derselbe (CHOS-AGENTS#68). Im governten Konsumenten wird deshalb die
+      // VERWEIGERUNG geprueft statt der Aktualisierung: die Eigenschaft schuetzt genau dort etwas.
+      if (!PRISTINE) {
+        const guard = await mkdtemp(
+          join(tmpdir(), "template-cli-guard-update-"),
+        );
+        try {
+          let text = "";
+          let code = 0;
+          try {
+            await runTemplate([
+              "scaffold",
+              "--domain",
+              "x",
+              "--display-name",
+              "X",
+              "--target",
+              join(guard, "app"),
+              "--allow-existing-empty",
+              "--allow-dirty",
+              "--json",
+            ]);
+          } catch (e) {
+            code = 1;
+            text = String((e as Error)?.message ?? e);
+          }
+          erklaertSichBeimVerweigern(code, text);
+          expect(text).toMatch(
+            /live\/governed consumer project|CHOS-AGENTS#68/,
+          );
+        } finally {
+          await rm(guard, { recursive: true, force: true });
+        }
+        return;
+      }
       const templateRoot = process.cwd();
       const root = await mkdtemp(join(tmpdir(), "template-cli-update-test-"));
       try {

@@ -49,6 +49,25 @@ export interface PersonaDescriptor {
   rbacRoles?: readonly string[];
   /** Kurzbeschreibung für den Bereichs-Einstieg (Landing). Optional — sonst dient `sub` als Beschreibung. */
   beschreibung?: string;
+  /** THE NAVIGATION WORDS OF THIS WORKSPACE — keyed by `ShellNavItem.key` (`start` · `antrag` · `antraege` ·
+   *  `postfach` · `eingang` · `akten` · `register` · `assistent` · `kennzahlen` · `boards` · `home`).
+   *
+   *  ⛔ WHY THIS FIELD EXISTS (measured 2026-09-09 on the fourth generated use case — an INTERNAL PURCHASING
+   *  application, i.e. a business process with no administrative act, no citizen and no legal remedy). Its seam
+   *  named the workspace correctly (`label: "Bedarfsträger:in"`, derived by the factory from the domain concept)
+   *  and the switcher rendered it. The sidebar right underneath still read «Start · Antrag stellen · Meine
+   *  Anträge · Postfach»: those words were literals inside `FachverfahrenShell.navFor`, reachable through no
+   *  seam at all. The one screen meant to PROVE genericity told the user he was filing a citizen application.
+   *
+   *  IT IS A WORD, NOT A ROUTE — deliberately. Which entries exist stays derived from the CONTRACT
+   *  (`config.antrag` · `config.register` · `config.ki.chat`), so a seam can never invent a nav entry pointing
+   *  at a route the app does not mount (audit D3-1: 3 of 6 items dead). Same reason it is a flat, JSON-
+   *  serialisable record rather than a nav-item list: a config seam cannot transport a `LucideIcon`.
+   *
+   *  FAIL-OPEN, never a required field: an absent, empty or blank word keeps today's generic administrative
+   *  wording, byte for byte. An application that declares nothing renders exactly as before. Same shape as the
+   *  established `governance.zonenLabels` override on the CHOS side — one mechanism, not a second one. */
+  navLabels?: Readonly<Record<string, string>>;
   /** WELLE 1c: die KI-Fähigkeiten dieser Zuständigkeit (Agent-Skills + Autonomie-Level) — der Laufzeit-Spiegel der
    *  CHOS-`governance.faehigkeiten`. JSON-serialisierbar über die Config-Naht, damit die generierende Fabrik sie einspeist;
    *  die App hat KEINE governance.yaml (die EINE Wahrheit ist die LeistungConfig). Optional/feature-tolerant: fehlt sie,

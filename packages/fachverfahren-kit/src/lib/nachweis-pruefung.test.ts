@@ -119,3 +119,80 @@ describe("pruefeNachweisDatei — reine Fail-Fast-Vorprüfung (nie autoritativ)"
     ).toBe("format");
   });
 });
+
+// ── DER BLOSSE ENDUNGS-TOKEN (2026-09-14, an der Buergerstrecke live gemessen) ─────────────────────────
+//
+// ⛔ Ein erzeugtes Verfahren deklarierte `akzeptierteTypen: ['pdf']` — ohne Punkt. Der Vergleich fiel
+// damit auf `mime === "pdf"`, und kein Browser meldet diesen MIME-Typ: eine gueltige PDF wurde
+// abgewiesen, beide ERFORDERLICHEN Nachweise liessen sich nicht anhaengen, der Antrag war strukturell
+// nicht absendbar. Die Meldung lautete dabei «Erlaubt: PDF» — denn `typLabel` versteht den Token sehr
+// wohl. Zwei Wahrheiten ueber denselben Token, in derselben Datei.
+describe("blosser Endungs-Token — er traf die LEERE MENGE", () => {
+  const pdf = {
+    name: "schulbescheinigung.pdf",
+    groesse: 601,
+    typ: "application/pdf",
+  };
+
+  it("DER FALL: `pdf` ohne Punkt nimmt eine PDF an (vorher: abgewiesen)", () => {
+    expect(
+      pruefeNachweisDatei({ ...basis, akzeptierteTypen: ["pdf"] }, pdf),
+    ).toBeNull();
+  });
+
+  it("… und zwar auch ohne MIME vom Browser — die ENDUNG traegt", () => {
+    expect(
+      pruefeNachweisDatei(
+        { ...basis, akzeptierteTypen: ["pdf"] },
+        { name: "a.pdf", groesse: 601, typ: "" },
+      ),
+    ).toBeNull();
+  });
+
+  it("NEGATIV-KONTROLLE: er weist weiterhin ab, was nicht passt", () => {
+    expect(
+      pruefeNachweisDatei(
+        { ...basis, akzeptierteTypen: ["pdf"] },
+        { name: "foto.png", groesse: 601, typ: "image/png" },
+      )?.grund,
+    ).toBe("format");
+  });
+
+  it('das accept-Attribut traegt dieselbe Normalform — ein `accept="pdf"` ignorieren Browser', () => {
+    expect(
+      nachweisAcceptAttribut({ ...basis, akzeptierteTypen: ["pdf", "jpg"] }),
+    ).toBe(".pdf,.jpg");
+  });
+
+  it("POSITIV-KONTROLLE: die drei GUELTIGEN Formen bleiben unveraendert", () => {
+    expect(
+      nachweisAcceptAttribut({
+        ...basis,
+        akzeptierteTypen: ["application/pdf", "image/*", ".jpg"],
+      }),
+    ).toBe("application/pdf,image/*,.jpg");
+    expect(
+      pruefeNachweisDatei(
+        { ...basis, akzeptierteTypen: ["application/pdf"] },
+        pdf,
+      ),
+    ).toBeNull();
+    expect(
+      pruefeNachweisDatei({ ...basis, akzeptierteTypen: [".pdf"] }, pdf),
+    ).toBeNull();
+    expect(
+      pruefeNachweisDatei({ ...basis, akzeptierteTypen: ["image/*"] }, pdf)
+        ?.grund,
+    ).toBe("format");
+  });
+
+  it("KEINE STILLE WEITUNG: was kein reiner Endungs-Token ist, bleibt wie es war", () => {
+    // `application/pdf` traegt ein `/`, `.pdf` einen Punkt — beide gehen unveraendert durch.
+    expect(
+      nachweisAcceptAttribut({
+        ...basis,
+        akzeptierteTypen: ["application/vnd.ms-excel"],
+      }),
+    ).toBe("application/vnd.ms-excel");
+  });
+});

@@ -83,6 +83,16 @@
           "APP_STORE_MODE": "memory"
         }
       }
+    },
+    "seam": {
+      "//": "THE DOMAIN SEAM OF THIS APP — the files that legitimately carry procedure vocabulary although they live outside modules/<domain>. `leistung.config.ts` is, in this kit's own words, 'DIE EINE Austausch-Naht dieser App'; the other three are generated FROM it. The domain-leakage gate protects SHARED code from hard-coded vocabulary — the seam is by design not shared, and reading this declaration is what keeps that distinction honest. Paths are relative to this app directory, so they survive the scaffold rename. Absent => nothing is exempt (the previous behaviour). — 2026-09-14: `deploy/k8s/` (trailing slash = the whole directory) joins the seam. A k8s Deployment/Service for THIS procedure must be named after it; that is deployment IDENTITY, not leakage, and the gate's own exception already said so for `service.yaml`. It is declared here rather than guessed in the scanner, because the manifests are written under names no fixed list can know in advance (zones, deploy units, dataflow jobs) — and a silently incomplete list turns every unlisted manifest into a false blocker.",
+      "files": [
+        "src/leistung.config.ts",
+        "leistung.contract.json",
+        "public/leistung.contract.json",
+        "public/runtime-config.json",
+        "deploy/k8s/"
+      ]
     }
   }
 }

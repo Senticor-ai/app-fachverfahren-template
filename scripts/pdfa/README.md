@@ -13,10 +13,11 @@ PDF/A reicht `pikepdf` (qpdf-basiert, `pip`). Kein Ghostscript-Runtime nötig.
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r scripts/pdfa/requirements.txt
 # Bescheid-PDF (aus dem Renderer) nach PDF/A-2B konvertieren:
-python3 scripts/pdfa/to_pdfa.py bescheid.pdf bescheid.pdfa.pdf   # --icc <sRGB.icc> optional
+python3 scripts/pdfa/to_pdfa.py bescheid.pdf bescheid.pdfa.pdf
 ```
 
-Der Schritt verifiziert am Ende die PDF/A-Marker (OutputIntent(sRGB) + `pdfaid:2B` + eingebettete Schrift).
+`--icc <sRGB.icc>` ist optional (siehe „sRGB-ICC" unten). Der Schritt verifiziert am Ende die
+PDF/A-Marker (OutputIntent(sRGB) + `pdfaid:2B` + eingebettete Schrift).
 
 ## sRGB-ICC
 

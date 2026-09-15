@@ -121,7 +121,7 @@ keine Existenz-Leaks). Store-Ausfall → 503 (`storeUnavailable`).
 | `POST /api/cases/:id/vermerke`                   | `case.note.write`       | Menschlichen Aktenvermerk schreiben — unveränderlich im Fall-Audit (`case.note.added`, `quelle=mensch`).                                                                                                                                                         |
 | `POST /api/cases/:id/vermerke/ki`                | `case.note.write`       | KI-Aktenvermerk-ENTWURF via `AiAssistPort` (`quelle=ki`, `ki-vorschlag`, `reviewStatus=offen`; high-risk→422, kein Modell→503, NIE fingiert).                                                                                                                    |
 | `POST /api/cases/:id/vermerke/:vermerkId/review` | `case.note.write`       | KI-Entwurf prüfen: `bestaetigt`/`verworfen` (append-only `case.note.reviewed`; einmalig→409, Mensch-Vermerk→422).                                                                                                                                                |
-| `GET /api/cases/:id/vermerke/export`             | `case.read`             | Kontext-Bundle der Akte für die agentische Weiterverarbeitung (nur public, Text injektions-neutralisiert) — die Brücke, die chos-code in Skills + Kontext übersetzt.                                                                                             |
+| `GET /api/cases/:id/vermerke/export`             | `case.read`             | Kontext-Bundle der Akte für die agentische Weiterverarbeitung (nur public, Text injektions-neutralisiert) — die Brücke, die chos-agents in Skills + Kontext übersetzt.                                                                                           |
 
 **Vier-Augen** bei `POST …/transitions`: trägt der Übergang `requiresFourEyes`,
 darf der Akteur des jüngsten Audit-Eintrags ihn nicht selbst auslösen (→ 403).
@@ -172,7 +172,7 @@ hinaus:
   eine Zelle mit Injektions-Muster wird beim Agenten-Konsum NEUTRALISIERT (nicht
   kaperbar) und für Prüfer als `verdacht` markiert.
 - **Kontext-Export** (die Brücke): `GET …/vermerke/export` liefert das
-  neutralisierte, strukturierte Bundle, das chos-code in Skills + Kontext übersetzt.
+  neutralisierte, strukturierte Bundle, das chos-agents in Skills + Kontext übersetzt.
 
 **Zwei Ebenen (Zwei-Ebenen-Symmetrie):** neben dem Fall-Wiki gibt es das
 **Verfahrens-Wiki** — generelles Wissen + Fähigkeiten EINES Verfahrens, dieselbe
@@ -251,7 +251,7 @@ kein hart kodierter Zielzustand — und entfernt es bei Wiederaufnahme).
   das server-seitige Gegenstück zu `src/leistung.config.ts` (Antrag). Sie exportiert
   `dossierProcedure: ProcedureVersion` (+ ein optionales neutrales `dossierDemo` fürs
   Preview-Seed); `startRuntime` registriert genau dieses Verfahren. **Der generierende
-  Build (chos-code/gtc-builder) ÜBERSCHREIBT GENAU DIESE DATEI** — dieselbe App,
+  Build (chos-agents/gtc-builder) ÜBERSCHREIBT GENAU DIESE DATEI** — dieselbe App,
   anderes Verfahren, ohne weitere Änderung. Der Template-Default ist ein neutrales
   „Musterverfahren" (kein echtes Fachverfahren).
 - **Rechtsgrundlage NIE erfinden**: `legalBasisIds` stammen aus der
@@ -303,8 +303,9 @@ Fortschritt: `fortschrittProzent` falls gesetzt, sonst aus erledigten Schritten.
 den vollständigen **Standalone-/OSS-Betrieb ohne chos** (Postgres-Variante ist
 server-autoritativ, revisionssicher, mandanten-scoped, Optimistic-Locking). In
 Produktion sitzt chos hinter **derselben** Naht (`CaseStore`/`TaskStore`/
-`ProcedureRegistry` als Dependency-Injection über `BffDeps`) — der Adapter lebt
-im Deployment, NICHT im OSS-Template. Bewusste Stub-Grenzen: keine laufende
+`ProcedureRegistry` als Dependency-Injection über `BffDeps`). Die chos-Adapter
+liegen IM Template — `packages/app-store-postgres/src/chos-*.ts`, gewählt über
+`APP_STORE_MODE=chos`. Bewusste Stub-Grenzen: keine laufende
 BPMN-Engine (Timer/Fristen-Orchestrierung, Boundary-Events, Subprozesse,
 Gateway-Semantik XOR/AND) — das füllt der Provider hinter der Naht.
 
