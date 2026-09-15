@@ -385,27 +385,45 @@ describe("agent platform contract", () => {
   // appended one, producing `deploy/k8s//` — a prefix that matches nothing. The gate behaved exactly as
   // before and nothing went red. That is why this witness pins the SEPARATOR itself and not merely "a
   // directory can be declared": the failure mode of this feature is silence, not noise.
+  // ⛔ AND THE WITNESS MUST NOT NAME `apps/fachverfahren` (measured 2026-09-15, it did).
+  //
+  // `collectDeclaredSeam` walks `apps/*` and stores `apps/<NAME>/<entry>`. In the pristine template that
+  // NAME is `fachverfahren`; in a SCAFFOLDED procedure the directory is renamed after the domain, so the
+  // stored form reads `apps/beispiel/deploy/k8s/`. Pinning the template's own demo identity made this test
+  // pass here and fail in every consumer: `pnpm run test:generated-app-ci` (the gate that proves a freshly
+  // scaffolded app passes ITS OWN CI) went red on `domain=beispiel`, and with it the push.
+  //
+  // ⭐ So the subject is taken from the SAME source the function reads — not from a second, hand-written
+  // copy of a name. The house has paid this exact class before (23 witnesses anchored on the template's
+  // demo identity, 2026-08-31).
   it("a declared directory seam carries exactly one separator and matches what lives under it", async () => {
     const seam = await collectDeclaredSeam(root);
-    const dir = "apps/fachverfahren/deploy/k8s/";
-    expect(seam.has(dir)).toBe(true);
+    // POSITIVE CONTROL: without an app directory carrying a declared seam there is nothing to judge, and a
+    // green verdict over the empty set would be the loudest lie this suite could tell.
+    const dir = [...seam].find((entry) => entry.endsWith("/deploy/k8s/"));
+    expect(
+      dir,
+      "no app declares `deploy/k8s/` as a directory seam",
+    ).toBeDefined();
+    const appDir = dir!.slice(0, dir!.indexOf("/deploy/k8s/"));
+    expect(appDir.startsWith("apps/")).toBe(true);
     expect([...seam].some((entry) => entry.includes("//"))).toBe(false);
     // The call site matches with `startsWith` — so the stored form must actually match a real manifest path.
-    const manifest = "apps/fachverfahren/deploy/k8s/deployment.yaml";
+    const manifest = `${appDir}/deploy/k8s/deployment.yaml`;
     expect(
       [...seam].some(
         (entry) => entry.endsWith("/") && manifest.startsWith(entry),
       ),
     ).toBe(true);
     // NEGATIVE CONTROL: a sibling OUTSIDE the declared directory must NOT be covered.
-    const sibling = "apps/fachverfahren/deploy-notes.yaml";
+    const sibling = `${appDir}/deploy-notes.yaml`;
     expect(
       [...seam].some(
         (entry) => entry.endsWith("/") && sibling.startsWith(entry),
       ),
     ).toBe(false);
     // The file entries keep working — a directory declaration must not swallow the exact-match ones.
-    expect(seam.has("apps/fachverfahren/src/leistung.config.ts")).toBe(true);
+    expect(seam.has(`${appDir}/src/leistung.config.ts`)).toBe(true);
   });
 
   it("validates source registry and preflight contracts", async () => {
